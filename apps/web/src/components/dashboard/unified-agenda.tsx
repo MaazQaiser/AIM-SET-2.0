@@ -33,7 +33,8 @@ export interface AgendaItem {
   status?: Call["status"];
 }
 
-const MAX_DAYS = 4;
+/** Agenda widget only lists today and tomorrow; full schedule is on /calls. */
+const AGENDA_DAY_COUNT = 2;
 
 function dayLabel(day: Date): string {
   if (isToday(day)) return "Today";
@@ -120,12 +121,15 @@ function AgendaRow({ item }: { item: AgendaItem }) {
 export function UnifiedAgenda() {
   const { data: calls = [] } = useCalls();
   const { data: connection } = useGoogleCalendarConnection();
-  const { data: calendarData } = useCalendarEvents(14, connection?.isConnected ?? false);
+  const { data: calendarData } = useCalendarEvents(
+    AGENDA_DAY_COUNT,
+    connection?.isConnected ?? false
+  );
 
   const items = useMemo(() => {
     const list: AgendaItem[] = [];
     const now = new Date();
-    const horizon = addDays(startOfDay(now), MAX_DAYS);
+    const horizon = addDays(startOfDay(now), AGENDA_DAY_COUNT);
 
     for (const call of calls) {
       const at = new Date(call.scheduledAt);
@@ -203,7 +207,7 @@ export function UnifiedAgenda() {
   }, [calls, calendarData, connection?.isConnected]);
 
   const grouped = useMemo(() => {
-    const days = Array.from({ length: MAX_DAYS }, (_, i) =>
+    const days = Array.from({ length: AGENDA_DAY_COUNT }, (_, i) =>
       addDays(startOfDay(new Date()), i)
     );
     return days
@@ -218,18 +222,45 @@ export function UnifiedAgenda() {
   return (
     <Card className="h-full">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Clock className="h-4 w-4 text-muted-foreground" />
-          Your agenda
-        </CardTitle>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Calls, calendar, and AI-scheduled prep — next {MAX_DAYS} days
-        </p>
+        <div className="flex items-start gap-3">
+          <Link
+            href="/calls"
+            aria-label="View full calendar"
+            title="View full calendar"
+            className="shrink-0 rounded-md p-1 -m-1 text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            <span className="sr-only">View full calendar</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="size-6"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="m4.5 19.5 15-15m0 0H8.25m11.25 0v11.25"
+              />
+            </svg>
+          </Link>
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
+              Your agenda
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Calls, calendar, and AI prep — today and tomorrow
+            </p>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="pt-0 space-y-5">
         {grouped.length === 0 ? (
           <div className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
-            Nothing scheduled in the next few days.
+            Nothing scheduled for today or tomorrow.
           </div>
         ) : (
           grouped.map(({ day, label, items: dayItems }) => (
@@ -248,12 +279,6 @@ export function UnifiedAgenda() {
             </section>
           ))
         )}
-        <Link
-          href="/calls"
-          className="block text-center text-xs text-primary hover:underline pt-2"
-        >
-          View full calendar →
-        </Link>
       </CardContent>
     </Card>
   );
