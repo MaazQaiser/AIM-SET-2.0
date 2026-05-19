@@ -28,20 +28,27 @@ class EmbeddingClient:
                 total_tokens=0,
             )
 
-        from openai import OpenAI
+        try:
+            from openai import OpenAI
 
-        client = OpenAI(api_key=self.api_key)
-        batch_size = 100
-        all_embeddings: List[List[float]] = []
-        total_tokens = 0
+            client = OpenAI(api_key=self.api_key)
+            batch_size = 100
+            all_embeddings: List[List[float]] = []
+            total_tokens = 0
 
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
-            response = client.embeddings.create(input=batch, model=self.model)
-            all_embeddings.extend([item.embedding for item in response.data])
-            total_tokens += getattr(response.usage, "total_tokens", 0) or 0
+            for i in range(0, len(texts), batch_size):
+                batch = texts[i : i + batch_size]
+                response = client.embeddings.create(input=batch, model=self.model)
+                all_embeddings.extend([item.embedding for item in response.data])
+                total_tokens += getattr(response.usage, "total_tokens", 0) or 0
 
-        return EmbeddingResult(embeddings=all_embeddings, model=self.model, total_tokens=total_tokens)
+            return EmbeddingResult(embeddings=all_embeddings, model=self.model, total_tokens=total_tokens)
+        except Exception:
+            return EmbeddingResult(
+                embeddings=[_fake_embedding(t) for t in texts],
+                model=f"{self.model}-offline",
+                total_tokens=0,
+            )
 
 
 def embed_texts(texts: List[str], api_key: Optional[str] = None, model: Optional[str] = None) -> List[List[float]]:

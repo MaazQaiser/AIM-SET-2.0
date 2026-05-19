@@ -8,14 +8,8 @@ from dc_embeddings.client import EmbeddingClient
 
 from app.config import get_settings
 from app.deps import get_supabase
+from app.domain.memory_store import get_memory_store
 from app.domain.tenant_service import get_tenant_service
-
-
-def _require_supabase() -> None:
-    if not get_settings().supabase_configured:
-        raise RuntimeError(
-            "Supabase is required for DC notes. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in services/api/.env"
-        )
 
 
 def _dc_asset_id(kind: Literal["pre-dc", "post-dc"], record_id: str) -> str:
@@ -32,35 +26,45 @@ def _record_chunk_text(kind: Literal["pre-dc", "post-dc"], fields: Dict[str, Any
 
 
 class DcNotesRepository:
-    """Pre/Post-DC records in Supabase Postgres; each row embedded into kb_chunks (pgvector)."""
+    """Pre/Post-DC records in Supabase (or in-memory when Supabase is unset)."""
 
     def __init__(self) -> None:
         self._tenants = get_tenant_service()
 
-    def _tenant_uuid(self, ctx: TenantContext) -> str:
-        tenant_uuid, _ = self._tenants.resolve(ctx)
-        return tenant_uuid
+    def _tenant_keys(self, ctx: TenantContext) -> tuple[str, str]:
+        tenant_uuid, clerk_key = self._tenants.resolve(ctx)
+        return tenant_uuid, clerk_key
 
     def get_notes(self, ctx: TenantContext) -> Dict[str, List[Dict[str, Any]]]:
-        _require_supabase()
-        tenant_uuid = self._tenant_uuid(ctx)
-        supabase = get_supabase()
+        tenant_uuid, clerk_key = self._tenant_keys(ctx)
+        settings = get_settings()
 
-        pre_result = (
-            supabase.table("pre_dc_records")
-            .select("id, fields")
-            .eq("tenant_id", tenant_uuid)
-            .execute()
-        )
-        post_result = (
-            supabase.table("post_dc_records")
-            .select("id, matched_call_id, fields")
-            .eq("tenant_id", tenant_uuid)
-            .execute()
-        )
+        if settings.supabase_configured:
+            try:
+                supabase = get_supabase()
+                pre_result = (
+                    supabase.table("pre_dc_records")
+                    .select("id, fields")
+                    .eq("tenant_id", tenant_uuid)
+                    .execute()
+                )
+                post_result = (
+                    supabase.table("post_dc_records")
+                    .select("id, matched_call_id, fields")
+                    .eq("tenant_id", tenant_uuid)
+                    .execute()
+                )
+                return {
+                    "pre_dc_records": pre_result.data or [],
+                    "post_dc_records": post_result.data or [],
+                }
+            except Exception as exc:
+                raise RuntimeError(f"Failed to load DC notes from Supabase: {exc}") from exc
+
+        store = get_memory_store()
         return {
-            "pre_dc_records": pre_result.data or [],
-            "post_dc_records": post_result.data or [],
+            "pre_dc_records": store.list_pre_dc_records(clerk_key),
+            "post_dc_records": store.list_post_dc_records(clerk_key),
         }
 
     def upsert_pre_dc(self, ctx: TenantContext, rows: List[Dict[str, Any]]) -> int:
@@ -76,15 +80,25 @@ class DcNotesRepository:
         table: str,
         rows: List[Dict[str, Any]],
     ) -> int:
-        _require_supabase()
-        tenant_uuid = self._tenant_uuid(ctx)
-        supabase = get_supabase()
+        tenant_uuid, clerk_key = self._tenant_keys(ctx)
+        settings = get_settings()
 
-        for row in rows:
-            row["tenant_id"] = tenant_uuid
+        if settings.supabase_configured:
+            try:
+                supabase = get_supabase()
+                payload = [{**row, "tenant_id": tenant_uuid} for row in rows]
+                supabase.table(table).upsert(payload).execute()
+                self._embed_records(tenant_uuid, kind, rows)
+                return len(rows)
+            except Exception as exc:
+                raise RuntimeError(f"Failed to save DC notes to Supabase: {exc}") from exc
 
-        supabase.table(table).upsert(rows).execute()
-        self._embed_records(tenant_uuid, kind, rows)
+        store = get_memory_store()
+        if kind == "pre-dc":
+            store.upsert_pre_dc_records(clerk_key, rows)
+        else:
+            store.upsert_post_dc_records(clerk_key, rows)
+        self._embed_records_memory(clerk_key, kind, rows)
         return len(rows)
 
     def _embed_records(
@@ -128,8 +142,11 @@ class DcNotesRepository:
         if not texts:
             return
 
-        client = EmbeddingClient(api_key=settings.openai_api_key or None)
-        embeddings = client.embed(texts).embeddings
+        try:
+            client = EmbeddingClient(api_key=settings.openai_api_key or None)
+            embeddings = client.embed(texts).embeddings
+        except Exception:
+            return
 
         supabase = get_supabase()
         for chunk, embedding in zip(chunk_rows, embeddings):
@@ -137,6 +154,37 @@ class DcNotesRepository:
             supabase.table("kb_chunks").delete().eq("tenant_id", tenant_uuid).eq("asset_id", asset_id).execute()
             chunk["embedding"] = embedding
             supabase.table("kb_chunks").insert(chunk).execute()
+
+    def _embed_records_memory(
+        self,
+        clerk_key: str,
+        kind: Literal["pre-dc", "post-dc"],
+        rows: List[Dict[str, Any]],
+    ) -> None:
+        settings = get_settings()
+        if not rows:
+            return
+
+        texts = [_record_chunk_text(kind, row.get("fields") or {}) for row in rows]
+        try:
+            client = EmbeddingClient(api_key=settings.openai_api_key or None)
+            embeddings = client.embed(texts).embeddings
+        except Exception:
+            return
+
+        store = get_memory_store()
+        existing = [c for c in store.kb_chunks.get(clerk_key, []) if not str(c.get("asset_id", "")).startswith(f"dc:{kind}:")]
+        for row, embedding in zip(rows, embeddings):
+            record_id = str(row["id"])
+            existing.append(
+                {
+                    "asset_id": _dc_asset_id(kind, record_id),
+                    "chunk_text": _record_chunk_text(kind, row.get("fields") or {}),
+                    "embedding": embedding,
+                    "metadata": {"source": "dc_note", "kind": kind, "record_id": record_id},
+                }
+            )
+        store.kb_chunks[clerk_key] = existing
 
 
 @lru_cache

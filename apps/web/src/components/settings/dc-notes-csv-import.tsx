@@ -203,8 +203,17 @@ export function DcNotesCsvImport() {
           body: JSON.stringify({ kind, records }),
         });
         if (!res.ok) {
-          const err = (await res.json().catch(() => null)) as { detail?: string; error?: string } | null;
-          throw new Error(err?.detail ?? err?.error ?? `Save failed (${res.status})`);
+          const err = (await res.json().catch(() => null)) as {
+            detail?: string | { msg: string }[];
+            error?: string;
+          } | null;
+          const detail =
+            typeof err?.detail === "string"
+              ? err.detail
+              : Array.isArray(err?.detail)
+                ? err.detail.map((d) => d.msg).join("; ")
+                : undefined;
+          throw new Error(detail ?? err?.error ?? `Save failed (${res.status})`);
         }
       };
 

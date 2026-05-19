@@ -36,7 +36,7 @@ def _ctx(tenant_id: str, x_user_id: Optional[str]) -> TenantContext:
     return TenantContext.from_headers(x_user_id or "internal", tenant_id)
 
 
-def _supabase_error(exc: Exception) -> HTTPException:
+def _service_error(exc: Exception) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         detail=str(exc),
@@ -51,8 +51,8 @@ def get_dc_notes(
     ctx = _ctx(tenant_id, x_user_id)
     try:
         data = _dc.get_notes(ctx)
-    except RuntimeError as exc:
-        raise _supabase_error(exc) from exc
+    except Exception as exc:
+        raise _service_error(exc) from exc
 
     return DcNotesResponse(
         pre_dc_records=[row_to_pre_record(row) for row in data["pre_dc_records"]],
@@ -77,8 +77,8 @@ def ingest_dc_notes(
         rows = [{"id": r.id, "fields": r.fields} for r in records]
         try:
             _dc.upsert_pre_dc(ctx, rows)
-        except RuntimeError as exc:
-            raise _supabase_error(exc) from exc
+        except Exception as exc:
+            raise _service_error(exc) from exc
     else:
         records = [PostDCRecordIn.model_validate(r) for r in body.records]
         rows = [
@@ -91,8 +91,11 @@ def ingest_dc_notes(
         ]
         try:
             _dc.upsert_post_dc(ctx, rows)
-        except RuntimeError as exc:
-            raise _supabase_error(exc) from exc
+        except Exception as exc:
+            raise _service_error(exc) from exc
 
-    _calls.sync_from_dc_notes(ctx)
+    try:
+        _calls.sync_from_dc_notes(ctx)
+    except Exception as exc:
+        raise _service_error(exc) from exc
     return IngestResponse(upserted=len(rows), kind=body.kind)

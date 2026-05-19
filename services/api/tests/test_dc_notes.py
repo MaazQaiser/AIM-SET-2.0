@@ -26,13 +26,16 @@ def test_dc_notes_ingest_requires_secret(monkeypatch):
     assert r.status_code == 401
 
 
-def test_dc_notes_requires_supabase(monkeypatch):
+def test_dc_notes_ingest_memory_without_supabase(monkeypatch):
     monkeypatch.setenv("INTERNAL_SECRET", SECRET)
     monkeypatch.delenv("SUPABASE_URL", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
     from app.config import get_settings
+    from app.domain.memory_store import get_memory_store
 
     get_settings.cache_clear()
+    store = get_memory_store()
+    store.pre_dc_records.clear()
 
     payload = {
         "kind": "pre-dc",
@@ -52,11 +55,22 @@ def test_dc_notes_requires_supabase(monkeypatch):
             "x-user-id": "user-test",
         },
     )
-    assert r.status_code == 503
-    assert "Supabase" in r.json()["detail"]
+    assert r.status_code == 200
+    assert r.json()["upserted"] == 1
+
+    loaded = client.get(
+        "/dc-notes",
+        headers={
+            "X-Internal-Secret": SECRET,
+            "x-tenant-id": "tenant-test",
+            "x-user-id": "user-test",
+        },
+    )
+    assert loaded.status_code == 200
+    assert len(loaded.json()["pre_dc_records"]) == 1
 
 
-def test_v1_calls_list_requires_supabase_or_empty(monkeypatch):
+def test_v1_calls_list_memory_fallback(monkeypatch):
     monkeypatch.setenv("INTERNAL_SECRET", SECRET)
     monkeypatch.delenv("SUPABASE_URL", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
@@ -68,4 +82,5 @@ def test_v1_calls_list_requires_supabase_or_empty(monkeypatch):
         "/api/v1/calls",
         headers={"x-user-id": "user-test", "x-tenant-id": "tenant-test"},
     )
-    assert r.status_code in (200, 503)
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)

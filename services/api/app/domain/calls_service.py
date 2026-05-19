@@ -9,6 +9,7 @@ from dc_core.tenancy import TenantContext
 from app.config import get_settings
 from app.deps import get_supabase
 from app.domain.dc_notes_repository import get_dc_notes_repository
+from app.domain.memory_store import get_memory_store
 from app.domain.tenant_service import get_tenant_service
 
 
@@ -52,15 +53,17 @@ class CallsService:
         return tenant_uuid
 
     def sync_from_dc_notes(self, ctx: TenantContext) -> List[Dict[str, Any]]:
-        if not get_settings().supabase_configured:
-            return []
         notes = self._dc.get_notes(ctx)
         calls = build_calls_from_pre_dc(notes["pre_dc_records"], notes["post_dc_records"])
         self._persist_calls(ctx, calls)
         return calls
 
     def _persist_calls(self, ctx: TenantContext, calls: List[Dict[str, Any]]) -> None:
+        if not calls:
+            return
+        _, clerk_key = self._tenants.resolve(ctx)
         if not get_settings().supabase_configured:
+            get_memory_store().upsert_calls(clerk_key, calls)
             return
         tenant_uuid = self._tenant_uuid(ctx)
         supabase = get_supabase()
@@ -85,7 +88,11 @@ class CallsService:
 
     def list_calls(self, ctx: TenantContext) -> List[Dict[str, Any]]:
         if not get_settings().supabase_configured:
-            return []
+            _, clerk_key = self._tenants.resolve(ctx)
+            mem_calls = get_memory_store().list_calls(clerk_key)
+            if mem_calls:
+                return mem_calls
+            return self.sync_from_dc_notes(ctx)
         tenant_uuid = self._tenant_uuid(ctx)
         supabase = get_supabase()
         result = (
