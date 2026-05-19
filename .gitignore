@@ -1,0 +1,30 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+.next
+.turbo
+dist
+build
+out
+
+# Environment
+.env
+.env.local
+.env.production
+*.local
+
+# Misc
+.DS_Store
+*.pem
+.vercel
+
+# Logs
+*.log
+
+# Python
+__pycache__
+*.pyc
+.venv
+.ruff_cache
