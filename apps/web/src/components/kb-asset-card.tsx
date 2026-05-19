@@ -64,6 +64,9 @@ export function KBAssetCard({ asset, onSelect }: KBAssetCardProps) {
             <p className="text-sm font-medium text-foreground truncate">{asset.title}</p>
             <p className="text-xs text-muted-foreground">
               {config.label} · v{asset.version}
+              {asset.status && asset.status !== "ready" && (
+                <span className="ml-1 capitalize">· {asset.status}</span>
+              )}
             </p>
           </div>
         </div>

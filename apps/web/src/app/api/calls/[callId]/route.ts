@@ -6,7 +6,7 @@ interface Params {
 }
 
 export async function GET(_request: Request, { params }: Params) {
-  const { userId } = await auth();
+  const { userId, orgId } = await auth();
   if (!userId) return new NextResponse("Unauthorized", { status: 401 });
 
   const { callId } = await params;
@@ -14,8 +14,11 @@ export async function GET(_request: Request, { params }: Params) {
   const res = await fetch(
     `${process.env.API_URL ?? "http://localhost:8000"}/api/v1/calls/${callId}`,
     {
-      headers: { "x-user-id": userId },
-      next: { revalidate: 60, tags: [`call:${callId}`] },
+      headers: {
+        "x-user-id": userId,
+        ...(orgId ? { "x-tenant-id": orgId, "x-clerk-org-id": orgId } : { "x-tenant-id": userId }),
+      },
+      cache: "no-store",
     }
   );
 

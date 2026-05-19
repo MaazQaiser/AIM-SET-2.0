@@ -1,60 +1,58 @@
 "use client";
 
+import { useMemo } from "react";
+import type { KeywordDefinitions } from "@/lib/live-types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { KEYWORD_DEFINITIONS } from "@/lib/mock-data";
 
-function findKeywordInText(text: string, keywords: string[]): string | null {
+const EMPTY_DEFINITIONS: KeywordDefinitions = {};
+
+function findKeywordInText(text: string, keys: string[]): string | undefined {
   const lower = text.toLowerCase();
-  for (const kw of keywords) {
-    if (lower.includes(kw.toLowerCase())) return kw;
-  }
-  return null;
+  return keys.find((k) => lower.includes(k.toLowerCase()));
 }
 
-export function KeywordHighlight({
-  text,
-  keywords,
-}: {
+interface KeywordHighlightProps {
   text: string;
-  keywords: string[];
-}) {
-  if (!keywords.length) return <>{text}</>;
+  definitions?: KeywordDefinitions;
+}
 
-  const pattern = new RegExp(
-    `(${keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
-    "gi"
-  );
-  const parts = text.split(pattern);
+export function KeywordHighlight({ text, definitions = EMPTY_DEFINITIONS }: KeywordHighlightProps) {
+  const keys = useMemo(() => Object.keys(definitions), [definitions]);
+
+  if (!keys.length) {
+    return <span>{text}</span>;
+  }
+
+  const parts = text.split(/(\s+)/);
 
   return (
-    <>
+    <span>
       {parts.map((part, i) => {
-        const matchedKey = keywords.find((k) => k.toLowerCase() === part.toLowerCase());
+        const matchedKey = findKeywordInText(part, keys);
         const defKey = matchedKey
-          ? Object.keys(KEYWORD_DEFINITIONS).find((k) => k.toLowerCase() === matchedKey.toLowerCase())
-          : findKeywordInText(part, Object.keys(KEYWORD_DEFINITIONS));
+          ? Object.keys(definitions).find((k) => k.toLowerCase() === matchedKey.toLowerCase())
+          : findKeywordInText(part, keys);
 
-        const def = defKey ? KEYWORD_DEFINITIONS[defKey] : null;
-
+        const def = defKey ? definitions[defKey] : null;
         if (!def) return <span key={i}>{part}</span>;
 
         return (
           <Popover key={i}>
             <PopoverTrigger asChild>
-              <mark className="bg-accent text-accent-foreground rounded-sm px-0.5 cursor-help">
+              <button type="button" className="underline decoration-dotted decoration-primary/60 cursor-help">
                 {part}
-              </mark>
+              </button>
             </PopoverTrigger>
-            <PopoverContent className="w-72 text-xs" side="top">
+            <PopoverContent className="w-72 text-sm">
               <p className="font-medium">{def.title}</p>
               <p className="text-muted-foreground mt-1">{def.definition}</p>
               {def.assetHint && (
-                <p className="text-primary mt-2">{def.assetHint}</p>
+                <p className="text-xs text-primary mt-2">KB: {def.assetHint}</p>
               )}
             </PopoverContent>
           </Popover>
         );
       })}
-    </>
+    </span>
   );
 }

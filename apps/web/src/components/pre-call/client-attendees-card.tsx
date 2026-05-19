@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { Linkedin, ChevronDown, ChevronUp, MessageCircle, Clock } from "lucide-react";
+import { useWidgetSize } from "@/components/dashboard-grid/dashboard-widget";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
-import type { ClientAttendee, InfluenceLevel } from "@/lib/mock-data";
+import type { ClientAttendee, InfluenceLevel } from "@/lib/brief-types";
 
 interface ClientAttendeesCardProps {
   attendees: ClientAttendee[];
@@ -26,32 +26,50 @@ function formatRelativeDays(iso: string) {
   return `${days}d ago`;
 }
 
-function AttendeeRow({ attendee }: { attendee: ClientAttendee }) {
+function AttendeeRow({
+  attendee,
+  compact,
+}: {
+  attendee: ClientAttendee;
+  compact: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
   const influence = INFLUENCE_CONFIG[attendee.influenceLevel];
   const initials = attendee.name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      {/* Collapsed row */}
+    <div className="rounded-lg border bg-card overflow-hidden min-w-0">
       <button
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
+        className={cn(
+          "w-full flex items-center gap-3 text-left hover:bg-muted/30 transition-colors min-w-0",
+          compact ? "px-3 py-2" : "px-4 py-3"
+        )}
         onClick={() => setExpanded((e) => !e)}
         aria-expanded={expanded}
       >
         {/* Avatar */}
-        <div className="h-10 w-10 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+        <div
+          className={cn(
+            "shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold",
+            compact ? "h-8 w-8 text-xs" : "h-10 w-10 text-sm"
+          )}
+        >
           {initials}
         </div>
 
         {/* Name + title */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-bold text-foreground">{attendee.name}</span>
-            <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium", influence.className)}>
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <span className="text-sm font-bold text-foreground truncate">{attendee.name}</span>
+            <span
+              className={cn(
+                "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                influence.className
+              )}
+            >
               {influence.label}
             </span>
-            {attendee.linkedinUrl && (
+            {attendee.linkedinUrl && !compact && (
               <a
                 href={attendee.linkedinUrl}
                 target="_blank"
@@ -65,21 +83,24 @@ function AttendeeRow({ attendee }: { attendee: ClientAttendee }) {
             )}
           </div>
           <p className="text-xs text-muted-foreground truncate">
-            {attendee.title} · {attendee.department}
+            {attendee.title}
+            {!compact && attendee.department ? ` · ${attendee.department}` : ""}
           </p>
         </div>
 
         {/* Last contacted */}
-        <div className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground mr-1">
-          {attendee.lastContactedAt ? (
-            <>
-              <Clock className="h-3 w-3" />
-              {formatRelativeDays(attendee.lastContactedAt)}
-            </>
-          ) : (
-            <span className="italic">First meeting</span>
-          )}
-        </div>
+        {!compact && (
+          <div className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground mr-1">
+            {attendee.lastContactedAt ? (
+              <>
+                <Clock className="h-3 w-3" />
+                {formatRelativeDays(attendee.lastContactedAt)}
+              </>
+            ) : (
+              <span className="italic">First meeting</span>
+            )}
+          </div>
+        )}
 
         {expanded ? (
           <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -91,19 +112,25 @@ function AttendeeRow({ attendee }: { attendee: ClientAttendee }) {
       {/* Expanded detail */}
       {expanded && (
         <div className="px-4 pb-4 pt-1 space-y-3 border-t bg-muted/20">
-          {/* Background */}
           <div>
-            <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">Background</p>
-            <p className="text-sm text-foreground/80 leading-relaxed">{attendee.background}</p>
+            <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">
+              Background
+            </p>
+            <p className="text-sm text-foreground/80 leading-relaxed break-words">
+              {attendee.background}
+            </p>
           </div>
 
-          {/* Prior interaction note */}
           {attendee.priorInteractionNote && (
-            <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 flex gap-2">
+            <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 flex gap-2 min-w-0">
               <MessageCircle className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
-              <div>
-                <p className="text-[10px] uppercase tracking-wide font-semibold text-primary mb-0.5">Agent note</p>
-                <p className="text-xs text-foreground/80 leading-relaxed">{attendee.priorInteractionNote}</p>
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-wide font-semibold text-primary mb-0.5">
+                  Agent note
+                </p>
+                <p className="text-xs text-foreground/80 leading-relaxed break-words">
+                  {attendee.priorInteractionNote}
+                </p>
               </div>
             </div>
           )}
@@ -120,32 +147,52 @@ function AttendeeRow({ attendee }: { attendee: ClientAttendee }) {
 }
 
 export function ClientAttendeesCard({ attendees }: ClientAttendeesCardProps) {
-  const decisionMakers = attendees.filter((a) => a.influenceLevel === "decision-maker" || a.influenceLevel === "blocker");
-  const others = attendees.filter((a) => a.influenceLevel !== "decision-maker" && a.influenceLevel !== "blocker");
+  const { compact, wide } = useWidgetSize();
+  const decisionMakers = attendees.filter(
+    (a) => a.influenceLevel === "decision-maker" || a.influenceLevel === "blocker"
+  );
+  const others = attendees.filter(
+    (a) => a.influenceLevel !== "decision-maker" && a.influenceLevel !== "blocker"
+  );
   const sorted = [...decisionMakers, ...others];
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+    <Card className="h-full">
+      <CardHeader className={cn("pb-3", compact && "pb-2")}>
+        <div className="flex items-center justify-between gap-2 min-w-0">
           <CardTitle className="text-sm">Client attendees</CardTitle>
-          <span className="text-xs text-muted-foreground">{attendees.length} people</span>
+          <span className="text-xs text-muted-foreground shrink-0">
+            {attendees.length} {compact ? "" : "people"}
+          </span>
         </div>
-        <div className="flex items-center gap-2 flex-wrap mt-1">
-          {Object.entries(INFLUENCE_CONFIG).map(([key, cfg]) => {
-            const count = attendees.filter((a) => a.influenceLevel === key).length;
-            if (count === 0) return null;
-            return (
-              <span key={key} className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium gap-1", cfg.className)}>
-                {count} {cfg.label}
-              </span>
-            );
-          })}
-        </div>
+        {!compact && (
+          <div className="flex items-center gap-2 flex-wrap mt-1">
+            {Object.entries(INFLUENCE_CONFIG).map(([key, cfg]) => {
+              const count = attendees.filter((a) => a.influenceLevel === key).length;
+              if (count === 0) return null;
+              return (
+                <span
+                  key={key}
+                  className={cn(
+                    "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium gap-1",
+                    cfg.className
+                  )}
+                >
+                  {count} {cfg.label}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </CardHeader>
-      <CardContent className="pt-0 space-y-2">
+      <CardContent
+        className={cn(
+          "pt-0",
+          wide ? "grid grid-cols-2 gap-2" : "space-y-2"
+        )}
+      >
         {sorted.map((attendee) => (
-          <AttendeeRow key={attendee.id} attendee={attendee} />
+          <AttendeeRow key={attendee.id} attendee={attendee} compact={compact} />
         ))}
       </CardContent>
     </Card>

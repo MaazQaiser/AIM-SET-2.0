@@ -2,8 +2,7 @@
 
 import { useUser } from "@clerk/nextjs";
 import { format, isSameDay, startOfDay } from "date-fns";
-import { useCalls } from "@/lib/data/hooks";
-import { MOCK_CRM_TASKS_POST_DC } from "@/lib/mock-data";
+import { useCalls, usePostCallCrmTasks } from "@/lib/data/hooks";
 
 function getSalutation(hour: number): string {
   if (hour >= 23 || hour < 5) return "Working late";
@@ -24,6 +23,7 @@ function displayName(
 export function AssistantGreeting() {
   const { user, isLoaded } = useUser();
   const { data: calls = [] } = useCalls();
+  const { data: crmTasks = [] } = usePostCallCrmTasks();
 
   const hour = new Date().getHours();
   const salutation = getSalutation(hour);
@@ -35,9 +35,7 @@ export function AssistantGreeting() {
       (c.status === "upcoming" || c.status === "live") &&
       isSameDay(new Date(c.scheduledAt), today)
   );
-  const pendingApprovals = MOCK_CRM_TASKS_POST_DC.filter(
-    (t) => t.status === "pending_approval"
-  ).length;
+  const pendingApprovals = crmTasks.filter((t) => t.status === "pending_approval").length;
 
   const dateLine = format(new Date(), "EEEE, MMMM d");
   const statParts: string[] = [];

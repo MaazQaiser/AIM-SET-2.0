@@ -1,11 +1,13 @@
 import { create } from "zustand";
 import type { TranscriptEvent, NudgePayload } from "@/types";
+import type { BantSignal } from "@dc-copilot/types";
 
 interface LiveCallState {
   callId: string | null;
   isConnected: boolean;
   transcript: TranscriptEvent[];
   pendingNudges: NudgePayload[];
+  bantSignals: BantSignal[];
   elapsedSeconds: number;
   sentimentAE: number;
   sentimentCustomer: number;
@@ -14,6 +16,7 @@ interface LiveCallState {
   setConnected: (connected: boolean) => void;
   appendTranscriptEvent: (event: TranscriptEvent) => void;
   addNudge: (nudge: NudgePayload) => void;
+  addBantSignal: (signal: BantSignal) => void;
   dismissNudge: (id: string) => void;
   acceptNudge: (id: string) => void;
   updateSentiment: (ae: number, customer: number) => void;
@@ -26,6 +29,7 @@ const initialState = {
   isConnected: false,
   transcript: [],
   pendingNudges: [],
+  bantSignals: [],
   elapsedSeconds: 0,
   sentimentAE: 0,
   sentimentCustomer: 0,
@@ -45,6 +49,11 @@ export const useLiveCall = create<LiveCallState>((set) => ({
   addNudge: (nudge) =>
     set((s) => ({
       pendingNudges: [...s.pendingNudges, nudge].slice(-5), // max 5 pending
+    })),
+
+  addBantSignal: (signal) =>
+    set((s) => ({
+      bantSignals: [...s.bantSignals, signal].slice(-20),
     })),
 
   dismissNudge: (id) =>

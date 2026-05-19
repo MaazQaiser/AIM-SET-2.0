@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { AIGeneratedBadge } from "@/components/ai-generated-badge";
-import { CONTENT_GAPS } from "@/lib/mock-data";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useContentGaps } from "@/lib/data/hooks";
 
 const EVIDENCE = [
   { call: "Meridian Trust DC", quote: "ESG regulatory pressure is the urgency driver", anonymized: true },
@@ -18,8 +19,23 @@ const EVIDENCE = [
 
 export default function ContentGapDetailPage({ params }: { params: Promise<{ gapId: string }> }) {
   const { gapId } = use(params);
-  const gap = CONTENT_GAPS.find((g) => g.id === gapId) ?? CONTENT_GAPS[0];
+  const { data: gaps = [] } = useContentGaps();
+  const gap = gaps.find((g) => g.id === gapId);
   const [notes, setNotes] = useState("Opening needs rewrite. Mark paragraphs 2–3 for refresh.");
+
+  if (!gap) {
+    return (
+      <div className="p-6">
+        <Link href="/content" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
+          <ChevronLeft className="h-4 w-4" />
+          Content
+        </Link>
+        <EmptyState icon={Lightbulb} title="Content gap not found" description="No gap data is available yet." />
+      </div>
+    );
+  }
+
+  const title = gap.topic;
 
   return (
     <div className="p-6 space-y-6 max-w-3xl mx-auto">
@@ -28,51 +44,33 @@ export default function ContentGapDetailPage({ params }: { params: Promise<{ gap
         Content
       </Link>
 
-      <div className="flex items-start gap-2">
-        <Lightbulb className="h-5 w-5 text-warning shrink-0 mt-0.5" />
-        <div>
-          <h1 className="text-xl font-semibold">{gap.topic}</h1>
-          <p className="text-sm text-muted-foreground">From: {gap.sourcedFrom}</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold">{title}</h1>
+        <p className="text-sm text-muted-foreground mt-1">Content gap studio</p>
       </div>
 
       <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            <CardTitle className="text-sm capitalize">AI draft {gap.draftType}</CardTitle>
-            <AIGeneratedBadge />
-            <Badge variant="warning">Priority: high</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Opening framing, three anonymized pain points from transcripts, solution outline, placeholder proof points.
-          </p>
-          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} className="text-sm" />
-          <div className="flex gap-2">
-            <Button size="sm">Approve draft</Button>
-            <Button size="sm" variant="outline">
-              Send back to agent
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Evidence chain</CardTitle>
+          <CardTitle className="text-sm flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            AI draft
+            <AIGeneratedBadge />
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {EVIDENCE.map((e, i) => (
-            <div key={i} className="text-sm border-l-2 border-primary/30 pl-3">
-              <p className="font-medium text-xs text-muted-foreground">{e.call}</p>
-              <p className="italic text-foreground">&ldquo;{e.quote}&rdquo;</p>
-            </div>
-          ))}
-          <p className="text-xs text-muted-foreground">
-            Duplicate suppression: no new draft will be generated while this item is in review.
-          </p>
+        <CardContent className="space-y-4">
+          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={6} />
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Evidence chain</p>
+            {EVIDENCE.map((e) => (
+              <div key={e.call} className="rounded-md border p-2 text-xs">
+                <Badge variant="outline" className="mb-1">
+                  {e.call}
+                </Badge>
+                <p className="italic text-muted-foreground">&ldquo;{e.quote}&rdquo;</p>
+              </div>
+            ))}
+          </div>
+          <Button>Submit for review</Button>
         </CardContent>
       </Card>
     </div>

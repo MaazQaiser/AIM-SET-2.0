@@ -25,8 +25,8 @@ const AGENT_DOMAIN_MAP: Record<AgentId, AgentConfig["profile"]["identity"]["allo
   task: ["task_execution"],
 };
 
-// ── Mock configs ──────────────────────────────────────────────────────────
-function getMockConfig(agentId: AgentId): AgentConfig {
+// ── Default agent profile (until config API exists) ───────────────────────
+function getDefaultAgentConfig(agentId: AgentId): AgentConfig {
   const base: AgentConfig = {
     agent_id: agentId,
     profile: {
@@ -242,7 +242,7 @@ export default function AgentConfigPage({ params }: { params: Promise<{ agentId:
   const agentId = rawAgentId as AgentId;
   if (!AGENT_IDS.includes(agentId)) notFound();
 
-  const config = getMockConfig(agentId);
+  const config = getDefaultAgentConfig(agentId);
   const label = AGENT_LABELS[agentId];
 
   function handleSave(updated: AgentConfig) {

@@ -27,15 +27,20 @@ const bantLabels = {
   timeline: "Timeline",
 };
 
+type BANTLayout = "inline" | "stack" | "grid" | "row";
+
 interface BANTScorecardProps {
   bant: BANTScore;
+  /** @deprecated use `layout="inline"` instead */
   compact?: boolean;
+  layout?: BANTLayout;
 }
 
-export function BANTScorecard({ bant, compact = false }: BANTScorecardProps) {
+export function BANTScorecard({ bant, compact = false, layout }: BANTScorecardProps) {
+  const resolvedLayout: BANTLayout = layout ?? (compact ? "inline" : "grid");
   const keys = ["budget", "authority", "need", "timeline"] as const;
 
-  if (compact) {
+  if (resolvedLayout === "inline") {
     return (
       <div className="flex items-center gap-1">
         {keys.map((key) => {
@@ -57,8 +62,15 @@ export function BANTScorecard({ bant, compact = false }: BANTScorecardProps) {
     );
   }
 
+  const gridClass =
+    resolvedLayout === "stack"
+      ? "grid grid-cols-1 gap-2"
+      : resolvedLayout === "row"
+        ? "grid grid-cols-4 gap-2"
+        : "grid grid-cols-2 gap-3";
+
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className={gridClass}>
       {keys.map((key) => {
         const status = bant[key];
         const config = statusConfig[status];
@@ -66,14 +78,14 @@ export function BANTScorecard({ bant, compact = false }: BANTScorecardProps) {
         return (
           <div
             key={key}
-            className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3"
+            className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3 min-w-0"
           >
             <Icon className={cn("h-5 w-5 shrink-0", config.color)} />
-            <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide truncate">
                 {bantLabels[key]}
               </p>
-              <p className={cn("text-sm font-semibold", config.color)}>{config.label}</p>
+              <p className={cn("text-sm font-semibold truncate", config.color)}>{config.label}</p>
             </div>
           </div>
         );

@@ -12,18 +12,14 @@ import { SentimentTimeline } from "@/components/sentiment-timeline";
 import { KBAssetCard } from "@/components/kb-asset-card";
 import { Button } from "@/components/ui/button";
 import { SignalLog } from "@/components/live/signal-log";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BookOpen } from "lucide-react";
 import { useCallUI } from "@/stores/use-call-ui";
 import { useLiveCall } from "@/stores/use-live-call";
 import { useLiveCallInit } from "@/hooks/use-live-call-init";
 import { usePersona } from "@/hooks/use-persona";
-import { useLiveCallStream } from "@/lib/data/hooks";
-import { LIVE_BANT_SIGNALS } from "@/lib/mock-data";
-import type { KBAsset, PodRole } from "@/types";
-
-const placeholderKBResults: KBAsset[] = [
-  { id: "kb1", title: "SOC 2 Compliance Automation — Deck v3", type: "deck", tags: ["compliance", "SOC 2"], lastUsed: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), effectivenessScore: 0.82, uploadedAt: "2026-01-10", version: 3 },
-  { id: "kb2", title: "Delta Finance Before/After Case Study", type: "case-study", tags: ["compliance", "fintech"], effectivenessScore: 0.91, uploadedAt: "2026-02-05", version: 1 },
-];
+import { useLiveCallStream, useCall, useKbAssets } from "@/lib/data/hooks";
+import type { PodRole } from "@/types";
 
 function formatElapsed(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -38,11 +34,14 @@ interface LivePageParams {
 export default function LiveCallPage({ params }: LivePageParams) {
   const { callId } = use(params);
   const persona = usePersona();
+  const { data: call } = useCall(callId);
+  const { data: kbAssets = [] } = useKbAssets();
   useLiveCallInit(callId);
   useLiveCallStream(callId, true);
 
   const transcript = useLiveCall((s) => s.transcript);
   const pendingNudges = useLiveCall((s) => s.pendingNudges);
+  const bantSignals = useLiveCall((s) => s.bantSignals);
   const elapsedSeconds = useLiveCall((s) => s.elapsedSeconds);
   const dismissNudge = useLiveCall((s) => s.dismissNudge);
   const acceptNudge = useLiveCall((s) => s.acceptNudge);
@@ -58,13 +57,22 @@ export default function LiveCallPage({ params }: LivePageParams) {
     [pendingNudges, viewerRole]
   );
 
-  const keywords = ["compliance", "SOC 2", "audit", "ESG", "Form ADV", "continuous compliance"];
+  const keywords = useMemo(() => {
+    const fromTranscript = transcript.flatMap((e) => e.keywords ?? []);
+    return [...new Set(fromTranscript)];
+  }, [transcript]);
 
-  const placeholderSentiment = Array.from({ length: 20 }, (_, i) => ({
-    timestamp: i * 10,
-    aeScore: 0.4 + Math.sin(i / 3) * 0.2,
-    customerScore: 0.3 + Math.cos(i / 4) * 0.25,
-  }));
+  const sentimentData = useMemo(
+    () =>
+      transcript.map((e, i) => ({
+        timestamp: e.timestamp ?? i * 10,
+        aeScore: e.speakerRole === "ae" ? 0.6 : 0.4,
+        customerScore: e.speakerRole === "customer" ? 0.6 : 0.4,
+      })),
+    [transcript]
+  );
+
+  const accountName = call?.accountName ?? "Live call";
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -77,11 +85,8 @@ export default function LiveCallPage({ params }: LivePageParams) {
         <Badge variant="live" aria-label="Live call in progress">
           Live
         </Badge>
-        <span className="text-sm font-medium text-foreground">Meridian Trust</span>
+        <span className="text-sm font-medium text-foreground">{accountName}</span>
         <span className="text-sm text-muted-foreground font-mono">{formatElapsed(elapsedSeconds)}</span>
-        <div className="flex-1" />
-        <span className="text-xs text-muted-foreground">Sentiment:</span>
-        <Badge variant="success">Positive</Badge>
       </div>
 
       <div className="flex-1 overflow-hidden">
@@ -102,15 +107,20 @@ export default function LiveCallPage({ params }: LivePageParams) {
                 ))}
               </div>
             )}
-            <TranscriptViewer
-              events={transcript}
-              keywords={keywords}
-              isLive
-              className="flex-1"
-            />
+            {transcript.length > 0 ? (
+              <TranscriptViewer events={transcript} keywords={keywords} isLive className="flex-1" />
+            ) : (
+              <div className="flex-1 flex items-center justify-center p-6">
+                <p className="text-sm text-muted-foreground text-center">
+                  Waiting for transcript. Connect your conferencing integration or start capture.
+                </p>
+              </div>
+            )}
             <div className="border-t border-border p-3 shrink-0 space-y-2">
-              <SignalLog signals={LIVE_BANT_SIGNALS} />
-              <SentimentTimeline data={placeholderSentiment} className="h-16" />
+              <SignalLog signals={bantSignals} />
+              {sentimentData.length > 0 && (
+                <SentimentTimeline data={sentimentData} className="h-16" />
+              )}
             </div>
           </div>
 
@@ -119,9 +129,17 @@ export default function LiveCallPage({ params }: LivePageParams) {
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Knowledge</p>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-3">
-              {placeholderKBResults.map((asset) => (
-                <KBAssetCard key={asset.id} asset={asset} onSelect={() => {}} />
-              ))}
+              {kbAssets.length > 0 ? (
+                kbAssets.slice(0, 8).map((asset) => (
+                  <KBAssetCard key={asset.id} asset={asset} onSelect={() => {}} />
+                ))
+              ) : (
+                <EmptyState
+                  icon={BookOpen}
+                  title="No KB matches yet"
+                  description="Relevant assets appear as the live agent detects topics."
+                />
+              )}
             </div>
           </div>
 
@@ -155,13 +173,17 @@ export default function LiveCallPage({ params }: LivePageParams) {
               )}
               <TranscriptViewer events={transcript} keywords={keywords} isLive className="flex-1" />
               <div className="p-2 border-t shrink-0">
-                <SignalLog signals={LIVE_BANT_SIGNALS} />
+                <SignalLog signals={bantSignals} />
               </div>
             </TabsContent>
             <TabsContent value="kb" className="flex-1 overflow-y-auto p-3 m-0 space-y-3">
-              {placeholderKBResults.map((asset) => (
-                <KBAssetCard key={asset.id} asset={asset} onSelect={() => {}} />
-              ))}
+              {kbAssets.length > 0 ? (
+                kbAssets.slice(0, 8).map((asset) => (
+                  <KBAssetCard key={asset.id} asset={asset} onSelect={() => {}} />
+                ))
+              ) : (
+                <EmptyState icon={BookOpen} title="No KB matches yet" description="Assets appear during the call." />
+              )}
             </TabsContent>
             <TabsContent value="chat" className="flex-1 overflow-hidden m-0">
               <BotChatPanel callId={callId} className="h-full" />
@@ -172,3 +194,4 @@ export default function LiveCallPage({ params }: LivePageParams) {
     </div>
   );
 }
+

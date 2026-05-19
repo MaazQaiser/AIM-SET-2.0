@@ -183,19 +183,29 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000
 
 ## Project structure
 
+See [docs/ACTUAL_STRUCTURE.md](./docs/ACTUAL_STRUCTURE.md) for documented vs implemented layout.
+
 ```
 AIM-SET-2.0/
-├── apps/web/              # Next.js frontend (main app)
-│   ├── src/app/           # Routes (dashboard, calls, settings, API)
-│   ├── src/components/    # UI components
-│   ├── src/lib/           # CSV import, data resolvers, mocks
-│   └── .env.example       # Env template → copy to .env.local
-├── packages/types/        # Shared TypeScript types
-├── packages/ui/           # Shared UI package
-├── pnpm-workspace.yaml
-├── pnpm-lock.yaml         # Locked dependency versions
-└── turbo.json
+├── apps/web/                 # Next.js 16 (UI + BFF)
+├── packages/types/           # Shared domain types (@dc-copilot/types)
+├── packages/api-client/      # Typed API client
+├── services/api/             # FastAPI: dc-notes, /api/v1, orchestrator, agents, WS
+├── python-packages/          # dc_core, dc_llm, dc_tools, dc_eval
+├── prompts/                  # Versioned agent prompts
+├── infra/supabase/migrations # Postgres + pgvector schema
+├── docs/ACTUAL_STRUCTURE.md
+└── .github/workflows/ci.yml
 ```
+
+### Dev flags (`.env.local`)
+
+| Variable | Purpose |
+|----------|---------|
+| `USE_MOCK_DATA=true` | Demo calls/briefs without CSV (dev only) |
+| `NEXT_PUBLIC_USE_API_DATA=true` | Fetch calls via BFF → FastAPI |
+| `INTERNAL_API_SECRET` | BFF ↔ API auth for dc-notes |
+| `ANTHROPIC_API_KEY` | Content Agent LLM (optional; offline fallback if unset) |
 
 ---
 

@@ -2,8 +2,8 @@
 
 import { Sparkles, TrendingUp, Calendar, DollarSign, Target } from "lucide-react";
 import { AIGeneratedBadge } from "@/components/ai-generated-badge";
-import { Badge } from "@/components/ui/badge";
-import type { CallBrief } from "@/lib/mock-data";
+import { useWidgetSize } from "@/components/dashboard-grid/dashboard-widget";
+import type { CallBrief } from "@/lib/brief-types";
 import { cn } from "@/lib/cn";
 
 interface BriefAISummaryProps {
@@ -19,16 +19,27 @@ const STAGE_COLOR: Record<string, string> = {
 };
 
 export function BriefAISummary({ brief }: BriefAISummaryProps) {
+  const { compact, wide } = useWidgetSize();
   const stageClass = STAGE_COLOR[brief.dealStage] ?? "bg-muted text-muted-foreground";
   const contactUrgency = brief.daysSinceLastContact > 14 ? "text-warning" : "text-muted-foreground";
 
   return (
-    <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-accent/30 p-5 space-y-4">
+    <div
+      className={cn(
+        "rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-accent/30 space-y-4 min-w-0",
+        compact ? "p-3" : "p-5"
+      )}
+    >
       {/* Header row */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <span className="text-sm font-semibold text-foreground">AI Brief Summary</span>
+      <div
+        className={cn(
+          "gap-2 flex-wrap min-w-0",
+          compact ? "flex flex-col items-start" : "flex items-center justify-between"
+        )}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <Sparkles className="h-4 w-4 text-primary shrink-0" />
+          <span className="text-sm font-semibold text-foreground truncate">AI Brief Summary</span>
           <AIGeneratedBadge />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -38,26 +49,48 @@ export function BriefAISummary({ brief }: BriefAISummaryProps) {
               {brief.opportunityValue}
             </span>
           )}
-          <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium", stageClass)}>
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+              stageClass
+            )}
+          >
             <Target className="h-3 w-3" />
             {brief.dealStage}
           </span>
-          <span className={cn("inline-flex items-center gap-1 rounded-full bg-background border px-2.5 py-0.5 text-xs", contactUrgency)}>
-            <Calendar className="h-3 w-3" />
-            Last contact {brief.daysSinceLastContact}d ago
-          </span>
+          {!compact && (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full bg-background border px-2.5 py-0.5 text-xs",
+                contactUrgency
+              )}
+            >
+              <Calendar className="h-3 w-3" />
+              Last contact {brief.daysSinceLastContact}d ago
+            </span>
+          )}
         </div>
       </div>
 
       {/* Summary text */}
-      <p className="text-sm leading-relaxed text-foreground/90">
+      <p
+        className={cn(
+          "text-sm leading-relaxed text-foreground/90 break-words",
+          compact && "line-clamp-6"
+        )}
+      >
         {brief.aiSummary}
       </p>
 
       {/* ICP match + note */}
-      <div className="flex items-center gap-3 pt-1 border-t border-primary/10">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-3.5 w-3.5 text-primary" />
+      <div
+        className={cn(
+          "pt-1 border-t border-primary/10 gap-3 min-w-0",
+          compact ? "flex flex-col items-start" : "flex items-center"
+        )}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <TrendingUp className="h-3.5 w-3.5 text-primary shrink-0" />
           <span className="text-xs font-medium">ICP match</span>
           <div className="flex items-center gap-1.5">
             <div className="w-20 h-1.5 rounded-full bg-primary/20 overflow-hidden">
@@ -66,11 +99,20 @@ export function BriefAISummary({ brief }: BriefAISummaryProps) {
                 style={{ width: `${brief.icpMatch * 100}%` }}
               />
             </div>
-            <span className="text-xs font-semibold text-primary">{(brief.icpMatch * 100).toFixed(0)}%</span>
+            <span className="text-xs font-semibold text-primary">
+              {(brief.icpMatch * 100).toFixed(0)}%
+            </span>
           </div>
         </div>
-        {brief.icpNote && (
-          <p className="text-xs text-muted-foreground border-l pl-3">{brief.icpNote}</p>
+        {brief.icpNote && !compact && (
+          <p
+            className={cn(
+              "text-xs text-muted-foreground min-w-0 break-words",
+              wide ? "border-l pl-3" : "pt-1"
+            )}
+          >
+            {brief.icpNote}
+          </p>
         )}
       </div>
     </div>

@@ -4,7 +4,7 @@ import {
 } from "@/lib/dc-notes/build-from-import";
 import type { PostDCRecord, PreDCRecord } from "@/types/dc-notes";
 import type { Call } from "@/types";
-import type { CallBrief, PostCallReview } from "@/lib/mock-data";
+import type { CallBrief, PostCallReview } from "@/lib/brief-types";
 
 /** One call per Pre-DC row, scheduledAt from Discovery Call Date/Time (PKT) columns */
 export function buildCallsFromPreDc(

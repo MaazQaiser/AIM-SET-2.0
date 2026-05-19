@@ -2,15 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import { useLiveCall } from "@/stores/use-live-call";
-import { LIVE_NUDGES_SEED, LIVE_TRANSCRIPT_SEED } from "@/lib/mock-data";
 
+/** Initialize live call session (WebSocket transcript feed connects separately). */
 export function useLiveCallInit(callId: string) {
   const initialized = useRef(false);
   const setCallId = useLiveCall((s) => s.setCallId);
   const setConnected = useLiveCall((s) => s.setConnected);
   const reset = useLiveCall((s) => s.reset);
-  const appendTranscriptEvent = useLiveCall((s) => s.appendTranscriptEvent);
-  const addNudge = useLiveCall((s) => s.addNudge);
   const transcript = useLiveCall((s) => s.transcript);
 
   useEffect(() => {
@@ -19,8 +17,6 @@ export function useLiveCallInit(callId: string) {
     reset();
     setCallId(callId);
     setConnected(true);
-    LIVE_TRANSCRIPT_SEED.forEach(appendTranscriptEvent);
-    LIVE_NUDGES_SEED.forEach(addNudge);
 
     const tick = setInterval(() => {
       useLiveCall.getState().tickElapsed();
@@ -31,7 +27,7 @@ export function useLiveCallInit(callId: string) {
       reset();
       initialized.current = false;
     };
-  }, [callId, reset, setCallId, setConnected, appendTranscriptEvent, addNudge]);
+  }, [callId, reset, setCallId, setConnected]);
 
   return { transcript };
 }

@@ -2,8 +2,7 @@
 
 import { useMemo } from "react";
 import { addHours, isWithinInterval } from "date-fns";
-import { useCalls, useCoachingInsights } from "@/lib/data/hooks";
-import { MOCK_CRM_TASKS_POST_DC } from "@/lib/mock-data";
+import { useCalls, useCoachingInsights, usePostCallCrmTasks } from "@/lib/data/hooks";
 import type { Call } from "@/types";
 
 export type AiTodoAgent = "live-call" | "content" | "coaching" | "task";
@@ -27,6 +26,7 @@ function parseRevenue(raw?: string): number {
 export function useAiTodos() {
   const { data: calls = [] } = useCalls();
   const { data: coachingInsights = [] } = useCoachingInsights();
+  const { data: crmTasks = [] } = usePostCallCrmTasks();
 
   const todos = useMemo(() => {
     const items: AiTodo[] = [];
@@ -34,9 +34,7 @@ export function useAiTodos() {
     const in24h = addHours(now, 24);
     const in2h = addHours(now, 2);
 
-    const pendingCrm = MOCK_CRM_TASKS_POST_DC.filter(
-      (t) => t.status === "pending_approval"
-    );
+    const pendingCrm = crmTasks.filter((t) => t.status === "pending_approval");
     if (pendingCrm.length > 0) {
       const hasFollowUp = pendingCrm.some((t) => t.task_type === "follow_up");
       items.push({
@@ -108,7 +106,7 @@ export function useAiTodos() {
     items.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
     return items;
-  }, [calls, coachingInsights]);
+  }, [calls, coachingInsights, crmTasks]);
 
   const counts = useMemo(
     () => ({
@@ -136,14 +134,12 @@ export function useAiTodos() {
     return [...todayCalls].sort(
       (a, b) => parseRevenue(b.annualRevenue) - parseRevenue(a.annualRevenue)
     )[0];
-  }, [calls]);
+  }, [calls, coachingInsights, crmTasks]);
 
   return {
     todos,
     counts,
-    pendingApprovalCount: MOCK_CRM_TASKS_POST_DC.filter(
-      (t) => t.status === "pending_approval"
-    ).length,
+    pendingApprovalCount: crmTasks.filter((t) => t.status === "pending_approval").length,
     topOpportunityCall,
   };
 }

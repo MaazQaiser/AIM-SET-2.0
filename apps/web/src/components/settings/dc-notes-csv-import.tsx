@@ -171,8 +171,7 @@ export function DcNotesCsvImport() {
     preDcFileName,
     postDcFileName,
     importedAt,
-    setPreDcImport,
-    setPostDcImport,
+    loadFromDb,
     clearImports,
   } = useDcImportsStore();
 
@@ -197,29 +196,53 @@ export function DcNotesCsvImport() {
       const result = parseDcNotesCsv(text);
       setParseErrors(result.errors);
 
+      const persistToDb = async (kind: "pre-dc" | "post-dc", records: PreDCRecord[] | PostDCRecord[]) => {
+        const res = await fetch("/api/dc-notes/ingest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind, records }),
+        });
+        if (!res.ok) {
+          const err = (await res.json().catch(() => null)) as { detail?: string; error?: string } | null;
+          throw new Error(err?.detail ?? err?.error ?? `Save failed (${res.status})`);
+        }
+      };
+
       if (result.kind === "pre-dc" && result.preDcRecords.length > 0) {
-        setPreDcImport(result.preDcRecords, file.name);
+        try {
+          await persistToDb("pre-dc", result.preDcRecords);
+          await loadFromDb();
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Could not save to Supabase");
+          return;
+        }
         invalidateDcQueries();
-        toast.success(`Imported ${result.preDcRecords.length} leads from CSV`);
+        toast.success(`Imported ${result.preDcRecords.length} leads to Supabase (vector-indexed)`);
         if (result.errors.length) toast.warning(`${result.errors.length} row warning(s)`);
         return;
       }
 
       if (result.kind === "post-dc" && result.postDcRecords.length > 0) {
-        setPostDcImport(result.postDcRecords, file.name);
+        try {
+          await persistToDb("post-dc", result.postDcRecords);
+          await loadFromDb();
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Could not save to Supabase");
+          return;
+        }
         invalidateDcQueries();
         const matched = useDcImportsStore
           .getState()
           .postDcRecords.filter((r) => r.matchedCallId).length;
         toast.success(
-          `Imported ${result.postDcRecords.length} Post-DC notes (${matched} linked to calls)`
+          `Imported ${result.postDcRecords.length} Post-DC notes to Supabase (${matched} linked to calls)`
         );
         return;
       }
 
       toast.error(result.errors[0] ?? "Could not parse CSV — check column headers");
     },
-    [setPreDcImport, setPostDcImport, invalidateDcQueries]
+    [loadFromDb, invalidateDcQueries]
   );
 
   const downloadTemplate = (kind: "pre" | "post") => {
@@ -241,8 +264,8 @@ export function DcNotesCsvImport() {
           Discovery call data import
         </CardTitle>
         <CardDescription>
-          Upload your Pre-DC research CSV to populate the calendar and briefs. Upload Post-DC notes to
-          enrich reviews and BANT on matched accounts.
+          Upload Pre-DC and Post-DC CSVs — records are stored in Supabase and embedded into the vector
+          index for agent retrieval. Data is not kept in browser local storage.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

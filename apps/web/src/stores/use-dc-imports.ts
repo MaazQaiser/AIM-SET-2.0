@@ -1,9 +1,8 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type { Call } from "@/types";
-import type { CallBrief, PostCallReview } from "@/lib/mock-data";
+import type { CallBrief, PostCallReview } from "@/lib/brief-types";
 import { buildCallsFromPreDc } from "@/lib/dc-data/build-calls-from-pre-dc";
 import type { PostDCRecord, PreDCRecord } from "@/types/dc-notes";
 
@@ -17,9 +16,8 @@ interface DcImportsState {
   postDcFileName: string | null;
   importedAt: string | null;
   importVersion: number;
-  setPreDcImport: (records: PreDCRecord[], fileName: string) => void;
-  setPostDcImport: (records: PostDCRecord[], fileName: string) => void;
-  clearImports: () => void;
+  loadFromDb: () => Promise<void>;
+  clearImports: () => Promise<void>;
 }
 
 const emptyState = {
@@ -34,51 +32,47 @@ const emptyState = {
   importVersion: 0,
 };
 
-export const useDcImportsStore = create<DcImportsState>()(
-  persist(
-    (set, get) => ({
-      ...emptyState,
-      setPreDcImport: (records, fileName) => {
-        const state = get();
-        const built = buildCallsFromPreDc(records, state.postDcRecords);
+function applyBuilt(
+  preDcRecords: PreDCRecord[],
+  postDcRecords: PostDCRecord[],
+  patch: Partial<DcImportsState> = {}
+) {
+  const built = buildCallsFromPreDc(preDcRecords, postDcRecords);
+  return {
+    preDcRecords,
+    postDcRecords: built.postDcRecords,
+    calls: built.calls,
+    briefsByCallId: built.briefsByCallId,
+    postReviewsByCallId: built.postReviewsByCallId,
+    ...patch,
+  };
+}
 
-        set({
-          preDcRecords: records,
-          preDcFileName: fileName,
-          calls: built.calls,
-          briefsByCallId: built.briefsByCallId,
-          postDcRecords: built.postDcRecords,
-          postReviewsByCallId: built.postReviewsByCallId,
-          importedAt: new Date().toISOString(),
-          importVersion: state.importVersion + 1,
-        });
-      },
-      setPostDcImport: (records, fileName) => {
-        const state = get();
-        const built = buildCallsFromPreDc(state.preDcRecords, records);
-
-        set({
-          postDcRecords: built.postDcRecords,
-          postDcFileName: fileName,
-          calls: built.calls,
-          briefsByCallId: built.briefsByCallId,
-          postReviewsByCallId: built.postReviewsByCallId,
-          importedAt: new Date().toISOString(),
-          importVersion: state.importVersion + 1,
-        });
-      },
-      clearImports: () => set({ ...emptyState, importVersion: get().importVersion + 1 }),
-    }),
-    {
-      name: "dc-notes-imports",
-      onRehydrateStorage: () => (state) => {
-        if (!state?.preDcRecords.length) return;
-        const built = buildCallsFromPreDc(state.preDcRecords, state.postDcRecords);
-        state.calls = built.calls;
-        state.briefsByCallId = built.briefsByCallId;
-        state.postReviewsByCallId = built.postReviewsByCallId;
-        state.postDcRecords = built.postDcRecords;
-      },
+export const useDcImportsStore = create<DcImportsState>()((set, get) => ({
+  ...emptyState,
+  loadFromDb: async () => {
+    const res = await fetch("/api/dc-notes");
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { detail?: string; error?: string } | null;
+      throw new Error(err?.detail ?? err?.error ?? `Failed to load DC notes (${res.status})`);
     }
-  )
-);
+
+    const data = (await res.json()) as {
+      pre_dc_records?: PreDCRecord[];
+      post_dc_records?: PostDCRecord[];
+    };
+
+    const preDcRecords = data.pre_dc_records ?? [];
+    const postDcRecords = data.post_dc_records ?? [];
+    const state = get();
+
+    set({
+      ...applyBuilt(preDcRecords, postDcRecords),
+      importedAt: preDcRecords.length || postDcRecords.length ? new Date().toISOString() : null,
+      importVersion: state.importVersion + 1,
+    });
+  },
+  clearImports: async () => {
+    set({ ...emptyState, importVersion: get().importVersion + 1 });
+  },
+}));

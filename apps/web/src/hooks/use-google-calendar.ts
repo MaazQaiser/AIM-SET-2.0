@@ -19,13 +19,15 @@ export function useGoogleCalendarConnection() {
   return useQuery({
     queryKey: CALENDAR_KEYS.connection,
     queryFn: async (): Promise<{ isConnected: boolean; connectedEmail?: string; lastSyncAt?: string }> => {
-      // ── Mock: simulate connected state ─────────────────────────────────
-      // Replace with: const res = await fetch("/api/integrations/google/connection");
-      return {
-        isConnected:   false,   // flip to true to see connected UI
-        connectedEmail: undefined,
-        lastSyncAt:    undefined,
-      };
+      const res = await fetch("/api/integrations/google/connection");
+      if (!res.ok) {
+        return { isConnected: false };
+      }
+      return res.json() as Promise<{
+        isConnected: boolean;
+        connectedEmail?: string;
+        lastSyncAt?: string;
+      }>;
     },
     staleTime: 60_000,
   });

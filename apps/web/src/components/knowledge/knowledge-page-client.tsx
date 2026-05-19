@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, BookOpen } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import Link from "next/link";
 import { SearchInput } from "@/components/ui/search-input";
-import { Button } from "@/components/ui/button";
 import { KBAssetCard } from "@/components/kb-asset-card";
+import { KbUploadButton } from "@/components/knowledge/kb-upload-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { FilterChip } from "@/components/ui/chip";
@@ -37,10 +37,7 @@ export function KnowledgePageClient() {
           <h1 className="text-2xl font-semibold text-foreground">Knowledge base</h1>
           <p className="text-sm text-muted-foreground mt-1">{assets.length} assets</p>
         </div>
-        <Button>
-          <Upload className="h-4 w-4" />
-          Upload asset
-        </Button>
+        <KbUploadButton />
       </div>
 
       <Tabs defaultValue={persona === "content-owner" ? "watchlist" : "library"} variant="underline">

@@ -7,12 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "biome lint ./src",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.9.9",
+    "@dc-copilot/api-client": "workspace:*",
     "@dc-copilot/types": "workspace:*",
-    "@dc-copilot/ui": "workspace:*",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-avatar": "^1.1.2",
     "@radix-ui/react-checkbox": "^1.1.3",
@@ -41,8 +43,10 @@
     "next-themes": "^0.4.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-grid-layout": "^2.2.3",
     "react-hook-form": "^7.54.2",
     "react-markdown": "^9.0.1",
+    "react-resizable": "^4.0.1",
     "recharts": "^2.15.0",
     "remark-gfm": "^4.0.0",
     "sonner": "^1.7.2",
@@ -52,10 +56,13 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "vitest": "^3.0.5",
     "@tailwindcss/postcss": "^4.0.9",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.1",
+    "@types/react-grid-layout": "^2.1.0",
     "tailwindcss": "^4.0.9",
     "typescript": "^5.6.3"
   }

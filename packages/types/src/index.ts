@@ -1,9 +1,10 @@
-// Shared domain types used by both the web app and future SDK consumers
+// Shared domain types — single source of truth for web, api-client, and tooling
 
 export type PodRole = "ae" | "se" | "designer";
 export type BANTStatus = "confirmed" | "partial" | "unknown";
 export type CallStatus = "upcoming" | "live" | "completed" | "no-show";
 export type AssetType = "deck" | "case-study" | "one-pager" | "architecture" | "battlecard";
+export type ConfidenceLevel = "high" | "medium" | "low";
 
 export interface PodMember {
   id: string;
@@ -23,6 +24,18 @@ export interface BANTScore {
 export interface Call {
   id: string;
   accountName: string;
+  leadName?: string;
+  leadTitle?: string;
+  industry?: string;
+  annualRevenue?: string;
+  annualRevenueRaw?: string;
+  employeeCount?: string;
+  icpBucket?: string;
+  website?: string;
+  companyTypeIcp?: string;
+  dealStage?: string;
+  discoveryCallDatePkt?: string;
+  discoveryCallTimePkt?: string;
   scheduledAt: string;
   duration?: number;
   status: CallStatus;
@@ -40,6 +53,7 @@ export interface TranscriptEvent {
   timestamp: number;
   keywords?: string[];
   sentiment?: "positive" | "negative" | "neutral";
+  signalType?: "discovery_anchor" | "timeline" | "objection";
 }
 
 export interface Citation {
@@ -68,6 +82,11 @@ export interface KBAsset {
   effectivenessScore?: number;
   uploadedAt: string;
   version: number;
+  status?: "pending" | "processing" | "ready" | "failed";
+  fileName?: string;
+  mimeType?: string;
+  chunkCount?: number;
+  ingestError?: string;
 }
 
 export interface CoachingInsight {
@@ -91,3 +110,10 @@ export interface AgentOutput<T = unknown> {
   traceId: string;
   generatedAt: string;
 }
+
+export * from "./kb";
+export * from "./domain";
+export * from "./dc-notes";
+export * from "./agents";
+export * from "./brief";
+export * from "./integrations";

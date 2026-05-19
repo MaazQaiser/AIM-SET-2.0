@@ -3,10 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./dc-notes": "./src/dc-notes.ts",
+    "./agents": "./src/agents.ts",
+    "./brief": "./src/brief.ts",
+    "./integrations": "./src/integrations.ts"
   },
   "scripts": {
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "tsc --noEmit"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

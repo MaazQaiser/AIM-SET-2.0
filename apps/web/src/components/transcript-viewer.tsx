@@ -101,7 +101,7 @@ export function TranscriptViewer({
                   )}
                 </div>
                 <p className="text-sm text-foreground leading-relaxed">
-                  <KeywordHighlight text={event.text} keywords={keywords} />
+                  <KeywordHighlight text={event.text} />
                   {isLastLive && (
                     <span className="inline-block w-2 h-3.5 ml-0.5 bg-foreground animate-cursor align-middle" />
                   )}

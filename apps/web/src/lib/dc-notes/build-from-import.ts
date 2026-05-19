@@ -4,7 +4,7 @@ import type {
   CallBrief,
   PostCallReview,
   PostDcBriefPreview,
-} from "@/lib/mock-data";
+} from "@/lib/brief-types";
 import {
   POST_DC_HEADERS,
   PRE_DC_HEADERS,

@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "react-grid-layout/css/styles.css";
+@import "react-resizable/css/styles.css";
 
 /* ── Animation utilities (replaces tw-animate-css) ── */
 @layer utilities {
@@ -390,4 +392,37 @@ body {
 }
 .animate-cursor {
   animation: blink 1s step-end infinite;
+}
+
+/* ── React Grid Layout (dashboard widgets) ── */
+.react-grid-placeholder {
+  background: hsl(var(--primary) / 0.1) !important;
+  border-radius: 0.75rem;
+  border: 2px dashed hsl(var(--primary) / 0.4) !important;
+  opacity: 1 !important;
+}
+
+.react-resizable-handle {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.editing-layout .react-resizable-handle {
+  opacity: 1;
+}
+
+.editing-layout .react-resizable-handle::after {
+  border-color: hsl(var(--primary) / 0.5);
+}
+
+/* 12-column guide while customizing (lg breakpoint) */
+.editing-layout .react-grid-layout {
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(100% / 12 - 1px),
+    hsl(var(--border) / 0.25) calc(100% / 12 - 1px),
+    hsl(var(--border) / 0.25) calc(100% / 12)
+  );
+  border-radius: 0.75rem;
 }
