@@ -117,7 +117,6 @@ def process_ingest_job(job: Dict[str, Any], repo: Optional[KbRepository] = None)
             error_message=str(exc)[:500],
             clerk_key=clerk_key,
         )
-        raise
 
 
 def _download(repo: KbRepository, tenant_id: str, storage_path: str, clerk_key: Optional[str]) -> bytes:

@@ -3,9 +3,10 @@ import type { AssetType } from "@/types";
 export const KB_ASSET_TYPES: { value: AssetType; label: string }[] = [
   { value: "deck", label: "Deck" },
   { value: "case-study", label: "Case Study" },
-  { value: "one-pager", label: "One-Pager" },
-  { value: "architecture", label: "Architecture" },
-  { value: "battlecard", label: "Battlecard" },
+  { value: "image", label: "Image" },
+  { value: "architecture", label: "Architecture Diagram" },
+  { value: "battlecard", label: "Battle Card" },
+  { value: "one-pager", label: "OnePager" },
 ];
 
 const EXTENSION_ASSET_TYPE: Record<string, AssetType> = {
@@ -14,9 +15,9 @@ const EXTENSION_ASSET_TYPE: Record<string, AssetType> = {
   ".ppt": "deck",
   ".docx": "one-pager",
   ".csv": "case-study",
-  ".png": "one-pager",
-  ".jpg": "one-pager",
-  ".jpeg": "one-pager",
+  ".png": "image",
+  ".jpg": "image",
+  ".jpeg": "image",
 };
 
 export function defaultAssetTypeForFile(fileName: string): AssetType {

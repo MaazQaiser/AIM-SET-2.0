@@ -72,13 +72,27 @@ export function KbUploadButton() {
       }
 
       const res = await fetch("/api/kb/upload", { method: "POST", body: form });
-      const data = (await res.json()) as KBUploadResponse & { detail?: string };
+      const responseText = await res.text();
+      let data: KBUploadResponse & { detail?: string; error?: string };
+      try {
+        data = JSON.parse(responseText) as KBUploadResponse & { detail?: string; error?: string };
+      } catch {
+        throw new Error(
+          responseText.trim()
+            ? `Upload failed (${res.status}): ${responseText.slice(0, 200)}`
+            : `Upload failed (${res.status}): empty response from server`
+        );
+      }
       if (!res.ok) {
-        throw new Error(data.detail ?? "Upload failed");
+        throw new Error(data.detail ?? data.error ?? "Upload failed");
       }
 
       setDialogOpen(false);
       resetForm();
+
+      if (data.job?.status === "failed") {
+        throw new Error(data.job.errorMessage ?? data.asset?.ingestError ?? "Ingest failed");
+      }
 
       toast.success(`Uploaded ${data.asset.title}`);
       await queryClient.invalidateQueries({ queryKey: ["kb-assets"] });

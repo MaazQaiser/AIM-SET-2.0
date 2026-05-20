@@ -3,7 +3,7 @@
 export type PodRole = "ae" | "se" | "designer";
 export type BANTStatus = "confirmed" | "partial" | "unknown";
 export type CallStatus = "upcoming" | "live" | "completed" | "no-show";
-export type AssetType = "deck" | "case-study" | "one-pager" | "architecture" | "battlecard";
+export type AssetType = "deck" | "case-study" | "one-pager" | "architecture" | "battlecard" | "image";
 export type ConfidenceLevel = "high" | "medium" | "low";
 
 export interface PodMember {

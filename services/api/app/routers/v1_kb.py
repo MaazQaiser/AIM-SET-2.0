@@ -105,7 +105,11 @@ async def upload_asset(
             "_clerk_key": clerk_key,
             "_uploaded_by": ctx.user_id,
         }
-        process_ingest_job(sync_job, repo)
+        try:
+            process_ingest_job(sync_job, repo)
+        except Exception:
+            # process_ingest_job records failed job/asset state; upload still returns JSON.
+            pass
         result["asset"] = repo.get_asset(ctx, result["asset"]["id"]) or result["asset"]
         result["job"] = repo.get_job(ctx, result["job"]["id"]) or result["job"]
 

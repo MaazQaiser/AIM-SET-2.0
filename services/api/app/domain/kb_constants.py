@@ -28,9 +28,9 @@ EXTENSION_ASSET_TYPE = {
     ".ppt": "deck",
     ".docx": "one-pager",
     ".csv": "case-study",
-    ".png": "one-pager",
-    ".jpg": "one-pager",
-    ".jpeg": "one-pager",
+    ".png": "image",
+    ".jpg": "image",
+    ".jpeg": "image",
 }
 
 ALLOWED_ASSET_TYPES = frozenset(
@@ -40,5 +40,6 @@ ALLOWED_ASSET_TYPES = frozenset(
         "one-pager",
         "architecture",
         "battlecard",
+        "image",
     }
 )

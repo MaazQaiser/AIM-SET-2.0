@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Presentation, Layout, Map, Shield, TrendingUp } from "lucide-react";
+import { FileText, Presentation, Layout, Map, Shield, TrendingUp, Image as ImageIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/cn";
 import { Chip } from "@/components/ui/chip";
@@ -10,9 +10,10 @@ import type { KBAsset } from "@/types";
 const typeConfig: Record<string, { icon: typeof FileText; label: string }> = {
   deck: { icon: Presentation, label: "Deck" },
   "case-study": { icon: FileText, label: "Case Study" },
-  "one-pager": { icon: Layout, label: "One-Pager" },
-  architecture: { icon: Map, label: "Architecture" },
-  battlecard: { icon: Shield, label: "Battlecard" },
+  image: { icon: ImageIcon, label: "Image" },
+  "one-pager": { icon: Layout, label: "OnePager" },
+  architecture: { icon: Map, label: "Architecture Diagram" },
+  battlecard: { icon: Shield, label: "Battle Card" },
 };
 
 function EffectivenessBar({ score }: { score: number }) {

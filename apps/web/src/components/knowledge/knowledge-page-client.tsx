@@ -14,7 +14,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useKbAssets, useKbWatchlist } from "@/lib/data/hooks";
 import { usePersona } from "@/hooks/use-persona";
 
-const filterTypes = ["All", "Deck", "Case Study", "Architecture", "Battlecard", "One-Pager"];
+const filterTypes = ["All", "Deck", "Case Study", "Image", "Architecture Diagram", "Battle Card", "OnePager"];
+
+const normalizeType = (value: string) => value.toLowerCase().replace(/[\s-]/g, "");
 
 export function KnowledgePageClient() {
   const persona = usePersona();
@@ -25,8 +27,7 @@ export function KnowledgePageClient() {
 
   const filtered = assets.filter((a) => {
     const matchesSearch = a.title.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter =
-      filter === "All" || a.type.replace("-", " ").toLowerCase().includes(filter.toLowerCase().replace("-", " "));
+    const matchesFilter = filter === "All" || normalizeType(a.type).includes(normalizeType(filter));
     return matchesSearch && matchesFilter;
   });
 

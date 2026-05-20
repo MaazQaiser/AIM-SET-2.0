@@ -12,9 +12,10 @@ interface CitationMarkerProps {
 const typeLabels: Record<string, string> = {
   deck: "Sales Deck",
   "case-study": "Case Study",
-  "one-pager": "One-Pager",
-  architecture: "Reference Architecture",
-  battlecard: "Battlecard",
+  image: "Image",
+  "one-pager": "OnePager",
+  architecture: "Architecture Diagram",
+  battlecard: "Battle Card",
   transcript: "Call Transcript",
 };
 
