@@ -57,6 +57,8 @@ def process_ingest_job(job: Dict[str, Any], repo: Optional[KbRepository] = None)
             "tags": row.get("tags") or [],
             "title": row.get("title") or "",
         }
+        if job.get("_uploaded_by"):
+            asset_meta["uploaded_by"] = job["_uploaded_by"]
 
         repo.update_job(job_id, tenant_id, stage="chunking", progress_pct=40, clerk_key=clerk_key)
         repo.delete_chunks_for_asset(tenant_id, asset_id, clerk_key)

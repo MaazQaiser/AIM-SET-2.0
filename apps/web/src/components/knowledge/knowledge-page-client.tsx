@@ -35,7 +35,12 @@ export function KnowledgePageClient() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Knowledge base</h1>
-          <p className="text-sm text-muted-foreground mt-1">{assets.length} assets</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {assets.length} assets
+            {process.env.NEXT_PUBLIC_KB_SHARED === "true" && (
+              <span className="ml-1">· Shared team library</span>
+            )}
+          </p>
         </div>
         <KbUploadButton />
       </div>

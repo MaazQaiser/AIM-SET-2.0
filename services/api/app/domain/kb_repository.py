@@ -12,6 +12,7 @@ from app.config import get_settings
 from app.deps import get_supabase
 from app.domain.kb_constants import ALLOWED_ASSET_TYPES, EXTENSION_ASSET_TYPE, EXTENSION_MIME
 from app.domain.memory_store import get_memory_store
+from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.tenant_service import get_tenant_service
 
 
@@ -41,8 +42,7 @@ class KbRepository:
         self._tenants = get_tenant_service()
 
     def _ctx_keys(self, ctx: TenantContext) -> Tuple[str, str]:
-        tenant_uuid, clerk_key = self._tenants.resolve(ctx)
-        return tenant_uuid, clerk_key
+        return resolve_kb_tenant(ctx)
 
     def list_assets(self, ctx: TenantContext) -> List[Dict[str, Any]]:
         tenant_uuid, clerk_key = self._ctx_keys(ctx)

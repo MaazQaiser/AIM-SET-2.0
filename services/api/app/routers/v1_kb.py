@@ -12,6 +12,7 @@ from dc_core.tenancy import TenantContext
 from app.config import get_settings
 from app.deps import get_tenant_context
 from app.domain.kb_constants import ALLOWED_ASSET_TYPES, ALLOWED_EXTENSIONS, EXTENSION_MIME
+from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.kb_repository import get_kb_repository
 from app.orchestrator.dispatcher import Orchestrator
 from app.services.kb_ingest_service import process_ingest_job
@@ -96,14 +97,13 @@ async def upload_asset(
         or not settings.supabase_configured
     )
     if run_sync:
-        from app.domain.tenant_service import get_tenant_service
-
-        tenant_uuid, clerk_key = get_tenant_service().resolve(ctx)
+        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
         sync_job = {
             "id": result["job"]["id"],
             "tenant_id": tenant_uuid,
             "asset_id": result["asset"]["id"],
             "_clerk_key": clerk_key,
+            "_uploaded_by": ctx.user_id,
         }
         process_ingest_job(sync_job, repo)
         result["asset"] = repo.get_asset(ctx, result["asset"]["id"]) or result["asset"]

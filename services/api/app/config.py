@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     kb_embedding_model: str = "text-embedding-3-small"
     kb_worker_poll_interval_ms: int = 2000
     kb_ingest_sync: bool = False
+    kb_shared_mode: bool = False
+    kb_shared_tenant_key: str = "dc-copilot-shared"
 
     @property
     def supabase_configured(self) -> bool:

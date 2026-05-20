@@ -11,8 +11,8 @@ from dc_tools.retrieve_kb import default_embed_fn, retrieve_kb
 
 from app.config import get_settings
 from app.domain.kb_repository import get_kb_repository
+from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.memory_store import get_memory_store
-from app.domain.tenant_service import get_tenant_service
 
 PROMPTS_ROOT = Path(__file__).resolve().parents[4] / "prompts"
 
@@ -33,10 +33,13 @@ def generate_pre_dc_brief(
 ) -> AgentEnvelope:
     settings = get_settings()
     repo = get_kb_repository()
-    tenant_uuid, clerk_key = get_tenant_service().resolve(
-        TenantContext(tenant_id=clerk_tenant_key or tenant_id, user_id="agent")
+    ctx = TenantContext(
+        tenant_id=clerk_tenant_key or tenant_id,
+        user_id="agent",
+        clerk_org_id=clerk_tenant_key,
     )
-    memory_key = clerk_tenant_key or clerk_key
+    tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+    memory_key = clerk_key
 
     query = account_name + " " + research.get("needs", "")
 
