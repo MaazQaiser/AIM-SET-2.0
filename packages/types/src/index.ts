@@ -117,3 +117,4 @@ export * from "./dc-notes";
 export * from "./agents";
 export * from "./brief";
 export * from "./integrations";
+export * from "./content_studio";

@@ -17,6 +17,14 @@ class Settings(BaseSettings):
     kb_ingest_sync: bool = False
     kb_shared_mode: bool = False
     kb_shared_tenant_key: str = "dc-copilot-shared"
+    anthropic_api_key: str = ""
+    content_templates_bucket: str = "content-templates"
+    content_exports_bucket: str = "content-exports"
+    content_studio_sync_ingest: bool = True
+
+    @property
+    def anthropic_configured(self) -> bool:
+        return bool(self.anthropic_api_key)
 
     @property
     def supabase_configured(self) -> bool:

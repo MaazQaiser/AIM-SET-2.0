@@ -14,7 +14,7 @@ sys.path.insert(0, str(_REPO_ROOT / "python-packages"))
 
 load_dotenv()
 
-from app.routers import dc_notes, v1_agents, v1_calls, v1_kb, websocket  # noqa: E402
+from app.routers import dc_notes, v1_agents, v1_calls, v1_content_studio, v1_kb, websocket  # noqa: E402
 
 app = FastAPI(title="DC Copilot API", version="0.2.0")
 
@@ -34,6 +34,7 @@ app.add_middleware(
 app.include_router(dc_notes.router)
 app.include_router(v1_calls.router)
 app.include_router(v1_kb.router)
+app.include_router(v1_content_studio.router)
 app.include_router(v1_agents.router)
 app.include_router(websocket.router)
 

@@ -34,4 +34,10 @@ def validate_envelope(envelope: AgentEnvelope) -> None:
 
 
 def _requires_citations(operation: str) -> bool:
-    return operation not in ("health_check", "ping")
+    return operation not in (
+        "health_check",
+        "ping",
+        "studio_ask",
+        "template_recommend",
+        "studio_refuse",
+    )

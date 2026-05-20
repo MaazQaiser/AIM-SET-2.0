@@ -10,6 +10,7 @@ from dc_llm.client import LlmClient
 from dc_tools.retrieve_kb import default_embed_fn, retrieve_kb
 
 from app.config import get_settings
+from app.domain.agent_config_repository import get_agent_config_repository
 from app.domain.kb_repository import get_kb_repository
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.memory_store import get_memory_store
@@ -61,7 +62,14 @@ def generate_pre_dc_brief(
         f"Account: {account_name}\nCall ID: {call_id}\n"
         f"Research: {research}\nKB hits: {hits[:3]}"
     )
-    completion = LlmClient().complete(system=system, user=user)
+    cfg = get_agent_config_repository().get_config(ctx, "content")
+    model_policy = cfg.get("model_policy") or {}
+    completion = LlmClient(api_key=settings.anthropic_api_key or None).complete(
+        system=system,
+        user=user,
+        model=model_policy.get("model_name") or "claude-opus-4-7",
+        fallback_model=model_policy.get("fallback_model_name") or "claude-sonnet-4-6",
+    )
 
     citations: List[Citation] = []
     for i, hit in enumerate(hits[:3]):

@@ -58,23 +58,20 @@ export function AgentStatusCard({ status }: AgentStatusCardProps) {
 
         {/* Cost */}
         <div>
-          <p className="text-xs text-muted-foreground mb-1">Daily spend</p>
-          <CostGaugeBar spentUsd={status.cost_today_usd} capUsd={status.cost_cap_usd} />
-        </div>
-
-        {/* Key metrics — top 2 */}
-        <div className="grid grid-cols-2 gap-2">
-          {status.metrics.slice(0, 2).map((m) => {
-            const passing = m.is_rate ? m.value >= m.target : m.value <= m.target || m.target === 0 ? m.value === m.target : m.value >= m.target;
-            return (
-              <div key={m.label} className="rounded-md bg-muted/50 p-2">
-                <p className="text-[10px] text-muted-foreground leading-tight mb-0.5">{m.label}</p>
-                <p className={cn("text-sm font-semibold", passing ? "text-success" : "text-warning")}>
-                  {m.value}{m.unit === "%" ? "%" : m.unit === "s" ? "s" : m.unit === "score" ? "/5" : ""}
-                </p>
-              </div>
-            );
-          })}
+          <p className="text-xs text-muted-foreground mb-1">Spend today</p>
+          <CostGaugeBar
+            spentUsd={status.cost_today_usd}
+            capUsd={status.cost_cap_usd}
+            capLabel={status.project_cap_usd ? "project cap" : "per-run cap"}
+          />
+          {status.per_run_cap_usd != null && (
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Per-run ceiling ${status.per_run_cap_usd.toFixed(2)}
+              {status.project_cap_usd != null
+                ? ` · Project ceiling $${status.project_cap_usd.toFixed(2)}`
+                : ""}
+            </p>
+          )}
         </div>
 
         {/* Runs + last run */}

@@ -1,0 +1,331 @@
+from __future__ import annotations
+
+from copy import deepcopy
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, List
+
+AGENT_IDS: List[str] = [
+    "live-call",
+    "content",
+    "content_generation",
+    "knowledge",
+    "coaching",
+    "task",
+]
+
+AGENT_LABELS: Dict[str, str] = {
+    "live-call": "Live Call Agent",
+    "content": "Content Agent",
+    "content_generation": "Content Generation Agent",
+    "knowledge": "Knowledge Agent",
+    "coaching": "Coaching Agent",
+    "task": "Task Agent",
+}
+
+AGENT_DOMAINS: Dict[str, List[str]] = {
+    "live-call": ["live_assist"],
+    "content": ["content_generation"],
+    "content_generation": ["content_generation"],
+    "knowledge": ["knowledge_maintenance"],
+    "coaching": ["coaching_insights"],
+    "task": ["task_execution"],
+}
+
+PROMPT_ROOT = Path(__file__).resolve().parents[4] / "prompts"
+
+AGENT_PROMPT_GLOBS: Dict[str, List[str]] = {
+    "live-call": ["live-call/**/*.md"],
+    "content": ["content/pre_dc_brief/**/*.md"],
+    "content_generation": ["content/studio/**/*.md", "content/template_vision/**/*.md"],
+}
+
+AGENT_OPERATIONS: Dict[str, List[str]] = {
+    "live-call": ["proactive_nudge", "signal_annotation"],
+    "content": ["pre_dc_brief"],
+    "content_generation": ["studio_turn", "template_ingest", "export_pdf", "export_png", "export_pptx"],
+    "knowledge": ["asset_ingested"],
+    "coaching": ["scorecard"],
+    "task": ["post_call_artifacts"],
+}
+
+
+def discover_prompt_versions(agent_id: str) -> List[Dict[str, Any]]:
+    patterns = AGENT_PROMPT_GLOBS.get(agent_id, [])
+    if not patterns:
+        return []
+    found: List[Path] = []
+    for pattern in patterns:
+        found.extend(sorted(PROMPT_ROOT.glob(pattern)))
+    versions: List[Dict[str, Any]] = []
+    for path in found:
+        rel = path.relative_to(PROMPT_ROOT).as_posix()
+        parts = rel.split("/")
+        version = parts[-1].replace(".md", "") if parts else "1.0.0"
+        label = parts[-2] if len(parts) >= 2 else agent_id
+        versions.append(
+            {
+                "version": version,
+                "label": label,
+                "path": rel,
+                "deployed_at": datetime.utcfromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%dT%H:%M:%S"),
+                "reviewed_by": "repo",
+                "changelog": f"Prompt file in repository: {rel}",
+                "is_active": len(versions) == 0,
+            }
+        )
+    return versions
+
+
+def _iso_days_ago(days: int) -> str:
+    return (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _guardrails() -> Dict[str, Any]:
+    return {
+        "policy_version": "2026.05.1",
+        "pre_input": {
+            "execution_order": 1,
+            "rules": [
+                {"id": "pre-intent", "name": "Intent and risk classify", "description": "Classify request intent, risk, and policy domain before processing.", "severity": "warn", "mode": "enforce", "enabled": True},
+                {"id": "pre-pii", "name": "PII and secret mask", "description": "Mask emails, tokens, and account IDs before prompt construction.", "severity": "block", "mode": "enforce", "enabled": True},
+                {"id": "pre-abuse", "name": "Rate and token quota", "description": "Apply per-tenant request/token budgets and abuse controls.", "severity": "block", "mode": "enforce", "enabled": True},
+            ],
+        },
+        "in_generation": {
+            "execution_order": 2,
+            "rules": [
+                {"id": "gen-stream-mod", "name": "Streaming moderation", "description": "Check partial output chunks for harmful content before emission.", "severity": "block", "mode": "enforce", "enabled": True},
+                {"id": "gen-tool-policy", "name": "Tool-call policy", "description": "Validate schema, destination, and risk tier for each tool call.", "severity": "block", "mode": "enforce", "enabled": True},
+                {"id": "gen-stateful", "name": "Stateful constraint check", "description": "Deny disallowed operations by session state and role.", "severity": "warn", "mode": "enforce", "enabled": True},
+            ],
+        },
+        "post_output": {
+            "execution_order": 3,
+            "rules": [
+                {"id": "post-contract", "name": "Output contract validation", "description": "Validate final structure and required fields before send.", "severity": "block", "mode": "enforce", "enabled": True},
+                {"id": "post-redaction", "name": "Leak redaction pass", "description": "Final scan and redact sensitive values before delivery.", "severity": "block", "mode": "enforce", "enabled": True},
+                {"id": "post-confidence", "name": "Confidence and escalation", "description": "Tag low-confidence outputs and trigger fallback/escalation.", "severity": "warn", "mode": "enforce", "enabled": True},
+            ],
+        },
+    }
+
+
+def _workflow() -> Dict[str, Any]:
+    return {
+        "version": "1.0.0",
+        "states": [
+            "receive_input", "validate_input", "policy_check", "plan_step", "execute_tool",
+            "evaluate_result", "stream_response", "final_policy_check", "deliver", "escalate_human",
+        ],
+        "transitions": [
+            {"from": "receive_input", "to": "validate_input", "condition": "input_received"},
+            {"from": "validate_input", "to": "policy_check", "condition": "payload_valid"},
+            {"from": "policy_check", "to": "plan_step", "condition": "policy_pass"},
+            {"from": "plan_step", "to": "execute_tool", "condition": "tool_required"},
+            {"from": "execute_tool", "to": "evaluate_result", "condition": "tool_finished"},
+            {"from": "evaluate_result", "to": "plan_step", "condition": "needs_additional_step"},
+            {"from": "evaluate_result", "to": "stream_response", "condition": "ready_to_respond"},
+            {"from": "stream_response", "to": "final_policy_check", "condition": "response_complete"},
+            {"from": "final_policy_check", "to": "deliver", "condition": "final_guardrail_pass"},
+            {"from": "final_policy_check", "to": "escalate_human", "condition": "final_guardrail_fail"},
+            {"from": "escalate_human", "to": "deliver", "condition": "handoff_or_safe_refusal_ready"},
+        ],
+        "policy": {
+            "max_tool_iterations": 3,
+            "allow_parallel_readonly_subtasks": True,
+            "require_idempotency_for_side_effects": True,
+            "circuit_breaker_threshold": 4,
+            "fallback_model_on_latency_spike": True,
+        },
+    }
+
+
+def _model_policy(agent_id: str) -> Dict[str, Any]:
+    if agent_id == "coaching":
+        return {
+            "primary": "opus",
+            "fallback": "sonnet",
+            "model_name": "claude-3-opus-20240229",
+            "fallback_model_name": "claude-sonnet-4-6",
+        }
+    if agent_id in ("content", "content_generation"):
+        return {
+            "primary": "opus",
+            "fallback": "sonnet",
+            "model_name": "claude-opus-4-7",
+            "fallback_model_name": "claude-sonnet-4-6",
+        }
+    return {
+        "primary": "haiku",
+        "fallback": "sonnet",
+        "model_name": "claude-3-haiku-20240307",
+        "fallback_model_name": "claude-sonnet-4-6",
+    }
+
+
+def _cost_cap(agent_id: str) -> Dict[str, Any]:
+    if agent_id == "content_generation":
+        return {
+            "per_run_ceiling_usd": 0.05,
+            "project_ceiling_usd": 1.5,
+            "abort_strategy": "hard_stop",
+        }
+    if agent_id == "coaching":
+        return {"per_run_ceiling_usd": 0.15, "abort_strategy": "degrade"}
+    if agent_id == "content":
+        return {"per_run_ceiling_usd": 0.05, "abort_strategy": "degrade"}
+    return {"per_run_ceiling_usd": 0.02, "abort_strategy": "degrade"}
+
+
+def default_agent_config(agent_id: str) -> Dict[str, Any]:
+    if agent_id not in AGENT_IDS:
+        raise ValueError(f"Unknown agent_id: {agent_id}")
+
+    label = AGENT_LABELS[agent_id]
+    cfg: Dict[str, Any] = {
+        "agent_id": agent_id,
+        "system_prompt_override": "",
+        "profile": {
+            "profile_version": "1.0.0",
+            "immutable_revision": 4,
+            "identity": {
+                "name": label,
+                "role": f"{label} specialist",
+                "allowed_domains": AGENT_DOMAINS[agent_id],
+                "persona_boundaries": [
+                    "Do not fabricate product commitments.",
+                    "Escalate compliance or legal ambiguity to a human reviewer.",
+                ],
+            },
+            "runtime": {
+                "provider": "hybrid",
+                "model_routing_policy": "quality_first" if agent_id == "coaching" else "balanced",
+                "latency_budget_ms": 1800 if agent_id == "live-call" else 3200,
+                "max_turns": 6 if agent_id == "live-call" else 10,
+                "timeout_ms": 7000,
+                "retry_budget": 2,
+            },
+            "memory": {
+                "session_ttl_seconds": 3600,
+                "long_term_memory_enabled": agent_id != "live-call",
+                "retention_days": 30,
+            },
+            "tools": [
+                {
+                    "tool_name": "kb_search",
+                    "timeout_ms": 1200,
+                    "quota_per_hour": 1800,
+                    "input_schema_version": "2026-05-01",
+                    "side_effecting": False,
+                },
+                {
+                    "tool_name": "crm_write" if agent_id == "task" else "analytics_query",
+                    "timeout_ms": 2000,
+                    "quota_per_hour": 400,
+                    "input_schema_version": "2026-05-01",
+                    "side_effecting": agent_id == "task",
+                },
+            ],
+            "output_contract": {
+                "allowed_formats": ["markdown", "json"],
+                "required_fields": ["summary", "evidence"],
+                "forbidden_content_classes": ["pii_leak", "secret_exposure"],
+            },
+            "risk_tier": "high" if agent_id in ("task", "coaching") else "medium",
+            "escalation": {
+                "enabled": True,
+                "max_auto_attempts": 2,
+                "confidence_threshold": 0.62,
+                "triggers": ["policy_violation", "low_confidence", "tool_failure"],
+                "fallback_action": "handoff_human",
+            },
+        },
+        "model_policy": _model_policy(agent_id),
+        "cost_cap": _cost_cap(agent_id),
+        "throttle": {
+            "max_nudges_per_window": 3,
+            "window_seconds": 300,
+            "max_concurrent_runs": 5 if agent_id == "live-call" else 3,
+        },
+        "failure_behaviour": {
+            "max_retries": 3,
+            "retry_delay_ms": 500,
+            "fallback_strategy": "degrade_gracefully",
+            "alert_on_failure": True,
+        },
+        "guardrails": _guardrails(),
+        "workflow": _workflow(),
+        "observability": {
+            "event_schema": {
+                "required_fields": ["session_id", "agent_id", "policy_version", "risk_tier", "tool_call_id"],
+                "trace_key": "trace_id",
+            },
+            "metrics": [
+                {"id": "first_token_latency", "label": "First token latency", "target": 1200, "unit": "ms", "alert_threshold": 1800},
+                {"id": "turn_latency", "label": "Turn latency", "target": 3500, "unit": "ms", "alert_threshold": 5000},
+                {"id": "tool_error_rate", "label": "Tool error rate", "target": 2, "unit": "%", "alert_threshold": 5},
+                {"id": "guardrail_hit_rate", "label": "Guardrail hit rate", "target": 8, "unit": "%", "alert_threshold": 15},
+                {"id": "escalation_rate", "label": "Escalation rate", "target": 5, "unit": "%", "alert_threshold": 10},
+            ],
+            "tracing_enabled": True,
+            "audit": {"immutable_log": True, "retention_days": 365, "replay_harness_enabled": True},
+        },
+        "rollout": {
+            "current_stage": "shadow",
+            "stages": [
+                {"stage": "simulation", "enabled": True, "gate": "Historical replay accuracy >= 95%"},
+                {"stage": "shadow", "enabled": True, "gate": "No Sev-1 policy misses for 7 days"},
+                {"stage": "soft_enforcement", "enabled": False, "gate": "False positive rate < 2%"},
+                {"stage": "high_risk_first", "enabled": False, "gate": "High-risk flows fully instrumented"},
+                {"stage": "continuous_tuning", "enabled": False, "gate": "Weekly drift review automation active"},
+            ],
+        },
+        "active_prompt_versions": discover_prompt_versions(agent_id),
+        "operations": AGENT_OPERATIONS.get(agent_id, []),
+    }
+
+    if agent_id == "live-call":
+        cfg["signal_routing"] = [
+            {"id": "sr-1", "keyword_pattern": "competitor|alternative|vs\\s|compared to", "signal_type": "competitor_mentioned", "nudge_type": "objection_handler", "target_role": "AE", "enabled": True, "confidence_threshold": 0.75},
+            {"id": "sr-2", "keyword_pattern": "budget|cost|price|pricing|invoice|spend", "signal_type": "budget_signal", "nudge_type": "discovery_question", "target_role": "AE", "enabled": True, "confidence_threshold": 0.70},
+            {"id": "sr-3", "keyword_pattern": "integration|API|technical|architecture|stack", "signal_type": "technical_question", "nudge_type": "reference_asset", "target_role": "SE", "enabled": True, "confidence_threshold": 0.65},
+            {"id": "sr-4", "keyword_pattern": "timeline|deadline|launch|go-live|urgent", "signal_type": "timeline_signal", "nudge_type": "discovery_question", "target_role": "AE", "enabled": True, "confidence_threshold": 0.70},
+            {"id": "sr-5", "keyword_pattern": "design|mockup|prototype|UX|demo", "signal_type": "design_query", "nudge_type": "reference_asset", "target_role": "Designer", "enabled": False, "confidence_threshold": 0.60},
+        ]
+
+    return cfg
+
+
+def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    out = deepcopy(base)
+    for key, val in override.items():
+        if isinstance(val, dict) and isinstance(out.get(key), dict):
+            out[key] = deep_merge(out[key], val)
+        else:
+            out[key] = val
+    return out
+
+
+EDITABLE_CONFIG_KEYS = frozenset(
+    {
+        "system_prompt_override",
+        "model_policy",
+        "cost_cap",
+        "throttle",
+        "signal_routing",
+        "failure_behaviour",
+    }
+)
+
+
+def merge_agent_config(agent_id: str, saved: Dict[str, Any] | None) -> Dict[str, Any]:
+    base = default_agent_config(agent_id)
+    if not saved:
+        return base
+    patch = {k: saved[k] for k in EDITABLE_CONFIG_KEYS if k in saved}
+    merged = deep_merge(base, patch)
+    merged["agent_id"] = agent_id
+    merged["active_prompt_versions"] = discover_prompt_versions(agent_id)
+    merged["operations"] = AGENT_OPERATIONS.get(agent_id, [])
+    return merged

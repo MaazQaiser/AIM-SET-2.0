@@ -1,5 +1,11 @@
 // ── Agent IDs ──────────────────────────────────────────────────────────────
-export type AgentId = "live-call" | "content" | "knowledge" | "coaching" | "task";
+export type AgentId =
+  | "live-call"
+  | "content"
+  | "content_generation"
+  | "knowledge"
+  | "coaching"
+  | "task";
 
 // ── Agent health ───────────────────────────────────────────────────────────
 export type AgentHealth = "healthy" | "degraded" | "outage" | "idle";
@@ -20,6 +26,8 @@ export type CostAbortStrategy = "hard_stop" | "degrade" | "alert_only";
 export interface CostCapConfig {
   per_run_ceiling_usd: number;
   abort_strategy: CostAbortStrategy;
+  /** Studio / project-level spend cap (Content Generation Agent). */
+  project_ceiling_usd?: number;
 }
 
 // ── Throttle settings ──────────────────────────────────────────────────────
@@ -231,6 +239,10 @@ export interface RolloutPlan {
 // ── Full agent config ──────────────────────────────────────────────────────
 export interface AgentConfig {
   agent_id: AgentId;
+  /** Orchestrator operations this agent handles (read-only, from codebase). */
+  operations?: string[];
+  /** When set, overrides the active prompt file for this agent. */
+  system_prompt_override?: string;
   profile: AgentProfile;
   model_policy: ModelPolicy;
   cost_cap: CostCapConfig;
@@ -306,8 +318,15 @@ export interface AgentStatus {
   health: AgentHealth;
   model_policy: ModelPolicy;
   cost_today_usd: number;
+  /** Gauge reference cap (project ceiling when set, else per-run ceiling). */
   cost_cap_usd: number;
+  per_run_cap_usd?: number;
+  project_cap_usd?: number;
   runs_today: number;
   last_run_at?: string;
   metrics: AgentMetric[];
+}
+
+export interface PromptVersionFile extends PromptVersion {
+  path?: string;
 }

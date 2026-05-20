@@ -20,9 +20,14 @@ export default function ContentPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Content</h1>
-        <p className="text-sm text-muted-foreground mt-1">Gaps detected from recent discovery calls</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Content</h1>
+          <p className="text-sm text-muted-foreground mt-1">Gaps from discovery calls and the Content Generation Studio</p>
+        </div>
+        <Button asChild variant="secondary">
+          <Link href="/content/studio">Open Content Studio</Link>
+        </Button>
       </div>
 
       {gaps.length > 0 ? (

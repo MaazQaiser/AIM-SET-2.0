@@ -15,6 +15,7 @@ import type { AgentId } from "@/types/agents";
 import { cn } from "@/lib/cn";
 import { AGENT_META, buildAgentStatuses } from "@/lib/agents/catalog";
 import { useAgentAudit, useAgentRuns } from "@/lib/data/hooks";
+import { useAgentConfig } from "@/lib/data/agent-config-hooks";
 
 function MetricCard({
   label,
@@ -62,6 +63,7 @@ function MetricCard({
 export function AgentDetailClient({ agentId }: { agentId: AgentId }) {
   const { data: allRuns = [] } = useAgentRuns();
   const { data: allFeed = [] } = useAgentAudit();
+  const { data: agentConfig } = useAgentConfig(agentId);
 
   const meta = AGENT_META[agentId];
   const status = buildAgentStatuses(allRuns).find((s) => s.agent_id === agentId);
@@ -69,28 +71,22 @@ export function AgentDetailClient({ agentId }: { agentId: AgentId }) {
   const feed = useMemo(() => allFeed.filter((e) => e.agent_id === agentId), [allFeed, agentId]);
 
   const costToday = runs.reduce((s, r) => s + r.cost_usd, 0);
+  const tokensToday = runs.reduce((s, r) => s + (r.tokens_used ?? 0), 0);
   const successRate =
     runs.length > 0 ? (runs.filter((r) => r.outcome === "success").length / runs.length) * 100 : 0;
-  const avgDurationSec =
-    runs.length > 0
-      ? runs.reduce((s, r) => s + (r.duration_ms ?? 0), 0) / runs.length / 1000
-      : 0;
 
-  const cap = status?.cost_cap_usd ?? 10;
+  const perRunCap =
+    agentConfig?.cost_cap.per_run_ceiling_usd ?? status?.per_run_cap_usd ?? status?.cost_cap_usd ?? 0.05;
+  const projectCap = agentConfig?.cost_cap.project_ceiling_usd ?? status?.project_cap_usd;
+  const gaugeCap = projectCap ?? perRunCap;
   const health = status?.health ?? "idle";
-  const modelPolicy = status?.model_policy;
+  const modelPolicy = agentConfig?.model_policy ?? status?.model_policy;
 
   const metrics = [
-    { label: "Success rate", value: successRate, target: 95, unit: "%", is_rate: true },
+    { label: "Success rate", value: Math.round(successRate), target: 0, unit: "%", is_rate: true },
     { label: "Runs recorded", value: runs.length, target: 0, unit: "count", is_rate: false },
-    { label: "Cost today", value: parseFloat(costToday.toFixed(2)), target: cap, unit: "usd", is_rate: false },
-    {
-      label: "Avg duration",
-      value: Math.round(avgDurationSec * 10) / 10,
-      target: 5,
-      unit: "s",
-      is_rate: false,
-    },
+    { label: "Cost today", value: parseFloat(costToday.toFixed(4)), target: 0, unit: "usd", is_rate: false },
+    { label: "Tokens today", value: tokensToday, target: 0, unit: "count", is_rate: false },
   ];
 
   return (
@@ -116,6 +112,9 @@ export function AgentDetailClient({ agentId }: { agentId: AgentId }) {
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground max-w-2xl">{meta.purpose}</p>
+          <p className="text-xs text-muted-foreground font-mono">
+            Operations: {meta.operations.join(", ")}
+          </p>
         </div>
         <Link href={`/agents/${agentId}/config`}>
           <Button variant="outline" className="gap-2 shrink-0">
@@ -132,8 +131,16 @@ export function AgentDetailClient({ agentId }: { agentId: AgentId }) {
             <ModelPolicyBadge policy={modelPolicy} showFallback />
           </div>
           <div className="min-w-[200px]">
-            <p className="text-xs text-muted-foreground mb-1">Daily spend vs cap</p>
-            <CostGaugeBar spentUsd={costToday} capUsd={cap} />
+            <p className="text-xs text-muted-foreground mb-1">Spend vs {projectCap ? "project" : "per-run"} cap</p>
+            <CostGaugeBar
+              spentUsd={costToday}
+              capUsd={gaugeCap}
+              capLabel={projectCap ? "project cap" : "per-run cap"}
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Per-run ${perRunCap.toFixed(2)}
+              {projectCap != null ? ` · Project $${projectCap.toFixed(2)}` : ""}
+            </p>
           </div>
         </div>
       )}

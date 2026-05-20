@@ -6,11 +6,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 interface CostGaugeBarProps {
   spentUsd: number;
   capUsd: number;
+  capLabel?: string;
   className?: string;
 }
 
-export function CostGaugeBar({ spentUsd, capUsd, className }: CostGaugeBarProps) {
-  const pct = Math.min((spentUsd / capUsd) * 100, 100);
+export function CostGaugeBar({ spentUsd, capUsd, capLabel = "cap", className }: CostGaugeBarProps) {
+  const safeCap = capUsd > 0 ? capUsd : 0.01;
+  const pct = Math.min((spentUsd / safeCap) * 100, 100);
   const isWarning = pct >= 75;
   const isDanger = pct >= 90;
 
@@ -19,18 +21,16 @@ export function CostGaugeBar({ spentUsd, capUsd, className }: CostGaugeBarProps)
       <TooltipTrigger asChild>
         <div className={cn("space-y-1", className)}>
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>${spentUsd.toFixed(2)}</span>
-            <span>${capUsd.toFixed(0)} cap</span>
+            <span>${spentUsd.toFixed(2)} today</span>
+            <span>
+              ${safeCap.toFixed(2)} {capLabel}
+            </span>
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
             <div
               className={cn(
                 "h-full rounded-full transition-all duration-500",
-                isDanger
-                  ? "bg-destructive"
-                  : isWarning
-                  ? "bg-warning"
-                  : "bg-primary"
+                isDanger ? "bg-destructive" : isWarning ? "bg-warning" : "bg-primary"
               )}
               style={{ width: `${pct}%` }}
             />
@@ -38,7 +38,7 @@ export function CostGaugeBar({ spentUsd, capUsd, className }: CostGaugeBarProps)
         </div>
       </TooltipTrigger>
       <TooltipContent>
-        {pct.toFixed(0)}% of daily cost cap used
+        {pct.toFixed(0)}% of {capLabel} ({spentUsd.toFixed(2)} / ${safeCap.toFixed(2)})
       </TooltipContent>
     </Tooltip>
   );

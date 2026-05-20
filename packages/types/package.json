@@ -7,7 +7,8 @@
     "./dc-notes": "./src/dc-notes.ts",
     "./agents": "./src/agents.ts",
     "./brief": "./src/brief.ts",
-    "./integrations": "./src/integrations.ts"
+    "./integrations": "./src/integrations.ts",
+    "./content_studio": "./src/content_studio.ts"
   },
   "scripts": {
     "type-check": "tsc --noEmit",

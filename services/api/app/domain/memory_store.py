@@ -13,10 +13,18 @@ class MemoryStore:
         self.kb_files: Dict[str, Dict[str, bytes]] = {}
         self.tenant_uuid_map: Dict[str, str] = {}
         self.agent_runs: Dict[str, List[Dict[str, Any]]] = {}
+        self.agent_configs: Dict[str, Dict[str, Dict[str, Any]]] = {}
         self.audit: Dict[str, List[Dict[str, Any]]] = {}
         self.pre_dc_records: Dict[str, List[Dict[str, Any]]] = {}
         self.post_dc_records: Dict[str, List[Dict[str, Any]]] = {}
         self.calls: Dict[str, List[Dict[str, Any]]] = {}
+        self.content_templates: Dict[str, List[Dict[str, Any]]] = {}
+        self.content_template_html: Dict[str, str] = {}
+        self.content_template_files: Dict[str, bytes] = {}
+        self.content_projects: Dict[str, List[Dict[str, Any]]] = {}
+        self.content_messages: Dict[str, List[Dict[str, Any]]] = {}
+        self.content_revisions: Dict[str, List[Dict[str, Any]]] = {}
+        self.content_exports: Dict[str, bytes] = {}
 
     def list_kb_assets(self, tenant_id: str) -> List[Dict[str, Any]]:
         return self.kb_assets.get(tenant_id, [])

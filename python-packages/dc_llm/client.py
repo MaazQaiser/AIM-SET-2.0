@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import os
 import uuid
 from dataclasses import dataclass
@@ -26,8 +27,9 @@ class LlmClient:
         self,
         system: str,
         user: str,
-        model: str = "claude-3-5-sonnet-20241022",
+        model: str = "claude-opus-4-7",
         max_tokens: int = 2048,
+        fallback_model: Optional[str] = None,
     ) -> LlmCompletion:
         trace_id = str(uuid.uuid4())
         if not self.api_key:
@@ -40,6 +42,45 @@ class LlmClient:
                 trace_id=trace_id,
             )
 
+        result = self._call_anthropic(
+            system=system,
+            user=user,
+            model=model,
+            max_tokens=max_tokens,
+            trace_id=trace_id,
+        )
+        if result is not None:
+            return result
+
+        if fallback_model and fallback_model != model:
+            result = self._call_anthropic(
+                system=system,
+                user=user,
+                model=fallback_model,
+                max_tokens=max_tokens,
+                trace_id=trace_id,
+            )
+            if result is not None:
+                return result
+
+        return LlmCompletion(
+            text=_fallback_complete(system, user),
+            model="fallback-error",
+            tokens_in=0,
+            tokens_out=0,
+            cost_usd=0.0,
+            trace_id=trace_id,
+        )
+
+    def _call_anthropic(
+        self,
+        *,
+        system: str,
+        user: str,
+        model: str,
+        max_tokens: int,
+        trace_id: str,
+    ) -> Optional[LlmCompletion]:
         try:
             import anthropic  # type: ignore
 
@@ -63,14 +104,110 @@ class LlmClient:
                 trace_id=trace_id,
             )
         except Exception:
+            return None
+
+    def complete_vision(
+        self,
+        system: str,
+        image_png_bytes: bytes,
+        user_text: str = "Convert this slide to HTML/CSS.",
+        model: str = "claude-opus-4-7",
+        max_tokens: int = 4096,
+        fallback_model: Optional[str] = None,
+    ) -> LlmCompletion:
+        trace_id = str(uuid.uuid4())
+        b64 = base64.standard_b64encode(image_png_bytes).decode("ascii")
+        if not self.api_key:
             return LlmCompletion(
-                text=_fallback_complete(system, user),
-                model="fallback-error",
-                tokens_in=0,
-                tokens_out=0,
+                text='<section class="slide" data-slide="1"><style scoped>:root{--brand:#1a1a2e;--accent:#e94560;--bg:#fff;--text:#333}</style><div class="placeholder" data-role="hero"></div></section>',
+                model="fallback-local",
+                tokens_in=100,
+                tokens_out=200,
                 cost_usd=0.0,
                 trace_id=trace_id,
             )
+
+        result = self._call_anthropic_vision(
+            system=system,
+            b64=b64,
+            user_text=user_text,
+            model=model,
+            max_tokens=max_tokens,
+            trace_id=trace_id,
+        )
+        if result is not None:
+            return result
+
+        if fallback_model and fallback_model != model:
+            result = self._call_anthropic_vision(
+                system=system,
+                b64=b64,
+                user_text=user_text,
+                model=fallback_model,
+                max_tokens=max_tokens,
+                trace_id=trace_id,
+            )
+            if result is not None:
+                return result
+
+        return LlmCompletion(
+            text='<section class="slide" data-slide="1"><p>Template slide (vision fallback)</p></section>',
+            model="fallback-error",
+            tokens_in=0,
+            tokens_out=0,
+            cost_usd=0.0,
+            trace_id=trace_id,
+        )
+
+    def _call_anthropic_vision(
+        self,
+        *,
+        system: str,
+        b64: str,
+        user_text: str,
+        model: str,
+        max_tokens: int,
+        trace_id: str,
+    ) -> Optional[LlmCompletion]:
+        try:
+            import anthropic  # type: ignore
+
+            client = anthropic.Anthropic(api_key=self.api_key)
+            msg = client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                system=system,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": "image/png",
+                                    "data": b64,
+                                },
+                            },
+                            {"type": "text", "text": user_text},
+                        ],
+                    }
+                ],
+            )
+            text = msg.content[0].text if msg.content else ""
+            usage = getattr(msg, "usage", None)
+            tokens_in = getattr(usage, "input_tokens", 0) if usage else 0
+            tokens_out = getattr(usage, "output_tokens", 0) if usage else 0
+            return LlmCompletion(
+                text=text,
+                model=model,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                cost_usd=_estimate_cost(model, tokens_in, tokens_out),
+                trace_id=trace_id,
+            )
+        except Exception:
+            return None
 
 
 def _fallback_complete(system: str, user: str) -> str:

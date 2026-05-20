@@ -15,6 +15,7 @@ export const useAgents = create<AgentsState>((set) => ({
   configs: {
     "live-call": null,
     content: null,
+    content_generation: null,
     knowledge: null,
     coaching: null,
     task: null,

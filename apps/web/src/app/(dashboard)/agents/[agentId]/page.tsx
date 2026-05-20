@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { AgentDetailClient } from "@/components/agents/agent-detail-client";
 import type { AgentId } from "@/types/agents";
 
-const AGENT_IDS: AgentId[] = ["live-call", "content", "knowledge", "coaching", "task"];
+const AGENT_IDS: AgentId[] = ["live-call", "content", "content_generation", "knowledge", "coaching", "task"];
 
 export function generateStaticParams() {
   return AGENT_IDS.map((id) => ({ agentId: id }));
