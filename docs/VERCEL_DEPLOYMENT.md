@@ -32,6 +32,8 @@ NEXT_PUBLIC_WS_URL=wss://your-api-host.example.com
 NEXT_PUBLIC_KB_SHARED=true
 ```
 
+Use the full Clerk keys from Clerk Dashboard -> API Keys. The `pk_live_...` and `sk_live_...` values above are placeholders; pasting those exact placeholder strings will fail the build.
+
 Do not enable `NEXT_PUBLIC_AUTH_BYPASS` in Vercel production.
 
 ## Backend requirement
