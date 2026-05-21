@@ -52,7 +52,7 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
     const envelope = await generateMut.mutateAsync({
       message:
         "Generate the slides now using gathered requirements and sensible defaults for any missing details. Do not ask follow-up questions unless generation is impossible.",
-      templateId: selectedTemplateId ?? project.templateId ?? undefined,
+      templateId: selectedTemplateId ?? project?.templateId ?? undefined,
       generate: true,
     });
     onTurn(envelope.result);

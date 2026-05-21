@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/lib/api/auth";
 import { NextResponse } from "next/server";
 import type { ActivityEvent, AgentId } from "@/types/agents";
 

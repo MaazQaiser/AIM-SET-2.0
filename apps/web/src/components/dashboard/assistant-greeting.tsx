@@ -3,6 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { format, isSameDay, startOfDay } from "date-fns";
 import { useCalls, usePostCallCrmTasks } from "@/lib/data/hooks";
+import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
 
 function getSalutation(hour: number): string {
   if (hour >= 23 || hour < 5) return "Working late";
@@ -21,13 +22,15 @@ function displayName(
 }
 
 export function AssistantGreeting() {
-  const { user, isLoaded } = useUser();
+  const localAuthBypass = isLocalAuthBypassEnabled();
+  const clerkUser = localAuthBypass ? null : useUser();
   const { data: calls = [] } = useCalls();
   const { data: crmTasks = [] } = usePostCallCrmTasks();
 
   const hour = new Date().getHours();
   const salutation = getSalutation(hour);
-  const name = displayName(user?.firstName, user?.username);
+  const isLoaded = localAuthBypass || Boolean(clerkUser?.isLoaded);
+  const name = displayName(clerkUser?.user?.firstName, clerkUser?.user?.username);
 
   const today = startOfDay(new Date());
   const todaysCalls = calls.filter(

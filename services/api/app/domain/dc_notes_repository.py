@@ -9,6 +9,7 @@ from dc_embeddings.client import EmbeddingClient
 from app.config import get_settings
 from app.deps import get_supabase
 from app.domain.memory_store import get_memory_store
+from app.domain.supabase_utils import execute_with_retry
 from app.domain.tenant_service import get_tenant_service
 
 
@@ -38,30 +39,45 @@ class DcNotesRepository:
     def get_notes(self, ctx: TenantContext) -> Dict[str, List[Dict[str, Any]]]:
         tenant_uuid, clerk_key = self._tenant_keys(ctx)
         settings = get_settings()
+        store = get_memory_store()
 
         if settings.supabase_configured:
             try:
                 supabase = get_supabase()
-                pre_result = (
-                    supabase.table("pre_dc_records")
-                    .select("id, fields")
-                    .eq("tenant_id", tenant_uuid)
-                    .execute()
+                pre_result = execute_with_retry(
+                    lambda: (
+                        supabase.table("pre_dc_records")
+                        .select("id, fields")
+                        .eq("tenant_id", tenant_uuid)
+                        .execute()
+                    )
                 )
-                post_result = (
-                    supabase.table("post_dc_records")
-                    .select("id, matched_call_id, fields")
-                    .eq("tenant_id", tenant_uuid)
-                    .execute()
+                post_result = execute_with_retry(
+                    lambda: (
+                        supabase.table("post_dc_records")
+                        .select("id, matched_call_id, fields")
+                        .eq("tenant_id", tenant_uuid)
+                        .execute()
+                    )
                 )
+                pre_rows = pre_result.data or []
+                post_rows = post_result.data or []
+                store.upsert_pre_dc_records(clerk_key, pre_rows)
+                store.upsert_post_dc_records(clerk_key, post_rows)
                 return {
-                    "pre_dc_records": pre_result.data or [],
-                    "post_dc_records": post_result.data or [],
+                    "pre_dc_records": pre_rows,
+                    "post_dc_records": post_rows,
                 }
             except Exception as exc:
+                cached_pre = store.list_pre_dc_records(clerk_key)
+                cached_post = store.list_post_dc_records(clerk_key)
+                if cached_pre or cached_post:
+                    return {
+                        "pre_dc_records": cached_pre,
+                        "post_dc_records": cached_post,
+                    }
                 raise RuntimeError(f"Failed to load DC notes from Supabase: {exc}") from exc
 
-        store = get_memory_store()
         return {
             "pre_dc_records": store.list_pre_dc_records(clerk_key),
             "post_dc_records": store.list_post_dc_records(clerk_key),

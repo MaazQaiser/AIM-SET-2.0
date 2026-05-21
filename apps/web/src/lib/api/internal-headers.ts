@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/lib/api/auth";
 
 export async function internalApiHeaders(): Promise<HeadersInit> {
   const { userId, orgId } = await auth();

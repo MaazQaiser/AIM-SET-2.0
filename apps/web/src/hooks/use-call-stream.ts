@@ -62,6 +62,7 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttempts = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const shouldReconnectRef = useRef(false);
 
   const {
     setConnected,
@@ -79,7 +80,17 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
   } = useLiveCall();
 
   const connect = useCallback(() => {
-    if (!enabled) return;
+    if (!enabled || !callId) return;
+
+    shouldReconnectRef.current = true;
+
+    const existing = wsRef.current;
+    if (
+      existing &&
+      (existing.readyState === WebSocket.CONNECTING || existing.readyState === WebSocket.OPEN)
+    ) {
+      return;
+    }
 
     const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000"}/ws/calls/${callId}`;
 
@@ -93,6 +104,7 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
       };
 
       ws.onmessage = (event: MessageEvent) => {
+        if (wsRef.current !== ws) return;
         try {
           const raw = JSON.parse(event.data as string) as { type: string; payload?: unknown };
           const msg = raw as StreamMessage;
@@ -137,10 +149,12 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
       };
 
       ws.onclose = () => {
+        if (wsRef.current !== ws) return;
+
         setConnected(false);
         wsRef.current = null;
 
-        if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
+        if (shouldReconnectRef.current && reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
           const delay = BASE_DELAY_MS * Math.pow(2, reconnectAttempts.current);
           reconnectAttempts.current++;
           reconnectTimer.current = setTimeout(connect, delay);
@@ -148,7 +162,9 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
       };
 
       ws.onerror = () => {
-        ws.close();
+        if (wsRef.current === ws) {
+          ws.close();
+        }
       };
     } catch {
       setConnected(false);
@@ -171,13 +187,24 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
   ]);
 
   useEffect(() => {
+    shouldReconnectRef.current = enabled;
     connect();
     return () => {
+      shouldReconnectRef.current = false;
       clearTimeout(reconnectTimer.current);
-      wsRef.current?.close();
+      reconnectTimer.current = undefined;
+      const ws = wsRef.current;
+      wsRef.current = null;
+      if (ws) {
+        ws.onopen = null;
+        ws.onmessage = null;
+        ws.onclose = null;
+        ws.onerror = null;
+        ws.close();
+      }
       setConnected(false);
     };
-  }, [connect, setConnected]);
+  }, [connect, enabled, setConnected]);
 
   const sendTranscript = useCallback(
     (segment: {

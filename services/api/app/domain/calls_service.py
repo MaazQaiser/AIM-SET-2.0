@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.deps import get_supabase
 from app.domain.dc_notes_repository import get_dc_notes_repository
 from app.domain.memory_store import get_memory_store
+from app.domain.supabase_utils import execute_with_retry
 from app.domain.tenant_service import get_tenant_service
 
 
@@ -87,24 +88,34 @@ class CallsService:
             supabase.table("calls").upsert(rows).execute()
 
     def list_calls(self, ctx: TenantContext) -> List[Dict[str, Any]]:
+        _, clerk_key = self._tenants.resolve(ctx)
         if not get_settings().supabase_configured:
-            _, clerk_key = self._tenants.resolve(ctx)
             mem_calls = get_memory_store().list_calls(clerk_key)
             if mem_calls:
                 return mem_calls
             return self.sync_from_dc_notes(ctx)
         tenant_uuid = self._tenant_uuid(ctx)
         supabase = get_supabase()
-        result = (
-            supabase.table("calls")
-            .select("id, account_name, scheduled_at, status, brief_ready, metadata")
-            .eq("tenant_id", tenant_uuid)
-            .order("scheduled_at", desc=True)
-            .execute()
-        )
+        try:
+            result = execute_with_retry(
+                lambda: (
+                    supabase.table("calls")
+                    .select("id, account_name, scheduled_at, status, brief_ready, metadata")
+                    .eq("tenant_id", tenant_uuid)
+                    .order("scheduled_at", desc=True)
+                    .execute()
+                )
+            )
+        except Exception:
+            mem_calls = get_memory_store().list_calls(clerk_key)
+            if mem_calls:
+                return mem_calls
+            raise
         rows = result.data or []
         if rows:
-            return [_row_to_call(r) for r in rows]
+            calls = [_row_to_call(r) for r in rows]
+            get_memory_store().upsert_calls(clerk_key, calls)
+            return calls
 
         return self.sync_from_dc_notes(ctx)
 
@@ -117,18 +128,26 @@ class CallsService:
             return get_memory_store().get_call_brief(clerk_key, call_id)
         tenant_uuid = self._tenant_uuid(ctx)
         supabase = get_supabase()
-        result = (
-            supabase.table("call_briefs")
-            .select("payload")
-            .eq("tenant_id", tenant_uuid)
-            .eq("call_id", call_id)
-            .order("version", desc=True)
-            .limit(1)
-            .execute()
-        )
+        try:
+            result = execute_with_retry(
+                lambda: (
+                    supabase.table("call_briefs")
+                    .select("payload")
+                    .eq("tenant_id", tenant_uuid)
+                    .eq("call_id", call_id)
+                    .order("version", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+            )
+        except Exception:
+            return get_memory_store().get_call_brief(clerk_key, call_id)
         rows = result.data or []
         if rows:
-            return rows[0].get("payload")
+            payload = rows[0].get("payload")
+            if payload:
+                get_memory_store().save_call_brief(clerk_key, call_id, payload)
+            return payload
         return None
 
     def save_brief(self, ctx: TenantContext, call_id: str, payload: Dict[str, Any]) -> None:

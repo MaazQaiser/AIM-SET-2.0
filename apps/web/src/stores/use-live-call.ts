@@ -67,25 +67,58 @@ const initialState = {
   suggestionLog: [],
 };
 
-export const useLiveCall = create<LiveCallState>((set) => ({
+function stableKey(value: unknown): string | null {
+  if (typeof value === "string" && value.length > 0) return value;
+  if (typeof value === "number") return String(value);
+  return null;
+}
+
+function upsertCapped<T>(
+  items: T[],
+  item: T,
+  getKey: (item: T) => unknown,
+  limit: number
+): T[] {
+  const key = stableKey(getKey(item));
+  const next = key ? items.filter((existing) => stableKey(getKey(existing)) !== key) : items;
+  return [...next, item].slice(-limit);
+}
+
+function uniqueBy<T>(items: T[], getKey: (item: T) => unknown): T[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = stableKey(getKey(item));
+    if (!key) return true;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export const useLiveCall = create<LiveCallState>((set, get) => ({
   ...initialState,
 
   setCallId: (callId) => set({ callId }),
   setConnected: (isConnected) => set({ isConnected }),
 
-  appendTranscriptEvent: (event) =>
+  appendTranscriptEvent: (event) => {
+    const eventId = stableKey(event.id);
+    if (eventId && get().transcript.some((existing) => stableKey(existing.id) === eventId)) {
+      return;
+    }
     set((s) => ({
-      transcript: [...s.transcript.slice(-500), event],
-    })),
+      transcript: [...s.transcript.slice(-499), event],
+    }));
+  },
 
   addNudge: (nudge) =>
     set((s) => ({
-      pendingNudges: [...s.pendingNudges, nudge].slice(-5),
+      pendingNudges: upsertCapped(s.pendingNudges, nudge, (item) => item.id, 5),
     })),
 
   addBantSignal: (signal) =>
     set((s) => ({
-      bantSignals: [...s.bantSignals, signal].slice(-20),
+      bantSignals: upsertCapped(s.bantSignals, signal, (item) => item.id, 20),
     })),
 
   dismissNudge: (id) =>
@@ -97,11 +130,18 @@ export const useLiveCall = create<LiveCallState>((set) => ({
   updateSentiment: (sentimentAE, sentimentCustomer) =>
     set({ sentimentAE, sentimentCustomer }),
 
-  applyIntentUpdate: (payload) =>
+  applyIntentUpdate: (payload) => {
+    const focusAreas = Array.from(new Set(payload.focus_areas ?? []));
+    const intentSnapshot = {
+      ...payload,
+      focus_areas: focusAreas,
+      pains: uniqueBy(payload.pains ?? [], (pain) => pain.id),
+    };
     set({
-      intentSnapshot: payload,
-      focusAreas: payload.focus_areas ?? [],
-    }),
+      intentSnapshot,
+      focusAreas,
+    });
+  },
 
   applyKeywordStats: (stats) => set({ keywordStats: stats }),
 
@@ -119,16 +159,23 @@ export const useLiveCall = create<LiveCallState>((set) => ({
   },
 
   addObjection: (objection) =>
-    set((s) => ({ objections: [...s.objections, objection].slice(-5) })),
+    set((s) => ({
+      objections: upsertCapped(s.objections, objection, (item) => item.id, 5),
+    })),
 
   addUnansweredQuestion: (q) =>
     set((s) => ({
-      unansweredQuestions: [...s.unansweredQuestions, q].slice(-10),
+      unansweredQuestions: upsertCapped(
+        s.unansweredQuestions,
+        q,
+        (item) => item.id ?? item.question_id,
+        10
+      ),
     })),
 
   appendSuggestionLog: (entry) =>
     set((s) => ({
-      suggestionLog: [...s.suggestionLog, entry].slice(-50),
+      suggestionLog: upsertCapped(s.suggestionLog, entry, (item) => item.id, 50),
     })),
 
   tickElapsed: () => set((s) => ({ elapsedSeconds: s.elapsedSeconds + 1 })),

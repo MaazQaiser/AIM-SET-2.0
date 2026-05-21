@@ -60,7 +60,9 @@ def _persist_and_broadcast(
     channel = get_call_channel()
     ws_messages: List[Dict[str, Any]] = []
 
-    ws_messages.append(transcript_event_to_ws(transcript_event))
+    transcript_ws_msg = transcript_event_to_ws(transcript_event)
+    ws_messages.append(transcript_ws_msg)
+    channel.broadcast_sync(call_id, transcript_ws_msg)
 
     for envelope in envelopes:
         validate_envelope(envelope)

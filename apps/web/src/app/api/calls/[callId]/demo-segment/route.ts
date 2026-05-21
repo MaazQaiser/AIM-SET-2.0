@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/lib/api/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 interface Params {

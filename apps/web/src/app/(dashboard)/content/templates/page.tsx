@@ -111,11 +111,7 @@ export default function ContentTemplatesPage() {
           icon={LayoutTemplate}
           title="No templates"
           description="Upload a deck or PDF to build your template library."
-          action={
-            <Button asChild>
-              <Link href="/content/templates/upload">Upload template</Link>
-            </Button>
-          }
+          action={{ label: "Upload template", href: "/content/templates/upload" }}
         />
       )}
 

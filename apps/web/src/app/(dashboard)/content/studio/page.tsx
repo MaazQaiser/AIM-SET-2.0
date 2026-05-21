@@ -126,12 +126,7 @@ export default function ContentStudioPage() {
           icon={Sparkles}
           title="No studio projects yet"
           description="Start a new project to generate content with the Content Generation Agent."
-          action={
-            <Button onClick={openCreateDialog}>
-              <Plus className="h-4 w-4 mr-1" />
-              New project
-            </Button>
-          }
+          action={{ label: "New project", onClick: openCreateDialog }}
         />
       )}
 

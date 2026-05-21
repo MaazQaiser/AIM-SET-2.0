@@ -5,6 +5,7 @@ import { Bell, Moon, Search, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { PersonaSwitcher } from "@/components/layout/persona-switcher";
+import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
 
 export function TopBar() {
   const { theme, setTheme } = useTheme();
@@ -46,9 +47,15 @@ export function TopBar() {
           <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-primary" />
         </Button>
 
-        <div className="ml-1 flex h-11 w-11 items-center justify-center rounded-full glass">
-          <UserButton afterSignOutUrl="/sign-in" />
-        </div>
+        {isLocalAuthBypassEnabled() ? (
+          <div className="ml-1 flex h-11 items-center rounded-full glass px-3 text-xs font-medium text-muted-foreground">
+            Local dev
+          </div>
+        ) : (
+          <div className="ml-1 flex h-11 w-11 items-center justify-center rounded-full glass">
+            <UserButton afterSignOutUrl="/sign-in" />
+          </div>
+        )}
       </div>
     </header>
   );
