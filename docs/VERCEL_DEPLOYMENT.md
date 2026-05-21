@@ -86,6 +86,8 @@ RECALL_WEBHOOK_SECRET=...
 
 `PUBLIC_API_BASE_URL` must be reachable by Recall.ai so transcript webhooks can be delivered.
 
+For step-by-step Recall testing on production, see **[RECALL_PRODUCTION_TESTING.md](./RECALL_PRODUCTION_TESTING.md)**.
+
 ## Local production build check
 
 The build requires real Clerk keys, or at least a build-time Clerk publishable key:

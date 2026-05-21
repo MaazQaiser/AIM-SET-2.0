@@ -65,7 +65,11 @@ export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlay
     setLineIndex(0);
   }
 
-  if (process.env.NODE_ENV === "production") {
+  const demoEnabled =
+    process.env.NODE_ENV !== "production" ||
+    process.env.NEXT_PUBLIC_ENABLE_DEMO_TRANSCRIPT === "true";
+
+  if (!demoEnabled) {
     return null;
   }
 
@@ -83,10 +87,15 @@ export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlay
           size="sm"
           className="h-7 text-xs"
           disabled={!isConnected}
+          title={
+            isConnected
+              ? "Replay scripted discovery call segments through the live-call agent"
+              : "Wait for the live stream to connect (WebSocket) before playing demo"
+          }
           onClick={() => void playDemo()}
         >
           <Play className="h-3 w-3 mr-1" />
-          Play demo transcript
+          {isConnected ? "Play demo transcript" : "Stream connecting…"}
         </Button>
       ) : (
         <Button

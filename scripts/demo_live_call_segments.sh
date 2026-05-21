@@ -22,8 +22,8 @@ post_segment() {
 }
 
 echo "Live call demo — Frontera franchise AI platform — call_id=${CALL_ID}"
-echo "Open: http://localhost:3002/calls/${CALL_ID}/live"
-echo "Pre-brief: http://localhost:3002/calls/${CALL_ID}"
+echo "Open: http://localhost:3000/calls/${CALL_ID}/live"
+echo "Pre-brief: http://localhost:3000/calls/${CALL_ID}"
 echo ""
 
 post_segment "Thanks Marcus — we'll focus on franchise operations modernization." "ae" 8

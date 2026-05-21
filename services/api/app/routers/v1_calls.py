@@ -101,6 +101,15 @@ def bot_chat(
     )
 
 
+@router.get("/{call_id}/transcript-events")
+def list_transcript_events(
+    call_id: str, ctx: TenantContext = Depends(get_tenant_context)
+) -> List[Dict[str, Any]]:
+    from app.domain.live_call_repository import get_live_call_repository
+
+    return get_live_call_repository().list_transcript_events(ctx, call_id)
+
+
 @router.get("/{call_id}/suggestions")
 def list_suggestions(call_id: str, ctx: TenantContext = Depends(get_tenant_context)) -> List[Dict[str, Any]]:
     from app.domain.live_call_repository import get_live_call_repository

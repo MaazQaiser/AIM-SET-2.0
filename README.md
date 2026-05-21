@@ -96,6 +96,12 @@ Edit `apps/web/.env.local` and set at least the **Clerk** keys (see below).
 
 **Note:** In development, Clerk may run in **keyless mode** without keys (limited). For full auth, use real keys in `.env.local`.
 
+### Live Call Assistant (local test)
+
+See **[docs/LIVE_CALL_TESTING.md](docs/LIVE_CALL_TESTING.md)**. Quick path: sign in → open  
+http://localhost:3000/calls/frontera-franchise-group/live → wait for stream → **Play demo transcript**  
+(requires `DEMO_TRANSCRIPT_REPLAY=true` in `services/api/.env`).
+
 ### 5. Run the web app
 
 From the repository root:
