@@ -2,21 +2,54 @@
 
 Railway tried to run the API as a **Node/pnpm** app. This API is **Python + Docker**.
 
-## Fix in Railway UI (2 minutes)
+## Easiest fix (no “Build” menu needed)
 
-1. Open **`@dc-copilot/api`** → **Settings**
-2. Right sidebar → **Build**
-3. Set **Builder** to **`Dockerfile`** (not Railpack / Nixpacks / Node)
-4. Set **Dockerfile path** to **`Dockerfile.api`**
-5. Right sidebar → **Source**
-6. **Root Directory:** `/` (repo root — empty or `/`)
-7. Right sidebar → **Config-as-code** (if shown)
-   - Config file: `services/api/railway.toml` or `railway.toml`
-8. **Settings → Deploy** — clear any **Custom Start Command** that mentions `pnpm`
-9. **Deployments** → **Redeploy**
+### Step 1 — Root directory (Settings → Source)
 
-Success: deploy log shows Docker build (pip install), not `node@22` / `pnpm`.
+1. **`@dc-copilot/api`** → **Settings** (top tab)
+2. Under **Source Repo**, set **Root Directory** to **`/`** (repo root)
+   - If you see “Add Root Directory”, click it and enter `/`
+
+### Step 2 — Force Docker via Variables tab
+
+1. Top tab → **Variables**
+2. **Add variable:**
+
+   | Name | Value |
+   |------|--------|
+   | `RAILWAY_DOCKERFILE_PATH` | `Dockerfile` |
+
+3. Save (Railway redeploys)
+
+Railway will use the root **`Dockerfile`** (auto-detected) instead of pnpm.
+
+### Step 3 — Redeploy
+
+**Deployments** → latest → **Redeploy** (or wait for auto-deploy from GitHub)
+
+Success in logs:
+
+```text
+Using detected Dockerfile!
+```
+
+Not `node@22` or `pnpm`.
+
+---
+
+## If you DO see a sidebar / search
+
+- **Filter Settings…** box → type **`docker`** or **`build`**
+- Or open **Config-as-code** → point to `railway.toml` or `services/api/railway.toml`
+
+---
+
+## After deploy is green
+
+1. **Variables** — add Supabase/OpenAI keys from `services/api/.env`
+2. **Networking** — **Generate Domain**
+3. **Vercel** — set `API_URL` to that Railway URL
 
 ## Verify
 
-`https://<your-railway-domain>/health` → JSON with `"status":"ok"`.
+`https://<railway-domain>/health` → `"status":"ok"`
