@@ -62,10 +62,12 @@ def start_recall_bot(
     body: Dict[str, Any],
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> Dict[str, Any]:
-    if not _calls.get_call(ctx, call_id):
-        raise HTTPException(status_code=404, detail="Call not found")
-
     meeting_url = str(body.get("meeting_url") or body.get("meetingUrl") or "").strip()
+    if not _calls.get_call(ctx, call_id):
+        # Live cockpit may use client-seeded demo calls (e.g. frontera-franchise-group) not yet in Supabase.
+        from app.domain.live_call_repository import get_live_call_repository
+
+        get_live_call_repository().get_or_create_session(ctx, call_id)
     if not meeting_url:
         raise HTTPException(status_code=400, detail="meeting_url is required")
     if not meeting_url.startswith(("https://", "http://")):
