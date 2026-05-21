@@ -29,7 +29,7 @@ SUPABASE_URL=https://<project>.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=<service_role_key>
 
 INTERNAL_SECRET=<long_random_string>
-# Must match Vercel INTERNAL_API_SECRET exactly
+# Required — DC notes CSV will not load without this. Must match Vercel INTERNAL_API_SECRET exactly.
 
 OPENAI_API_KEY=<sk-...>
 # Required for KB chunk embeddings after upload

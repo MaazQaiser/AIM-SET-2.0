@@ -162,8 +162,11 @@ export function useKbAssets() {
   return useQuery({
     queryKey: ["kb-assets"],
     queryFn: async () => {
-      const api = await bffFetch<KBAsset[]>("/api/kb/assets");
-      return api ?? [];
+      const res = await fetch("/api/kb/assets", { cache: "no-store" });
+      if (!res.ok) {
+        throw new Error(`KB assets request failed (${res.status})`);
+      }
+      return res.json() as Promise<KBAsset[]>;
     },
     staleTime: REFETCH_MS,
     refetchInterval: REFETCH_MS,
