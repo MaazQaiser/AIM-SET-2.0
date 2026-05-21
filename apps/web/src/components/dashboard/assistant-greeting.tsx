@@ -4,6 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { format, isSameDay, startOfDay } from "date-fns";
 import { useCalls, usePostCallCrmTasks } from "@/lib/data/hooks";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
+import { isClerkConfigured } from "@/lib/public-env";
 
 function getSalutation(hour: number): string {
   if (hour >= 23 || hour < 5) return "Working late";
@@ -21,16 +22,28 @@ function displayName(
   return "there";
 }
 
-export function AssistantGreeting() {
-  const localAuthBypass = isLocalAuthBypassEnabled();
-  const clerkUser = localAuthBypass ? null : useUser();
+function AssistantGreetingWithClerk() {
+  const clerkUser = useUser();
+  return (
+    <AssistantGreetingBody
+      isLoaded={Boolean(clerkUser.isLoaded)}
+      name={displayName(clerkUser.user?.firstName, clerkUser.user?.username)}
+    />
+  );
+}
+
+function AssistantGreetingBody({
+  isLoaded,
+  name,
+}: {
+  isLoaded: boolean;
+  name: string;
+}) {
   const { data: calls = [] } = useCalls();
   const { data: crmTasks = [] } = usePostCallCrmTasks();
 
   const hour = new Date().getHours();
   const salutation = getSalutation(hour);
-  const isLoaded = localAuthBypass || Boolean(clerkUser?.isLoaded);
-  const name = displayName(clerkUser?.user?.firstName, clerkUser?.user?.username);
 
   const today = startOfDay(new Date());
   const todaysCalls = calls.filter(
@@ -70,4 +83,11 @@ export function AssistantGreeting() {
       <p className="mt-3 text-sm text-muted-foreground">{subLine}</p>
     </header>
   );
+}
+
+export function AssistantGreeting() {
+  if (isLocalAuthBypassEnabled() || !isClerkConfigured()) {
+    return <AssistantGreetingBody isLoaded name="there" />;
+  }
+  return <AssistantGreetingWithClerk />;
 }

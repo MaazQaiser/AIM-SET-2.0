@@ -14,6 +14,9 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+/** Avoid static prerender when Clerk env is not set at build time (Vercel). */
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: {
     default: "DC Copilot",

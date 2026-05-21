@@ -6,6 +6,9 @@ This repo is prepared for deploying the Next.js web app from the monorepo.
 
 - Framework preset: Next.js
 - Root directory: `apps/web`
+
+**Important:** In the Vercel build log, confirm the clone line shows commit **`f03553e` or later** (not `e03db53`).  
+Redeploying an *old* deployment reuses the old commit. Use **Deployments → Redeploy** on the latest `main` commit, or push a new commit to trigger a fresh build.
 - Install command: `cd ../.. && pnpm install --frozen-lockfile`
 - Build command: `cd ../.. && pnpm --filter @dc-copilot/web build`
 - Output directory: `.next`
