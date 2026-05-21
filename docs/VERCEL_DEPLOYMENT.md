@@ -14,25 +14,39 @@ These values are also captured in `apps/web/vercel.json`.
 
 ## Required web environment variables
 
-Set these in Vercel for Production, Preview, and Development as needed:
+### Already set via `apps/web/vercel.json` (no action needed)
+
+These public routing defaults are committed in the repo:
+
+- `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
+- `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/`
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
+- `NEXT_PUBLIC_KB_SHARED=true`
+
+### You must add in Vercel Dashboard
+
+Vercel → your project → **Settings** → **Environment Variables**.  
+Use the checklist in `apps/web/.env.vercel.template`.
+
+**Required for build and sign-in** (from [Clerk Dashboard → API Keys](https://dashboard.clerk.com/last-active?path=api-keys)):
 
 ```env
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
-CLERK_SECRET_KEY=sk_live_...
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
-NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_xxxxxxxx
+CLERK_SECRET_KEY=sk_live_xxxxxxxx
+```
 
+**Required for API routes after deploy** (your public FastAPI host):
+
+```env
 API_URL=https://your-api-host.example.com
 INTERNAL_API_URL=https://your-api-host.example.com
 INTERNAL_API_SECRET=the_same_value_as_services_api_INTERNAL_SECRET
 NEXT_PUBLIC_API_URL=https://your-api-host.example.com
 NEXT_PUBLIC_WS_URL=wss://your-api-host.example.com
-NEXT_PUBLIC_KB_SHARED=true
 ```
 
-Use the full Clerk keys from Clerk Dashboard -> API Keys. The `pk_live_...` and `sk_live_...` values above are placeholders; pasting those exact placeholder strings will fail the build.
+Use real keys only — not `pk_test_...` / `pk_live_...` placeholder text from docs.
 
 Do not enable `NEXT_PUBLIC_AUTH_BYPASS` in Vercel production.
 

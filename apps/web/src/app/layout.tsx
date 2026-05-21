@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
+import { getClerkPublishableKey, isClerkConfigured } from "@/lib/public-env";
 import "./globals.css";
 
 const inter = Inter({
@@ -39,12 +40,12 @@ function AppDocument({ children }: { children: React.ReactNode }) {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const document = <AppDocument>{children}</AppDocument>;
 
-  if (isLocalAuthBypassEnabled()) {
+  if (isLocalAuthBypassEnabled() || !isClerkConfigured()) {
     return document;
   }
 
   return (
-    <ClerkProvider>
+    <ClerkProvider publishableKey={getClerkPublishableKey()}>
       {document}
     </ClerkProvider>
   );

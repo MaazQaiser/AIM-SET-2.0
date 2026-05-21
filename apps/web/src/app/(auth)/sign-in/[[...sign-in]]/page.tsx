@@ -2,11 +2,28 @@ import { SignIn } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
+import { isClerkConfigured } from "@/lib/public-env";
 
 export const metadata: Metadata = { title: "Sign in" };
+export const dynamic = "force-dynamic";
 
 export default function SignInPage() {
   if (isLocalAuthBypassEnabled()) redirect("/");
+
+  if (!isClerkConfigured()) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-background px-4">
+        <div className="max-w-md rounded-xl border border-border bg-card p-6 text-center space-y-3">
+          <h1 className="text-lg font-semibold">Sign-in not configured</h1>
+          <p className="text-sm text-muted-foreground">
+            Add <code className="text-xs">NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</code> and{" "}
+            <code className="text-xs">CLERK_SECRET_KEY</code> in Vercel → Environment Variables,
+            then redeploy.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-svh items-center justify-center bg-background px-4">

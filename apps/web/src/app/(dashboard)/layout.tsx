@@ -3,6 +3,9 @@ import { TopBar } from "@/components/layout/top-bar";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { DcImportsHydrator } from "@/components/settings/dc-imports-hydrator";
 
+/** Avoid static prerender of dashboard pages that use Clerk client components. */
+export const dynamic = "force-dynamic";
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <QueryProvider>
