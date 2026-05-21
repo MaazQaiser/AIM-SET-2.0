@@ -44,3 +44,45 @@ def generate_brief(call_id: str, ctx: TenantContext = Depends(get_tenant_context
 @router.post("/{call_id}/post-call")
 def post_call_pipeline(call_id: str, ctx: TenantContext = Depends(get_tenant_context)) -> Dict[str, Any]:
     return _orch.dispatch_post_call(ctx, call_id)
+
+
+@router.post("/{call_id}/end-live")
+def end_live_call(call_id: str, ctx: TenantContext = Depends(get_tenant_context)) -> Dict[str, Any]:
+    return _orch.dispatch_call_end(ctx, call_id)
+
+
+@router.post("/{call_id}/bot-chat")
+def bot_chat(
+    call_id: str,
+    body: Dict[str, Any],
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    message = (body.get("message") or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="message is required")
+    return _orch.dispatch_bot_chat(ctx, call_id, message)
+
+
+@router.get("/{call_id}/suggestions")
+def list_suggestions(call_id: str, ctx: TenantContext = Depends(get_tenant_context)) -> List[Dict[str, Any]]:
+    from app.domain.live_call_repository import get_live_call_repository
+
+    return get_live_call_repository().list_suggestions(ctx, call_id)
+
+
+@router.post("/{call_id}/suggestions/{suggestion_id}/feedback")
+def suggestion_feedback(
+    call_id: str,
+    suggestion_id: str,
+    body: Dict[str, Any],
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    from app.domain.live_call_repository import get_live_call_repository
+
+    status = (body.get("status") or "").strip()
+    if status not in ("accepted", "dismissed"):
+        raise HTTPException(status_code=400, detail="status must be accepted or dismissed")
+    updated = get_live_call_repository().update_suggestion_status(ctx, call_id, suggestion_id, status)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+    return updated

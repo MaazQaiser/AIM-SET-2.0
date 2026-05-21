@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { bffFetch } from "@/lib/api/bff-fetch";
 import type {
   Call,
@@ -68,8 +69,49 @@ export function useCallBrief(callId: string) {
 export function usePostCallReview(callId: string) {
   return useQuery({
     queryKey: ["post-call", callId, getImportVersion()],
-    queryFn: async () => resolvePostCallReview(callId),
+    queryFn: async () => {
+      const base = resolvePostCallReview(callId);
+      const snap = useDcImportsStore.getState().discoverySnapshotsByCallId[callId];
+      if (!base && !snap) return null;
+      const merged = base ?? {
+        headline: "Post-call review",
+        summary: [],
+        podScorecard: [],
+        learned: [],
+      };
+      return {
+        ...merged,
+        openDiscoveryGaps: snap?.openGaps?.length
+          ? snap.openGaps
+          : merged.openDiscoveryGaps,
+        discoveryBantCoverage:
+          snap?.bantCoverage ?? merged.discoveryBantCoverage,
+      };
+    },
     staleTime: REFETCH_MS,
+  });
+}
+
+export function useRunPostCallPipeline(callId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/calls/${callId}/post-call`, { method: "POST" });
+      if (!res.ok) throw new Error("Post-call pipeline failed");
+      return res.json() as Promise<{
+        discovery?: { result?: { openGaps?: string[]; checklist?: { bantCoverage?: number } } };
+      }>;
+    },
+    onSuccess: (data) => {
+      const result = data.discovery?.result ?? data.discovery;
+      const openGaps = (result as { openGaps?: string[] })?.openGaps ?? [];
+      const checklist = (result as { checklist?: { bantCoverage?: number } })?.checklist;
+      useDcImportsStore.getState().setDiscoverySnapshot(callId, {
+        openGaps,
+        bantCoverage: checklist?.bantCoverage,
+      });
+      void queryClient.invalidateQueries({ queryKey: ["post-call", callId] });
+    },
   });
 }
 

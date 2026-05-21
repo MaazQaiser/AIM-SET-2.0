@@ -14,6 +14,7 @@ interface AgentsState {
 export const useAgents = create<AgentsState>((set) => ({
   configs: {
     "live-call": null,
+    "discovery-checklist": null,
     content: null,
     content_generation: null,
     knowledge: null,

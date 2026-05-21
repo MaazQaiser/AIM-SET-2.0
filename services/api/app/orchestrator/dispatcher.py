@@ -3,20 +3,24 @@ from __future__ import annotations
 import uuid
 from typing import Any, Dict, Optional
 
-from dc_core.evidence import validate_envelope
+from dc_core.evidence import AgentEnvelope, validate_envelope
 from dc_core.tenancy import TenantContext
 
 from app.agents.content_agent import generate_pre_dc_brief
 from app.agents.content_generation_agent import run_studio_turn
 from app.agents.coaching_agent import generate_scorecard
 from app.agents.knowledge_agent import ingest_asset_metadata
-from app.agents.live_call_agent import handle_transcript_segment
+from app.agents.discovery_checklist_agent import finalize_session, handle_segment, seed_checklist
+from app.agents.live_call.handler import handle_call_end, handle_transcript_segment
 from app.agents.task_agent import draft_post_call_artifacts
+from dc_tools.bant import checklist_from_dict
 from app.domain.calls_service import CallsService
 from app.domain.dc_notes_repository import get_dc_notes_repository
 from app.domain.content_studio_repository import get_content_studio_repository
 from app.domain.agent_runs_repository import get_agent_runs_repository
 from app.domain.memory_store import get_memory_store
+from app.agents.live_call_agent import bot_chat_response
+from app.domain.call_channel import get_call_channel
 from app.services.content_export_service import export_revision
 from app.services.template_ingest_service import process_template_ingest
 
@@ -58,13 +62,60 @@ class Orchestrator:
         return envelope.model_dump()
 
     def dispatch_post_call(self, ctx: TenantContext, call_id: str) -> Dict[str, Any]:
-        task_env = draft_post_call_artifacts(call_id)
-        coach_env = generate_scorecard(call_id)
+        from app.domain.kb_tenancy import resolve_kb_tenant
+        from app.domain.live_call_session import clear_live_session
+
+        _, clerk_key = resolve_kb_tenant(ctx)
+        live_snapshot = clear_live_session(clerk_key, call_id)
+        if live_snapshot:
+            self.calls.save_live_signals(ctx, call_id, live_snapshot)
+
+        discovery_snapshot = self._finalize_discovery_checklist(ctx, call_id)
+        task_env = draft_post_call_artifacts(call_id, discovery_snapshot=discovery_snapshot)
+        coach_env = generate_scorecard(call_id, discovery_snapshot=discovery_snapshot)
         validate_envelope(task_env)
         validate_envelope(coach_env)
         self._log_run(ctx, task_env)
         self._log_run(ctx, coach_env)
-        return {"task": task_env.model_dump(), "coaching": coach_env.model_dump()}
+        out: Dict[str, Any] = {
+            "task": task_env.model_dump(),
+            "coaching": coach_env.model_dump(),
+        }
+        if discovery_snapshot:
+            out["discovery"] = discovery_snapshot
+        if live_snapshot:
+            out["live_signals"] = live_snapshot
+        return out
+
+    def dispatch_call_end(self, ctx: TenantContext, call_id: str) -> Dict[str, Any]:
+        return handle_call_end(ctx, call_id)
+
+    def dispatch_bot_chat(self, ctx: TenantContext, call_id: str, message: str) -> Dict[str, Any]:
+        from app.domain.live_call_repository import get_live_call_repository
+        from app.orchestrator.live_broadcast import envelope_to_ws_messages
+
+        env = bot_chat_response(ctx, call_id, message)
+        validate_envelope(env)
+        self._log_run(ctx, env)
+        repo = get_live_call_repository()
+        sid = str(uuid.uuid4())
+        repo.append_suggestion(
+            ctx,
+            call_id,
+            operation="bot_chat_response",
+            payload=env.result,
+            trace_id=env.trace_id,
+            suggestion_id=sid,
+        )
+        ws_messages = envelope_to_ws_messages(env, suggestion_id=sid, shown_at=None)
+        for msg in ws_messages:
+            get_call_channel().broadcast_sync(call_id, msg)
+        return {
+            "envelope": env.model_dump(),
+            "content": env.result.get("answer"),
+            "citations": [c.model_dump() for c in env.citations],
+            "ws_messages": ws_messages,
+        }
 
     def dispatch_kb_ingest(self, ctx: TenantContext, asset: Dict[str, Any]) -> Dict[str, Any]:
         env = ingest_asset_metadata(ctx.tenant_id, asset)
@@ -72,10 +123,81 @@ class Orchestrator:
         self._log_run(ctx, env)
         return env.model_dump()
 
-    def dispatch_live_segment(self, ctx: TenantContext, call_id: str, text: str) -> Dict[str, Any]:
-        env = handle_transcript_segment(call_id, text)
+    def dispatch_live_segment(
+        self,
+        ctx: TenantContext,
+        call_id: str,
+        segment: Any,
+        *,
+        elapsed_seconds: int = 0,
+    ) -> Dict[str, Any]:
+        if isinstance(segment, str):
+            segment = {"text": segment, "timestamp": elapsed_seconds}
+        elif not isinstance(segment, dict):
+            segment = {"text": str(segment), "timestamp": elapsed_seconds}
+
+        text = (segment.get("text") or "").strip()
+        if segment.get("timestamp") is None:
+            segment["timestamp"] = elapsed_seconds
+
+        call = self.calls.get_call(ctx, call_id) or {}
+        seed_bant = call.get("bant") if isinstance(call.get("bant"), dict) else None
+
+        stored = self.memory.get_discovery_checklist(ctx.tenant_id, call_id)
+        state = checklist_from_dict(stored) if stored else None
+
+        discovery_out = handle_segment(
+            call_id,
+            text,
+            state=state,
+            elapsed_seconds=elapsed_seconds,
+            seed_bant=seed_bant,
+        )
+        checklist_env = discovery_out["envelope"]
+        validate_envelope(checklist_env)
+        self._log_run(ctx, checklist_env)
+
+        self.memory.set_discovery_checklist(
+            ctx.tenant_id,
+            call_id,
+            discovery_out["checklist"],
+        )
+
+        intent_out = handle_transcript_segment(ctx, call_id, segment)
+        live_envelope = AgentEnvelope.model_validate(intent_out["envelope"])
+        validate_envelope(live_envelope)
+        self._log_run(ctx, live_envelope)
+        live_result = live_envelope.result or {}
+        live_nudge = live_result.get("nudge")
+
+        nudge = discovery_out.get("nudge") or live_nudge
+        return {
+            "discovery": checklist_env.model_dump(),
+            "live": live_envelope.model_dump(),
+            "checklist": discovery_out["checklist"],
+            "nudge": nudge,
+            "bant_signals": discovery_out.get("bant_signals") or [],
+            "live_nudge": live_nudge,
+            "ws_messages": intent_out.get("ws_messages") or [],
+        }
+
+    def _finalize_discovery_checklist(
+        self, ctx: TenantContext, call_id: str
+    ) -> Optional[Dict[str, Any]]:
+        stored = self.memory.pop_discovery_checklist(ctx.tenant_id, call_id)
+        if not stored:
+            call = self.calls.get_call(ctx, call_id) or {}
+            seed = call.get("bant") if isinstance(call.get("bant"), dict) else None
+            state = seed_checklist(call_id, seed_bant=seed)
+        else:
+            state = checklist_from_dict(stored)
+
+        env = finalize_session(call_id, state)
+        validate_envelope(env)
         self._log_run(ctx, env)
-        return env.model_dump()
+        snapshot = env.model_dump()
+        self.memory.set_discovery_checklist(ctx.tenant_id, f"{call_id}:final", snapshot)
+        return snapshot
 
     def dispatch_studio_turn(
         self,

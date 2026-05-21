@@ -112,8 +112,9 @@ class CallsService:
         return next((c for c in self.list_calls(ctx) if c["id"] == call_id), None)
 
     def get_brief(self, ctx: TenantContext, call_id: str) -> Optional[Dict[str, Any]]:
+        _, clerk_key = self._tenants.resolve(ctx)
         if not get_settings().supabase_configured:
-            return None
+            return get_memory_store().get_call_brief(clerk_key, call_id)
         tenant_uuid = self._tenant_uuid(ctx)
         supabase = get_supabase()
         result = (
@@ -131,7 +132,13 @@ class CallsService:
         return None
 
     def save_brief(self, ctx: TenantContext, call_id: str, payload: Dict[str, Any]) -> None:
+        _, clerk_key = self._tenants.resolve(ctx)
         if not get_settings().supabase_configured:
+            get_memory_store().save_call_brief(clerk_key, call_id, payload)
+            for call in get_memory_store().list_calls(clerk_key):
+                if call["id"] == call_id:
+                    call["briefReady"] = True
+                    break
             return
         tenant_uuid = self._tenant_uuid(ctx)
         supabase = get_supabase()
@@ -146,6 +153,28 @@ class CallsService:
         ).execute()
 
         supabase.table("calls").update({"brief_ready": True}).eq("tenant_id", tenant_uuid).eq("id", call_id).execute()
+
+    def save_live_signals(self, ctx: TenantContext, call_id: str, snapshot: Dict[str, Any]) -> None:
+        _, clerk_key = self._tenants.resolve(ctx)
+        if not get_settings().supabase_configured:
+            get_memory_store().save_live_signals(clerk_key, call_id, snapshot)
+            call = self.get_call(ctx, call_id)
+            if call:
+                meta = call.get("metadata") or {}
+                if not isinstance(meta, dict):
+                    meta = {}
+                meta["live_signals"] = snapshot
+                call["metadata"] = meta
+                get_memory_store().upsert_calls(clerk_key, [call])
+            return
+        tenant_uuid = self._tenant_uuid(ctx)
+        supabase = get_supabase()
+        call = self.get_call(ctx, call_id)
+        meta = (call or {}).get("metadata") or {}
+        if not isinstance(meta, dict):
+            meta = {}
+        meta["live_signals"] = snapshot
+        supabase.table("calls").update({"metadata": meta}).eq("tenant_id", tenant_uuid).eq("id", call_id).execute()
 
 
 def _row_to_call(row: Dict[str, Any]) -> Dict[str, Any]:

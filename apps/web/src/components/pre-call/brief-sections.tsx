@@ -14,8 +14,10 @@ import {
   BriefPodNotesCard,
   BriefSignalsCard,
 } from "@/components/pre-call/brief-widget-cards";
+import { DiscoveryChecklistPanel } from "@/components/live/discovery-checklist-panel";
+import { seedChecklistFromCall } from "@/lib/discovery-checklist-seed";
 import type { CallBrief } from "@/lib/brief-types";
-import type { BANTScore } from "@/types";
+import type { BANTScore, Call } from "@/types";
 
 export {
   BriefBANTCard,
@@ -32,6 +34,7 @@ interface BriefSectionsProps {
   bant?: BANTScore;
   discoveryQuestions?: string[];
   leadershipPreview?: boolean;
+  call?: Call;
 }
 
 export function BriefSections({
@@ -39,6 +42,7 @@ export function BriefSections({
   bant,
   discoveryQuestions = [],
   leadershipPreview,
+  call,
 }: BriefSectionsProps) {
   return (
     <div className="space-y-5">
@@ -67,6 +71,10 @@ export function BriefSections({
       )}
 
       {bant && <BriefBANTCard bant={bant} />}
+
+      {call && seedChecklistFromCall(call) && (
+        <DiscoveryChecklistPanel state={seedChecklistFromCall(call)!} />
+      )}
 
       <BriefPainsCard pains={brief.pains} />
 

@@ -2,10 +2,19 @@ import { notFound } from "next/navigation";
 import { AgentConfigPageClient } from "@/components/agents/agent-config-page-client";
 import type { AgentId } from "@/types/agents";
 
-const AGENT_IDS: AgentId[] = ["live-call", "content", "content_generation", "knowledge", "coaching", "task"];
+const AGENT_IDS: AgentId[] = [
+  "live-call",
+  "discovery-checklist",
+  "content",
+  "content_generation",
+  "knowledge",
+  "coaching",
+  "task",
+];
 
 const AGENT_LABELS: Record<AgentId, string> = {
   "live-call": "Live Call Agent",
+  "discovery-checklist": "Discovery Checklist Tracker",
   content: "Content Agent",
   content_generation: "Content Generation Agent",
   knowledge: "Knowledge Agent",

@@ -3,6 +3,7 @@ import type { AgentId, AgentStatus, ModelPolicy } from "@/types/agents";
 /** Agents implemented in services/api/app/agents/ and the orchestrator. */
 export const PROJECT_AGENT_IDS: AgentId[] = [
   "live-call",
+  "discovery-checklist",
   "content",
   "content_generation",
   "knowledge",
@@ -16,10 +17,24 @@ export const AGENT_META: Record<
 > = {
   "live-call": {
     display_name: "Live Call Agent",
-    description: "Real-time signal feed for the pod during active calls.",
+    description:
+      "Real-time signal feed for the pod during active calls, including Intent Detection (sentiment, keywords, pains, focus areas).",
     purpose:
-      "Operate the live-call experience: feed the pod with relevant signal in real time while the call is happening.",
-    operations: ["proactive_nudge", "signal_annotation"],
+      "Operate the live-call experience: feed the pod with relevant signal in real time while the call is happening. Intent Detection runs as an in-agent module on every transcript segment.",
+    operations: [
+      "proactive_nudge",
+      "signal_annotation",
+      "intent_snapshot",
+      "sentiment_update",
+      "focus_suggestion",
+    ],
+  },
+  "discovery-checklist": {
+    display_name: "Discovery Checklist Tracker",
+    description: "Real-time BANT and discovery checklist coverage with timed nudges.",
+    purpose:
+      "Track qualification coverage during discovery calls and nudge the AE on missed BANT and closure items.",
+    operations: ["checklist_updated", "discovery_nudge", "session_finalized"],
   },
   content: {
     display_name: "Content Agent",
@@ -61,6 +76,7 @@ export const DEFAULT_COST_CAPS: Record<
   { per_run_usd: number; project_usd?: number; abort_strategy: string }
 > = {
   "live-call": { per_run_usd: 0.02, abort_strategy: "degrade" },
+  "discovery-checklist": { per_run_usd: 0.02, abort_strategy: "degrade" },
   content: { per_run_usd: 0.05, abort_strategy: "degrade" },
   content_generation: { per_run_usd: 0.05, project_usd: 1.5, abort_strategy: "hard_stop" },
   knowledge: { per_run_usd: 0.02, abort_strategy: "degrade" },
@@ -70,6 +86,12 @@ export const DEFAULT_COST_CAPS: Record<
 
 const DEFAULT_MODEL_POLICY: Record<AgentId, ModelPolicy> = {
   "live-call": {
+    primary: "haiku",
+    fallback: "sonnet",
+    model_name: "claude-3-haiku-20240307",
+    fallback_model_name: "claude-sonnet-4-6",
+  },
+  "discovery-checklist": {
     primary: "haiku",
     fallback: "sonnet",
     model_name: "claude-3-haiku-20240307",

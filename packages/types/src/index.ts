@@ -53,7 +53,98 @@ export interface TranscriptEvent {
   timestamp: number;
   keywords?: string[];
   sentiment?: "positive" | "negative" | "neutral";
-  signalType?: "discovery_anchor" | "timeline" | "objection";
+  signalType?: string;
+}
+
+export type CallIntentLabel =
+  | "general_discovery"
+  | "commercial_discovery"
+  | "technical_deep_dive"
+  | "competitive_evaluation"
+  | "timeline_planning"
+  | "design_exploration"
+  | "topic_focus";
+
+export interface CallIntent {
+  label: CallIntentLabel | string;
+  confidence: number;
+  evidence?: string;
+  signal_type?: string | null;
+}
+
+export interface PainSignal {
+  id: string;
+  text: string;
+  source: "brief_match" | "emergent";
+  confidence: number;
+  timestamp: number;
+  evidence?: string;
+}
+
+export interface KeywordCount {
+  term: string;
+  count: number;
+}
+
+export interface KeywordStats {
+  by_speaker: Record<string, KeywordCount[]>;
+  global_top: KeywordCount[];
+}
+
+export interface IntentSnapshot {
+  intent: CallIntent;
+  focus_areas: string[];
+  pains: PainSignal[];
+  top_keywords: KeywordCount[];
+}
+
+export interface SentimentShift {
+  direction: "negative" | "positive";
+  from_score: number;
+  to_score: number;
+  timestamp: number;
+  message: string;
+}
+
+export interface LiveSentimentPayload {
+  ae: number;
+  customer: number;
+  shift?: SentimentShift | null;
+}
+
+export interface SurfacedKbAsset {
+  id: string;
+  title: string;
+  excerpt?: string;
+  type?: string;
+}
+
+export interface ObjectionPayload {
+  id: string;
+  objection_text: string;
+  counter_points: string[];
+  suggested_action?: string;
+  timestamp: number;
+  shownAt?: string;
+}
+
+export interface UnansweredQuestionPayload {
+  id?: string;
+  question_id?: string;
+  text: string;
+  asked_at_offset?: number;
+  seconds_unanswered?: number;
+  timestamp?: number;
+}
+
+export interface SuggestionLogEntry {
+  id?: string;
+  operation: string;
+  timestamp: number;
+  shownAt?: string;
+  confidence?: number;
+  trace_id?: string;
+  summary?: string;
 }
 
 export interface Citation {
@@ -64,6 +155,8 @@ export interface Citation {
   excerpt?: string;
 }
 
+export type NudgeSource = "live-call" | "discovery-checklist";
+
 export interface NudgePayload {
   id: string;
   message: string;
@@ -71,6 +164,9 @@ export interface NudgePayload {
   role: PodRole;
   timestamp: number;
   accepted?: boolean;
+  source?: NudgeSource;
+  checklistItemId?: string;
+  suggestionId?: string;
 }
 
 export interface KBAsset {
@@ -118,3 +214,4 @@ export * from "./agents";
 export * from "./brief";
 export * from "./integrations";
 export * from "./content_studio";
+export * from "./discovery-checklist";

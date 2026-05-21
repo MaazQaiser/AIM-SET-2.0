@@ -12,6 +12,8 @@ interface DcImportsState {
   calls: Call[];
   briefsByCallId: Record<string, CallBrief>;
   postReviewsByCallId: Record<string, PostCallReview>;
+  discoverySnapshotsByCallId: Record<string, { openGaps: string[]; bantCoverage?: number }>;
+  setDiscoverySnapshot: (callId: string, snapshot: { openGaps: string[]; bantCoverage?: number }) => void;
   preDcFileName: string | null;
   postDcFileName: string | null;
   importedAt: string | null;
@@ -26,6 +28,7 @@ const emptyState = {
   calls: [] as Call[],
   briefsByCallId: {} as Record<string, CallBrief>,
   postReviewsByCallId: {} as Record<string, PostCallReview>,
+  discoverySnapshotsByCallId: {} as Record<string, { openGaps: string[]; bantCoverage?: number }>,
   preDcFileName: null as string | null,
   postDcFileName: null as string | null,
   importedAt: null as string | null,
@@ -50,6 +53,10 @@ function applyBuilt(
 
 export const useDcImportsStore = create<DcImportsState>()((set, get) => ({
   ...emptyState,
+  setDiscoverySnapshot: (callId, snapshot) =>
+    set((s) => ({
+      discoverySnapshotsByCallId: { ...s.discoverySnapshotsByCallId, [callId]: snapshot },
+    })),
   loadFromDb: async () => {
     const res = await fetch("/api/dc-notes");
     if (!res.ok) {

@@ -104,4 +104,6 @@ export interface PostCallReview {
     watch: string;
   }[];
   learned: { label: string; from?: number; to?: number; note: string }[];
+  openDiscoveryGaps?: string[];
+  discoveryBantCoverage?: number;
 }

@@ -9,6 +9,7 @@ import {
   PostScorecardCard,
   PostSummaryCard,
 } from "@/components/post-dc/post-dc-widget-cards";
+import { PostDiscoveryGapsCard } from "@/components/post-dc/post-discovery-gaps-card";
 import { usePostCallReview } from "@/lib/data/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -56,6 +57,12 @@ export function PostDCReviewPanel({ callId }: PostDCReviewPanelProps) {
 
       <PostSummaryCard summary={review.summary} />
       <PostScorecardCard scorecard={review.podScorecard} />
+      {(review.openDiscoveryGaps?.length || review.discoveryBantCoverage !== undefined) && (
+        <PostDiscoveryGapsCard
+          gaps={review.openDiscoveryGaps ?? []}
+          bantCoverage={review.discoveryBantCoverage}
+        />
+      )}
       <PostLearnedCard learned={review.learned} />
     </div>
   );

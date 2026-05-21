@@ -36,6 +36,22 @@ def get_effective_agent_config(ctx: TenantContext, agent_id: str) -> Dict[str, A
     return get_agent_config_repository().get_config(ctx, agent_id)
 
 
+def get_live_call_runtime(ctx: TenantContext) -> Dict[str, Any]:
+    cfg = get_effective_agent_config(ctx, "live-call")
+    model_policy = cfg.get("model_policy") or {}
+    override = (cfg.get("system_prompt_override") or "").strip()
+    prompt_path = resolve_prompt_path(cfg)
+    if prompt_path == "content/studio/v1.0.0.md":
+        prompt_path = "live-call/v1.0.0.md"
+    return {
+        "model_name": model_policy.get("model_name") or "claude-3-haiku-20240307",
+        "fallback_model_name": model_policy.get("fallback_model_name") or "claude-sonnet-4-6",
+        "system_prompt": override or load_prompt_file(prompt_path),
+        "prompt_path": prompt_path,
+        "config": cfg,
+    }
+
+
 def get_content_generation_runtime(ctx: TenantContext) -> Dict[str, Any]:
     cfg = get_effective_agent_config(ctx, "content_generation")
     model_policy = cfg.get("model_policy") or {}

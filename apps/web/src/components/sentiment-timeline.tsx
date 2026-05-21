@@ -28,12 +28,15 @@ function formatTime(seconds: number) {
 }
 
 export function SentimentTimeline({ data, className }: SentimentTimelineProps) {
+  if (data.length < 2) return null;
+
   return (
     <div
       className={className}
+      style={{ minHeight: 80 }}
       aria-label={`Sentiment timeline from ${formatTime(data[0]?.timestamp ?? 0)} to ${formatTime(data[data.length - 1]?.timestamp ?? 0)}`}
     >
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height={80}>
         <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -24 }}>
           <defs>
             <linearGradient id="aeGradient" x1="0" y1="0" x2="0" y2="1">

@@ -16,7 +16,6 @@ export function useLiveCallInit(callId: string) {
     initialized.current = true;
     reset();
     setCallId(callId);
-    setConnected(true);
 
     const tick = setInterval(() => {
       useLiveCall.getState().tickElapsed();

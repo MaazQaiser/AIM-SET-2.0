@@ -27,6 +27,9 @@ import {
   PostScorecardCard,
   PostSummaryCard,
 } from "@/components/post-dc/post-dc-widget-cards";
+import { PostDiscoveryGapsCard } from "@/components/post-dc/post-discovery-gaps-card";
+import { DiscoveryChecklistPanel } from "@/components/live/discovery-checklist-panel";
+import { seedChecklistFromCall } from "@/lib/discovery-checklist-seed";
 import type { CallBrief, PostCallReview } from "@/lib/brief-types";
 import type { BANTScore, Call } from "@/types";
 
@@ -106,6 +109,16 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     defaultLayout: { x: 0, y: 13, w: 6, h: 4, minH: 3 },
     isAvailable: ({ bant }) => Boolean(bant),
     render: ({ bant }) => <BriefBANTCard bant={bant!} />,
+  },
+  {
+    id: "brief.discovery_checklist",
+    title: "Discovery checklist (preview)",
+    category: "qualification",
+    defaultLayout: { x: 6, y: 13, w: 6, h: 5, minH: 4 },
+    isAvailable: ({ call }) => Boolean(call),
+    render: ({ call }) => (
+      <DiscoveryChecklistPanel state={seedChecklistFromCall(call) ?? null} />
+    ),
   },
   {
     id: "account.metrics",
@@ -214,6 +227,23 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     category: "qualification",
     defaultLayout: { x: 8, y: 3, w: 4, h: 4, minH: 3 },
     render: ({ review }) => <PostLearnedCard learned={review.learned} />,
+  },
+  {
+    id: "post.discovery_gaps",
+    title: "Discovery gaps",
+    category: "qualification",
+    defaultLayout: { x: 4, y: 7, w: 4, h: 3, minH: 2 },
+    isAvailable: ({ review }) =>
+      Boolean(
+        (review.openDiscoveryGaps && review.openDiscoveryGaps.length > 0) ||
+          review.discoveryBantCoverage !== undefined
+      ),
+    render: ({ review }) => (
+      <PostDiscoveryGapsCard
+        gaps={review.openDiscoveryGaps ?? []}
+        bantCoverage={review.discoveryBantCoverage}
+      />
+    ),
   },
   {
     id: "account.metrics",

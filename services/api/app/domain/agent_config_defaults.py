@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 
 AGENT_IDS: List[str] = [
     "live-call",
+    "discovery-checklist",
     "content",
     "content_generation",
     "knowledge",
@@ -16,6 +17,7 @@ AGENT_IDS: List[str] = [
 
 AGENT_LABELS: Dict[str, str] = {
     "live-call": "Live Call Agent",
+    "discovery-checklist": "Discovery Checklist Tracker",
     "content": "Content Agent",
     "content_generation": "Content Generation Agent",
     "knowledge": "Knowledge Agent",
@@ -25,6 +27,7 @@ AGENT_LABELS: Dict[str, str] = {
 
 AGENT_DOMAINS: Dict[str, List[str]] = {
     "live-call": ["live_assist"],
+    "discovery-checklist": ["live_assist"],
     "content": ["content_generation"],
     "content_generation": ["content_generation"],
     "knowledge": ["knowledge_maintenance"],
@@ -35,13 +38,21 @@ AGENT_DOMAINS: Dict[str, List[str]] = {
 PROMPT_ROOT = Path(__file__).resolve().parents[4] / "prompts"
 
 AGENT_PROMPT_GLOBS: Dict[str, List[str]] = {
-    "live-call": ["live-call/**/*.md"],
+    "live-call": ["live-call/**/*.md", "live-call/intent_detection/**/*.md"],
+    "discovery-checklist": ["discovery-checklist/**/*.md"],
     "content": ["content/pre_dc_brief/**/*.md"],
     "content_generation": ["content/studio/**/*.md", "content/template_vision/**/*.md"],
 }
 
 AGENT_OPERATIONS: Dict[str, List[str]] = {
-    "live-call": ["proactive_nudge", "signal_annotation"],
+    "live-call": [
+        "proactive_nudge",
+        "signal_annotation",
+        "intent_snapshot",
+        "sentiment_update",
+        "focus_suggestion",
+    ],
+    "discovery-checklist": ["checklist_updated", "discovery_nudge", "session_finalized"],
     "content": ["pre_dc_brief"],
     "content_generation": ["studio_turn", "template_ingest", "export_pdf", "export_png", "export_pptx"],
     "knowledge": ["asset_ingested"],
@@ -284,6 +295,21 @@ def default_agent_config(agent_id: str) -> Dict[str, Any]:
         "active_prompt_versions": discover_prompt_versions(agent_id),
         "operations": AGENT_OPERATIONS.get(agent_id, []),
     }
+
+    if agent_id == "discovery-checklist":
+        from dc_tools.bant import DEFAULT_PLAYBOOK, SECONDARY_ITEM_IDS
+
+        cfg["checklist_policy"] = {
+            "nudge_thresholds_seconds": {
+                "budget": 1800,
+                "authority": 1200,
+                "need": 900,
+                "timeline": 1500,
+                "next_step": 2400,
+            },
+            "enabled_secondary_items": list(SECONDARY_ITEM_IDS),
+            "playbook": DEFAULT_PLAYBOOK,
+        }
 
     if agent_id == "live-call":
         cfg["signal_routing"] = [

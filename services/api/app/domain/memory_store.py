@@ -25,6 +25,12 @@ class MemoryStore:
         self.content_messages: Dict[str, List[Dict[str, Any]]] = {}
         self.content_revisions: Dict[str, List[Dict[str, Any]]] = {}
         self.content_exports: Dict[str, bytes] = {}
+        self.call_briefs: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        self.call_live_signals: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        self.live_sessions: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        self.transcript_events: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+        self.live_suggestions: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+        self.discovery_checklists: Dict[str, Dict[str, Any]] = {}
 
     def list_kb_assets(self, tenant_id: str) -> List[Dict[str, Any]]:
         return self.kb_assets.get(tenant_id, [])
@@ -68,6 +74,27 @@ class MemoryStore:
 
     def add_audit(self, tenant_id: str, event: Dict[str, Any]) -> None:
         self.audit.setdefault(tenant_id, []).append(event)
+
+    def get_call_brief(self, tenant_key: str, call_id: str) -> Dict[str, Any] | None:
+        return self.call_briefs.get(tenant_key, {}).get(call_id)
+
+    def save_call_brief(self, tenant_key: str, call_id: str, payload: Dict[str, Any]) -> None:
+        self.call_briefs.setdefault(tenant_key, {})[call_id] = payload
+
+    def save_live_signals(self, tenant_key: str, call_id: str, snapshot: Dict[str, Any]) -> None:
+        self.call_live_signals.setdefault(tenant_key, {})[call_id] = snapshot
+
+    def get_live_signals(self, tenant_key: str, call_id: str) -> Dict[str, Any] | None:
+        return self.call_live_signals.get(tenant_key, {}).get(call_id)
+
+    def get_discovery_checklist(self, tenant_id: str, call_id: str) -> Dict[str, Any] | None:
+        return self.discovery_checklists.get(f"{tenant_id}:{call_id}")
+
+    def set_discovery_checklist(self, tenant_id: str, call_id: str, payload: Dict[str, Any]) -> None:
+        self.discovery_checklists[f"{tenant_id}:{call_id}"] = payload
+
+    def pop_discovery_checklist(self, tenant_id: str, call_id: str) -> Dict[str, Any] | None:
+        return self.discovery_checklists.pop(f"{tenant_id}:{call_id}", None)
 
 
 _memory = MemoryStore()

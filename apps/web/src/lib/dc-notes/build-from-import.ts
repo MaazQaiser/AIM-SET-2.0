@@ -332,9 +332,20 @@ export function buildPostReviewFromPostDc(record: PostDCRecord): PostCallReview 
   const potential = postDcField(record, "accountsAnnualPotential");
   const serviceLine = postDcField(record, "serviceLine");
 
+  const bantNotes = {
+    budget: postDcField(record, "budget"),
+    authority: postDcField(record, "authority"),
+    need: postDcField(record, "need"),
+    timeline: postDcField(record, "timeline"),
+  };
+  const openDiscoveryGaps = (Object.keys(bantNotes) as (keyof typeof bantNotes)[]).filter(
+    (k) => !bantNotes[k] || /^(no|unknown|n\/a|-)$/i.test(bantNotes[k].trim())
+  );
+
   return {
     headline: [leadStage, potential, serviceLine].filter(Boolean).join(" · ") || "Post-DC summary",
     summary: paragraphs.length > 0 ? paragraphs : [bottomLine || "No summary provided."],
+    openDiscoveryGaps,
     researchSections: buildPostDcResearchSections(record),
     podScorecard: [
       {

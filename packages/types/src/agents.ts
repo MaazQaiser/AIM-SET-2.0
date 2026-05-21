@@ -1,6 +1,7 @@
 // ── Agent IDs ──────────────────────────────────────────────────────────────
 export type AgentId =
   | "live-call"
+  | "discovery-checklist"
   | "content"
   | "content_generation"
   | "knowledge"

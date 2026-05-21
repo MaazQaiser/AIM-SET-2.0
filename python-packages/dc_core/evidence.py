@@ -40,4 +40,6 @@ def _requires_citations(operation: str) -> bool:
         "studio_ask",
         "template_recommend",
         "studio_refuse",
+        "intent_snapshot",
+        "sentiment_update",
     )

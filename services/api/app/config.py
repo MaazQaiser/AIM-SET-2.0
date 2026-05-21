@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     content_templates_bucket: str = "content-templates"
     content_exports_bucket: str = "content-exports"
     content_studio_sync_ingest: bool = True
+    recall_api_key: str = ""
+    recall_webhook_secret: str = ""
+    demo_transcript_replay: bool = False
 
     @property
     def anthropic_configured(self) -> bool:
