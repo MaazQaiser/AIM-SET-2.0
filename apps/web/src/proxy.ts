@@ -2,7 +2,7 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
-import { isClerkConfigured } from "@/lib/public-env";
+import { isClerkConfigured, isClerkSecretConfigured } from "@/lib/public-env";
 
 const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
 
@@ -13,7 +13,11 @@ const clerkHandler = clerkMiddleware(async (auth, request) => {
 });
 
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
-  if (isLocalAuthBypassEnabled() || !isClerkConfigured()) {
+  if (
+    isLocalAuthBypassEnabled() ||
+    !isClerkConfigured() ||
+    !isClerkSecretConfigured()
+  ) {
     return NextResponse.next();
   }
   return clerkHandler(request, event);

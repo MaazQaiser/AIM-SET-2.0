@@ -53,6 +53,19 @@ Use real keys only — not `pk_test_...` / `pk_live_...` placeholder text from d
 
 Do not enable `NEXT_PUBLIC_AUTH_BYPASS` in Vercel production.
 
+### Clerk domain (runtime)
+
+In [Clerk Dashboard → Domains](https://dashboard.clerk.com/), add your Vercel production URL (e.g. `https://your-app.vercel.app`) and any preview pattern you use. Without this, the app can build but fail at runtime with a blank or generic error page.
+
+## Runtime: “This page couldn’t load”
+
+If the deploy **succeeds** but the site shows a generic reload/back screen:
+
+1. Build log must show commit **`8a6bfb6` or later** (not `e03db53`).
+2. Both **`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`** and **`CLERK_SECRET_KEY`** must be set (middleware needs the secret at runtime, not only at build).
+3. Clerk **Domains** must include your Vercel host.
+4. Open browser DevTools → Console on the failing URL and check Vercel → **Logs** for the function error.
+
 ## Backend requirement
 
 Vercel is only building the Next.js web app. Live calls, Supabase-backed data, Recall.ai bot launch, and websockets still require the FastAPI service to be deployed at a public HTTPS host.
