@@ -34,9 +34,11 @@ interface BANTScorecardProps {
   /** @deprecated use `layout="inline"` instead */
   compact?: boolean;
   layout?: BANTLayout;
+  /** No per-dimension boxes — use inside an outer brief card */
+  plain?: boolean;
 }
 
-export function BANTScorecard({ bant, compact = false, layout }: BANTScorecardProps) {
+export function BANTScorecard({ bant, compact = false, layout, plain = false }: BANTScorecardProps) {
   const resolvedLayout: BANTLayout = layout ?? (compact ? "inline" : "grid");
   const keys = ["budget", "authority", "need", "timeline"] as const;
 
@@ -78,7 +80,10 @@ export function BANTScorecard({ bant, compact = false, layout }: BANTScorecardPr
         return (
           <div
             key={key}
-            className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 p-3 min-w-0"
+            className={cn(
+              "flex items-center gap-3 min-w-0",
+              plain ? "py-1.5" : "rounded-lg border border-border bg-muted/40 p-3"
+            )}
           >
             <Icon className={cn("h-5 w-5 shrink-0", config.color)} />
             <div className="min-w-0">

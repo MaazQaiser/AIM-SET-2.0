@@ -3,8 +3,9 @@
 import { Plus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { buildDefaultColumnOrder } from "@/lib/dashboard/column-order";
 import type { WidgetSpec } from "@/lib/dashboard/widget-registry";
-import { buildDefaultLayouts, useDashboardLayoutStore, type LayoutKey } from "@/stores/use-dashboard-layout";
+import { useDashboardLayoutStore, type LayoutKey } from "@/stores/use-dashboard-layout";
 
 interface LayoutControlsProps<P> {
   layoutKey: LayoutKey;
@@ -16,9 +17,8 @@ export function LayoutControls<P>({ layoutKey, widgets, widgetProps }: LayoutCon
   const isEditing = useDashboardLayoutStore((s) => s.isEditing);
   const hidden = useDashboardLayoutStore((s) => s.hidden[layoutKey] ?? []);
   const showWidget = useDashboardLayoutStore((s) => s.showWidget);
-  const resetLayout = useDashboardLayoutStore((s) => s.resetLayout);
+  const resetColumnLayout = useDashboardLayoutStore((s) => s.resetColumnLayout);
 
-  // Header owns the Customize / Done toggle now — render nothing in view mode.
   if (!isEditing) return null;
 
   const hiddenWidgets = widgets.filter((w) => {
@@ -32,17 +32,17 @@ export function LayoutControls<P>({ layoutKey, widgets, widgetProps }: LayoutCon
       if (w.isAvailable && !w.isAvailable(widgetProps)) return false;
       return true;
     });
-    resetLayout(layoutKey, buildDefaultLayouts(available, []));
+    resetColumnLayout(layoutKey, buildDefaultColumnOrder(available));
   };
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
       <p className="w-full text-xs text-muted-foreground sm:w-auto sm:flex-1">
-        Drag into open space beside another widget. Resize to half width (6 cols) for two columns.
+        Hide widgets you do not need. Reset restores the default three-column layout.
       </p>
       <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={handleReset}>
         <RotateCcw className="h-3.5 w-3.5" />
-        Reset
+        Reset layout
       </Button>
       {hiddenWidgets.length > 0 && (
         <Popover>

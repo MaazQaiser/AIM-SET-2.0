@@ -14,6 +14,11 @@ import type {
 } from "@/types";
 import type { CallBrief, PostCallReview } from "@/lib/brief-types";
 import {
+  FRANCHISE_DEMO_CALL_ID,
+  franchiseDemoPostReview,
+  mergeFranchiseDemoCalls,
+} from "@/lib/demo/franchise-ai-platform-demo";
+import {
   getImportVersion,
   resolveCall,
   resolveCallBrief,
@@ -27,7 +32,7 @@ const REFETCH_MS = 30_000;
 
 async function fetchCallsFromApi(): Promise<Call[]> {
   const api = await bffFetch<Call[]>("/api/calls");
-  if (api && api.length > 0) return api;
+  if (api && api.length > 0) return mergeFranchiseDemoCalls(api);
   return resolveCalls();
 }
 
@@ -71,7 +76,14 @@ export function usePostCallReview(callId: string) {
     queryKey: ["post-call", callId, getImportVersion()],
     queryFn: async () => {
       const base = resolvePostCallReview(callId);
-      const snap = useDcImportsStore.getState().discoverySnapshotsByCallId[callId];
+      const snap =
+        useDcImportsStore.getState().discoverySnapshotsByCallId[callId] ??
+        (callId === FRANCHISE_DEMO_CALL_ID
+          ? {
+              openGaps: franchiseDemoPostReview.openDiscoveryGaps ?? [],
+              bantCoverage: franchiseDemoPostReview.discoveryBantCoverage,
+            }
+          : undefined);
       if (!base && !snap) return null;
       const merged = base ?? {
         headline: "Post-call review",

@@ -5,6 +5,7 @@ import type {
   IntentSnapshot,
   KeywordStats,
   ObjectionPayload,
+  SentimentShift,
   SurfacedKbAsset,
   SuggestionLogEntry,
   UnansweredQuestionPayload,
@@ -20,6 +21,7 @@ interface LiveCallState {
   elapsedSeconds: number;
   sentimentAE: number;
   sentimentCustomer: number;
+  sentimentShift: SentimentShift | null;
   intentSnapshot: IntentSnapshot | null;
   keywordStats: KeywordStats | null;
   focusAreas: string[];
@@ -36,7 +38,7 @@ interface LiveCallState {
   addBantSignal: (signal: BantSignal) => void;
   dismissNudge: (id: string) => void;
   acceptNudge: (id: string) => void;
-  updateSentiment: (ae: number, customer: number) => void;
+  updateSentiment: (ae: number, customer: number, shift?: SentimentShift | null) => void;
   applyIntentUpdate: (payload: IntentSnapshot) => void;
   applyKeywordStats: (stats: KeywordStats) => void;
   applyChecklistUpdate: (state: DiscoveryChecklistState) => void;
@@ -57,6 +59,7 @@ const initialState = {
   elapsedSeconds: 0,
   sentimentAE: 0,
   sentimentCustomer: 0,
+  sentimentShift: null,
   intentSnapshot: null,
   keywordStats: null,
   focusAreas: [],
@@ -127,8 +130,12 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
   acceptNudge: (id) =>
     set((s) => ({ pendingNudges: s.pendingNudges.filter((n) => n.id !== id) })),
 
-  updateSentiment: (sentimentAE, sentimentCustomer) =>
-    set({ sentimentAE, sentimentCustomer }),
+  updateSentiment: (sentimentAE, sentimentCustomer, shift) =>
+    set({
+      sentimentAE,
+      sentimentCustomer,
+      ...(shift !== undefined ? { sentimentShift: shift ?? null } : {}),
+    }),
 
   applyIntentUpdate: (payload) => {
     const focusAreas = Array.from(new Set(payload.focus_areas ?? []));

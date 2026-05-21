@@ -12,10 +12,17 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   const { callId } = await params;
-  const body = (await request.json()) as { message?: string };
+  const body = (await request.json()) as {
+    message?: string;
+    mode?: "direct" | "group";
+    sender_name?: string;
+    sender_role?: string;
+  };
   if (!body.message?.trim()) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
   }
+
+  const mode = body.mode === "direct" ? "direct" : "group";
 
   const res = await fetch(
     `${process.env.API_URL ?? "http://localhost:8000"}/api/v1/calls/${callId}/bot-chat`,
@@ -26,7 +33,12 @@ export async function POST(request: NextRequest, { params }: Params) {
         "x-user-id": userId,
         ...(orgId ? { "x-tenant-id": orgId, "x-clerk-org-id": orgId } : { "x-tenant-id": userId }),
       },
-      body: JSON.stringify({ message: body.message }),
+      body: JSON.stringify({
+        message: body.message,
+        mode,
+        sender_name: body.sender_name,
+        sender_role: body.sender_role,
+      }),
     }
   );
 
@@ -43,8 +55,13 @@ export async function POST(request: NextRequest, { params }: Params) {
     citations?: { id: string; title: string; type: string; excerpt?: string }[];
   };
 
+  const messageId =
+    (data as { message_id?: string }).message_id ??
+    (data as { envelope?: { trace_id?: string } }).envelope?.trace_id;
+
   return NextResponse.json({
     content: data.content ?? "",
+    message_id: messageId,
     citations: (data.citations ?? []).map((c, i) => ({
       id: c.id ?? `cite-${i}`,
       title: c.title ?? "Source",

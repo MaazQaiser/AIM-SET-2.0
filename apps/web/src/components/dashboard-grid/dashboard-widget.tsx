@@ -13,11 +13,15 @@ import { cn } from "@/lib/cn";
  *   compact: < 360  → collapse to single column, hide non-essential metadata
  *   wide:    > 700  → switch internal layouts to two columns where it helps
  */
+export type ColumnZone = "left" | "center" | "right";
+
 export interface WidgetSize {
   width: number;
   height: number;
   compact: boolean;
   wide: boolean;
+  /** Fixed 3-column call detail layout — center never uses compact clamps. */
+  columnZone: ColumnZone;
 }
 
 const COMPACT_BREAKPOINT = 360;
@@ -28,9 +32,15 @@ const DEFAULT_SIZE: WidgetSize = {
   height: 280,
   compact: false,
   wide: false,
+  columnZone: "center",
 };
 
 const WidgetSizeContext = createContext<WidgetSize>(DEFAULT_SIZE);
+const ColumnZoneContext = createContext<ColumnZone>("center");
+
+export function useColumnZone(): ColumnZone {
+  return useContext(ColumnZoneContext);
+}
 
 export function useWidgetSize(): WidgetSize {
   return useContext(WidgetSizeContext);
@@ -40,10 +50,17 @@ interface DashboardWidgetProps {
   title: string;
   isEditing: boolean;
   onHide?: () => void;
+  columnZone?: ColumnZone;
   children: React.ReactNode;
 }
 
-export function DashboardWidget({ title, isEditing, onHide, children }: DashboardWidgetProps) {
+export function DashboardWidget({
+  title,
+  isEditing,
+  onHide,
+  columnZone = "center",
+  children,
+}: DashboardWidgetProps) {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const [{ width, height }, setSize] = useState<{ width: number; height: number }>({
     width: 0,
@@ -69,28 +86,48 @@ export function DashboardWidget({ title, isEditing, onHide, children }: Dashboar
   }, []);
 
   const sizeValue = useMemo<WidgetSize>(() => {
-    if (width <= 0) return DEFAULT_SIZE;
+    if (width <= 0) {
+      return { ...DEFAULT_SIZE, columnZone };
+    }
+    const measuredCompact = width < COMPACT_BREAKPOINT;
+    const measuredWide = width > WIDE_BREAKPOINT;
     return {
       width,
       height,
-      compact: width < COMPACT_BREAKPOINT,
-      wide: width > WIDE_BREAKPOINT,
+      columnZone,
+      compact:
+        columnZone === "center" ? false : columnZone === "left" || columnZone === "right" ? true : measuredCompact,
+      wide: columnZone === "center" ? measuredWide : false,
     };
-  }, [width, height]);
+  }, [width, height, columnZone]);
+
+  const context = (
+    <ColumnZoneContext.Provider value={columnZone}>
+      <WidgetSizeContext.Provider value={sizeValue}>{children}</WidgetSizeContext.Provider>
+    </ColumnZoneContext.Provider>
+  );
+
+  if (!isEditing) {
+    return (
+      <div ref={bodyRef} className="min-w-0 w-full">
+        {context}
+      </div>
+    );
+  }
 
   return (
     <div
       className={cn(
-        "relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl",
-        isEditing && "ring-1 ring-primary/30 bg-card shadow-sm"
+        "relative flex min-h-0 flex-col overflow-hidden rounded-xl ring-1 ring-primary/30 bg-card shadow-sm",
+        columnZone === "center" ? "min-h-0" : "max-h-[min(28rem,55vh)] shrink-0"
       )}
     >
-      {isEditing && <WidgetToolbar title={title} onHide={onHide} />}
+      <WidgetToolbar title={title} onHide={onHide} />
       <div
         ref={bodyRef}
-        className={cn("min-h-0 min-w-0 flex-1 overflow-auto", isEditing ? "p-2" : "")}
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2"
       >
-        <WidgetSizeContext.Provider value={sizeValue}>{children}</WidgetSizeContext.Provider>
+        {context}
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { DEMO_LIVE_TRANSCRIPT } from "@/lib/demo-live-transcript";
+import { getDemoTranscriptForCall } from "@/lib/demo-live-transcript";
 import { Play, Square } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -15,6 +15,7 @@ export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlay
   const [lineIndex, setLineIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const stopRef = useRef(false);
+  const lines = getDemoTranscriptForCall(callId);
 
   async function playDemo() {
     if (!isConnected || playing) return;
@@ -23,9 +24,9 @@ export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlay
     setLineIndex(0);
     setError(null);
 
-    for (let i = 0; i < DEMO_LIVE_TRANSCRIPT.length; i++) {
+    for (let i = 0; i < lines.length; i++) {
       if (stopRef.current) break;
-      const line = DEMO_LIVE_TRANSCRIPT[i];
+      const line = lines[i];
       setLineIndex(i + 1);
 
       try {
@@ -96,7 +97,7 @@ export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlay
           onClick={stopDemo}
         >
           <Square className="h-3 w-3 mr-1" />
-          Stop ({lineIndex}/{DEMO_LIVE_TRANSCRIPT.length})
+          Stop ({lineIndex}/{lines.length})
         </Button>
       )}
     </div>

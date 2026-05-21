@@ -88,7 +88,17 @@ def bot_chat(
     message = (body.get("message") or "").strip()
     if not message:
         raise HTTPException(status_code=400, detail="message is required")
-    return _orch.dispatch_bot_chat(ctx, call_id, message)
+    mode = (body.get("mode") or "group").strip().lower()
+    if mode not in ("direct", "group"):
+        mode = "group"
+    return _orch.dispatch_bot_chat(
+        ctx,
+        call_id,
+        message,
+        mode=mode,
+        sender_name=(body.get("sender_name") or "").strip() or None,
+        sender_role=(body.get("sender_role") or "").strip() or None,
+    )
 
 
 @router.get("/{call_id}/suggestions")

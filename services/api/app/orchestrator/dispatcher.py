@@ -90,11 +90,27 @@ class Orchestrator:
     def dispatch_call_end(self, ctx: TenantContext, call_id: str) -> Dict[str, Any]:
         return handle_call_end(ctx, call_id)
 
-    def dispatch_bot_chat(self, ctx: TenantContext, call_id: str, message: str) -> Dict[str, Any]:
+    def dispatch_bot_chat(
+        self,
+        ctx: TenantContext,
+        call_id: str,
+        message: str,
+        *,
+        mode: str = "group",
+        sender_name: Optional[str] = None,
+        sender_role: Optional[str] = None,
+    ) -> Dict[str, Any]:
         from app.domain.live_call_repository import get_live_call_repository
         from app.orchestrator.live_broadcast import envelope_to_ws_messages
 
-        env = bot_chat_response(ctx, call_id, message)
+        env = bot_chat_response(
+            ctx,
+            call_id,
+            message,
+            mode=mode,
+            sender_name=sender_name,
+            sender_role=sender_role,
+        )
         validate_envelope(env)
         self._log_run(ctx, env)
         repo = get_live_call_repository()
@@ -103,18 +119,25 @@ class Orchestrator:
             ctx,
             call_id,
             operation="bot_chat_response",
-            payload=env.result,
+            payload={**env.result, "mode": mode, "sender_name": sender_name, "sender_role": sender_role},
             trace_id=env.trace_id,
             suggestion_id=sid,
         )
         ws_messages = envelope_to_ws_messages(env, suggestion_id=sid, shown_at=None)
-        for msg in ws_messages:
-            get_call_channel().broadcast_sync(call_id, msg)
+        if mode == "group":
+            for msg in ws_messages:
+                if msg.get("type") == "bot_chat":
+                    payload = msg.get("payload") or {}
+                    payload["message_id"] = sid
+                    payload["sender_name"] = sender_name
+                    payload["sender_role"] = sender_role
+                get_call_channel().broadcast_sync(call_id, msg)
         return {
             "envelope": env.model_dump(),
             "content": env.result.get("answer"),
+            "message_id": sid,
             "citations": [c.model_dump() for c in env.citations],
-            "ws_messages": ws_messages,
+            "ws_messages": ws_messages if mode == "group" else [],
         }
 
     def dispatch_kb_ingest(self, ctx: TenantContext, asset: Dict[str, Any]) -> Dict[str, Any]:

@@ -1,5 +1,6 @@
 "use client";
 
+import { filterKeywordCounts } from "@/lib/live/keyword-filter";
 import type { KeywordStats } from "@/types";
 import { Badge } from "@/components/ui/badge";
 
@@ -16,15 +17,20 @@ export function KeywordFrequencyPanel({ stats }: KeywordFrequencyPanelProps) {
     );
   }
 
+  const globalTop = filterKeywordCounts(stats.global_top);
+
   return (
     <div className="space-y-2 text-xs">
-      {stats.global_top.length > 0 && (
+      {globalTop.length > 0 && (
         <div>
           <p className="font-semibold uppercase tracking-wide text-muted-foreground mb-1">
             Top keywords
           </p>
+          <p className="text-[10px] text-muted-foreground mb-1.5">
+            Industry &amp; tech terms only — fillers and common words hidden.
+          </p>
           <div className="flex flex-wrap gap-1">
-            {stats.global_top.slice(0, 8).map((k) => (
+            {globalTop.slice(0, 8).map((k) => (
               <Badge key={k.term} variant="secondary" className="text-[10px] font-normal">
                 {k.term} ×{k.count}
               </Badge>
@@ -32,20 +38,21 @@ export function KeywordFrequencyPanel({ stats }: KeywordFrequencyPanelProps) {
           </div>
         </div>
       )}
-      {Object.entries(stats.by_speaker).map(([speakerId, terms]) =>
-        terms.length > 0 ? (
+      {Object.entries(stats.by_speaker).map(([speakerId, terms]) => {
+        const filtered = filterKeywordCounts(terms);
+        return filtered.length > 0 ? (
           <div key={speakerId}>
             <p className="text-[10px] text-muted-foreground mb-0.5 truncate">{speakerId}</p>
             <div className="flex flex-wrap gap-1">
-              {terms.slice(0, 5).map((k) => (
+              {filtered.slice(0, 5).map((k) => (
                 <Badge key={`${speakerId}-${k.term}`} variant="outline" className="text-[9px]">
                   {k.term} ({k.count})
                 </Badge>
               ))}
             </div>
           </div>
-        ) : null
-      )}
+        ) : null;
+      })}
     </div>
   );
 }

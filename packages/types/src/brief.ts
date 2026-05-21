@@ -45,6 +45,17 @@ export interface ClientAttendee {
   linkedinUrl?: string;
 }
 
+/** Pod members assigned to this call with role context for pre-DC prep. */
+export interface InternalAttendee {
+  id: string;
+  name: string;
+  role: "ae" | "se" | "designer";
+  designation: string;
+  fitReason: string;
+  initials: string;
+  avatarUrl?: string;
+}
+
 export interface ClientInteraction {
   id: string;
   date: string;
@@ -81,6 +92,7 @@ export interface CallBrief {
   icpNote?: string;
   newSignals: string[];
   clientAttendees: ClientAttendee[];
+  internalAttendees?: InternalAttendee[];
   interactionHistory: ClientInteraction[];
   pains: HypothesizedPain[];
   objections: AnticipatedObjection[];

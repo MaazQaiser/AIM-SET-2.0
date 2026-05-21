@@ -1,4 +1,9 @@
-/** Scripted DC call lines (M3 storyline) for local live-cockpit testing without Recall. */
+import {
+  FRANCHISE_DEMO_CALL_ID,
+  FRANCHISE_DEMO_TRANSCRIPT,
+} from "@/lib/demo/franchise-ai-platform-demo";
+
+/** Scripted DC call lines for local live-cockpit testing without Recall. */
 
 export interface DemoTranscriptLine {
   text: string;
@@ -11,7 +16,11 @@ export interface DemoTranscriptLine {
   pauseAfterMs?: number;
 }
 
-export const DEMO_LIVE_TRANSCRIPT: DemoTranscriptLine[] = [
+/** Default demo playback (Frontera franchise AI platform scenario). */
+export const DEMO_LIVE_TRANSCRIPT: DemoTranscriptLine[] = FRANCHISE_DEMO_TRANSCRIPT;
+
+/** @deprecated Use DEMO_LIVE_TRANSCRIPT or getDemoTranscriptForCall */
+export const LEGACY_MERIDIAN_TRANSCRIPT: DemoTranscriptLine[] = [
   {
     text: "Thanks for making time today — I'll keep intros brief.",
     speakerId: "ae-sarah",
@@ -101,3 +110,10 @@ export const DEMO_LIVE_TRANSCRIPT: DemoTranscriptLine[] = [
     pauseAfterMs: 1500,
   },
 ];
+
+export function getDemoTranscriptForCall(callId: string): DemoTranscriptLine[] {
+  if (callId === FRANCHISE_DEMO_CALL_ID) return FRANCHISE_DEMO_TRANSCRIPT;
+  return DEMO_LIVE_TRANSCRIPT;
+}
+
+export { FRANCHISE_DEMO_CALL_ID };

@@ -1,9 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Linkedin, ChevronDown, ChevronUp, MessageCircle, Clock } from "lucide-react";
-import { useWidgetSize } from "@/components/dashboard-grid/dashboard-widget";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Linkedin, Clock, MessageCircle, ExternalLink } from "lucide-react";
+import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/cn";
 import type { ClientAttendee, InfluenceLevel } from "@/lib/brief-types";
 
@@ -13,10 +20,10 @@ interface ClientAttendeesCardProps {
 
 const INFLUENCE_CONFIG: Record<InfluenceLevel, { label: string; className: string }> = {
   "decision-maker": { label: "Decision maker", className: "bg-blue-100 text-blue-700 border-blue-200" },
-  "influencer":     { label: "Influencer",     className: "bg-purple-100 text-purple-700 border-purple-200" },
-  "champion":       { label: "Champion",        className: "bg-green-100 text-green-700 border-green-200" },
-  "blocker":        { label: "Blocker",          className: "bg-red-100 text-red-700 border-red-200" },
-  "evaluator":      { label: "Evaluator",        className: "bg-orange-100 text-orange-700 border-orange-200" },
+  influencer: { label: "Influencer", className: "bg-purple-100 text-purple-700 border-purple-200" },
+  champion: { label: "Champion", className: "bg-green-100 text-green-700 border-green-200" },
+  blocker: { label: "Blocker", className: "bg-red-100 text-red-700 border-red-200" },
+  evaluator: { label: "Evaluator", className: "bg-orange-100 text-orange-700 border-orange-200" },
 };
 
 function formatRelativeDays(iso: string) {
@@ -26,128 +33,113 @@ function formatRelativeDays(iso: string) {
   return `${days}d ago`;
 }
 
-function AttendeeRow({
+function initialsFor(name: string) {
+  return name
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function ClientAttendeeDetailDialog({
   attendee,
-  compact,
+  open,
+  onOpenChange,
 }: {
-  attendee: ClientAttendee;
-  compact: boolean;
+  attendee: ClientAttendee | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  if (!attendee) return null;
+
   const influence = INFLUENCE_CONFIG[attendee.influenceLevel];
-  const initials = attendee.name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden min-w-0">
-      <button
-        className={cn(
-          "w-full flex items-center gap-3 text-left hover:bg-muted/30 transition-colors min-w-0",
-          compact ? "px-3 py-2" : "px-4 py-3"
-        )}
-        onClick={() => setExpanded((e) => !e)}
-        aria-expanded={expanded}
-      >
-        {/* Avatar */}
-        <div
-          className={cn(
-            "shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold",
-            compact ? "h-8 w-8 text-xs" : "h-10 w-10 text-sm"
-          )}
-        >
-          {initials}
-        </div>
-
-        {/* Name + title */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap min-w-0">
-            <span className="text-sm font-bold text-foreground truncate">{attendee.name}</span>
-            <span
-              className={cn(
-                "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                influence.className
-              )}
-            >
-              {influence.label}
-            </span>
-            {attendee.linkedinUrl && !compact && (
-              <a
-                href={attendee.linkedinUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="text-muted-foreground hover:text-primary transition-colors"
-                aria-label={`${attendee.name} LinkedIn`}
-              >
-                <Linkedin className="h-3.5 w-3.5" />
-              </a>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground truncate">
-            {attendee.title}
-            {!compact && attendee.department ? ` · ${attendee.department}` : ""}
-          </p>
-        </div>
-
-        {/* Last contacted */}
-        {!compact && (
-          <div className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground mr-1">
-            {attendee.lastContactedAt ? (
-              <>
-                <Clock className="h-3 w-3" />
-                {formatRelativeDays(attendee.lastContactedAt)}
-              </>
-            ) : (
-              <span className="italic">First meeting</span>
-            )}
-          </div>
-        )}
-
-        {expanded ? (
-          <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
-        ) : (
-          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-        )}
-      </button>
-
-      {/* Expanded detail */}
-      {expanded && (
-        <div className="px-4 pb-4 pt-1 space-y-3 border-t bg-muted/20">
-          <div>
-            <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">
-              Background
-            </p>
-            <p className="text-sm text-foreground/80 leading-relaxed break-words">
-              {attendee.background}
-            </p>
-          </div>
-
-          {attendee.priorInteractionNote && (
-            <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 flex gap-2 min-w-0">
-              <MessageCircle className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-wide font-semibold text-primary mb-0.5">
-                  Agent note
-                </p>
-                <p className="text-xs text-foreground/80 leading-relaxed break-words">
-                  {attendee.priorInteractionNote}
-                </p>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[min(90vh,640px)] overflow-y-auto">
+        <DialogHeader className="pr-8">
+          <div className="flex items-start gap-3">
+            <div className="h-12 w-12 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+              {initialsFor(attendee.name)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-left">{attendee.name}</DialogTitle>
+              <DialogDescription className="text-left mt-1">
+                {attendee.title}
+                {attendee.department ? ` · ${attendee.department}` : ""}
+              </DialogDescription>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <span
+                  className={cn(
+                    "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                    influence.className
+                  )}
+                >
+                  {influence.label}
+                </span>
+                {attendee.lastContactedAt ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    Last contact {formatRelativeDays(attendee.lastContactedAt)}
+                  </span>
+                ) : (
+                  <span className="text-xs text-warning font-medium">First meeting</span>
+                )}
               </div>
             </div>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-4 pt-2">
+          <section>
+            <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+              Background
+            </h4>
+            <p className="text-sm text-foreground/90 leading-relaxed">{attendee.background}</p>
+          </section>
+
+          {attendee.priorInteractionNote && (
+            <section className="rounded-lg bg-primary/5 px-3 py-3">
+              <div className="flex gap-2">
+                <MessageCircle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-[10px] font-semibold uppercase tracking-wide text-primary mb-1">
+                    Agent note
+                  </h4>
+                  <p className="text-sm text-foreground/90 leading-relaxed">
+                    {attendee.priorInteractionNote}
+                  </p>
+                </div>
+              </div>
+            </section>
           )}
 
           {!attendee.lastContactedAt && (
-            <div className="rounded-md border border-warning/20 bg-warning/5 px-3 py-2 text-xs text-warning font-medium">
-              First time joining — no prior interaction data. Treat as a fresh introduction.
-            </div>
+            <p className="text-sm text-warning leading-relaxed">
+              No prior interaction on record — plan a crisp introduction and confirm role on the call.
+            </p>
+          )}
+
+          {attendee.linkedinUrl && (
+            <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+              <a href={attendee.linkedinUrl} target="_blank" rel="noopener noreferrer">
+                <Linkedin className="h-4 w-4 mr-2" />
+                View LinkedIn
+                <ExternalLink className="h-3 w-3 ml-2 opacity-60" />
+              </a>
+            </Button>
           )}
         </div>
-      )}
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 export function ClientAttendeesCard({ attendees }: ClientAttendeesCardProps) {
-  const { compact, wide } = useWidgetSize();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = attendees.find((a) => a.id === selectedId) ?? null;
+
   const decisionMakers = attendees.filter(
     (a) => a.influenceLevel === "decision-maker" || a.influenceLevel === "blocker"
   );
@@ -157,44 +149,76 @@ export function ClientAttendeesCard({ attendees }: ClientAttendeesCardProps) {
   const sorted = [...decisionMakers, ...others];
 
   return (
-    <Card className="h-full">
-      <CardHeader className={cn("pb-3", compact && "pb-2")}>
-        <div className="flex items-center justify-between gap-2 min-w-0">
-          <CardTitle className="text-sm">Client attendees</CardTitle>
-          <span className="text-xs text-muted-foreground shrink-0">
-            {attendees.length} {compact ? "" : "people"}
-          </span>
+    <>
+      <BriefDetailCard
+        title="Client attendees"
+        headerExtra={
+          <span className="text-xs text-muted-foreground shrink-0">{attendees.length}</span>
+        }
+      >
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {Object.entries(INFLUENCE_CONFIG).map(([key, cfg]) => {
+            const count = attendees.filter((a) => a.influenceLevel === key).length;
+            if (count === 0) return null;
+            return (
+              <span
+                key={key}
+                className={cn(
+                  "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                  cfg.className
+                )}
+              >
+                {count} {cfg.label}
+              </span>
+            );
+          })}
         </div>
-        {!compact && (
-          <div className="flex items-center gap-2 flex-wrap mt-1">
-            {Object.entries(INFLUENCE_CONFIG).map(([key, cfg]) => {
-              const count = attendees.filter((a) => a.influenceLevel === key).length;
-              if (count === 0) return null;
-              return (
+
+        <ul className="divide-y divide-border">
+          {sorted.map((attendee) => {
+            const influence = INFLUENCE_CONFIG[attendee.influenceLevel];
+            return (
+              <li key={attendee.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                <div className="h-9 w-9 shrink-0 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-foreground">
+                  {initialsFor(attendee.name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground truncate">{attendee.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {attendee.title}
+                    {attendee.department ? ` · ${attendee.department}` : ""}
+                  </p>
+                </div>
                 <span
-                  key={key}
                   className={cn(
-                    "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium gap-1",
-                    cfg.className
+                    "hidden sm:inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                    influence.className
                   )}
                 >
-                  {count} {cfg.label}
+                  {influence.label}
                 </span>
-              );
-            })}
-          </div>
-        )}
-      </CardHeader>
-      <CardContent
-        className={cn(
-          "pt-0",
-          wide ? "grid grid-cols-2 gap-2" : "space-y-2"
-        )}
-      >
-        {sorted.map((attendee) => (
-          <AttendeeRow key={attendee.id} attendee={attendee} compact={compact} />
-        ))}
-      </CardContent>
-    </Card>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 h-8 text-xs"
+                  onClick={() => setSelectedId(attendee.id)}
+                >
+                  Details
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
+      </BriefDetailCard>
+
+      <ClientAttendeeDetailDialog
+        attendee={selected}
+        open={selectedId !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedId(null);
+        }}
+      />
+    </>
   );
 }

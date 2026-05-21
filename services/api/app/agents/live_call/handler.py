@@ -191,10 +191,10 @@ def handle_transcript_segment(
 
     if analysis.get("sentiment"):
         sent = analysis["sentiment"]
-        ws_msg = {
-            "type": "sentiment",
-            "payload": {"ae": sent.get("ae", 0), "customer": sent.get("customer", 0)},
-        }
+        payload = {"ae": sent.get("ae", 0), "customer": sent.get("customer", 0)}
+        if sent.get("shift"):
+            payload["shift"] = sent["shift"]
+        ws_msg = {"type": "sentiment", "payload": payload}
         ws_messages.append(ws_msg)
         get_call_channel().broadcast_sync(call_id, ws_msg)
 

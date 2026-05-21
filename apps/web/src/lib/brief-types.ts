@@ -8,6 +8,7 @@ export type {
   AnticipatedObjection,
   DeckSlide,
   ClientAttendee,
+  InternalAttendee,
   ClientInteraction,
   InfluenceLevel,
   SentimentTrend,

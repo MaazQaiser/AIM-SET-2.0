@@ -3,8 +3,17 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { LayoutItem, ResponsiveLayouts } from "react-grid-layout";
+import {
+  buildDefaultColumnOrder,
+  mergeColumnOrder,
+  type ColumnOrder,
+  type ColumnOrderSeed,
+  EMPTY_COLUMN_ORDER,
+} from "@/lib/dashboard/column-order";
+import type { WidgetColumn } from "@/lib/dashboard/widget-registry";
 
 export type LayoutKey = "brief" | "post-dc";
+export type { ColumnOrder, WidgetColumn };
 
 const BREAKPOINTS = ["lg", "md", "sm", "xs"] as const;
 
@@ -15,18 +24,21 @@ let layoutDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 export interface WidgetLayoutSeed {
   id: string;
-  defaultLayout: Pick<LayoutItem, "x" | "y" | "w" | "h" | "minW" | "minH">;
+  defaultLayout?: Pick<LayoutItem, "x" | "y" | "w" | "h" | "minW" | "minH">;
 }
 
 interface DashboardLayoutState {
   isEditing: boolean;
   layouts: Record<LayoutKey, ResponsiveLayouts>;
+  columnOrder: Record<LayoutKey, ColumnOrder>;
   hidden: Record<LayoutKey, string[]>;
   setEditing: (value: boolean) => void;
   setLayout: (key: LayoutKey, layouts: ResponsiveLayouts) => void;
+  setColumnOrder: (key: LayoutKey, order: ColumnOrder) => void;
   hideWidget: (key: LayoutKey, id: string) => void;
   showWidget: (key: LayoutKey, id: string) => void;
   resetLayout: (key: LayoutKey, defaultLayouts: ResponsiveLayouts) => void;
+  resetColumnLayout: (key: LayoutKey, defaultOrder: ColumnOrder) => void;
 }
 
 export const useDashboardLayoutStore = create<DashboardLayoutState>()(
@@ -36,6 +48,10 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
       layouts: {
         brief: { ...EMPTY_LAYOUTS },
         "post-dc": { ...EMPTY_LAYOUTS },
+      },
+      columnOrder: {
+        brief: { ...EMPTY_COLUMN_ORDER },
+        "post-dc": { ...EMPTY_COLUMN_ORDER },
       },
       hidden: { ...EMPTY_HIDDEN },
 
@@ -73,6 +89,15 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
         }));
       },
 
+      setColumnOrder: (key, order) => {
+        set((state) => ({
+          columnOrder: {
+            ...state.columnOrder,
+            [key]: order,
+          },
+        }));
+      },
+
       resetLayout: (key, defaultLayouts) => {
         set((state) => ({
           layouts: {
@@ -85,20 +110,38 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
           },
         }));
       },
+
+      resetColumnLayout: (key, defaultOrder) => {
+        set((state) => ({
+          columnOrder: {
+            ...state.columnOrder,
+            [key]: defaultOrder,
+          },
+          hidden: {
+            ...state.hidden,
+            [key]: [],
+          },
+        }));
+      },
     }),
     {
-      name: "dc-copilot:dashboard-layout-v7",
-      version: 1,
+      name: "dc-copilot:dashboard-layout-v9",
+      version: 3,
       migrate: () => ({
         isEditing: false,
         layouts: {
           brief: { ...EMPTY_LAYOUTS },
           "post-dc": { ...EMPTY_LAYOUTS },
         },
+        columnOrder: {
+          brief: { ...EMPTY_COLUMN_ORDER },
+          "post-dc": { ...EMPTY_COLUMN_ORDER },
+        },
         hidden: { ...EMPTY_HIDDEN },
       }),
       partialize: (state) => ({
         layouts: state.layouts,
+        columnOrder: state.columnOrder,
         hidden: state.hidden,
       }),
       merge: (persisted, current) => {
@@ -110,6 +153,10 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
             brief: p?.layouts?.brief ?? { ...EMPTY_LAYOUTS },
             "post-dc": p?.layouts?.["post-dc"] ?? { ...EMPTY_LAYOUTS },
           },
+          columnOrder: {
+            brief: p?.columnOrder?.brief ?? { ...EMPTY_COLUMN_ORDER },
+            "post-dc": p?.columnOrder?.["post-dc"] ?? { ...EMPTY_COLUMN_ORDER },
+          },
           hidden: {
             brief: p?.hidden?.brief ?? [],
             "post-dc": p?.hidden?.["post-dc"] ?? [],
@@ -120,16 +167,19 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
   )
 );
 
+export { buildDefaultColumnOrder, mergeColumnOrder };
+export type { ColumnOrderSeed };
+
 export function buildDefaultLayouts(items: WidgetLayoutSeed[], hidden: string[]): ResponsiveLayouts {
-  const visible = items.filter((w) => !hidden.includes(w.id));
+  const visible = items.filter((w) => !hidden.includes(w.id) && w.defaultLayout);
   const lg: LayoutItem[] = visible.map((w) => ({
     i: w.id,
-    x: w.defaultLayout.x,
-    y: w.defaultLayout.y,
-    w: w.defaultLayout.w,
-    h: w.defaultLayout.h,
-    minW: w.defaultLayout.minW ?? 3,
-    minH: w.defaultLayout.minH ?? 2,
+    x: w.defaultLayout!.x,
+    y: w.defaultLayout!.y,
+    w: w.defaultLayout!.w,
+    h: w.defaultLayout!.h,
+    minW: w.defaultLayout!.minW ?? 3,
+    minH: w.defaultLayout!.minH ?? 2,
     maxW: 12,
   }));
 

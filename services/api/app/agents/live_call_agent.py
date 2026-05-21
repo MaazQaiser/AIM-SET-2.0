@@ -384,6 +384,10 @@ def bot_chat_response(
     ctx: TenantContext,
     call_id: str,
     message: str,
+    *,
+    mode: str = "group",
+    sender_name: Optional[str] = None,
+    sender_role: Optional[str] = None,
 ) -> AgentEnvelope:
     runtime = get_live_call_runtime(ctx)
     state = get_session(call_id)
@@ -397,8 +401,22 @@ def bot_chat_response(
     brief = calls.get_brief(ctx, call_id)
     kb_hits = _retrieve_kb_for_call(ctx, f"{message}\n{window}", limit=5)
 
+    sender = sender_name or "Pod member"
+    role = sender_role or "ae"
+    if mode == "direct":
+        context_header = (
+            f"PRIVATE direct message from {sender} ({role}) — not visible to other pod members. "
+            "Give coaching they can use without repeating sensitive team context aloud."
+        )
+    else:
+        context_header = (
+            f"GROUP pod chat message from {sender} ({role}) — visible to AE, SE, designer, and QA on the call. "
+            "Answer for the whole pod; be concise and actionable."
+        )
+
     user = (
-        f"Pod member question: {message}\n"
+        f"{context_header}\n"
+        f"Question: {message}\n"
         f"Transcript window: {window}\n"
         f"Brief: {json.dumps(brief or {}, default=str)[:600]}\n"
         f"KB: {json.dumps(kb_hits[:3], default=str)}"

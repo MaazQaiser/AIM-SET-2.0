@@ -15,7 +15,7 @@ import {
   Clock,
 } from "lucide-react";
 import { useWidgetSize } from "@/components/dashboard-grid/dashboard-widget";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
 import { cn } from "@/lib/cn";
 import type { ClientInteraction, SentimentTrend } from "@/lib/brief-types";
 
@@ -163,17 +163,12 @@ function InteractionRow({
 }
 
 export function ClientHistoryCard({ interactions }: ClientHistoryCardProps) {
-  const { compact, wide } = useWidgetSize();
+  const { compact } = useWidgetSize();
   if (interactions.length === 0) {
     return (
-      <Card className="h-full">
-        <CardHeader className={cn("pb-3", compact && "pb-2")}>
-          <CardTitle className="text-sm">Client interaction history</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <p className="text-sm text-muted-foreground">No prior interactions recorded.</p>
-        </CardContent>
-      </Card>
+      <BriefDetailCard title="Client interaction history">
+        <p className="text-sm text-muted-foreground">No prior interactions recorded.</p>
+      </BriefDetailCard>
     );
   }
 
@@ -182,34 +177,23 @@ export function ClientHistoryCard({ interactions }: ClientHistoryCardProps) {
   );
 
   return (
-    <Card className="h-full">
-      <CardHeader className={cn("pb-3", compact && "pb-2")}>
-        <div className="flex items-center justify-between gap-2 min-w-0">
-          <CardTitle className="text-sm">Client interaction history</CardTitle>
-          <span className="text-xs text-muted-foreground shrink-0">
-            {interactions.length} {compact ? "" : "interactions"}
-          </span>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div
-          className={cn(
-            "relative",
-            wide
-              ? "grid grid-cols-2 gap-x-4"
-              : "border-l border-dashed border-border ml-1.5"
-          )}
-        >
-          {sorted.map((interaction, i) => (
-            <InteractionRow
-              key={interaction.id}
-              interaction={interaction}
-              isFirst={i === 0}
-              compact={compact}
-            />
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+    <BriefDetailCard
+      title="Client interaction history"
+      scrollMaxHeight="14rem"
+      headerExtra={
+        <span className="text-xs text-muted-foreground shrink-0">{interactions.length}</span>
+      }
+    >
+      <div className="relative border-l border-dashed border-border ml-1.5 pl-3 space-y-3">
+        {sorted.map((interaction, i) => (
+          <InteractionRow
+            key={interaction.id}
+            interaction={interaction}
+            isFirst={i === 0}
+            compact={compact}
+          />
+        ))}
+      </div>
+    </BriefDetailCard>
   );
 }

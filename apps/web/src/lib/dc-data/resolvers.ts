@@ -5,6 +5,13 @@ import {
   slugifyCompany,
 } from "@/lib/dc-notes/build-from-import";
 import { buildCallsFromPreDc } from "@/lib/dc-data/build-calls-from-pre-dc";
+import {
+  FRANCHISE_DEMO_CALL_ID,
+  franchiseDemoBrief,
+  franchiseDemoCall,
+  franchiseDemoPostReview,
+  mergeFranchiseDemoCalls,
+} from "@/lib/demo/franchise-ai-platform-demo";
 import { preDcField } from "@/types/dc-notes";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import type { Call } from "@/types";
@@ -16,9 +23,9 @@ export function resolveCalls(): Call[] {
   const preDcRecords = state.preDcRecords ?? [];
   const postDcRecords = state.postDcRecords ?? [];
   if (preDcRecords.length === 0) {
-    return state.calls ?? [];
+    return mergeFranchiseDemoCalls(state.calls ?? []);
   }
-  return buildCallsFromPreDc(preDcRecords, postDcRecords).calls;
+  return mergeFranchiseDemoCalls(buildCallsFromPreDc(preDcRecords, postDcRecords).calls);
 }
 
 export function resolveCall(callId: string): Call | undefined {
@@ -29,6 +36,7 @@ export function resolveCallBrief(callId: string): CallBrief | null {
   const state = useDcImportsStore.getState();
   const preDcRecords = state.preDcRecords ?? [];
   if (preDcRecords.length === 0) {
+    if (callId === FRANCHISE_DEMO_CALL_ID) return franchiseDemoBrief;
     return state.briefsByCallId?.[callId] ?? null;
   }
 
@@ -56,6 +64,7 @@ export function resolvePostCallReview(callId: string): PostCallReview | null {
   const preDcRecords = state.preDcRecords ?? [];
   const postDcRecords = state.postDcRecords ?? [];
   if (preDcRecords.length === 0) {
+    if (callId === FRANCHISE_DEMO_CALL_ID) return franchiseDemoPostReview;
     return state.postReviewsByCallId?.[callId] ?? null;
   }
 

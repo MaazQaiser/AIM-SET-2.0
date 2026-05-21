@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-type PanelId = "transcript" | "signals" | "kb" | "chat";
+type PanelId = "transcript" | "insights" | "signals" | "kb" | "chat" | "wrap-up";
 
 interface CallUIState {
   activePanel: PanelId | null;

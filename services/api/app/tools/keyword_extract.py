@@ -124,6 +124,22 @@ _STOPWORDS = frozenset(
         "really",
         "well",
         "right",
+        "actually",
+        "basically",
+        "literally",
+        "honestly",
+        "anyway",
+        "stuff",
+        "things",
+        "gonna",
+        "wanna",
+        "gotta",
+        "thanks",
+        "please",
+        "sorry",
+        "hello",
+        "hey",
+        "hi",
     }
 )
 

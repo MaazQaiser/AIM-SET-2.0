@@ -18,6 +18,7 @@ import {
   parseDiscoveryDateTime,
 } from "@/lib/dc-notes/parse-discovery";
 import { formatCompanyRevenue } from "@/lib/dc-notes/format";
+import { buildInternalAttendeesFromPreDc } from "@/lib/attendees/build-internal-attendees";
 
 export function slugifyCompany(name: string): string {
   const slug = name
@@ -54,9 +55,18 @@ export function buildCallFromPreDc(record: PreDCRecord): Call {
     new Date().toISOString();
 
   const revenueRaw = preDcField(record, "annualRevenue");
+  const callId = slugifyCompany(companyName);
+  const internalAttendees = buildInternalAttendeesFromPreDc(callId, {
+    industry: preDcField(record, "industry"),
+    intersection: preDcField(record, "intersectionAreas"),
+    needs: preDcField(record, "describedNeeds"),
+    relevance: preDcField(record, "relevanceToTkxel"),
+    techStacks: preDcField(record, "techStacks"),
+    technicalBackground: preDcField(record, "technicalBackground"),
+  });
 
   return {
-    id: slugifyCompany(companyName),
+    id: callId,
     accountName: companyName,
     leadName: preDcField(record, "leadName"),
     leadTitle: preDcField(record, "prospectPersona"),
@@ -73,7 +83,13 @@ export function buildCallFromPreDc(record: PreDCRecord): Call {
     scheduledAt,
     status: isDiscoveryCallUpcoming(scheduledAt) ? "upcoming" : "completed",
     briefReady: true,
-    pod: [],
+    pod: internalAttendees.map((m) => ({
+      id: m.id,
+      name: m.name,
+      role: m.role,
+      initials: m.initials,
+      avatarUrl: m.avatarUrl,
+    })),
     bant: {
       budget: "unknown",
       authority: "partial",
@@ -306,6 +322,14 @@ export function buildBriefFromPreDc(record: PreDCRecord, callId: string): CallBr
           },
         ]
       : [],
+    internalAttendees: buildInternalAttendeesFromPreDc(callId, {
+      industry: preDcField(record, "industry"),
+      intersection: preDcField(record, "intersectionAreas"),
+      needs: preDcField(record, "describedNeeds"),
+      relevance: preDcField(record, "relevanceToTkxel"),
+      techStacks: preDcField(record, "techStacks"),
+      technicalBackground: preDcField(record, "technicalBackground"),
+    }),
     interactionHistory: [],
     pains,
     objections: [],

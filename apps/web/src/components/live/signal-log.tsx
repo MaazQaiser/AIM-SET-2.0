@@ -1,17 +1,28 @@
 "use client";
 
 import type { BantSignal } from "@/lib/live-types";
-import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/cn";
 
 interface SignalLogProps {
   signals: BantSignal[];
 }
 
-const dimLabel: Record<BantSignal["dimension"], string> = {
-  budget: "Budget",
-  authority: "Authority",
-  need: "Need",
-  timeline: "Timeline",
+const dimConfig: Record<
+  BantSignal["dimension"],
+  { label: string; emoji: string; accent: string }
+> = {
+  budget: { label: "Budget", emoji: "💰", accent: "border-emerald-300/60 bg-emerald-50/50 dark:bg-emerald-950/25" },
+  authority: {
+    label: "Authority",
+    emoji: "👤",
+    accent: "border-violet-300/60 bg-violet-50/50 dark:bg-violet-950/25",
+  },
+  need: { label: "Need", emoji: "🎯", accent: "border-sky-300/60 bg-sky-50/50 dark:bg-sky-950/25" },
+  timeline: {
+    label: "Timeline",
+    emoji: "📅",
+    accent: "border-amber-300/60 bg-amber-50/50 dark:bg-amber-950/25",
+  },
 };
 
 export function SignalLog({ signals }: SignalLogProps) {
@@ -24,12 +35,27 @@ export function SignalLog({ signals }: SignalLogProps) {
   }
 
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {signals.map((s) => (
-        <Badge key={s.id} variant="outline" className="text-[10px] font-normal">
-          {dimLabel[s.dimension]} · {s.label}
-        </Badge>
-      ))}
-    </div>
+    <ul className="space-y-1.5">
+      {[...signals].reverse().slice(0, 8).map((s) => {
+        const cfg = dimConfig[s.dimension];
+        return (
+          <li
+            key={s.id}
+            className={cn(
+              "flex items-start gap-2 rounded-md border px-2.5 py-2 text-xs",
+              cfg.accent
+            )}
+          >
+            <span className="text-base leading-none shrink-0" aria-hidden>
+              {cfg.emoji}
+            </span>
+            <div className="min-w-0">
+              <p className="font-semibold text-foreground">{cfg.label}</p>
+              <p className="text-muted-foreground leading-snug mt-0.5">{s.label}</p>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

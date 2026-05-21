@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
+import { useBotChatStore } from "@/stores/use-bot-chat";
 import { useLiveCall } from "@/stores/use-live-call";
 import type {
   TranscriptEvent,
@@ -13,6 +14,7 @@ import type {
   SurfacedKbAsset,
   SuggestionLogEntry,
   UnansweredQuestionPayload,
+  Citation,
 } from "@/types";
 import type { BantSignal, DiscoveryChecklistState } from "@dc-copilot/types";
 
@@ -28,6 +30,16 @@ type StreamMessage =
   | { type: "objection"; payload: ObjectionPayload }
   | { type: "unanswered_question"; payload: UnansweredQuestionPayload }
   | { type: "suggestion_log"; payload: SuggestionLogEntry }
+  | {
+      type: "bot_chat";
+      payload: {
+        answer?: string;
+        citations?: { id: string; title: string; type: string; excerpt?: string }[];
+        message_id?: string;
+        sender_name?: string;
+        sender_role?: string;
+      };
+    }
   | { type: "ping" };
 
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -116,7 +128,11 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
               addNudge(normalizeNudge(msg.payload as unknown as Record<string, unknown>));
               break;
             case "sentiment":
-              updateSentiment(msg.payload.ae, msg.payload.customer);
+              updateSentiment(
+                msg.payload.ae,
+                msg.payload.customer,
+                msg.payload.shift ?? null
+              );
               break;
             case "intent_update":
               applyIntentUpdate(msg.payload);
@@ -142,6 +158,27 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
             case "suggestion_log":
               appendSuggestionLog(msg.payload as SuggestionLogEntry);
               break;
+            case "bot_chat": {
+              const p = msg.payload;
+              if (p?.answer) {
+                useBotChatStore.getState().appendGroupFromWs(callId, {
+                  id: p.message_id ?? crypto.randomUUID(),
+                  role: "assistant",
+                  content: p.answer,
+                  citations: (p.citations ?? []).map(
+                    (c, i): Citation => ({
+                      id: c.id ?? `cite-${i}`,
+                      title: c.title ?? "Source",
+                      type: (c.type as Citation["type"]) ?? "transcript",
+                      excerpt: c.excerpt,
+                    })
+                  ),
+                  authorName: "DC Copilot",
+                  createdAt: Date.now(),
+                });
+              }
+              break;
+            }
           }
         } catch {
           // Malformed message; ignore

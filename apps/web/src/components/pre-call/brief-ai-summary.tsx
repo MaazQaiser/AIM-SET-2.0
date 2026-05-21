@@ -1,8 +1,10 @@
 "use client";
 
-import { Sparkles, TrendingUp, Calendar, DollarSign, Target } from "lucide-react";
+import { Sparkles, TrendingUp, Calendar, DollarSign, Target, Users } from "lucide-react";
 import { AIGeneratedBadge } from "@/components/ai-generated-badge";
 import { useWidgetSize } from "@/components/dashboard-grid/dashboard-widget";
+import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
+import { parseSummaryHighlights } from "@/lib/brief-summary-highlights";
 import type { CallBrief } from "@/lib/brief-types";
 import { cn } from "@/lib/cn";
 
@@ -11,110 +13,116 @@ interface BriefAISummaryProps {
 }
 
 const STAGE_COLOR: Record<string, string> = {
-  "Evaluation → Proposal": "bg-blue-100 text-blue-700 border-blue-200",
-  "Discovery":              "bg-purple-100 text-purple-700 border-purple-200",
-  "Proposal":               "bg-orange-100 text-orange-700 border-orange-200",
-  "Closed Won":             "bg-green-100 text-green-700 border-green-200",
-  "Closed Lost":            "bg-red-100 text-red-700 border-red-200",
+  "Evaluation → Proposal": "bg-blue-100/90 text-blue-800 border-blue-200/80",
+  Discovery: "bg-purple-100/90 text-purple-800 border-purple-200/80",
+  Proposal: "bg-orange-100/90 text-orange-800 border-orange-200/80",
+  "Closed Won": "bg-emerald-100/90 text-emerald-800 border-emerald-200/80",
+  "Closed Lost": "bg-rose-100/90 text-rose-800 border-rose-200/80",
 };
 
-export function BriefAISummary({ brief }: BriefAISummaryProps) {
-  const { compact, wide } = useWidgetSize();
-  const stageClass = STAGE_COLOR[brief.dealStage] ?? "bg-muted text-muted-foreground";
-  const contactUrgency = brief.daysSinceLastContact > 14 ? "text-warning" : "text-muted-foreground";
-
+function MetaChip({
+  children,
+  className,
+  icon,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  icon?: React.ReactNode;
+}) {
   return (
-    <div
+    <span
       className={cn(
-        "rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-accent/30 space-y-4 min-w-0",
-        compact ? "p-3" : "p-5"
+        "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium min-w-0 max-w-full",
+        className
       )}
     >
-      {/* Header row */}
-      <div
-        className={cn(
-          "gap-2 flex-wrap min-w-0",
-          compact ? "flex flex-col items-start" : "flex items-center justify-between"
-        )}
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <Sparkles className="h-4 w-4 text-primary shrink-0" />
-          <span className="text-sm font-semibold text-foreground truncate">AI Brief Summary</span>
-          <AIGeneratedBadge />
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+      {icon}
+      <span className="truncate">{children}</span>
+    </span>
+  );
+}
+
+function HighlightedSummary({ text, clamp }: { text: string; clamp?: boolean }) {
+  const parts = parseSummaryHighlights(text);
+  return (
+    <p
+      className={cn(
+        "text-sm leading-relaxed text-foreground/90 break-words",
+        clamp && "line-clamp-6"
+      )}
+    >
+      {parts.map((part, i) =>
+        part.type === "highlight" ? (
+          <mark key={i} className={cn(part.className, "font-medium")}>
+            {part.value}
+          </mark>
+        ) : (
+          <span key={i}>{part.value}</span>
+        )
+      )}
+    </p>
+  );
+}
+
+export function BriefAISummary({ brief }: BriefAISummaryProps) {
+  const { compact, columnZone } = useWidgetSize();
+  const isCenter = columnZone === "center";
+  const stageClass = STAGE_COLOR[brief.dealStage] ?? "bg-muted/60 text-muted-foreground border-border";
+  const contactUrgency = brief.daysSinceLastContact > 14 ? "text-warning" : "text-muted-foreground";
+  const icpPct = Math.round(brief.icpMatch * 100);
+  const icpSegments = brief.icpNote?.split("·").map((s) => s.trim()).filter(Boolean) ?? [];
+
+  return (
+    <BriefDetailCard
+      title="AI Brief Summary"
+      icon={Sparkles}
+      variant="highlight"
+      headerExtra={<AIGeneratedBadge />}
+    >
+      <div className="space-y-4 min-w-0">
+        {/* Deal context + ICP / firmographic chips (top) */}
+        <div className="flex flex-wrap items-center gap-1.5">
           {brief.opportunityValue && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-background border px-2.5 py-0.5 text-xs font-semibold">
-              <DollarSign className="h-3 w-3 text-success" />
-              {brief.opportunityValue}
-            </span>
-          )}
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium",
-              stageClass
-            )}
-          >
-            <Target className="h-3 w-3" />
-            {brief.dealStage}
-          </span>
-          {!compact && (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full bg-background border px-2.5 py-0.5 text-xs",
-                contactUrgency
-              )}
+            <MetaChip
+              className="bg-amber-50/90 border-amber-200/70 text-amber-950"
+              icon={<DollarSign className="h-3 w-3 shrink-0 text-amber-700" />}
             >
-              <Calendar className="h-3 w-3" />
+              {brief.opportunityValue}
+            </MetaChip>
+          )}
+          <MetaChip className={cn("border", stageClass)} icon={<Target className="h-3 w-3 shrink-0" />}>
+            {brief.dealStage}
+          </MetaChip>
+          <MetaChip
+            className="bg-violet-50/90 border-violet-200/70 text-violet-950"
+            icon={<TrendingUp className="h-3 w-3 shrink-0 text-violet-700" />}
+          >
+            ICP {icpPct}%
+          </MetaChip>
+          {icpSegments.map((segment) => (
+            <MetaChip
+              key={segment}
+              className="bg-slate-100/90 border-slate-200/70 text-slate-800"
+              icon={<Users className="h-3 w-3 shrink-0 text-slate-600" />}
+            >
+              {segment}
+            </MetaChip>
+          ))}
+          {(!compact || isCenter) && (
+            <MetaChip
+              className={cn(
+                "bg-background/80 border-border",
+                contactUrgency === "text-warning" && "bg-warning/10 border-warning/30 text-warning"
+              )}
+              icon={<Calendar className="h-3 w-3 shrink-0" />}
+            >
               Last contact {brief.daysSinceLastContact}d ago
-            </span>
+            </MetaChip>
           )}
         </div>
-      </div>
 
-      {/* Summary text */}
-      <p
-        className={cn(
-          "text-sm leading-relaxed text-foreground/90 break-words",
-          compact && "line-clamp-6"
-        )}
-      >
-        {brief.aiSummary}
-      </p>
-
-      {/* ICP match + note */}
-      <div
-        className={cn(
-          "pt-1 border-t border-primary/10 gap-3 min-w-0",
-          compact ? "flex flex-col items-start" : "flex items-center"
-        )}
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <TrendingUp className="h-3.5 w-3.5 text-primary shrink-0" />
-          <span className="text-xs font-medium">ICP match</span>
-          <div className="flex items-center gap-1.5">
-            <div className="w-20 h-1.5 rounded-full bg-primary/20 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-primary"
-                style={{ width: `${brief.icpMatch * 100}%` }}
-              />
-            </div>
-            <span className="text-xs font-semibold text-primary">
-              {(brief.icpMatch * 100).toFixed(0)}%
-            </span>
-          </div>
-        </div>
-        {brief.icpNote && !compact && (
-          <p
-            className={cn(
-              "text-xs text-muted-foreground min-w-0 break-words",
-              wide ? "border-l pl-3" : "pt-1"
-            )}
-          >
-            {brief.icpNote}
-          </p>
-        )}
+        <HighlightedSummary text={brief.aiSummary} clamp={!isCenter && compact} />
       </div>
-    </div>
+    </BriefDetailCard>
   );
 }

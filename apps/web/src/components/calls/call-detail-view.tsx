@@ -16,9 +16,10 @@ import { preDcField } from "@/types/dc-notes";
 
 interface CallDetailViewProps {
   callId: string;
+  initialTab?: "brief" | "post-dc";
 }
 
-export function CallDetailView({ callId }: CallDetailViewProps) {
+export function CallDetailView({ callId, initialTab = "brief" }: CallDetailViewProps) {
   const { data: call, isLoading } = useCall(callId);
   const preRecord = useDcImportsStore((s) =>
     s.preDcRecords.find((r) => slugifyCompany(preDcField(r, "companyName")) === callId)
@@ -28,7 +29,7 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="p-6 space-y-6 max-w-[1400px] mx-auto w-full">
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-96 w-full" />
       </div>
@@ -70,7 +71,7 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
       ];
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6 max-w-[1400px] mx-auto w-full">
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="icon">
           <Link href="/calls" aria-label="Back to calls">
@@ -131,17 +132,11 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
             Customize layout
           </Button>
         )}
-        {(call.status === "upcoming" || call.status === "live") && (
-          <Button asChild>
-            <Link href={`/calls/${call.id}/live`}>
-              {call.status === "live" ? "Join live" : "Join call"}
-            </Link>
-          </Button>
-        )}
       </div>
 
       <CallDetailTabs
         callId={callId}
+        initialTab={initialTab}
         discoveryQuestions={discoveryQuestions}
         bant={call.bant ?? { budget: "unknown", authority: "unknown", need: "unknown", timeline: "unknown" }}
         call={call}

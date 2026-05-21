@@ -5,19 +5,23 @@ import type { UnansweredQuestionPayload } from "@/types";
 
 interface UnansweredQuestionsListProps {
   questions: UnansweredQuestionPayload[];
+  /** Hide section title when wrapped in LiveCollapsibleSection */
+  compact?: boolean;
 }
 
-export function UnansweredQuestionsList({ questions }: UnansweredQuestionsListProps) {
+export function UnansweredQuestionsList({ questions, compact }: UnansweredQuestionsListProps) {
   if (questions.length === 0) {
     return null;
   }
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-        <AlertCircle className="h-3 w-3 text-amber-600" />
-        Unanswered prospect questions
-      </p>
+      {!compact && (
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+          <AlertCircle className="h-3 w-3 text-amber-600" />
+          Unanswered prospect questions
+        </p>
+      )}
       {questions.map((q, i) => (
         <div
           key={q.id ?? q.question_id ?? i}

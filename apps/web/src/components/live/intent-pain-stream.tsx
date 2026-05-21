@@ -20,7 +20,7 @@ export function IntentPainStream({ intent, pains }: IntentPainStreamProps) {
   return (
     <div className="space-y-3 text-xs">
       {intent && (
-        <div>
+        <div className="rounded-lg border border-border bg-card/50 p-2.5">
           <p className="font-semibold uppercase tracking-wide text-muted-foreground mb-1">
             Call intent
           </p>
@@ -39,7 +39,7 @@ export function IntentPainStream({ intent, pains }: IntentPainStreamProps) {
           </p>
           <ul className="space-y-2">
             {pains.slice(-6).map((p) => (
-              <li key={p.id} className="rounded-md border border-border p-2 bg-card">
+              <li key={p.id} className="rounded-lg border border-border bg-card/50 p-2.5">
                 <div className="flex items-center gap-1.5 mb-1">
                   <Badge variant="outline" className="text-[9px] px-1 py-0">
                     {p.source === "brief_match" ? "Brief" : "Live"}

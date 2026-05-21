@@ -12,6 +12,12 @@ const sentimentColor: Record<string, string> = {
   neutral: "border-l-border",
 };
 
+const sentimentEmoji: Record<string, string> = {
+  positive: "😊",
+  negative: "😟",
+  neutral: "😐",
+};
+
 const roleColor: Record<string, string> = {
   ae: "text-primary",
   se: "text-success",
@@ -94,6 +100,15 @@ export function TranscriptViewer({
                   <span className="text-xs text-muted-foreground">
                     {Math.floor(event.timestamp / 60)}:{String(event.timestamp % 60).padStart(2, "0")}
                   </span>
+                  {event.sentiment && (
+                    <span
+                      className="text-xs leading-none"
+                      title={event.sentiment}
+                      aria-label={`Sentiment: ${event.sentiment}`}
+                    >
+                      {sentimentEmoji[event.sentiment] ?? "😐"}
+                    </span>
+                  )}
                   {event.signalType === "discovery_anchor" && (
                     <span className="text-[10px] font-medium text-success bg-success/10 border border-success/30 rounded px-1.5 py-0.5">
                       Discovery anchor

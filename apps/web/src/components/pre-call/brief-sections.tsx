@@ -2,6 +2,8 @@
 
 import { BriefAISummary } from "@/components/pre-call/brief-ai-summary";
 import { ClientAttendeesCard } from "@/components/pre-call/client-attendees-card";
+import { InternalAttendeesCard } from "@/components/pre-call/internal-attendees-card";
+import { resolveInternalAttendees } from "@/lib/attendees/build-internal-attendees";
 import { ClientHistoryCard } from "@/components/pre-call/client-history-card";
 import { PostDcBriefPreviewCard } from "@/components/pre-call/post-dc-brief-preview";
 import { PreDcResearchCard } from "@/components/pre-call/pre-dc-research-card";
@@ -61,6 +63,10 @@ export function BriefSections({
       {brief.postDcPreview && <PostDcBriefPreviewCard preview={brief.postDcPreview} />}
 
       {brief.newSignals.length > 0 && <BriefSignalsCard signals={brief.newSignals} />}
+
+      <InternalAttendeesCard
+        attendees={resolveInternalAttendees(brief.internalAttendees, call)}
+      />
 
       {brief.clientAttendees.length > 0 && (
         <ClientAttendeesCard attendees={brief.clientAttendees} />
