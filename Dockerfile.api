@@ -19,8 +19,7 @@ ENV PYTHONPATH=/python-packages:/app/services/api
 ENV PROMPTS_DIR=/prompts
 
 RUN pip install --no-cache-dir -e ".[llm]" \
-    && pip install pdf2image \
-    && playwright install chromium --with-deps || playwright install chromium
+    && pip install pdf2image
 
 EXPOSE 8000
 
