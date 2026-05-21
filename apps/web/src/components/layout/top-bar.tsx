@@ -5,11 +5,12 @@ import { Bell, Moon, Search, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { PersonaSwitcher } from "@/components/layout/persona-switcher";
+import { useClerkGate } from "@/components/providers/clerk-gate";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
-import { isClerkConfigured } from "@/lib/public-env";
 
 export function TopBar() {
   const { theme, setTheme } = useTheme();
+  const clerkEnabled = useClerkGate();
 
   return (
     <header className="relative z-10 flex h-16 items-center justify-between bg-transparent px-6">
@@ -48,7 +49,7 @@ export function TopBar() {
           <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-primary" />
         </Button>
 
-        {isLocalAuthBypassEnabled() || !isClerkConfigured() ? (
+        {isLocalAuthBypassEnabled() || !clerkEnabled ? (
           <div className="ml-1 flex h-11 items-center rounded-full glass px-3 text-xs font-medium text-muted-foreground">
             {isLocalAuthBypassEnabled() ? "Local dev" : "Auth not configured"}
           </div>

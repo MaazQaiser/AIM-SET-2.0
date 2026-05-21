@@ -2,9 +2,9 @@
 
 import { useUser } from "@clerk/nextjs";
 import { createContext, useContext, type ReactNode } from "react";
+import { useClerkGate } from "@/components/providers/clerk-gate";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
 import { personaFromMetadata, type Persona } from "@/lib/persona";
-import { isClerkConfigured } from "@/lib/public-env";
 import { usePersonaStore } from "@/stores/use-persona";
 
 const PersonaContext = createContext<Persona>("ae");
@@ -32,11 +32,14 @@ function PersonaFallback({ children }: { children: ReactNode }) {
   );
 }
 
-/** Supplies persona without calling Clerk hooks when auth is not configured. */
+/** Persona from Clerk only when server enabled ClerkProvider (see root layout). */
 export function PersonaProvider({ children }: { children: ReactNode }) {
-  if (isLocalAuthBypassEnabled() || !isClerkConfigured()) {
+  const clerkEnabled = useClerkGate();
+
+  if (isLocalAuthBypassEnabled() || !clerkEnabled) {
     return <PersonaFallback>{children}</PersonaFallback>;
   }
+
   return <PersonaFromClerk>{children}</PersonaFromClerk>;
 }
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { ClerkGateProvider } from "@/components/providers/clerk-gate";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
@@ -41,15 +42,21 @@ function AppDocument({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const document = <AppDocument>{children}</AppDocument>;
+  const clerkEnabled =
+    !isLocalAuthBypassEnabled() && isClerkConfigured();
+  const publishableKey = getClerkPublishableKey();
 
-  if (isLocalAuthBypassEnabled() || !isClerkConfigured()) {
+  const document = (
+    <ClerkGateProvider enabled={clerkEnabled}>
+      <AppDocument>{children}</AppDocument>
+    </ClerkGateProvider>
+  );
+
+  if (!clerkEnabled) {
     return document;
   }
 
   return (
-    <ClerkProvider publishableKey={getClerkPublishableKey()}>
-      {document}
-    </ClerkProvider>
+    <ClerkProvider publishableKey={publishableKey}>{document}</ClerkProvider>
   );
 }

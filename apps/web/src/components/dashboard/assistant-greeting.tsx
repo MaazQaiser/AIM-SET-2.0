@@ -2,9 +2,9 @@
 
 import { useUser } from "@clerk/nextjs";
 import { format, isSameDay, startOfDay } from "date-fns";
+import { useClerkGate } from "@/components/providers/clerk-gate";
 import { useCalls, usePostCallCrmTasks } from "@/lib/data/hooks";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
-import { isClerkConfigured } from "@/lib/public-env";
 
 function getSalutation(hour: number): string {
   if (hour >= 23 || hour < 5) return "Working late";
@@ -86,7 +86,9 @@ function AssistantGreetingBody({
 }
 
 export function AssistantGreeting() {
-  if (isLocalAuthBypassEnabled() || !isClerkConfigured()) {
+  const clerkEnabled = useClerkGate();
+
+  if (isLocalAuthBypassEnabled() || !clerkEnabled) {
     return <AssistantGreetingBody isLoaded name="there" />;
   }
   return <AssistantGreetingWithClerk />;
