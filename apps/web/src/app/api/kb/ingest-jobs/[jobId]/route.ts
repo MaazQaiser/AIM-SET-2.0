@@ -1,4 +1,5 @@
 import { auth } from "@/lib/api/auth";
+import { getInternalApiSecret } from "@/lib/public-env";
 import { NextResponse, type NextRequest } from "next/server";
 
 const internalApiUrl = () => process.env.INTERNAL_API_URL ?? process.env.API_URL ?? "http://localhost:8000";
@@ -13,7 +14,7 @@ export async function GET(
   }
 
   const { jobId } = await params;
-  const secret = process.env.INTERNAL_API_SECRET;
+  const secret = getInternalApiSecret();
 
   const res = await fetch(`${internalApiUrl()}/api/v1/kb/ingest-jobs/${jobId}`, {
     headers: {

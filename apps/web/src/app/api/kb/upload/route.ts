@@ -1,4 +1,5 @@
 import { auth } from "@/lib/api/auth";
+import { getInternalApiSecret } from "@/lib/public-env";
 import { NextResponse, type NextRequest } from "next/server";
 
 /** Sync KB ingest via upstream API can exceed default Vercel serverless timeout. */
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const secret = process.env.INTERNAL_API_SECRET;
+    const secret = getInternalApiSecret();
     if (!secret) {
       return NextResponse.json(
         { error: "INTERNAL_API_SECRET is not configured" },

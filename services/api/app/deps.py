@@ -31,7 +31,9 @@ def verify_internal_secret(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="INTERNAL_SECRET is not configured on the API service",
         )
-    if x_internal_secret != settings.internal_secret:
+    expected = (settings.internal_secret or "").strip()
+    provided = (x_internal_secret or "").strip()
+    if provided != expected:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid internal secret")
 
 

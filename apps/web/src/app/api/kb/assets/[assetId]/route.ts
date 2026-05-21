@@ -1,10 +1,11 @@
 import { auth } from "@/lib/api/auth";
+import { getInternalApiSecret } from "@/lib/public-env";
 import { NextResponse, type NextRequest } from "next/server";
 
 const internalApiUrl = () => process.env.INTERNAL_API_URL ?? process.env.API_URL ?? "http://localhost:8000";
 
 function headers(userId: string, orgId: string | null | undefined) {
-  const secret = process.env.INTERNAL_API_SECRET;
+  const secret = getInternalApiSecret();
   return {
     ...(secret ? { "X-Internal-Secret": secret } : {}),
     "x-user-id": userId,

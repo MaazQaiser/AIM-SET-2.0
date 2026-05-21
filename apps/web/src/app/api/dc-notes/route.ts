@@ -1,4 +1,5 @@
 import { auth } from "@/lib/api/auth";
+import { getInternalApiSecret } from "@/lib/public-env";
 import { NextResponse } from "next/server";
 
 const internalApiUrl = () => process.env.INTERNAL_API_URL ?? process.env.API_URL ?? "http://localhost:8000";
@@ -9,7 +10,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const secret = process.env.INTERNAL_API_SECRET;
+  const secret = getInternalApiSecret();
   if (!secret) {
     return NextResponse.json(
       { error: "INTERNAL_API_SECRET is not configured in apps/web/.env.local" },

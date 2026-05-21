@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
@@ -38,6 +39,13 @@ class Settings(BaseSettings):
     cors_allowed_origins: str = (
         "http://localhost:3000,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3002"
     )
+
+    @field_validator("internal_secret", mode="before")
+    @classmethod
+    def _strip_internal_secret(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+        return value
 
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]

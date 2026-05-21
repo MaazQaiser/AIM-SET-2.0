@@ -1,4 +1,5 @@
 import { auth } from "@/lib/api/auth";
+import { getInternalApiSecret } from "@/lib/public-env";
 import { NextResponse, type NextRequest } from "next/server";
 
 const internalApiUrl = () => process.env.INTERNAL_API_URL ?? process.env.API_URL ?? "http://localhost:8000";
@@ -11,7 +12,7 @@ export async function POST(
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { assetId } = await params;
-  const secret = process.env.INTERNAL_API_SECRET;
+  const secret = getInternalApiSecret();
   const res = await fetch(`${internalApiUrl()}/api/v1/kb/assets/${assetId}/re-embed`, {
     method: "POST",
     headers: {
