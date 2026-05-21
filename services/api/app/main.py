@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import get_settings
+
 # Repo-root python-packages (dc_core, dc_llm, dc_tools)
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_REPO_ROOT / "python-packages"))
@@ -26,14 +28,10 @@ from app.routers import (  # noqa: E402
 
 app = FastAPI(title="DC Copilot API", version="0.2.0")
 
+_settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3002",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:3002",
-    ],
+    allow_origins=_settings.cors_origin_list(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,5 +47,12 @@ app.include_router(websocket.router)
 
 
 @app.get("/health")
-def health() -> Dict[str, str]:
-    return {"status": "ok"}
+def health() -> Dict[str, object]:
+    settings = get_settings()
+    return {
+        "status": "ok",
+        "supabase_configured": settings.supabase_configured,
+        "openai_configured": settings.openai_configured,
+        "kb_ingest_sync": settings.kb_ingest_sync,
+        "kb_shared_mode": settings.kb_shared_mode,
+    }

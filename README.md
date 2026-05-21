@@ -187,7 +187,7 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000
 
 ## Deploy
 
-Vercel build settings and required production environment variables are documented in [docs/VERCEL_DEPLOYMENT.md](./docs/VERCEL_DEPLOYMENT.md).
+Vercel build settings and required production environment variables are documented in [docs/VERCEL_DEPLOYMENT.md](./docs/VERCEL_DEPLOYMENT.md). Deploy the FastAPI backend (Supabase + KB) via [docs/API_DEPLOYMENT.md](./docs/API_DEPLOYMENT.md).
 
 ---
 

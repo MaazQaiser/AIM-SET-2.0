@@ -1,0 +1,11 @@
+# Railway deploy — set root directory to repo root, Dockerfile path: Dockerfile.api
+# Docs: docs/API_DEPLOYMENT.md
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.api"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"

@@ -19,5 +19,13 @@
       "NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL": "/",
       "NEXT_PUBLIC_KB_SHARED": "true"
     }
+  },
+  "functions": {
+    "src/app/api/kb/upload/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/dc-notes/ingest/route.ts": {
+      "maxDuration": 60
+    }
   }
 }

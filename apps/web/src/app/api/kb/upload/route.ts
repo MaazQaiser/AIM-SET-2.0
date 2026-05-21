@@ -1,6 +1,9 @@
 import { auth } from "@/lib/api/auth";
 import { NextResponse, type NextRequest } from "next/server";
 
+/** Sync KB ingest via upstream API can exceed default Vercel serverless timeout. */
+export const maxDuration = 60;
+
 const internalApiUrl = () => process.env.INTERNAL_API_URL ?? process.env.API_URL ?? "http://localhost:8000";
 
 export async function POST(req: NextRequest) {

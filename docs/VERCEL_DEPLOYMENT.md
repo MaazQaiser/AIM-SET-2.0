@@ -86,27 +86,67 @@ If the deploy **succeeds** but the site shows a generic reload/back screen:
 3. Clerk **Domains** must include your Vercel host.
 4. Open browser DevTools → Console on the failing URL and check Vercel → **Logs** for the function error.
 
-## Backend requirement
+## Backend requirement (Supabase + KB)
 
-Vercel is only building the Next.js web app. Live calls, Supabase-backed data, Recall.ai bot launch, and websockets still require the FastAPI service to be deployed at a public HTTPS host.
+Vercel is only building the Next.js web app. **All Supabase reads/writes and KB file uploads go through the FastAPI API** — not through Vercel env vars.
 
-The FastAPI deployment needs the values from `services/api/.env.example`, especially:
+Deploy the API first: **[API_DEPLOYMENT.md](./API_DEPLOYMENT.md)** (Railway/Render + `Dockerfile.api`).
+
+Do **not** point production `API_URL` at a localtunnel URL ([PATH_A_ACTIVE.md](./PATH_A_ACTIVE.md) is dev-only). Data “vanishes” when the API runs without Supabase or restarts with in-memory fallback.
+
+### API host environment (minimum)
 
 ```env
 SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
 INTERNAL_SECRET=the_same_value_as_Vercel_INTERNAL_API_SECRET
 OPENAI_API_KEY=...
-ANTHROPIC_API_KEY=...
-RECALL_API_KEY=...
-RECALL_REGION=us-west-2
+KB_INGEST_SYNC=true
+KB_SHARED_MODE=true
+KB_STORAGE_BUCKET=kb-assets
 PUBLIC_API_BASE_URL=https://your-api-host.example.com
-RECALL_WEBHOOK_SECRET=...
+CORS_ALLOWED_ORIGINS=https://aim-set-2-0-web.vercel.app,http://localhost:3000
 ```
 
-`PUBLIC_API_BASE_URL` must be reachable by Recall.ai so transcript webhooks can be delivered.
+Optional: `ANTHROPIC_API_KEY`, `RECALL_*` for Content Studio and live calls.
 
-For step-by-step Recall testing on production, see **[RECALL_PRODUCTION_TESTING.md](./RECALL_PRODUCTION_TESTING.md)**.
+### Vercel → API wiring
+
+```env
+API_URL=https://your-api-host.example.com
+INTERNAL_API_URL=https://your-api-host.example.com
+INTERNAL_API_SECRET=<same as API INTERNAL_SECRET>
+NEXT_PUBLIC_API_URL=https://your-api-host.example.com
+NEXT_PUBLIC_WS_URL=wss://your-api-host.example.com
+```
+
+**Redeploy Vercel** after changing `API_URL` or any `NEXT_PUBLIC_*` variable.
+
+### Verify Supabase + KB end-to-end
+
+1. **API health:** `curl https://<api-host>/health`  
+   → `supabase_configured: true`, `openai_configured: true`, `kb_ingest_sync: true`
+2. **Vercel health:** `https://<vercel-app>/api/health/deployment`  
+   → `clerkReady: true`, `apiUrlConfigured: true`
+3. **DC notes:** Import CSV on Settings → reload → data persists (check `pre_dc_records` in Supabase)
+4. **KB upload:** Knowledge → Upload asset → success toast  
+   → Supabase Storage `kb-assets` has a new object; `kb_assets.status` = `ready`, `chunk_count` > 0
+
+### KB upload timeouts on Vercel
+
+Large files run sync ingest on the API. `apps/web/vercel.json` sets `maxDuration: 60` for `/api/kb/upload`. Hobby plan caps at 10s — use Pro for 60s or smaller test files.
+
+### Troubleshooting
+
+| Symptom | Likely cause |
+|---------|----------------|
+| Empty lists after reload | `API_URL` wrong, API down, or Clerk/secret 401 |
+| Upload 502/503 | Vercel cannot reach `API_URL`; tunnel dead |
+| Upload OK but asset `pending` | API missing `KB_INGEST_SYNC=true` and no worker |
+| Data in app, empty in Supabase | API missing `SUPABASE_*` (memory fallback) |
+| Ingest failed | Missing `OPENAI_API_KEY` on API |
+
+`PUBLIC_API_BASE_URL` must be reachable by Recall.ai for live-call webhooks. See **[RECALL_PRODUCTION_TESTING.md](./RECALL_PRODUCTION_TESTING.md)**.
 
 ## Local production build check
 

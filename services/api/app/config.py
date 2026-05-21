@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     recall_webhook_secret: str = ""
     public_api_base_url: str = ""
     demo_transcript_replay: bool = False
+    cors_allowed_origins: str = (
+        "http://localhost:3000,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3002"
+    )
+
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]
 
     @property
     def anthropic_configured(self) -> bool:

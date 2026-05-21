@@ -1,27 +1,21 @@
-# Path A — active tunnel (local API → public URL)
+# Path A — local API tunnel (development only)
+
+> **Do not use this for Vercel Production.** Tunnel URLs change on every restart and your laptop must stay online. Production needs a deployed API — see **[API_DEPLOYMENT.md](./API_DEPLOYMENT.md)**.
 
 **Generated:** 2026-05-21  
 **Tunnel:** localtunnel (ngrok needs your authtoken — see below)
 
-## Your public API URL (use everywhere as `API_URL`)
+## Your public API URL (local dev only)
 
-```text
-https://thin-dragons-double.loca.lt
-```
+Run `./scripts/start-api-tunnel.sh` and paste the printed `https://....loca.lt` URL.
 
-**Health check:**  
-https://thin-dragons-double.loca.lt/health  
-→ should show `{"status":"ok"}`
+**Health check:** `https://<tunnel>/health` → `{"status":"ok", ...}`
 
-**Important:** This URL changes every time you restart the tunnel. Re-run:
-
-```bash
-./scripts/start-api-tunnel.sh
-```
+**Important:** This URL changes every time you restart the tunnel.
 
 ---
 
-## What was configured
+## What was configured (local)
 
 | File | Change |
 |------|--------|
@@ -41,20 +35,19 @@ https://thin-dragons-double.loca.lt/health
 
 ---
 
-## Point Vercel at this tunnel
+## Optional: point Vercel Preview at tunnel (not Production)
 
-Vercel → **aim-set-2-0-web** → Settings → Environment Variables → Production:
+Only for short-lived demos while your Mac is on:
 
 ```env
-API_URL=https://thin-dragons-double.loca.lt
-INTERNAL_API_URL=https://thin-dragons-double.loca.lt
-NEXT_PUBLIC_API_URL=https://thin-dragons-double.loca.lt
-NEXT_PUBLIC_WS_URL=wss://thin-dragons-double.loca.lt
-INTERNAL_API_SECRET=dev-internal-secret-change-in-production
-NEXT_PUBLIC_ENABLE_DEMO_TRANSCRIPT=true
+API_URL=https://<current-tunnel>.loca.lt
+INTERNAL_API_URL=https://<current-tunnel>.loca.lt
+NEXT_PUBLIC_API_URL=https://<current-tunnel>.loca.lt
+NEXT_PUBLIC_WS_URL=wss://<current-tunnel-host>
+INTERNAL_API_SECRET=<match services/api INTERNAL_SECRET>
 ```
 
-Redeploy. Your laptop must stay on with `pnpm dev` + tunnel running.
+Redeploy. Replace URLs after every tunnel restart.
 
 ---
 
@@ -75,4 +68,4 @@ Redeploy. Your laptop must stay on with `pnpm dev` + tunnel running.
 1. Sign up: https://dashboard.ngrok.com/signup  
 2. `ngrok config add-authtoken <YOUR_TOKEN>`  
 3. `ngrok http 8000`  
-4. Replace `thin-dragons-double.loca.lt` with your `https://xxxx.ngrok-free.app` in `.env` files and Vercel.
+4. Use the `https://xxxx.ngrok-free.app` URL in local `.env` files only.

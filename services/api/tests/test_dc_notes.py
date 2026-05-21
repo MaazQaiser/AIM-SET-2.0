@@ -9,7 +9,11 @@ SECRET = "test-secret"
 def test_health():
     r = client.get("/health")
     assert r.status_code == 200
-    assert r.json()["status"] == "ok"
+    body = r.json()
+    assert body["status"] == "ok"
+    assert "supabase_configured" in body
+    assert "openai_configured" in body
+    assert "kb_ingest_sync" in body
 
 
 def test_dc_notes_ingest_requires_secret(monkeypatch):
