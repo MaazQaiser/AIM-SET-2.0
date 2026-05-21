@@ -10,7 +10,7 @@ from app.config import get_settings
 from app.deps import get_supabase
 from app.domain.memory_store import get_memory_store
 from app.domain.supabase_utils import execute_with_retry
-from app.domain.tenant_service import get_tenant_service
+from app.domain.kb_tenancy import resolve_team_tenant
 
 
 def _dc_asset_id(kind: Literal["pre-dc", "post-dc"], record_id: str) -> str:
@@ -29,12 +29,8 @@ def _record_chunk_text(kind: Literal["pre-dc", "post-dc"], fields: Dict[str, Any
 class DcNotesRepository:
     """Pre/Post-DC records in Supabase (or in-memory when Supabase is unset)."""
 
-    def __init__(self) -> None:
-        self._tenants = get_tenant_service()
-
     def _tenant_keys(self, ctx: TenantContext) -> tuple[str, str]:
-        tenant_uuid, clerk_key = self._tenants.resolve(ctx)
-        return tenant_uuid, clerk_key
+        return resolve_team_tenant(ctx)
 
     def get_notes(self, ctx: TenantContext) -> Dict[str, List[Dict[str, Any]]]:
         tenant_uuid, clerk_key = self._tenant_keys(ctx)

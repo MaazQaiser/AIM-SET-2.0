@@ -274,7 +274,12 @@ export function DcNotesCsvImport() {
         </CardTitle>
         <CardDescription>
           Upload Pre-DC and Post-DC CSVs — records are stored in Supabase and embedded into the vector
-          index for agent retrieval. Data is not kept in browser local storage.
+          index for agent retrieval.
+          {process.env.NEXT_PUBLIC_KB_SHARED === "true" && (
+            <span className="block mt-1 text-primary/90">
+              Shared team dataset — every signed-in user sees the same imported calls and notes.
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

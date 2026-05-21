@@ -11,7 +11,7 @@ from app.deps import get_supabase
 from app.domain.dc_notes_repository import get_dc_notes_repository
 from app.domain.memory_store import get_memory_store
 from app.domain.supabase_utils import execute_with_retry
-from app.domain.tenant_service import get_tenant_service
+from app.domain.kb_tenancy import resolve_team_tenant
 
 
 def slugify_company(name: str) -> str:
@@ -48,11 +48,14 @@ def build_calls_from_pre_dc(
 class CallsService:
     def __init__(self) -> None:
         self._dc = get_dc_notes_repository()
-        self._tenants = get_tenant_service()
 
     def _tenant_uuid(self, ctx: TenantContext) -> str:
-        tenant_uuid, _ = self._tenants.resolve(ctx)
+        tenant_uuid, _ = resolve_team_tenant(ctx)
         return tenant_uuid
+
+    def _clerk_key(self, ctx: TenantContext) -> str:
+        _, clerk_key = resolve_team_tenant(ctx)
+        return clerk_key
 
     def sync_from_dc_notes(self, ctx: TenantContext) -> List[Dict[str, Any]]:
         notes = self._dc.get_notes(ctx)
@@ -63,7 +66,7 @@ class CallsService:
     def _persist_calls(self, ctx: TenantContext, calls: List[Dict[str, Any]]) -> None:
         if not calls:
             return
-        _, clerk_key = self._tenants.resolve(ctx)
+        clerk_key = self._clerk_key(ctx)
         if not get_settings().supabase_configured:
             get_memory_store().upsert_calls(clerk_key, calls)
             return
@@ -90,7 +93,7 @@ class CallsService:
             supabase.table("calls").upsert(rows).execute()
 
     def list_calls(self, ctx: TenantContext) -> List[Dict[str, Any]]:
-        _, clerk_key = self._tenants.resolve(ctx)
+        clerk_key = self._clerk_key(ctx)
         if not get_settings().supabase_configured:
             mem_calls = get_memory_store().list_calls(clerk_key)
             if mem_calls:
@@ -125,7 +128,7 @@ class CallsService:
         return next((c for c in self.list_calls(ctx) if c["id"] == call_id), None)
 
     def get_brief(self, ctx: TenantContext, call_id: str) -> Optional[Dict[str, Any]]:
-        _, clerk_key = self._tenants.resolve(ctx)
+        clerk_key = self._clerk_key(ctx)
         if not get_settings().supabase_configured:
             return get_memory_store().get_call_brief(clerk_key, call_id)
         tenant_uuid = self._tenant_uuid(ctx)
@@ -153,7 +156,7 @@ class CallsService:
         return None
 
     def save_brief(self, ctx: TenantContext, call_id: str, payload: Dict[str, Any]) -> None:
-        _, clerk_key = self._tenants.resolve(ctx)
+        clerk_key = self._clerk_key(ctx)
         if not get_settings().supabase_configured:
             get_memory_store().save_call_brief(clerk_key, call_id, payload)
             for call in get_memory_store().list_calls(clerk_key):
@@ -176,7 +179,7 @@ class CallsService:
         supabase.table("calls").update({"brief_ready": True}).eq("tenant_id", tenant_uuid).eq("id", call_id).execute()
 
     def save_live_signals(self, ctx: TenantContext, call_id: str, snapshot: Dict[str, Any]) -> None:
-        _, clerk_key = self._tenants.resolve(ctx)
+        clerk_key = self._clerk_key(ctx)
         if not get_settings().supabase_configured:
             get_memory_store().save_live_signals(clerk_key, call_id, snapshot)
             call = self.get_call(ctx, call_id)

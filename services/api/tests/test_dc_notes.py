@@ -1,5 +1,9 @@
+from dc_core.tenancy import TenantContext
 from fastapi.testclient import TestClient
 
+from app.config import get_settings
+from app.domain.dc_notes_repository import get_dc_notes_repository
+from app.domain.kb_tenancy import resolve_team_tenant
 from app.main import app
 
 client = TestClient(app)
@@ -72,6 +76,32 @@ def test_dc_notes_ingest_memory_without_supabase(monkeypatch):
     )
     assert loaded.status_code == 200
     assert len(loaded.json()["pre_dc_records"]) == 1
+
+
+def test_dc_notes_shared_tenant_when_kb_shared_mode(monkeypatch):
+    monkeypatch.setenv("INTERNAL_SECRET", SECRET)
+    get_settings.cache_clear()
+    settings = get_settings()
+    monkeypatch.setattr(settings, "supabase_url", "")
+    monkeypatch.setattr(settings, "supabase_service_role_key", "")
+    monkeypatch.setattr(settings, "kb_shared_mode", True)
+    monkeypatch.setattr(settings, "kb_shared_tenant_key", "dc-copilot-shared")
+
+    ctx_a = TenantContext(tenant_id="org-a", user_id="user-a", clerk_org_id="org-a")
+    ctx_b = TenantContext(tenant_id="org-b", user_id="user-b", clerk_org_id="org-b")
+    uuid_a, key_a = resolve_team_tenant(ctx_a)
+    uuid_b, key_b = resolve_team_tenant(ctx_b)
+    assert uuid_a == uuid_b
+    assert key_a == key_b == "dc-copilot-shared"
+
+    repo = get_dc_notes_repository()
+    repo.upsert_pre_dc(
+        ctx_a,
+        [{"id": "pre-shared", "fields": {"Company Name-PreDC": "Shared Co", "Lead Name-PreDC": "Sam"}}],
+    )
+    notes = repo.get_notes(ctx_b)
+    assert len(notes["pre_dc_records"]) == 1
+    assert notes["pre_dc_records"][0]["id"] == "pre-shared"
 
 
 def test_v1_calls_list_memory_fallback(monkeypatch):
