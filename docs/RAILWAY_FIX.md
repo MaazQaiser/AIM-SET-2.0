@@ -44,6 +44,20 @@ Not `node@22` or `pnpm`.
 
 ---
 
+## “Remove start command” spun then stopped
+
+That usually means a **new deploy started**. Check the **top** deployment in the list (newest first):
+
+| Status | Meaning |
+|--------|---------|
+| **Building** | Wait 5–15 min (first Docker build is slow) |
+| **Active** / green | Success — open `/health` on your Railway URL |
+| **Failed** / red | Click **View logs** → read the **last 5 lines** |
+
+If it failed again, confirm **Start Command** is empty in Settings (search “start”) and redeploy.
+
+---
+
 ## After deploy is green
 
 1. **Variables** — add Supabase/OpenAI keys from `services/api/.env`
