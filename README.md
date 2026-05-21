@@ -179,6 +179,10 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000
 | `pnpm --filter @dc-copilot/web run type-check` | TypeScript check |
 | `pnpm lint` | Lint (Biome) |
 
+## Deploy
+
+Vercel build settings and required production environment variables are documented in [docs/VERCEL_DEPLOYMENT.md](./docs/VERCEL_DEPLOYMENT.md).
+
 ---
 
 ## Project structure

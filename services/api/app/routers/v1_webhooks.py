@@ -38,7 +38,7 @@ async def recall_transcript_webhook(
     user_id: Optional[str] = Query(default=None),
 ) -> Dict[str, Any]:
     raw = await request.body()
-    if not verify_recall_signature(raw, x_recall_signature):
+    if not verify_recall_signature(raw, x_recall_signature, request.headers):
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
     try:

@@ -39,6 +39,7 @@ def build_calls_from_pre_dc(
                 "pod": [],
                 "leadName": fields.get("Lead Name-PreDC"),
                 "industry": fields.get("Industry - PreDC"),
+                "meetingUrl": _meeting_url_from_fields(fields),
             }
         )
     return calls
@@ -80,6 +81,7 @@ class CallsService:
                 "metadata": {
                     "leadName": c.get("leadName"),
                     "industry": c.get("industry"),
+                    "meetingUrl": c.get("meetingUrl"),
                 },
             }
             for c in calls
@@ -207,4 +209,21 @@ def _row_to_call(row: Dict[str, Any]) -> Dict[str, Any]:
         "pod": [],
         "leadName": meta.get("leadName"),
         "industry": meta.get("industry"),
+        "meetingUrl": meta.get("meetingUrl") or meta.get("meeting_url") or meta.get("recall_meeting_url"),
     }
+
+
+def _meeting_url_from_fields(fields: Dict[str, Any]) -> Optional[str]:
+    for key in (
+        "Meeting URL",
+        "Meeting Link",
+        "Meeting URL-PreDC",
+        "Meeting Link-PreDC",
+        "Google Meet Link",
+        "Zoom Link",
+        "Teams Link",
+    ):
+        value = fields.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None

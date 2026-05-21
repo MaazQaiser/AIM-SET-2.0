@@ -9,6 +9,11 @@ from dc_core.tenancy import TenantContext
 from app.deps import get_tenant_context
 from app.domain.calls_service import CallsService
 from app.orchestrator.dispatcher import Orchestrator
+from app.services.transcript_provider.recall_client import (
+    RecallAPIError,
+    RecallConfigurationError,
+    create_recall_live_bot,
+)
 
 router = APIRouter(prefix="/api/v1/calls", tags=["calls"])
 _calls = CallsService()
@@ -49,6 +54,29 @@ def post_call_pipeline(call_id: str, ctx: TenantContext = Depends(get_tenant_con
 @router.post("/{call_id}/end-live")
 def end_live_call(call_id: str, ctx: TenantContext = Depends(get_tenant_context)) -> Dict[str, Any]:
     return _orch.dispatch_call_end(ctx, call_id)
+
+
+@router.post("/{call_id}/recall-bot")
+def start_recall_bot(
+    call_id: str,
+    body: Dict[str, Any],
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    if not _calls.get_call(ctx, call_id):
+        raise HTTPException(status_code=404, detail="Call not found")
+
+    meeting_url = str(body.get("meeting_url") or body.get("meetingUrl") or "").strip()
+    if not meeting_url:
+        raise HTTPException(status_code=400, detail="meeting_url is required")
+    if not meeting_url.startswith(("https://", "http://")):
+        raise HTTPException(status_code=400, detail="meeting_url must be an http(s) URL")
+
+    try:
+        return create_recall_live_bot(ctx, call_id, meeting_url)
+    except RecallConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except RecallAPIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.post("/{call_id}/bot-chat")

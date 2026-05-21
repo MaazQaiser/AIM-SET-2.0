@@ -3,7 +3,13 @@
 export type PodRole = "ae" | "se" | "designer";
 export type BANTStatus = "confirmed" | "partial" | "unknown";
 export type CallStatus = "upcoming" | "live" | "completed" | "no-show";
-export type AssetType = "deck" | "case-study" | "one-pager" | "architecture" | "battlecard" | "image";
+export type AssetType =
+  | "deck"
+  | "case-study"
+  | "one-pager"
+  | "architecture"
+  | "battlecard"
+  | "image";
 export type ConfidenceLevel = "high" | "medium" | "low";
 
 export interface PodMember {
@@ -36,6 +42,7 @@ export interface Call {
   dealStage?: string;
   discoveryCallDatePkt?: string;
   discoveryCallTimePkt?: string;
+  meetingUrl?: string;
   scheduledAt: string;
   duration?: number;
   status: CallStatus;

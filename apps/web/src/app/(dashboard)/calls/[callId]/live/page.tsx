@@ -1,36 +1,37 @@
 "use client";
 
-import { use, useMemo } from "react";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TranscriptViewer } from "@/components/transcript-viewer";
 import { BotChatPanel } from "@/components/bot-chat-panel";
-import { NudgeAlert } from "@/components/nudge-alert";
-import { SentimentTimeline } from "@/components/sentiment-timeline";
 import { KBAssetCard } from "@/components/kb-asset-card";
-import { Button } from "@/components/ui/button";
-import { SignalLog } from "@/components/live/signal-log";
+import { DemoTranscriptPlayer } from "@/components/live/demo-transcript-player";
+import { DiscoveryChecklistPanel } from "@/components/live/discovery-checklist-panel";
 import { FocusAreasBar } from "@/components/live/focus-areas-bar";
 import { IntentPainStream } from "@/components/live/intent-pain-stream";
 import { KeywordFrequencyPanel } from "@/components/live/keyword-frequency-panel";
-import { DiscoveryChecklistPanel } from "@/components/live/discovery-checklist-panel";
 import { ObjectionCard } from "@/components/live/objection-card";
-import { UnansweredQuestionsList } from "@/components/live/unanswered-questions-list";
+import { RecallBotLauncher } from "@/components/live/recall-bot-launcher";
+import { SignalLog } from "@/components/live/signal-log";
 import { SuggestionLog } from "@/components/live/suggestion-log";
-import { DemoTranscriptPlayer } from "@/components/live/demo-transcript-player";
-import { postSuggestionFeedback } from "@/lib/live-suggestion-feedback";
+import { UnansweredQuestionsList } from "@/components/live/unanswered-questions-list";
+import { NudgeAlert } from "@/components/nudge-alert";
+import { SentimentTimeline } from "@/components/sentiment-timeline";
+import { TranscriptViewer } from "@/components/transcript-viewer";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { BookOpen } from "lucide-react";
-import { useCallUI } from "@/stores/use-call-ui";
-import { useLiveCall } from "@/stores/use-live-call";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCallStream } from "@/hooks/use-call-stream";
 import { useLiveCallInit } from "@/hooks/use-live-call-init";
 import { usePersona } from "@/hooks/use-persona";
-import { useCallStream } from "@/hooks/use-call-stream";
 import { useCall, useKbAssets } from "@/lib/data/hooks";
 import { seedChecklistFromCall } from "@/lib/discovery-checklist-seed";
+import { postSuggestionFeedback } from "@/lib/live-suggestion-feedback";
+import { useCallUI } from "@/stores/use-call-ui";
+import { useLiveCall } from "@/stores/use-live-call";
 import type { PodRole } from "@/types";
+import { ArrowLeft } from "lucide-react";
+import { BookOpen } from "lucide-react";
+import Link from "next/link";
+import { use, useMemo } from "react";
 
 function formatElapsed(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -106,9 +107,7 @@ export default function LiveCallPage({ params }: LivePageParams) {
 
   const visibleNudges = useMemo(
     () =>
-      viewerRole === null
-        ? pendingNudges
-        : pendingNudges.filter((n) => n.role === viewerRole),
+      viewerRole === null ? pendingNudges : pendingNudges.filter((n) => n.role === viewerRole),
     [pendingNudges, viewerRole]
   );
 
@@ -154,11 +153,14 @@ export default function LiveCallPage({ params }: LivePageParams) {
           Live
         </Badge>
         <span className="text-sm font-medium text-foreground">{accountName}</span>
-        <span className="text-sm text-muted-foreground font-mono">{formatElapsed(elapsedSeconds)}</span>
-        {!isConnected && (
-          <span className="text-xs text-muted-foreground">Connecting stream…</span>
-        )}
-        <DemoTranscriptPlayer callId={callId} isConnected={isConnected} />
+        <span className="text-sm text-muted-foreground font-mono">
+          {formatElapsed(elapsedSeconds)}
+        </span>
+        {!isConnected && <span className="text-xs text-muted-foreground">Connecting stream…</span>}
+        <div className="ml-auto flex min-w-0 items-center gap-2">
+          <RecallBotLauncher callId={callId} meetingUrl={call?.meetingUrl} />
+          <DemoTranscriptPlayer callId={callId} isConnected={isConnected} />
+        </div>
       </div>
 
       <div className="flex-1 overflow-hidden">
@@ -187,7 +189,7 @@ export default function LiveCallPage({ params }: LivePageParams) {
             ) : (
               <div className="flex-1 flex items-center justify-center p-6">
                 <p className="text-sm text-muted-foreground text-center">
-                  Waiting for transcript. In dev, use Play demo transcript above, or connect Recall later.
+                  Waiting for transcript. Start Recall above or play a demo transcript.
                 </p>
               </div>
             )}
@@ -306,7 +308,9 @@ export default function LiveCallPage({ params }: LivePageParams) {
               <div className="p-2 border-t shrink-0 space-y-2">
                 <SignalLog signals={bantSignals} />
                 <KeywordFrequencyPanel stats={keywordStats} />
-                {sentimentData.length > 0 && <SentimentTimeline data={sentimentData} className="h-16" />}
+                {sentimentData.length > 0 && (
+                  <SentimentTimeline data={sentimentData} className="h-16" />
+                )}
               </div>
             </TabsContent>
             <TabsContent value="signals" className="flex-1 overflow-y-auto p-3 m-0 space-y-4">
@@ -337,7 +341,11 @@ export default function LiveCallPage({ params }: LivePageParams) {
                   />
                 ))
               ) : (
-                <EmptyState icon={BookOpen} title="No KB matches yet" description="Assets appear during the call." />
+                <EmptyState
+                  icon={BookOpen}
+                  title="No KB matches yet"
+                  description="Assets appear during the call."
+                />
               )}
             </TabsContent>
             <TabsContent value="chat" className="flex-1 overflow-hidden m-0">

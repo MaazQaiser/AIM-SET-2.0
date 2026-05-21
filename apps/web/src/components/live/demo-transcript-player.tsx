@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DEMO_LIVE_TRANSCRIPT } from "@/lib/demo-live-transcript";
+import { Play, Square } from "lucide-react";
+import { useRef, useState } from "react";
 
 interface DemoTranscriptPlayerProps {
   callId: string;
@@ -69,7 +69,7 @@ export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlay
   }
 
   return (
-    <div className="flex items-center gap-2 ml-auto">
+    <div className="flex items-center gap-2">
       {error && (
         <span className="text-xs text-destructive max-w-[200px] truncate" title={error}>
           {error}
@@ -88,7 +88,13 @@ export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlay
           Play demo transcript
         </Button>
       ) : (
-        <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={stopDemo}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={stopDemo}
+        >
           <Square className="h-3 w-3 mr-1" />
           Stop ({lineIndex}/{DEMO_LIVE_TRANSCRIPT.length})
         </Button>

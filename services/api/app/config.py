@@ -1,10 +1,18 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=_ENV_FILE,
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,
+        extra="ignore",
+    )
 
     supabase_url: str = ""
     supabase_service_role_key: str = ""
@@ -22,7 +30,10 @@ class Settings(BaseSettings):
     content_exports_bucket: str = "content-exports"
     content_studio_sync_ingest: bool = True
     recall_api_key: str = ""
+    recall_region: str = "us-west-2"
+    recall_bot_name: str = "DC Copilot Live Agent"
     recall_webhook_secret: str = ""
+    public_api_base_url: str = ""
     demo_transcript_replay: bool = False
 
     @property
