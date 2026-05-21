@@ -4,7 +4,11 @@ import type { NextFetchEvent, NextRequest } from "next/server";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
 import { isClerkConfigured, isClerkSecretConfigured } from "@/lib/public-env";
 
-const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
+const isPublicRoute = createRouteMatcher([
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/api/health/deployment",
+]);
 
 const clerkHandler = clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {

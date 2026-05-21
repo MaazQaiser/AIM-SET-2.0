@@ -42,9 +42,15 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ meetingUrl: meetingUrlValue }),
       });
-      const body = (await res.json().catch(() => ({}))) as { error?: string; botId?: string };
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        detail?: string;
+        botId?: string;
+      };
       if (!res.ok) {
-        throw new Error(body.error ?? "Recall bot launch failed");
+        throw new Error(
+          body.error ?? body.detail ?? `Recall bot launch failed (${res.status})`
+        );
       }
       setStatus("ready");
       setMessage(body.botId ? `Bot invited: ${body.botId}` : "Bot invited");

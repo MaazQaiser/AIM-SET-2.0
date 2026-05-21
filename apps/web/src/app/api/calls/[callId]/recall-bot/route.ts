@@ -1,4 +1,5 @@
 import { auth } from "@/lib/api/auth";
+import { isClerkConfigured, isClerkSecretConfigured } from "@/lib/public-env";
 import { type NextRequest, NextResponse } from "next/server";
 
 interface Params {
@@ -8,7 +9,19 @@ interface Params {
 export async function POST(request: NextRequest, { params }: Params) {
   const { userId, orgId } = await auth();
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!isClerkConfigured() || !isClerkSecretConfigured()) {
+      return NextResponse.json(
+        {
+          error:
+            "Auth not configured. Add NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY in Vercel (Production), then redeploy.",
+        },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json(
+      { error: "Sign in required. Open /sign-in and try again." },
+      { status: 401 }
+    );
   }
 
   const { callId } = await params;
