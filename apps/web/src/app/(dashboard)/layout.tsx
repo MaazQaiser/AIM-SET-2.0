@@ -1,3 +1,4 @@
+import { AuthSetupBanner } from "@/components/layout/auth-setup-banner";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { PersonaProvider } from "@/components/providers/persona-provider";
@@ -16,6 +17,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Sidebar />
           <div className="relative z-[1] flex min-w-0 flex-1 flex-col overflow-hidden">
             <TopBar />
+            <AuthSetupBanner />
             <main className="flex-1 overflow-y-auto">{children}</main>
           </div>
         </div>

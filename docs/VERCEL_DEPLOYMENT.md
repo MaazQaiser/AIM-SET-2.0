@@ -57,6 +57,26 @@ Do not enable `NEXT_PUBLIC_AUTH_BYPASS` in Vercel production.
 
 In [Clerk Dashboard → Domains](https://dashboard.clerk.com/), add your Vercel production URL (e.g. `https://your-app.vercel.app`) and any preview pattern you use. Without this, the app can build but fail at runtime with a blank or generic error page.
 
+## “Auth not configured” + unable to load data
+
+The top bar shows **Auth not configured** when Clerk env vars are missing or invalid at **runtime**. All `/api/*` BFF routes then return **401**, so lists (calls, KB, etc.) stay empty.
+
+### Fix
+
+1. Vercel → **Settings** → **Environment Variables** → **Production** (and Preview if you use it):
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` = `pk_test_...` or `pk_live_...` (from [Clerk API Keys](https://dashboard.clerk.com/last-active?path=api-keys))
+   - `CLERK_SECRET_KEY` = `sk_test_...` or `sk_live_...` (same page)
+   - Paste the **full** key; do not truncate (keys often end with `$` — include it).
+2. **Redeploy** after saving (required: `NEXT_PUBLIC_*` is baked in at build time).
+3. [Clerk Dashboard → Domains](https://dashboard.clerk.com/): add `https://aim-set-2-0-web.vercel.app` (and preview URL if needed).
+4. Set `API_URL` to your **FastAPI** host (not the Vercel web URL). See [RECALL_PRODUCTION_TESTING.md](./RECALL_PRODUCTION_TESTING.md).
+
+### Verify
+
+- Open: `https://<your-app>/api/health/deployment`  
+  → `clerkReady: true` and `apiUrlConfigured: true`
+- Dashboard should show a yellow setup banner until fixed.
+
 ## Runtime: “This page couldn’t load”
 
 If the deploy **succeeds** but the site shows a generic reload/back screen:

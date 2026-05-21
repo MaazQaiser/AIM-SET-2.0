@@ -1,7 +1,12 @@
 import path from "node:path";
 import type { NextConfig } from "next";
+import { assertVercelBuildEnv } from "./src/lib/public-env";
 
 const repoRoot = path.resolve(process.cwd(), "../..");
+
+if (process.env.VERCEL === "1") {
+  assertVercelBuildEnv();
+}
 
 const nextConfig: NextConfig = {
   experimental: {
