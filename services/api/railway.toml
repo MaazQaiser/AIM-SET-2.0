@@ -1,4 +1,4 @@
-# Railway monorepo service @dc-copilot/api — build from repo root (see docs/API_DEPLOYMENT.md)
+# @dc-copilot/api — must use Docker, not Railpack/pnpm (see docs/API_DEPLOYMENT.md)
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.api"
@@ -9,3 +9,4 @@ healthcheckPath = "/health"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
 numReplicas = 1
+# Do not set startCommand — the Docker image CMD runs uvicorn
