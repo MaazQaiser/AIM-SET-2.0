@@ -5,8 +5,11 @@ Vercel hosts only the Next.js app. **Supabase credentials and KB file storage go
 ## Quick deploy (Railway)
 
 1. Create a [Railway](https://railway.app) project → **Deploy from GitHub** → select this repo.
-2. Set **Root Directory** to the repo root (not `apps/web`).
-3. Railway reads [`railway.toml`](../railway.toml) and builds with [`Dockerfile.api`](../Dockerfile.api).
+2. Railway may create **two** services (`@dc-copilot/web` and `@dc-copilot/api`). **Delete or stop `@dc-copilot/web`** — the web app stays on Vercel.
+3. Open **`@dc-copilot/api`** → **Settings**:
+   - **Root Directory:** `/` (repo root — **not** `services/api` or `apps/web`)
+   - **Dockerfile Path:** `Dockerfile.api`
+4. If the service **crashed**, check **Deployments → View logs**. Common fixes: wrong root directory, missing env vars, or port (the Dockerfile uses Railway’s `PORT`).
 4. Add environment variables (see below).
 5. Copy the public HTTPS URL (e.g. `https://dc-copilot-api-production.up.railway.app`).
 6. Paste that URL into Vercel env vars — see [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md).
