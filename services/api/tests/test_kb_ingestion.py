@@ -30,6 +30,18 @@ def test_fake_embeddings_dim():
     assert len(result.embeddings[0]) == 1536
 
 
+def test_csv_extract_windows_1252_en_dash():
+    """Excel/Windows CSV exports often use cp1252; byte 0x96 is an en-dash."""
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+        f.write(b"name,value\nAcme\x96Corp,42\n")
+        path = f.name
+
+    doc = extract_document(path, mime_type="text/csv")
+    Path(path).unlink(missing_ok=True)
+    assert doc.chunks
+    assert "\u2013" in doc.chunks[0].text or "Acme" in doc.chunks[0].text
+
+
 def test_csv_extract_and_ingest_memory(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     get_settings.cache_clear()

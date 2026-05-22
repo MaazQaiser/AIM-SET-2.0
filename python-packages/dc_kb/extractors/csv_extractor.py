@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import csv
+import io
 from pathlib import Path
 
 from dc_kb.models import ExtractedDocument, TextChunk
+from dc_kb.text_encoding import decode_text_bytes
 
 
 def extract_csv(path: Path) -> ExtractedDocument:
     chunks: list[TextChunk] = []
-    with path.open(newline="", encoding="utf-8-sig") as f:
+    text = decode_text_bytes(path.read_bytes())
+    with io.StringIO(text, newline="") as f:
         reader = csv.DictReader(f)
         headers = reader.fieldnames or []
         batch: list[str] = []
