@@ -112,6 +112,75 @@ def list_transcript_events(
     return get_live_call_repository().list_transcript_events(ctx, call_id)
 
 
+@router.post("/{call_id}/poll-transcript")
+def poll_transcript(
+    call_id: str, ctx: TenantContext = Depends(get_tenant_context)
+) -> Dict[str, Any]:
+    """Poll Recall API for transcript when webhooks fail (tunnel down)."""
+    from app.domain.live_call_repository import get_live_call_repository
+    from app.services.transcript_provider.recall_client import poll_recall_transcript
+
+    repo = get_live_call_repository()
+    session = repo.get_session(ctx, call_id)
+    if not session or not session.get("provider_meeting_id"):
+        raise HTTPException(status_code=404, detail="No active Recall bot for this call")
+
+    bot_id = session["provider_meeting_id"]
+    raw_segments = poll_recall_transcript(bot_id)
+    if not raw_segments:
+        return {"ok": True, "new_segments": 0}
+
+    new_count = 0
+    for seg in raw_segments:
+        words = seg.get("words") or []
+        text = " ".join(w.get("text", "") if isinstance(w, dict) else str(w) for w in words).strip()
+        if not text:
+            text = seg.get("text", "")
+        if not text:
+            continue
+
+        speaker = seg.get("speaker") or "unknown"
+        speaker_name = speaker
+        if isinstance(seg.get("participant"), dict):
+            speaker_name = seg["participant"].get("name") or speaker
+
+        # Use speaker + text hash as dedup key
+        import hashlib
+        peid = hashlib.sha256(f"{bot_id}:{speaker}:{text[:50]}".encode()).hexdigest()[:32]
+
+        offset = 0.0
+        if words and isinstance(words[0], dict):
+            st = words[0].get("start_timestamp")
+            if isinstance(st, dict):
+                offset = float(st.get("relative", 0))
+            elif st is not None:
+                try:
+                    offset = float(st)
+                except (TypeError, ValueError):
+                    pass
+
+        event = {
+            "id": peid,
+            "speaker_id": speaker_name,
+            "speaker_role": "customer",
+            "text": text,
+            "offset_seconds": offset,
+            "provider": "recall",
+            "provider_event_id": peid,
+        }
+        stored = repo.append_transcript_event(ctx, call_id, event)
+        # Check if it was actually new (not deduped)
+        if stored.get("id") == peid:
+            new_count += 1
+            # Dispatch through orchestrator for BANT/intent analysis
+            try:
+                _orch.dispatch_live_segment(ctx, call_id, event)
+            except Exception:
+                pass
+
+    return {"ok": True, "new_segments": new_count, "total_from_recall": len(raw_segments)}
+
+
 @router.get("/{call_id}/suggestions")
 def list_suggestions(call_id: str, ctx: TenantContext = Depends(get_tenant_context)) -> List[Dict[str, Any]]:
     from app.domain.live_call_repository import get_live_call_repository

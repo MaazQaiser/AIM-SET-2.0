@@ -86,6 +86,31 @@ def create_recall_live_bot(
     }
 
 
+def poll_recall_transcript(bot_id: str) -> list[Dict[str, Any]]:
+    """Fetch transcript directly from Recall API (polling fallback when webhooks fail)."""
+    settings = get_settings()
+    if not settings.recall_api_key:
+        return []
+    base_url = _recall_base_url(settings.recall_region)
+    try:
+        response = httpx.get(
+            f"{base_url}/api/v1/bot/{bot_id}/transcript/",
+            headers={
+                "Authorization": _authorization_header(settings.recall_api_key),
+                "accept": "application/json",
+            },
+            timeout=10,
+        )
+    except httpx.HTTPError:
+        return []
+    if response.status_code >= 400:
+        return []
+    try:
+        return response.json() if isinstance(response.json(), list) else []
+    except ValueError:
+        return []
+
+
 def _missing_settings(values: Dict[str, str]) -> Iterable[str]:
     return [name for name, value in values.items() if not str(value or "").strip()]
 

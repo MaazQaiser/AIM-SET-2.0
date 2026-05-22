@@ -53,6 +53,8 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
       launchedUrlRef.current = meetingUrlValue;
       setStatus("ready");
       setMessage(body.botId ? `Bot invited: ${body.botId}` : "Bot invited");
+      // Start polling Recall API as fallback for unreliable webhooks
+      startPolling();
     } catch (err) {
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Recall bot launch failed");
@@ -71,6 +73,26 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
     }
     await doLaunch(meetingUrlValue);
   }
+
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function startPolling() {
+    if (pollRef.current) return;
+    pollRef.current = setInterval(() => {
+      void fetch(`/api/calls/${encodeURIComponent(callId)}/poll-transcript`, {
+        method: "POST",
+      }).catch(() => {});
+    }, 5000);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, []);
 
   function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
     const pasted = e.clipboardData.getData("text").trim();
