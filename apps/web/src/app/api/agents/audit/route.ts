@@ -1,17 +1,7 @@
 import { auth } from "@/lib/api/auth";
 import { NextResponse } from "next/server";
+import { isProjectAgentId } from "@/lib/agents/catalog";
 import type { ActivityEvent, AgentId } from "@/types/agents";
-
-const AGENT_IDS: AgentId[] = [
-  "live-call",
-  "discovery-checklist",
-  "content",
-  "workflow",
-  "content_generation",
-  "knowledge",
-  "coaching",
-  "task",
-];
 
 export async function GET() {
   const { userId, orgId } = await auth();
@@ -49,14 +39,16 @@ export async function GET() {
     return "brief_generated";
   };
 
-  const events: ActivityEvent[] = rows.map((row, i) => ({
-    id: row.id ?? `audit-${i}`,
-    agent_id: (AGENT_IDS.includes(row.agent as AgentId) ? row.agent : "task") as AgentId,
-    event_type: mapEventType(row.action),
-    timestamp: row.created_at ?? new Date().toISOString(),
-    description: row.action ?? "Agent activity",
-    meta: row.payload,
-  }));
+  const events: ActivityEvent[] = rows
+    .filter((row) => row.agent && isProjectAgentId(row.agent))
+    .map((row, i) => ({
+      id: row.id ?? `audit-${i}`,
+      agent_id: row.agent as AgentId,
+      event_type: mapEventType(row.action),
+      timestamp: row.created_at ?? new Date().toISOString(),
+      description: row.action ?? "Agent activity",
+      meta: row.payload,
+    }));
 
   return NextResponse.json(events);
 }

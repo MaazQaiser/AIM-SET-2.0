@@ -59,7 +59,7 @@ export default function AgentsPage() {
       <div>
         <h1 className="text-2xl font-semibold">Agent Control Panel</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Six project agents — spend and runs come from the API; configure caps and models per agent.
+          Five orchestrator-backed agents — spend and runs come from the API; configure caps and models per agent.
         </p>
       </div>
 

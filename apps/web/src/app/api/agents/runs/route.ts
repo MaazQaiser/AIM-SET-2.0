@@ -1,17 +1,7 @@
 import { auth } from "@/lib/api/auth";
 import { NextResponse } from "next/server";
+import { isProjectAgentId } from "@/lib/agents/catalog";
 import type { AgentId, AgentRun } from "@/types/agents";
-
-const AGENT_IDS: AgentId[] = [
-  "live-call",
-  "discovery-checklist",
-  "content",
-  "workflow",
-  "content_generation",
-  "knowledge",
-  "coaching",
-  "task",
-];
 
 export async function GET() {
   const { userId, orgId } = await auth();
@@ -39,19 +29,21 @@ export async function GET() {
     created_at?: string;
   }[];
 
-  const runs: AgentRun[] = rows.map((row, i) => ({
-    id: row.id ?? `run-${i}`,
-    agent_id: (AGENT_IDS.includes(row.agent_id as AgentId) ? row.agent_id : "content") as AgentId,
-    trigger: "manual",
-    triggered_at: row.created_at ?? new Date().toISOString(),
-    completed_at: row.created_at,
-    outcome: row.status === "success" ? "success" : "failed",
-    cost_usd: Number(row.cost_usd) || 0,
-    tokens_used: Number(row.tokens_used) || 0,
-    model_used: row.model_used ?? "",
-    operation: row.operation ?? "",
-    trace_id: row.trace_id ?? "",
-  }));
+  const runs: AgentRun[] = rows
+    .filter((row) => row.agent_id && isProjectAgentId(row.agent_id))
+    .map((row, i) => ({
+      id: row.id ?? `run-${i}`,
+      agent_id: row.agent_id as AgentId,
+      trigger: "manual",
+      triggered_at: row.created_at ?? new Date().toISOString(),
+      completed_at: row.created_at,
+      outcome: row.status === "success" ? "success" : "failed",
+      cost_usd: Number(row.cost_usd) || 0,
+      tokens_used: Number(row.tokens_used) || 0,
+      model_used: row.model_used ?? "",
+      operation: row.operation ?? "",
+      trace_id: row.trace_id ?? "",
+    }));
 
   return NextResponse.json(runs);
 }

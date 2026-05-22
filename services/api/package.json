@@ -2,5 +2,10 @@
   "name": "@dc-copilot/api",
   "version": "0.1.0",
   "private": true,
-  "description": "Python FastAPI service — deploy via Dockerfile.api on Railway, not pnpm"
+  "description": "Python FastAPI service — deploy via Dockerfile.api on Railway, or pnpm dev locally",
+  "scripts": {
+    "dev": ".venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
+    "start": ".venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000",
+    "test": ".venv/bin/python -m pytest tests -q"
+  }
 }

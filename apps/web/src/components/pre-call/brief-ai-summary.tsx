@@ -75,11 +75,7 @@ function HighlightedSummary({
 
 export function BriefAISummary({ brief }: BriefAISummaryProps) {
   const { data: workflowConfig } = useAgentConfig("workflow");
-  const highlightRules = workflowConfig?.summary_highlight_rules?.map((r) => ({
-    pattern: r.pattern,
-    className: r.className,
-    flags: r.flags,
-  }));
+  const highlightRules = workflowConfig?.summary_highlight_rules;
 
   const { compact, columnZone } = useWidgetSize();
   const isCenter = columnZone === "center";

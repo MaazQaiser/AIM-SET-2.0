@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { AgentId, AgentConfig, AgentRun, ActivityEvent } from "@/types/agents";
+import type { AgentId, AgentConfig } from "@/types/agents";
+import { PROJECT_AGENT_IDS } from "@/lib/agents/catalog";
 
 interface AgentsState {
   configs: Record<AgentId, AgentConfig | null>;
@@ -11,16 +12,12 @@ interface AgentsState {
   markConfigDirty: (dirty: boolean) => void;
 }
 
+const emptyConfigs = Object.fromEntries(
+  PROJECT_AGENT_IDS.map((id) => [id, null])
+) as Record<AgentId, AgentConfig | null>;
+
 export const useAgents = create<AgentsState>((set) => ({
-  configs: {
-    "live-call": null,
-    "discovery-checklist": null,
-    content: null,
-    content_generation: null,
-    knowledge: null,
-    coaching: null,
-    task: null,
-  },
+  configs: emptyConfigs,
   selectedAgentId: null,
   configDirty: false,
 

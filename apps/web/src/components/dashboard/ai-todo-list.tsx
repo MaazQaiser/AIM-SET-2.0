@@ -21,15 +21,24 @@ const AGENT_CONFIG: Record<
   { icon: React.ElementType; label: string; className: string }
 > = {
   "live-call": { icon: Bot, label: "Live Call", className: "text-primary bg-primary/10" },
+  "discovery-checklist": {
+    icon: TrendingUp,
+    label: "Discovery",
+    className: "text-warning bg-warning/10",
+  },
   content: {
     icon: FileText,
     label: "Content",
     className: "text-purple-600 bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300",
   },
-  coaching: { icon: TrendingUp, label: "Coaching", className: "text-warning bg-warning/10" },
-  task: {
+  workflow: {
+    icon: FileText,
+    label: "PRE-DC",
+    className: "text-teal-700 bg-teal-100 dark:bg-teal-950/40 dark:text-teal-300",
+  },
+  content_generation: {
     icon: Mail,
-    label: "Task",
+    label: "Studio",
     className: "text-indigo-600 bg-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-300",
   },
 };

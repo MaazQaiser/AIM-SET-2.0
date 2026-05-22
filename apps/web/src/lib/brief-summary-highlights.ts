@@ -3,8 +3,20 @@
  */
 
 export interface SummaryHighlightRule {
-  pattern: RegExp;
+  /** Regex source from agent config, or a built-in RegExp. */
+  pattern: string | RegExp;
   className: string;
+  flags?: string;
+}
+
+function ruleToRegExp(rule: SummaryHighlightRule): RegExp {
+  if (typeof rule.pattern === "string") {
+    return new RegExp(rule.pattern, rule.flags ?? "gi");
+  }
+  if (rule.flags && rule.flags !== rule.pattern.flags) {
+    return new RegExp(rule.pattern.source, rule.flags);
+  }
+  return rule.pattern;
 }
 
 const RULES: SummaryHighlightRule[] = [
@@ -48,7 +60,7 @@ function applyRules(text: string, rules: SummaryHighlightRule[]): TextPart[] {
         next.push(part);
         continue;
       }
-      const re = new RegExp(rule.pattern.source, rule.pattern.flags);
+      const re = ruleToRegExp(rule);
       let last = 0;
       let m: RegExpExecArray | null;
       while ((m = re.exec(part.value)) !== null) {
@@ -104,7 +116,7 @@ export function parseSummaryHighlights(
   const rules =
     customRules && customRules.length > 0
       ? customRules.map((r) => ({
-          pattern: new RegExp(r.pattern, r.flags ?? "gi"),
+          pattern: ruleToRegExp(r),
           className: r.className,
         }))
       : RULES;

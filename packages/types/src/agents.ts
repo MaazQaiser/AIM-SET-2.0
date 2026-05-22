@@ -4,10 +4,7 @@ export type AgentId =
   | "discovery-checklist"
   | "content"
   | "workflow"
-  | "content_generation"
-  | "knowledge"
-  | "coaching"
-  | "task";
+  | "content_generation";
 
 // ── Agent health ───────────────────────────────────────────────────────────
 export type AgentHealth = "healthy" | "degraded" | "outage" | "idle";

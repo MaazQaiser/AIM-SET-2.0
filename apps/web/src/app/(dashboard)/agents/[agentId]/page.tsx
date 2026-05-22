@@ -1,20 +1,10 @@
 import { notFound } from "next/navigation";
 import { AgentDetailClient } from "@/components/agents/agent-detail-client";
+import { isProjectAgentId, PROJECT_AGENT_IDS } from "@/lib/agents/catalog";
 import type { AgentId } from "@/types/agents";
 
-const AGENT_IDS: AgentId[] = [
-  "live-call",
-  "discovery-checklist",
-  "content",
-  "workflow",
-  "content_generation",
-  "knowledge",
-  "coaching",
-  "task",
-];
-
 export function generateStaticParams() {
-  return AGENT_IDS.map((id) => ({ agentId: id }));
+  return PROJECT_AGENT_IDS.map((id) => ({ agentId: id }));
 }
 
 export default async function AgentDetailPage({
@@ -23,8 +13,7 @@ export default async function AgentDetailPage({
   params: Promise<{ agentId: string }>;
 }) {
   const { agentId: rawAgentId } = await params;
-  const agentId = rawAgentId as AgentId;
-  if (!AGENT_IDS.includes(agentId)) notFound();
+  if (!isProjectAgentId(rawAgentId)) notFound();
 
-  return <AgentDetailClient agentId={agentId} />;
+  return <AgentDetailClient agentId={rawAgentId as AgentId} />;
 }

@@ -11,9 +11,6 @@ AGENT_IDS: List[str] = [
     "content",
     "workflow",
     "content_generation",
-    "knowledge",
-    "coaching",
-    "task",
 ]
 
 AGENT_LABELS: Dict[str, str] = {
@@ -22,9 +19,6 @@ AGENT_LABELS: Dict[str, str] = {
     "content": "Content Agent",
     "workflow": "PRE-DC Workflow",
     "content_generation": "Content Generation Agent",
-    "knowledge": "Knowledge Agent",
-    "coaching": "Coaching Agent",
-    "task": "Task Agent",
 }
 
 AGENT_DOMAINS: Dict[str, List[str]] = {
@@ -33,9 +27,6 @@ AGENT_DOMAINS: Dict[str, List[str]] = {
     "content": ["content_generation"],
     "workflow": ["content_generation"],
     "content_generation": ["content_generation"],
-    "knowledge": ["knowledge_maintenance"],
-    "coaching": ["coaching_insights"],
-    "task": ["task_execution"],
 }
 
 PROMPT_ROOT = Path(__file__).resolve().parents[4] / "prompts"
@@ -82,9 +73,6 @@ AGENT_OPERATIONS: Dict[str, List[str]] = {
     "content": ["pre_dc_brief"],
     "workflow": ["workflow_pipeline"],
     "content_generation": ["studio_turn", "template_ingest", "export_pdf", "export_png", "export_pptx"],
-    "knowledge": ["asset_ingested"],
-    "coaching": ["scorecard"],
-    "task": ["post_call_artifacts"],
 }
 
 
@@ -180,13 +168,6 @@ def _workflow() -> Dict[str, Any]:
 
 
 def _model_policy(agent_id: str) -> Dict[str, Any]:
-    if agent_id == "coaching":
-        return {
-            "primary": "opus",
-            "fallback": "sonnet",
-            "model_name": "claude-3-opus-20240229",
-            "fallback_model_name": "claude-sonnet-4-6",
-        }
     if agent_id in ("content", "content_generation", "workflow"):
         return {
             "primary": "opus",
@@ -209,8 +190,6 @@ def _cost_cap(agent_id: str) -> Dict[str, Any]:
             "project_ceiling_usd": 1.5,
             "abort_strategy": "hard_stop",
         }
-    if agent_id == "coaching":
-        return {"per_run_ceiling_usd": 0.15, "abort_strategy": "degrade"}
     if agent_id in ("content", "workflow"):
         return {"per_run_ceiling_usd": 0.05, "abort_strategy": "degrade"}
     return {"per_run_ceiling_usd": 0.02, "abort_strategy": "degrade"}
@@ -238,7 +217,7 @@ def default_agent_config(agent_id: str) -> Dict[str, Any]:
             },
             "runtime": {
                 "provider": "hybrid",
-                "model_routing_policy": "quality_first" if agent_id == "coaching" else "balanced",
+                "model_routing_policy": "balanced",
                 "latency_budget_ms": 1800 if agent_id == "live-call" else 3200,
                 "max_turns": 6 if agent_id == "live-call" else 10,
                 "timeout_ms": 7000,
@@ -258,11 +237,11 @@ def default_agent_config(agent_id: str) -> Dict[str, Any]:
                     "side_effecting": False,
                 },
                 {
-                    "tool_name": "crm_write" if agent_id == "task" else "analytics_query",
+                    "tool_name": "analytics_query",
                     "timeout_ms": 2000,
                     "quota_per_hour": 400,
                     "input_schema_version": "2026-05-01",
-                    "side_effecting": agent_id == "task",
+                    "side_effecting": False,
                 },
             ],
             "output_contract": {
@@ -270,7 +249,7 @@ def default_agent_config(agent_id: str) -> Dict[str, Any]:
                 "required_fields": ["summary", "evidence"],
                 "forbidden_content_classes": ["pii_leak", "secret_exposure"],
             },
-            "risk_tier": "high" if agent_id in ("task", "coaching") else "medium",
+            "risk_tier": "medium",
             "escalation": {
                 "enabled": True,
                 "max_auto_attempts": 2,

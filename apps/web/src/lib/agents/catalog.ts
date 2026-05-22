@@ -1,16 +1,25 @@
 import type { AgentId, AgentStatus, ModelPolicy } from "@/types/agents";
 
-/** Agents implemented in services/api/app/agents/ and the orchestrator. */
+/** Agents with orchestrator-backed implementations (shown in Agent Control Panel). */
 export const PROJECT_AGENT_IDS: AgentId[] = [
   "live-call",
   "discovery-checklist",
   "content",
   "workflow",
   "content_generation",
-  "knowledge",
-  "coaching",
-  "task",
 ];
+
+export const AGENT_LABELS: Record<AgentId, string> = {
+  "live-call": "Live Call Agent",
+  "discovery-checklist": "Discovery Checklist Tracker",
+  content: "Content Agent",
+  workflow: "PRE-DC Workflow",
+  content_generation: "Content Generation Agent",
+};
+
+export function isProjectAgentId(id: string): id is AgentId {
+  return PROJECT_AGENT_IDS.includes(id as AgentId);
+}
 
 export const AGENT_META: Record<
   AgentId,
@@ -59,24 +68,6 @@ export const AGENT_META: Record<
       "Turn AE intent into grounded HTML/CSS artifacts via templates and KB citations, with PDF/PNG/PPTX export.",
     operations: ["studio_turn", "template_ingest", "export_pdf", "export_png", "export_pptx"],
   },
-  knowledge: {
-    display_name: "Knowledge Agent",
-    description: "KB ingest metadata and asset lifecycle hooks.",
-    purpose: "Maintain the integrity, freshness, and effectiveness of the Knowledge Base.",
-    operations: ["asset_ingested"],
-  },
-  coaching: {
-    display_name: "Coaching Agent",
-    description: "Post-call scorecards and coaching signals.",
-    purpose: "Produce coaching insights: scorecards, recommendations, and pattern analysis.",
-    operations: ["scorecard"],
-  },
-  task: {
-    display_name: "Task Agent",
-    description: "Follow-up emails, CRM tasks, internal notifications.",
-    purpose: "Turn call outcomes into follow-up emails, CRM tasks, and internal notifications.",
-    operations: ["post_call_artifacts"],
-  },
 };
 
 /** Default cost caps (match services/api/app/domain/agent_config_defaults.py). */
@@ -89,9 +80,6 @@ export const DEFAULT_COST_CAPS: Record<
   content: { per_run_usd: 0.05, abort_strategy: "degrade" },
   workflow: { per_run_usd: 0.05, abort_strategy: "degrade" },
   content_generation: { per_run_usd: 0.05, project_usd: 1.5, abort_strategy: "hard_stop" },
-  knowledge: { per_run_usd: 0.02, abort_strategy: "degrade" },
-  coaching: { per_run_usd: 0.15, abort_strategy: "degrade" },
-  task: { per_run_usd: 0.02, abort_strategy: "degrade" },
 };
 
 const DEFAULT_MODEL_POLICY: Record<AgentId, ModelPolicy> = {
@@ -123,24 +111,6 @@ const DEFAULT_MODEL_POLICY: Record<AgentId, ModelPolicy> = {
     primary: "opus",
     fallback: "sonnet",
     model_name: "claude-opus-4-7",
-    fallback_model_name: "claude-sonnet-4-6",
-  },
-  knowledge: {
-    primary: "haiku",
-    fallback: "sonnet",
-    model_name: "claude-3-haiku-20240307",
-    fallback_model_name: "claude-sonnet-4-6",
-  },
-  coaching: {
-    primary: "opus",
-    fallback: "sonnet",
-    model_name: "claude-3-opus-20240229",
-    fallback_model_name: "claude-sonnet-4-6",
-  },
-  task: {
-    primary: "haiku",
-    fallback: "sonnet",
-    model_name: "claude-3-haiku-20240307",
     fallback_model_name: "claude-sonnet-4-6",
   },
 };

@@ -9,33 +9,6 @@ export interface PreDcAgentInput {
   trigger: PreDcAgentTrigger;
 }
 
-export type PlannedArtifactType =
-  | "deck"
-  | "case_study"
-  | "one_pager"
-  | "demo_script"
-  | "battlecard"
-  | "architecture";
-
-export interface PlannedArtifact {
-  id: string;
-  name: string;
-  type: PlannedArtifactType;
-  rationale: string;
-  priority: number;
-}
-
-export type ArtifactFulfillmentStatus = "found" | "partial" | "missing";
-
-export interface ArtifactFulfillment {
-  artifactId: string;
-  name: string;
-  status: ArtifactFulfillmentStatus;
-  snippet?: string;
-  assetId?: string;
-  requiredData?: string;
-}
-
 export interface PreDcPromptOverrides {
   summary?: string;
   artifact_plan?: string;

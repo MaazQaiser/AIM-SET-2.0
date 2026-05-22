@@ -4,8 +4,9 @@ import { useMemo } from "react";
 import { addHours, isWithinInterval } from "date-fns";
 import { useCalls, useCoachingInsights, usePostCallCrmTasks } from "@/lib/data/hooks";
 import type { Call } from "@/types";
+import type { AgentId } from "@/types/agents";
 
-export type AiTodoAgent = "live-call" | "content" | "coaching" | "task";
+export type AiTodoAgent = AgentId;
 export type AiTodoPriority = "high" | "medium" | "low";
 
 export interface AiTodo {
@@ -42,8 +43,8 @@ export function useAiTodos() {
         title: hasFollowUp
           ? "Approve follow-up email & CRM tasks"
           : `Approve ${pendingCrm.length} CRM task${pendingCrm.length > 1 ? "s" : ""}`,
-        subtitle: `${pendingCrm.length} item${pendingCrm.length > 1 ? "s" : ""} · Task Agent · awaiting sign-off`,
-        agent: "task",
+        subtitle: `${pendingCrm.length} item${pendingCrm.length > 1 ? "s" : ""} · Post-call · awaiting sign-off`,
+        agent: "content",
         priority: "high",
         href: "/calls/call-001?tab=post-dc",
       });
@@ -54,7 +55,7 @@ export function useAiTodos() {
         id: `todo-coaching-${insight.id}`,
         title: "Review coaching pattern",
         subtitle: insight.pattern.slice(0, 72) + (insight.pattern.length > 72 ? "…" : ""),
-        agent: "coaching",
+        agent: "discovery-checklist",
         priority: "high",
         href: insight.callId ? `/calls/${insight.callId}` : "/coaching",
       });
