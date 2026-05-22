@@ -2,52 +2,92 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from typing import Any, Dict, List, Set
 
 from fastapi import WebSocket
+
+_logger = logging.getLogger(__name__)
+
+
+class _ClientConnection:
+    """Wraps a WebSocket with a serialized send queue to prevent concurrent sends."""
+
+    def __init__(self, ws: WebSocket) -> None:
+        self.ws = ws
+        self._queue: asyncio.Queue[str] = asyncio.Queue()
+        self._task: asyncio.Task | None = None
+
+    def start(self) -> None:
+        self._task = asyncio.create_task(self._send_loop())
+
+    async def _send_loop(self) -> None:
+        try:
+            while True:
+                payload = await self._queue.get()
+                try:
+                    await self.ws.send_text(payload)
+                except Exception:
+                    break
+        except asyncio.CancelledError:
+            pass
+
+    def enqueue(self, payload: str) -> None:
+        try:
+            self._queue.put_nowait(payload)
+        except Exception:
+            pass
+
+    def stop(self) -> None:
+        if self._task and not self._task.done():
+            self._task.cancel()
 
 
 class CallChannelManager:
     """In-memory fan-out of live call events to subscribed WebSocket clients."""
 
     def __init__(self) -> None:
-        self._rooms: Dict[str, Set[WebSocket]] = {}
+        self._rooms: Dict[str, Dict[WebSocket, _ClientConnection]] = {}
         self._lock = asyncio.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
 
     async def subscribe(self, call_id: str, ws: WebSocket) -> None:
         if self._loop is None:
             self._loop = asyncio.get_running_loop()
+        client = _ClientConnection(ws)
+        client.start()
         async with self._lock:
-            self._rooms.setdefault(call_id, set()).add(ws)
+            self._rooms.setdefault(call_id, {})[ws] = client
+        _logger.info(
+            "WS subscribe call_id=%s total=%d", call_id, len(self._rooms[call_id])
+        )
 
     async def unsubscribe(self, call_id: str, ws: WebSocket) -> None:
         async with self._lock:
             room = self._rooms.get(call_id)
             if not room:
                 return
-            room.discard(ws)
+            client = room.pop(ws, None)
+            if client:
+                client.stop()
             if not room:
                 del self._rooms[call_id]
 
     async def broadcast(self, call_id: str, message: Dict[str, Any]) -> None:
-        async with self._lock:
-            targets = list(self._rooms.get(call_id, set()))
-        if not targets:
-            return
         payload = json.dumps(message)
-        dead: List[WebSocket] = []
-        for ws in targets:
-            try:
-                await ws.send_text(payload)
-            except Exception:
-                dead.append(ws)
-        if dead:
-            async with self._lock:
-                room = self._rooms.get(call_id)
-                if room:
-                    for ws in dead:
-                        room.discard(ws)
+        async with self._lock:
+            room = self._rooms.get(call_id)
+            if not room:
+                return
+            clients = list(room.values())
+        _logger.info(
+            "broadcast call_id=%s type=%s to %d clients",
+            call_id,
+            message.get("type"),
+            len(clients),
+        )
+        for client in clients:
+            client.enqueue(payload)
 
     def broadcast_sync(self, call_id: str, message: Dict[str, Any]) -> None:
         """Schedule a broadcast on the WebSocket loop (safe from worker threads)."""
