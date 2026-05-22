@@ -137,6 +137,7 @@ export default function LiveCallPage({ params }: LivePageParams) {
         <div className="ml-auto flex min-w-0 items-center gap-2 flex-wrap justify-end">
           <CallWrapUpActions
             callId={callId}
+            accountName={accountName}
             hasReview={Boolean(postReview)}
             showLiveLink={false}
             variant="compact"

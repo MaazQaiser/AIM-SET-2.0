@@ -1,16 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ClipboardCheck, Loader2, PlayCircle } from "lucide-react";
+import { ClipboardCheck, Loader2, PlayCircle, Presentation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRunPostCallPipeline } from "@/lib/data/hooks";
 import { FRANCHISE_DEMO_CALL_ID } from "@/lib/demo/franchise-ai-platform-demo";
 import { cn } from "@/lib/cn";
 import { toast } from "sonner";
+import { createDeckFromCall } from "@/lib/content-studio/create-deck-from-call";
+import { useLiveCall } from "@/stores/use-live-call";
 
 interface CallWrapUpActionsProps {
   callId: string;
+  accountName?: string;
   hasReview?: boolean;
   /** Show link back to live cockpit */
   showLiveLink?: boolean;
@@ -21,6 +25,7 @@ interface CallWrapUpActionsProps {
 
 export function CallWrapUpActions({
   callId,
+  accountName,
   hasReview = true,
   showLiveLink = false,
   variant = "default",
@@ -29,6 +34,29 @@ export function CallWrapUpActions({
   const router = useRouter();
   const wrapUp = useRunPostCallPipeline(callId);
   const isDemo = callId === FRANCHISE_DEMO_CALL_ID;
+  const [creatingDeck, setCreatingDeck] = useState(false);
+  const transcript = useLiveCall((s) => s.transcript);
+  const checklistState = useLiveCall((s) => s.checklistState);
+  const intentSnapshot = useLiveCall((s) => s.intentSnapshot);
+
+  async function handleCreateDeck() {
+    setCreatingDeck(true);
+    try {
+      const projectId = await createDeckFromCall({
+        callId,
+        accountName: accountName ?? "Discovery Call",
+        transcript,
+        checklistState,
+        intentLabel: intentSnapshot?.intent?.label,
+      });
+      toast.success("Deck project created — generating slides from pain points");
+      router.push(`/content/studio/${projectId}`);
+    } catch {
+      toast.error("Failed to create deck project");
+    } finally {
+      setCreatingDeck(false);
+    }
+  }
 
   async function handleEndAndReview() {
     try {
@@ -69,6 +97,21 @@ export function CallWrapUpActions({
         <Button
           type="button"
           size="sm"
+          variant="secondary"
+          className="h-8 text-xs"
+          disabled={creatingDeck}
+          onClick={() => void handleCreateDeck()}
+        >
+          {creatingDeck ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Presentation className="h-3 w-3 mr-1" />
+          )}
+          Create Deck
+        </Button>
+        <Button
+          type="button"
+          size="sm"
           className="h-8 text-xs"
           disabled={wrapUp.isPending}
           onClick={() => void handleEndAndReview()}
@@ -99,6 +142,20 @@ export function CallWrapUpActions({
           <Link href={previewHref}>Preview Post-DC</Link>
         </Button>
       )}
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        disabled={creatingDeck}
+        onClick={() => void handleCreateDeck()}
+      >
+        {creatingDeck ? (
+          <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+        ) : (
+          <Presentation className="h-4 w-4 mr-1.5" />
+        )}
+        Create Deck
+      </Button>
       <Button
         type="button"
         size="sm"
