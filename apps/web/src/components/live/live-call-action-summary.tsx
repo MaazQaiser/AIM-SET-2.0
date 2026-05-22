@@ -64,26 +64,57 @@ export function LiveCallActionSummary({
 
   const actions = useMemo(() => {
     const items: string[] = [];
+    const latestPain = pains.length > 0 ? pains[pains.length - 1]?.text?.slice(0, 60) : "";
+    const bantItems = checklist?.items?.filter((i) => i.tier === "bant") ?? [];
+    const confirmedBant = bantItems.filter((i) => i.status === "confirmed").map((i) => i.label);
+    const partialBant = bantItems.filter((i) => i.status === "partial").map((i) => i.label);
+
     if (openGaps.includes("authority")) {
-      items.push("Schedule CFO / economic buyer readout before proposal lands.");
+      const evidence = bantItems.find((i) => i.id === "authority")?.evidence?.[0]?.snippet;
+      items.push(
+        evidence
+          ? `Probe authority deeper — customer mentioned: "${evidence.slice(0, 50)}…"`
+          : "Identify the decision maker — ask who else needs to approve."
+      );
     }
     if (openGaps.includes("budget")) {
-      items.push("Confirm board-approved budget band — partial range on record.");
+      const evidence = bantItems.find((i) => i.id === "budget")?.evidence?.[0]?.snippet;
+      items.push(
+        evidence
+          ? `Clarify budget — customer said: "${evidence.slice(0, 50)}…"`
+          : "Ask about budget range and approval process."
+      );
+    }
+    if (openGaps.includes("need") && pains.length > 0) {
+      items.push(`Dig into pain point: "${latestPain}…" — quantify impact and urgency.`);
+    } else if (openGaps.includes("need")) {
+      items.push("Uncover core need — ask what problem is most urgent right now.");
     }
     if (openGaps.includes("timeline")) {
-      items.push("Align pilot vs production dates with customer go-live language.");
+      const evidence = bantItems.find((i) => i.id === "timeline")?.evidence?.[0]?.snippet;
+      items.push(
+        evidence
+          ? `Pin down timeline — customer mentioned: "${evidence.slice(0, 50)}…"`
+          : "Ask about target go-live date or decision deadline."
+      );
     }
     if (sentimentShift?.direction === "negative") {
       items.push(sentimentShift.message || "Address sentiment shift — re-engage on outcomes.");
     }
     if (pains.length >= 2 && bantPct != null && bantPct >= 70) {
-      items.push("Strong discovery signal — draft proposal outline while pains are fresh.");
+      items.push("Strong discovery — propose next steps: pilot scope, timeline, or proposal outline.");
+    }
+    if (confirmedBant.length > 0 && items.length < 3) {
+      items.push(`${confirmedBant.join(", ")} confirmed — focus on remaining gaps.`);
+    }
+    if (partialBant.length > 0 && items.length < 4) {
+      items.push(`Deepen partial signals: ${partialBant.join(", ")} — ask for specifics.`);
     }
     if (items.length === 0) {
-      items.push("Continue BANT discovery; capture proposal scope and success criteria.");
+      items.push("Continue discovery — ask open-ended questions to uncover pain and BANT.");
     }
     return items.slice(0, 4);
-  }, [openGaps, sentimentShift, pains.length, bantPct]);
+  }, [openGaps, sentimentShift, pains, bantPct, checklist]);
 
   const hasLiveSignals =
     intent ||
@@ -142,7 +173,7 @@ export function LiveCallActionSummary({
             hint={
               pains.length > 0
                 ? pains[pains.length - 1]?.text?.slice(0, 72)
-                : "Franchise ops pains surface as customer speaks"
+                : "Pain points surface as the customer speaks"
             }
           />
         </div>
