@@ -57,6 +57,8 @@ class CallChannelManager:
                 loop = asyncio.get_running_loop()
             except RuntimeError:
                 return
+        if loop.is_closed():
+            return
         coro = self.broadcast(call_id, message)
         try:
             if asyncio.get_running_loop() is loop:
@@ -64,7 +66,10 @@ class CallChannelManager:
                 return
         except RuntimeError:
             pass
-        asyncio.run_coroutine_threadsafe(coro, loop)
+        try:
+            asyncio.run_coroutine_threadsafe(coro, loop)
+        except RuntimeError:
+            pass
 
 
 _channels: CallChannelManager | None = None

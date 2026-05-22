@@ -78,7 +78,10 @@ async def call_stream(websocket: WebSocket, call_id: str) -> None:
             except json.JSONDecodeError:
                 continue
             if msg.get("type") == "ping":
-                await websocket.send_json({"type": "ping"})
+                try:
+                    await websocket.send_json({"type": "pong"})
+                except Exception:
+                    break
                 continue
             if msg.get("type") == "transcript":
                 ctx = TenantContext.from_headers(
@@ -95,5 +98,8 @@ async def call_stream(websocket: WebSocket, call_id: str) -> None:
                     )
                 )
     except WebSocketDisconnect:
+        pass
+    except Exception:
+        _logger.exception("unexpected error in ws loop call_id=%s", call_id)
+    finally:
         await channel.unsubscribe(call_id, websocket)
-        return

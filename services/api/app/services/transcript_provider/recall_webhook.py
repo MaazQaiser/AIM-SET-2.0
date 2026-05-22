@@ -73,12 +73,12 @@ def parse_recall_payload(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         or data.get("participant_name")
         or "unknown"
     )
-    # Prefer participant name over numeric id for display
+    # Use numeric participant id when available; fall back to name for display
     speaker_id = str(
-        participant.get("name")
-        or participant.get("id")
+        participant.get("id")
         or data.get("speaker_id")
         or data.get("participant_id")
+        or participant.get("name")
         or speaker
     )
     role_raw = (data.get("speaker_role") or data.get("role") or "").lower()
@@ -211,7 +211,11 @@ def _verify_recall_webhook_headers(
     timestamp = headers.get("webhook-timestamp") or headers.get("svix-timestamp") or ""
     signature_header = headers.get("webhook-signature") or headers.get("svix-signature") or ""
     key = _webhook_secret_bytes(secret)
-    signed = f"{msg_id}.{timestamp}.{raw_body.decode('utf-8')}".encode("utf-8")
+    try:
+        body_str = raw_body.decode("utf-8")
+    except UnicodeDecodeError:
+        body_str = raw_body.decode("utf-8", errors="replace")
+    signed = f"{msg_id}.{timestamp}.{body_str}".encode("utf-8")
     expected = hmac.new(key, signed, hashlib.sha256).digest()
     for item in signature_header.split(" "):
         version, _, signature = item.partition(",")

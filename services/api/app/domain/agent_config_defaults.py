@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -94,7 +94,7 @@ def discover_prompt_versions(agent_id: str) -> List[Dict[str, Any]]:
                 "version": version,
                 "label": label,
                 "path": rel,
-                "deployed_at": datetime.utcfromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%dT%H:%M:%S"),
+                "deployed_at": datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
                 "reviewed_by": "repo",
                 "changelog": f"Prompt file in repository: {rel}",
                 "is_active": len(versions) == 0,
@@ -104,7 +104,7 @@ def discover_prompt_versions(agent_id: str) -> List[Dict[str, Any]]:
 
 
 def _iso_days_ago(days: int) -> str:
-    return (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S")
+    return (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S")
 
 
 def _guardrails() -> Dict[str, Any]:

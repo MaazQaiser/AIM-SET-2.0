@@ -174,7 +174,7 @@ def poll_transcript(
             new_count += 1
             # Dispatch through orchestrator for BANT/intent analysis
             try:
-                _orch.dispatch_live_segment(ctx, call_id, event)
+                _orch.dispatch_live_segment(ctx, call_id, event, elapsed_seconds=int(event.get("offset_seconds", 0)))
             except Exception:
                 pass
 

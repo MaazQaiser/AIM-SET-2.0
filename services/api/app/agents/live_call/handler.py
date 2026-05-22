@@ -222,7 +222,7 @@ def handle_call_end(ctx: TenantContext, call_id: str) -> Dict[str, Any]:
     from app.domain.live_call_session import clear_live_session
 
     clear_live_session(clerk_key, call_id)
-    post = __import__(
-        "app.orchestrator.dispatcher", fromlist=["Orchestrator"]
-    ).Orchestrator().dispatch_post_call(ctx, call_id)
+    from app.orchestrator.dispatcher import Orchestrator
+
+    post = Orchestrator().dispatch_post_call(ctx, call_id)
     return {"summary": summary, "post_call": post}
