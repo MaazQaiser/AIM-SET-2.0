@@ -10,7 +10,7 @@ interface WorkflowOutputSectionProps {
   brief: CallBrief;
 }
 
-/** Workflow agent output block on the Pre-DC (Pre-call brief) screen. */
+/** PRE-DC Workflow output block on the Pre-DC (Pre-call brief) screen. */
 export function WorkflowOutputSection({ brief }: WorkflowOutputSectionProps) {
   const hasWorkflowOutput =
     Boolean(brief.aiSummary) ||
@@ -28,10 +28,10 @@ export function WorkflowOutputSection({ brief }: WorkflowOutputSectionProps) {
         <div className="flex items-center gap-2 min-w-0">
           <Workflow className="h-4 w-4 text-primary shrink-0" />
           <h2 id="workflow-output-heading" className="text-sm font-semibold text-foreground">
-            Workflow
+            PRE-DC Workflow
           </h2>
           <span className="text-xs text-muted-foreground hidden sm:inline">
-            Pre-DC agent output
+            Summary, artifacts &amp; KB fulfillment
           </span>
         </div>
         <WorkflowAgentBadge />
@@ -39,8 +39,8 @@ export function WorkflowOutputSection({ brief }: WorkflowOutputSectionProps) {
 
       {brief.agentStatus === "failed" && (
         <p className="text-xs text-warning rounded-md border border-warning/30 bg-warning/10 px-3 py-2">
-          Workflow could not complete for this lead. Re-import or run workflow again from Agents →
-          Workflow Agent.
+          PRE-DC Workflow could not complete for this lead. Re-import or run again from Agents →
+          PRE-DC Workflow.
         </p>
       )}
 

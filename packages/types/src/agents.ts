@@ -245,7 +245,7 @@ export interface AgentConfig {
   operations?: string[];
   /** When set, overrides the active prompt file for this agent. */
   system_prompt_override?: string;
-  /** Workflow Agent: per-operation prompt overrides. */
+  /** PRE-DC Workflow: per-operation prompt overrides. */
   workflow_prompts?: {
     summary?: string;
     artifact_plan?: string;
@@ -257,7 +257,7 @@ export interface AgentConfig {
     artifact_plan?: string;
     artifact_fulfill?: string;
   };
-  /** Workflow Agent: UI highlight rules for AI summary (regex pattern + Tailwind class). */
+  /** PRE-DC Workflow: UI highlight rules for AI summary (regex pattern + Tailwind class). */
   summary_highlight_rules?: {
     pattern: string;
     className: string;

@@ -35,15 +35,15 @@ export function BriefArtifactsPanel({ brief }: BriefArtifactsPanelProps) {
 
   return (
     <BriefDetailCard
-      title="Workflow artifacts"
+      title="PRE-DC Workflow artifacts"
       icon={Package}
       headerExtra={<WorkflowAgentBadge />}
     >
       <div className="space-y-4 min-w-0">
         {brief.agentStatus === "failed" && (
           <p className="text-xs text-warning rounded-md border border-warning/30 bg-warning/10 px-3 py-2">
-            Workflow could not complete artifact planning. Re-import the lead or re-run workflow
-            from Agents → Workflow Agent.
+            PRE-DC Workflow could not complete artifact planning. Re-import the lead or re-run from
+            Agents → PRE-DC Workflow.
           </p>
         )}
 

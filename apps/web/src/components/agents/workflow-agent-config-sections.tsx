@@ -46,7 +46,7 @@ export function WorkflowAgentConfigSections({
       <section className="space-y-4">
         <h3 className="text-sm font-semibold">AI summary prompt</h3>
         <p className="text-xs text-muted-foreground">
-          Controls how the Workflow agent writes the executive summary on the Pre-DC (Pre-call brief)
+          Controls how PRE-DC Workflow writes the executive summary on the Pre-DC (Pre-call brief)
           screen. Use **double asterisks** in the prompt to instruct the model what to emphasize.
         </p>
         <div className="space-y-2">
@@ -65,7 +65,7 @@ export function WorkflowAgentConfigSections({
       <section className="space-y-4">
         <h3 className="text-sm font-semibold">Summary highlight rules</h3>
         <p className="text-xs text-muted-foreground">
-          Regex patterns applied on the Pre-DC screen to color-key phrases in the workflow summary.
+          Regex patterns applied on the Pre-DC screen to color-key phrases in the PRE-DC Workflow summary.
           Defaults are pre-filled; edit or add rules, then save.
         </p>
         {rules.length === 0 ? (
@@ -141,7 +141,7 @@ export function WorkflowAgentConfigSections({
       <section className="space-y-4">
         <h3 className="text-sm font-semibold">Artifact planning prompt</h3>
         <p className="text-xs text-muted-foreground">
-          Defines which decks, case studies, and one-pagers the workflow plans before the discovery
+          Defines which decks, case studies, and one-pagers PRE-DC Workflow plans before the discovery
           call (shown on the Pre-DC screen).
         </p>
         <textarea
@@ -157,7 +157,7 @@ export function WorkflowAgentConfigSections({
       <section className="space-y-4">
         <h3 className="text-sm font-semibold">KB fulfillment prompt</h3>
         <p className="text-xs text-muted-foreground">
-          How the workflow matches planned artifacts to KB chunks and what to show when content is
+          How PRE-DC Workflow matches planned artifacts to KB chunks and what to show when content is
           missing on the Pre-DC screen.
         </p>
         <textarea

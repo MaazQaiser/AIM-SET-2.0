@@ -228,7 +228,7 @@ export function DcNotesCsvImport() {
         }
         invalidateDcQueries();
         toast.success(
-          `Imported ${result.preDcRecords.length} leads (vector-indexed). Workflow agent runs on the server for each row.`
+          `Imported ${result.preDcRecords.length} leads (vector-indexed). PRE-DC Workflow runs on the server for each row.`
         );
         if (result.errors.length) toast.warning(`${result.errors.length} row warning(s)`);
         return;

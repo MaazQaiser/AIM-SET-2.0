@@ -45,11 +45,11 @@ export const AGENT_META: Record<
     operations: ["pre_dc_brief"],
   },
   workflow: {
-    display_name: "Workflow Agent",
+    display_name: "PRE-DC Workflow",
     description:
       "Pre-DC screen output: AI summary, artifact planning, and KB fulfillment on every lead ingest.",
     purpose:
-      "On each Pre-DC CSV row, run the workflow that generates the executive summary, plans DC artifacts, and fulfills them from the KB — shown on the Pre-call brief.",
+      "On each Pre-DC CSV row, run PRE-DC Workflow to generate the executive summary, plan DC artifacts, and fulfill them from the KB — shown on the Pre-call brief.",
     operations: ["workflow_pipeline"],
   },
   content_generation: {

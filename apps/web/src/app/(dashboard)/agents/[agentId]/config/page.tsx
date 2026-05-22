@@ -17,7 +17,7 @@ const AGENT_LABELS: Record<AgentId, string> = {
   "live-call": "Live Call Agent",
   "discovery-checklist": "Discovery Checklist Tracker",
   content: "Content Agent",
-  workflow: "Workflow Agent",
+  workflow: "PRE-DC Workflow",
   content_generation: "Content Generation Agent",
   knowledge: "Knowledge Agent",
   coaching: "Coaching Agent",

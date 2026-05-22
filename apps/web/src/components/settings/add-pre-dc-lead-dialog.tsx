@@ -88,7 +88,7 @@ export function AddPreDcLeadDialog({ onCreated }: AddPreDcLeadDialogProps) {
       resetForm();
       const agentNote =
         body.agent_processed != null && body.agent_processed > 0
-          ? " Workflow ran on this lead."
+          ? " PRE-DC Workflow ran on this lead."
           : "";
       toast.success(`Lead created.${agentNote}`, {
         action: callId
@@ -120,8 +120,8 @@ export function AddPreDcLeadDialog({ onCreated }: AddPreDcLeadDialogProps) {
         <DialogHeader>
           <DialogTitle>Add new Pre-DC lead</DialogTitle>
           <DialogDescription>
-            Create a lead in Pre-DC CSV format. Required: company name. The Workflow agent runs after
-            save and shows the summary and artifacts on the Pre-DC screen.
+            Create a lead in Pre-DC CSV format. Required: company name. PRE-DC Workflow runs after save
+            and shows the summary and artifacts on the Pre-DC screen.
           </DialogDescription>
         </DialogHeader>
 

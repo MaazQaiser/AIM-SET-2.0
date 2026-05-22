@@ -90,7 +90,7 @@ export function BriefAISummary({ brief }: BriefAISummaryProps) {
 
   return (
     <BriefDetailCard
-      title="Workflow summary"
+      title="PRE-DC Workflow summary"
       icon={Sparkles}
       variant="highlight"
       headerExtra={<WorkflowAgentBadge />}
