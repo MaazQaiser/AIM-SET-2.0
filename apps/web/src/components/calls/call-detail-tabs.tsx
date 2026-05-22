@@ -7,7 +7,7 @@ import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { CallDetailColumnLayout } from "@/components/calls/call-detail-column-layout";
-import { BriefAISummary } from "@/components/pre-call/brief-ai-summary";
+import { WorkflowOutputSection } from "@/components/pre-call/workflow-output-section";
 import { LayoutControls } from "@/components/dashboard-grid/layout-controls";
 import { BRIEF_WIDGETS, POST_DC_WIDGETS } from "@/lib/dashboard/widget-registry";
 import { BotChatPanel } from "@/components/bot-chat-panel";
@@ -114,7 +114,7 @@ export function CallDetailTabs({
               </div>
             )}
             <div className="mb-4">
-              <BriefAISummary brief={brief} />
+              <WorkflowOutputSection brief={brief} />
             </div>
             <LayoutControls
               layoutKey="brief"

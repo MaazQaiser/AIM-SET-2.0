@@ -23,6 +23,7 @@ import { cn } from "@/lib/cn";
 import { parseDcNotesCsv } from "@/lib/dc-notes/parse-dc-csv";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { preDcField, postDcField, type PreDCRecord, type PostDCRecord } from "@/types/dc-notes";
+import { AddPreDcLeadDialog } from "@/components/settings/add-pre-dc-lead-dialog";
 
 const PRE_DC_TEMPLATE_HEADER = `Company Name-PreDC,Company Type ICP - PreDC,Annual Revenue - PreDC,No. of Employees - PreDC,Industry - PreDC,Company LinkedIn-PreDC,Company Description,Website-PreDC,Company Stage-PreDC,Company Stage,ICP Bucket,Need-PreDC,Campaign Service - PreDC,Discovery Call Time (PKT),Discovery Call Date (PKT),Prospect's Persona,Person LinkedIn-PreDC,Lead Name-PreDC`;
 
@@ -226,7 +227,9 @@ export function DcNotesCsvImport() {
           return;
         }
         invalidateDcQueries();
-        toast.success(`Imported ${result.preDcRecords.length} leads to Supabase (vector-indexed)`);
+        toast.success(
+          `Imported ${result.preDcRecords.length} leads (vector-indexed). Workflow agent runs on the server for each row.`
+        );
         if (result.errors.length) toast.warning(`${result.errors.length} row warning(s)`);
         return;
       }
@@ -296,7 +299,13 @@ export function DcNotesCsvImport() {
           />
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          <AddPreDcLeadDialog
+            onCreated={async () => {
+              await loadFromDb();
+              invalidateDcQueries();
+            }}
+          />
           <Button type="button" variant="outline" size="sm" onClick={() => downloadTemplate("pre")}>
             <Download className="h-3.5 w-3.5" />
             Pre-DC template

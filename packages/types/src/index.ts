@@ -219,6 +219,7 @@ export * from "./domain";
 export * from "./dc-notes";
 export * from "./agents";
 export * from "./brief";
+export * from "./pre-dc-agent";
 export * from "./integrations";
 export * from "./content_studio";
 export * from "./discovery-checklist";

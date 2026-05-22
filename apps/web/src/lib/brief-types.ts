@@ -12,4 +12,9 @@ export type {
   ClientInteraction,
   InfluenceLevel,
   SentimentTrend,
+  PlannedArtifact,
+  ArtifactFulfillment,
+  PlannedArtifactType,
+  ArtifactFulfillmentStatus,
+  PreDcAgentStatus,
 } from "@dc-copilot/types/brief";

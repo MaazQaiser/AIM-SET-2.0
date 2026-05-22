@@ -1,10 +1,11 @@
 "use client";
 
 import { Sparkles, TrendingUp, Calendar, DollarSign, Target, Users } from "lucide-react";
-import { AIGeneratedBadge } from "@/components/ai-generated-badge";
+import { WorkflowAgentBadge } from "@/components/pre-call/workflow-agent-badge";
 import { useWidgetSize } from "@/components/dashboard-grid/dashboard-widget";
 import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
-import { parseSummaryHighlights } from "@/lib/brief-summary-highlights";
+import { parseSummaryHighlights, type SummaryHighlightRule } from "@/lib/brief-summary-highlights";
+import { useAgentConfig } from "@/lib/data/agent-config-hooks";
 import type { CallBrief } from "@/lib/brief-types";
 import { cn } from "@/lib/cn";
 
@@ -42,8 +43,16 @@ function MetaChip({
   );
 }
 
-function HighlightedSummary({ text, clamp }: { text: string; clamp?: boolean }) {
-  const parts = parseSummaryHighlights(text);
+function HighlightedSummary({
+  text,
+  clamp,
+  rules,
+}: {
+  text: string;
+  clamp?: boolean;
+  rules?: SummaryHighlightRule[];
+}) {
+  const parts = parseSummaryHighlights(text, rules);
   return (
     <p
       className={cn(
@@ -65,6 +74,13 @@ function HighlightedSummary({ text, clamp }: { text: string; clamp?: boolean }) 
 }
 
 export function BriefAISummary({ brief }: BriefAISummaryProps) {
+  const { data: workflowConfig } = useAgentConfig("workflow");
+  const highlightRules = workflowConfig?.summary_highlight_rules?.map((r) => ({
+    pattern: r.pattern,
+    className: r.className,
+    flags: r.flags,
+  }));
+
   const { compact, columnZone } = useWidgetSize();
   const isCenter = columnZone === "center";
   const stageClass = STAGE_COLOR[brief.dealStage] ?? "bg-muted/60 text-muted-foreground border-border";
@@ -74,10 +90,10 @@ export function BriefAISummary({ brief }: BriefAISummaryProps) {
 
   return (
     <BriefDetailCard
-      title="AI Brief Summary"
+      title="Workflow summary"
       icon={Sparkles}
       variant="highlight"
-      headerExtra={<AIGeneratedBadge />}
+      headerExtra={<WorkflowAgentBadge />}
     >
       <div className="space-y-4 min-w-0">
         {/* Deal context + ICP / firmographic chips (top) */}
@@ -121,7 +137,11 @@ export function BriefAISummary({ brief }: BriefAISummaryProps) {
           )}
         </div>
 
-        <HighlightedSummary text={brief.aiSummary} clamp={!isCenter && compact} />
+        <HighlightedSummary
+          text={brief.aiSummary}
+          clamp={!isCenter && compact}
+          rules={highlightRules}
+        />
       </div>
     </BriefDetailCard>
   );

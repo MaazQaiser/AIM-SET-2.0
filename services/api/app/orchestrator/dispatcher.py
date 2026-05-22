@@ -7,6 +7,7 @@ from dc_core.evidence import AgentEnvelope, validate_envelope
 from dc_core.tenancy import TenantContext
 
 from app.agents.content_agent import generate_pre_dc_brief
+from app.agents.pre_dc_agent import run_pre_dc_pipeline
 from app.agents.content_generation_agent import run_studio_turn
 from app.agents.coaching_agent import generate_scorecard
 from app.agents.knowledge_agent import ingest_asset_metadata
@@ -31,24 +32,57 @@ class Orchestrator:
         self.dc_notes = get_dc_notes_repository()
         self.memory = get_memory_store()
 
+    def _pre_dc_fields_for_call(self, ctx: TenantContext, call_id: str) -> Dict[str, str]:
+        call = self.calls.get_call(ctx, call_id)
+        if not call:
+            return {}
+        notes = self.dc_notes.get_notes(ctx)
+        account = (call.get("accountName") or "").lower()
+        for row in notes["pre_dc_records"]:
+            fields = row.get("fields") or {}
+            company = (fields.get("Company Name-PreDC") or "").strip()
+            if company and account in company.lower():
+                return {str(k): str(v) for k, v in fields.items()}
+        return {}
+
+    def dispatch_pre_dc_pipeline(
+        self,
+        ctx: TenantContext,
+        call_id: str,
+        fields: Dict[str, str],
+        *,
+        trigger: str = "ingest",
+    ) -> Dict[str, Any]:
+        account_name = (fields.get("Company Name-PreDC") or "").strip()
+        if not account_name:
+            raise ValueError("Company Name-PreDC is required for Pre-DC pipeline")
+
+        existing = self.calls.get_brief(ctx, call_id) or {}
+        try:
+            envelope = run_pre_dc_pipeline(ctx, call_id, account_name, fields, trigger=trigger)
+            validate_envelope(envelope)
+            merged = {**existing, **envelope.result}
+            merged["callId"] = call_id
+            merged["accountName"] = account_name
+            merged["agentRunId"] = envelope.trace_id
+            self.calls.save_brief(ctx, call_id, merged)
+            self._log_run(ctx, envelope)
+            return envelope.model_dump()
+        except Exception:
+            failed = {**existing, "agentStatus": "failed", "callId": call_id, "accountName": account_name}
+            self.calls.save_brief(ctx, call_id, failed)
+            raise
+
     def dispatch_pre_dc_brief(self, ctx: TenantContext, call_id: str) -> Dict[str, Any]:
+        fields = self._pre_dc_fields_for_call(ctx, call_id)
+        if fields:
+            return self.dispatch_pre_dc_pipeline(ctx, call_id, fields, trigger="manual")
+
         call = self.calls.get_call(ctx, call_id)
         if not call:
             raise ValueError(f"Call not found: {call_id}")
 
-        notes = self.dc_notes.get_notes(ctx)
         research: Dict[str, str] = {}
-        for row in notes["pre_dc_records"]:
-            fields = row.get("fields") or {}
-            if call["accountName"].lower() in (fields.get("Company Name-PreDC") or "").lower():
-                research = {
-                    "needs": fields.get("Have they described their needs", ""),
-                    "company_description": fields.get("Company Description", ""),
-                    "deal_stage": fields.get("Company Stage", "Discovery"),
-                    "other": fields.get("Other Information", ""),
-                }
-                break
-
         envelope = generate_pre_dc_brief(
             ctx.tenant_id,
             call_id,

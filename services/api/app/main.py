@@ -22,6 +22,7 @@ from app.routers import (  # noqa: E402
     v1_calls,
     v1_content_studio,
     v1_kb,
+    v1_workflow,
     v1_webhooks,
     websocket,
 )
@@ -39,6 +40,7 @@ app.add_middleware(
 
 app.include_router(dc_notes.router)
 app.include_router(v1_calls.router)
+app.include_router(v1_workflow.router)
 app.include_router(v1_kb.router)
 app.include_router(v1_content_studio.router)
 app.include_router(v1_agents.router)

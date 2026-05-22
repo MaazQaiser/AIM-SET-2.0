@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     recall_webhook_secret: str = ""
     public_api_base_url: str = ""
     demo_transcript_replay: bool = False
+    workflow_agent_on_ingest: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("workflow_agent_on_ingest", "pre_dc_agent_on_ingest"),
+    )
     cors_allowed_origins: str = (
         "http://localhost:3000,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3002"
     )

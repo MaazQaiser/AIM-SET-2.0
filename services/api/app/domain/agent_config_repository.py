@@ -30,19 +30,21 @@ class AgentConfigRepository:
         _, clerk_key = _tenant_keys(ctx)
         store = get_memory_store()
         saved: Optional[Dict[str, Any]] = store.agent_configs.get(clerk_key, {}).get(agent_id)
+        if saved is None and agent_id == "workflow":
+            saved = store.agent_configs.get(clerk_key, {}).get("pre-dc")
 
         if saved is None:
             settings = get_settings()
             if settings.supabase_configured:
                 tenant_uuid, _ = _tenant_keys(ctx)
 
-                def _fetch() -> Optional[Dict[str, Any]]:
+                def _fetch(fetch_agent_id: str) -> Optional[Dict[str, Any]]:
                     row = (
                         get_supabase()
                         .table("agent_configs")
                         .select("config")
                         .eq("tenant_id", tenant_uuid)
-                        .eq("agent_id", agent_id)
+                        .eq("agent_id", fetch_agent_id)
                         .limit(1)
                         .execute()
                     )
@@ -51,7 +53,9 @@ class AgentConfigRepository:
                         return data["config"]
                     return None
 
-                saved = run_with_timeout(_fetch, default=None)
+                saved = run_with_timeout(lambda: _fetch(agent_id), default=None)
+                if saved is None and agent_id == "workflow":
+                    saved = run_with_timeout(lambda: _fetch("pre-dc"), default=None)
 
         return merge_agent_config(agent_id, saved)
 

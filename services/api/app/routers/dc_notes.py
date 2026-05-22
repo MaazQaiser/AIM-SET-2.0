@@ -4,9 +4,11 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
+from app.config import get_settings
 from app.deps import verify_internal_secret
-from app.domain.calls_service import CallsService
+from app.domain.calls_service import CallsService, slugify_company
 from app.domain.dc_notes_repository import get_dc_notes_repository
+from app.orchestrator.dispatcher import Orchestrator
 from app.schemas import (
     DcNotesResponse,
     IngestRequest,
@@ -23,6 +25,7 @@ from dc_core.tenancy import TenantContext
 router = APIRouter(prefix="/dc-notes", tags=["dc-notes"])
 _calls = CallsService()
 _dc = get_dc_notes_repository()
+_orch = Orchestrator()
 
 
 def _tenant_id(
@@ -98,4 +101,24 @@ def ingest_dc_notes(
         _calls.sync_from_dc_notes(ctx)
     except Exception as exc:
         raise _service_error(exc) from exc
-    return IngestResponse(upserted=len(rows), kind=body.kind)
+
+    agent_processed = 0
+    if body.kind == "pre-dc" and get_settings().workflow_agent_on_ingest:
+        for row in rows:
+            fields = row.get("fields") or {}
+            company = (fields.get("Company Name-PreDC") or "").strip()
+            if not company:
+                continue
+            call_id = slugify_company(company)
+            try:
+                _orch.dispatch_pre_dc_pipeline(
+                    ctx,
+                    call_id,
+                    {str(k): str(v) for k, v in fields.items()},
+                    trigger="ingest",
+                )
+                agent_processed += 1
+            except Exception:
+                continue
+
+    return IngestResponse(upserted=len(rows), kind=body.kind, agent_processed=agent_processed)

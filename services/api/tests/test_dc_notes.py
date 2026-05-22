@@ -36,12 +36,15 @@ def test_dc_notes_ingest_requires_secret(monkeypatch):
 
 def test_dc_notes_ingest_memory_without_supabase(monkeypatch):
     monkeypatch.setenv("INTERNAL_SECRET", SECRET)
-    monkeypatch.delenv("SUPABASE_URL", raising=False)
-    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+    monkeypatch.setenv("SUPABASE_URL", "")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "")
     from app.config import get_settings
     from app.domain.memory_store import get_memory_store
 
     get_settings.cache_clear()
+    settings = get_settings()
+    monkeypatch.setattr(settings, "supabase_url", "")
+    monkeypatch.setattr(settings, "supabase_service_role_key", "")
     store = get_memory_store()
     store.pre_dc_records.clear()
 
@@ -86,6 +89,11 @@ def test_dc_notes_shared_tenant_when_kb_shared_mode(monkeypatch):
     monkeypatch.setattr(settings, "supabase_service_role_key", "")
     monkeypatch.setattr(settings, "kb_shared_mode", True)
     monkeypatch.setattr(settings, "kb_shared_tenant_key", "dc-copilot-shared")
+
+    from app.domain.memory_store import get_memory_store
+
+    store = get_memory_store()
+    store.pre_dc_records.pop("dc-copilot-shared", None)
 
     ctx_a = TenantContext(tenant_id="org-a", user_id="user-a", clerk_org_id="org-a")
     ctx_b = TenantContext(tenant_id="org-b", user_id="user-b", clerk_org_id="org-b")

@@ -9,6 +9,7 @@ AGENT_IDS: List[str] = [
     "live-call",
     "discovery-checklist",
     "content",
+    "workflow",
     "content_generation",
     "knowledge",
     "coaching",
@@ -19,6 +20,7 @@ AGENT_LABELS: Dict[str, str] = {
     "live-call": "Live Call Agent",
     "discovery-checklist": "Discovery Checklist Tracker",
     "content": "Content Agent",
+    "workflow": "Workflow Agent",
     "content_generation": "Content Generation Agent",
     "knowledge": "Knowledge Agent",
     "coaching": "Coaching Agent",
@@ -29,6 +31,7 @@ AGENT_DOMAINS: Dict[str, List[str]] = {
     "live-call": ["live_assist"],
     "discovery-checklist": ["live_assist"],
     "content": ["content_generation"],
+    "workflow": ["content_generation"],
     "content_generation": ["content_generation"],
     "knowledge": ["knowledge_maintenance"],
     "coaching": ["coaching_insights"],
@@ -37,10 +40,33 @@ AGENT_DOMAINS: Dict[str, List[str]] = {
 
 PROMPT_ROOT = Path(__file__).resolve().parents[4] / "prompts"
 
+WORKFLOW_PROMPT_FILES: Dict[str, str] = {
+    "summary": "workflow/summary/v1.0.0.md",
+    "artifact_plan": "workflow/artifact_plan/v1.0.0.md",
+    "artifact_fulfill": "workflow/artifact_fulfill/v1.0.0.md",
+}
+
+
+def _read_prompt_body(rel_path: str) -> str:
+    path = PROMPT_ROOT / rel_path
+    if not path.is_file():
+        return ""
+    text = path.read_text(encoding="utf-8")
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) >= 3:
+            return parts[2].strip()
+    return text.strip()
+
+
+def _default_workflow_prompts() -> Dict[str, str]:
+    return {key: _read_prompt_body(rel) for key, rel in WORKFLOW_PROMPT_FILES.items()}
+
 AGENT_PROMPT_GLOBS: Dict[str, List[str]] = {
     "live-call": ["live-call/**/*.md", "live-call/intent_detection/**/*.md"],
     "discovery-checklist": ["discovery-checklist/**/*.md"],
     "content": ["content/pre_dc_brief/**/*.md"],
+    "workflow": ["workflow/**/*.md", "pre-dc/**/*.md"],
     "content_generation": ["content/studio/**/*.md", "content/template_vision/**/*.md"],
 }
 
@@ -54,6 +80,7 @@ AGENT_OPERATIONS: Dict[str, List[str]] = {
     ],
     "discovery-checklist": ["checklist_updated", "discovery_nudge", "session_finalized"],
     "content": ["pre_dc_brief"],
+    "workflow": ["workflow_pipeline"],
     "content_generation": ["studio_turn", "template_ingest", "export_pdf", "export_png", "export_pptx"],
     "knowledge": ["asset_ingested"],
     "coaching": ["scorecard"],
@@ -160,7 +187,7 @@ def _model_policy(agent_id: str) -> Dict[str, Any]:
             "model_name": "claude-3-opus-20240229",
             "fallback_model_name": "claude-sonnet-4-6",
         }
-    if agent_id in ("content", "content_generation"):
+    if agent_id in ("content", "content_generation", "workflow"):
         return {
             "primary": "opus",
             "fallback": "sonnet",
@@ -184,7 +211,7 @@ def _cost_cap(agent_id: str) -> Dict[str, Any]:
         }
     if agent_id == "coaching":
         return {"per_run_ceiling_usd": 0.15, "abort_strategy": "degrade"}
-    if agent_id == "content":
+    if agent_id in ("content", "workflow"):
         return {"per_run_ceiling_usd": 0.05, "abort_strategy": "degrade"}
     return {"per_run_ceiling_usd": 0.02, "abort_strategy": "degrade"}
 
@@ -311,6 +338,41 @@ def default_agent_config(agent_id: str) -> Dict[str, Any]:
             "playbook": DEFAULT_PLAYBOOK,
         }
 
+    if agent_id == "workflow":
+        cfg["workflow_prompts"] = _default_workflow_prompts()
+        cfg["summary_highlight_rules"] = [
+            {
+                "pattern": r"\b(budget|revenue|pricing|cost|ROI|\$[\d,.]+[KMB]?)\b",
+                "className": "rounded px-1 py-0.5 bg-amber-100/90 text-amber-950",
+                "flags": "gi",
+            },
+            {
+                "pattern": r"\b(timeline|deadline|Q[1-4]|within \d+ (?:days|weeks|months))\b",
+                "className": "rounded px-1 py-0.5 bg-blue-100/90 text-blue-950",
+                "flags": "gi",
+            },
+            {
+                "pattern": r"\b(pain|challenge|struggle|bottleneck|legacy)\b",
+                "className": "rounded px-1 py-0.5 bg-orange-100/90 text-orange-950",
+                "flags": "gi",
+            },
+            {
+                "pattern": r"\b(competitor|alternative|vendor|switching|incumbent)\b",
+                "className": "rounded px-1 py-0.5 bg-rose-100/90 text-rose-950",
+                "flags": "gi",
+            },
+            {
+                "pattern": r"\b(opportunity|growth|scale|expansion|priority|strategic|initiative)\b",
+                "className": "rounded px-1 py-0.5 bg-emerald-100/90 text-emerald-950",
+                "flags": "gi",
+            },
+            {
+                "pattern": r"\b(authority|decision|stakeholder|executive|CTO|CFO|VP|director|buyer)\b",
+                "className": "rounded px-1 py-0.5 bg-violet-100/90 text-violet-950",
+                "flags": "gi",
+            },
+        ]
+
     if agent_id == "live-call":
         cfg["signal_routing"] = [
             {"id": "sr-1", "keyword_pattern": "competitor|alternative|vs\\s|compared to", "signal_type": "competitor_mentioned", "nudge_type": "objection_handler", "target_role": "AE", "enabled": True, "confidence_threshold": 0.75},
@@ -336,6 +398,9 @@ def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]
 EDITABLE_CONFIG_KEYS = frozenset(
     {
         "system_prompt_override",
+        "workflow_prompts",
+        "pre_dc_prompts",
+        "summary_highlight_rules",
         "model_policy",
         "cost_cap",
         "throttle",
@@ -349,9 +414,29 @@ def merge_agent_config(agent_id: str, saved: Dict[str, Any] | None) -> Dict[str,
     base = default_agent_config(agent_id)
     if not saved:
         return base
+    saved = dict(saved)
+    if agent_id == "workflow" and "workflow_prompts" not in saved and saved.get("pre_dc_prompts"):
+        saved["workflow_prompts"] = saved["pre_dc_prompts"]
     patch = {k: saved[k] for k in EDITABLE_CONFIG_KEYS if k in saved}
     merged = deep_merge(base, patch)
+    if agent_id == "workflow":
+        merged = _apply_workflow_config_defaults(merged, base)
     merged["agent_id"] = agent_id
     merged["active_prompt_versions"] = discover_prompt_versions(agent_id)
     merged["operations"] = AGENT_OPERATIONS.get(agent_id, [])
+    return merged
+
+
+def _apply_workflow_config_defaults(merged: Dict[str, Any], base: Dict[str, Any]) -> Dict[str, Any]:
+    """Empty saved overrides mean 'use repo defaults' — do not wipe prompts or highlight rules."""
+    base_prompts = base.get("workflow_prompts") or _default_workflow_prompts()
+    merged_prompts = dict(merged.get("workflow_prompts") or {})
+    for key, default_text in base_prompts.items():
+        if not str(merged_prompts.get(key) or "").strip():
+            merged_prompts[key] = default_text
+    merged["workflow_prompts"] = merged_prompts
+
+    rules = merged.get("summary_highlight_rules")
+    if not isinstance(rules, list) or len(rules) == 0:
+        merged["summary_highlight_rules"] = list(base.get("summary_highlight_rules") or [])
     return merged

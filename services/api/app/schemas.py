@@ -23,9 +23,18 @@ class IngestRequest(BaseModel):
     records: List[Dict[str, Any]]
 
 
+class PreDcAgentInput(BaseModel):
+    record: PreDCRecordIn
+    call_id: str = Field(alias="callId")
+    trigger: Literal["ingest", "manual"] = "ingest"
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class IngestResponse(BaseModel):
     upserted: int
     kind: Literal["pre-dc", "post-dc"]
+    agent_processed: int = 0
 
 
 class PreDCRecordOut(BaseModel):

@@ -3,6 +3,7 @@ export type AgentId =
   | "live-call"
   | "discovery-checklist"
   | "content"
+  | "workflow"
   | "content_generation"
   | "knowledge"
   | "coaching"
@@ -244,6 +245,24 @@ export interface AgentConfig {
   operations?: string[];
   /** When set, overrides the active prompt file for this agent. */
   system_prompt_override?: string;
+  /** Workflow Agent: per-operation prompt overrides. */
+  workflow_prompts?: {
+    summary?: string;
+    artifact_plan?: string;
+    artifact_fulfill?: string;
+  };
+  /** @deprecated Use workflow_prompts — kept for migrated tenant configs. */
+  pre_dc_prompts?: {
+    summary?: string;
+    artifact_plan?: string;
+    artifact_fulfill?: string;
+  };
+  /** Workflow Agent: UI highlight rules for AI summary (regex pattern + Tailwind class). */
+  summary_highlight_rules?: {
+    pattern: string;
+    className: string;
+    flags?: string;
+  }[];
   profile: AgentProfile;
   model_policy: ModelPolicy;
   cost_cap: CostCapConfig;

@@ -5,6 +5,7 @@ export const PROJECT_AGENT_IDS: AgentId[] = [
   "live-call",
   "discovery-checklist",
   "content",
+  "workflow",
   "content_generation",
   "knowledge",
   "coaching",
@@ -43,6 +44,14 @@ export const AGENT_META: Record<
       "Find, assemble, and draft content artifacts grounded in the KB — pre-call briefs, decks, one-pagers.",
     operations: ["pre_dc_brief"],
   },
+  workflow: {
+    display_name: "Workflow Agent",
+    description:
+      "Pre-DC screen output: AI summary, artifact planning, and KB fulfillment on every lead ingest.",
+    purpose:
+      "On each Pre-DC CSV row, run the workflow that generates the executive summary, plans DC artifacts, and fulfills them from the KB — shown on the Pre-call brief.",
+    operations: ["workflow_pipeline"],
+  },
   content_generation: {
     display_name: "Content Generation Agent",
     description: "Chat-driven studio for decks, one-pagers, and images (HTML preview + export).",
@@ -78,6 +87,7 @@ export const DEFAULT_COST_CAPS: Record<
   "live-call": { per_run_usd: 0.02, abort_strategy: "degrade" },
   "discovery-checklist": { per_run_usd: 0.02, abort_strategy: "degrade" },
   content: { per_run_usd: 0.05, abort_strategy: "degrade" },
+  workflow: { per_run_usd: 0.05, abort_strategy: "degrade" },
   content_generation: { per_run_usd: 0.05, project_usd: 1.5, abort_strategy: "hard_stop" },
   knowledge: { per_run_usd: 0.02, abort_strategy: "degrade" },
   coaching: { per_run_usd: 0.15, abort_strategy: "degrade" },
@@ -98,6 +108,12 @@ const DEFAULT_MODEL_POLICY: Record<AgentId, ModelPolicy> = {
     fallback_model_name: "claude-sonnet-4-6",
   },
   content: {
+    primary: "opus",
+    fallback: "sonnet",
+    model_name: "claude-opus-4-7",
+    fallback_model_name: "claude-sonnet-4-6",
+  },
+  workflow: {
     primary: "opus",
     fallback: "sonnet",
     model_name: "claude-opus-4-7",

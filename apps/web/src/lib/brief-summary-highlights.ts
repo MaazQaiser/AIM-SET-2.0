@@ -67,6 +67,46 @@ function applyRules(text: string, rules: SummaryHighlightRule[]): TextPart[] {
   return parts;
 }
 
-export function parseSummaryHighlights(text: string): TextPart[] {
-  return applyRules(text, RULES);
+/** Split text parts on **markdown bold** markers from the Pre-DC agent. */
+function applyBoldMarkers(parts: TextPart[]): TextPart[] {
+  const out: TextPart[] = [];
+  const boldRe = /\*\*(.+?)\*\*/g;
+  for (const part of parts) {
+    if (part.type !== "text") {
+      out.push(part);
+      continue;
+    }
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = boldRe.exec(part.value)) !== null) {
+      if (m.index > last) {
+        out.push({ type: "text", value: part.value.slice(last, m.index) });
+      }
+      out.push({
+        type: "highlight",
+        value: m[1],
+        className:
+          "rounded px-1 py-0.5 bg-primary/15 text-primary font-semibold dark:bg-primary/25",
+      });
+      last = m.index + m[0].length;
+    }
+    if (last < part.value.length) {
+      out.push({ type: "text", value: part.value.slice(last) });
+    }
+  }
+  return out.length > 0 ? out : parts;
+}
+
+export function parseSummaryHighlights(
+  text: string,
+  customRules?: SummaryHighlightRule[]
+): TextPart[] {
+  const rules =
+    customRules && customRules.length > 0
+      ? customRules.map((r) => ({
+          pattern: new RegExp(r.pattern, r.flags ?? "gi"),
+          className: r.className,
+        }))
+      : RULES;
+  return applyBoldMarkers(applyRules(text, rules));
 }

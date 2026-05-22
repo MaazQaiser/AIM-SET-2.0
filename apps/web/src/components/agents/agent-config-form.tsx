@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { ModelPolicyBadge } from "./model-policy-badge";
 import { NudgeThrottleControl } from "./nudge-throttle-control";
 import { SignalRoutingTable } from "./signal-routing-table";
+import { WorkflowAgentConfigSections } from "./workflow-agent-config-sections";
 import type {
   AgentConfig,
   AgentId,
@@ -311,6 +312,20 @@ export function AgentConfigForm({
           </div>
         </div>
       </section>
+
+      {agentId === "workflow" && (
+        <>
+          <Separator />
+          <WorkflowAgentConfigSections
+            config={local}
+            readOnly={readOnly}
+            onChange={(next) => {
+              setLocal(next);
+              setDirty(true);
+            }}
+          />
+        </>
+      )}
 
       <Separator />
 

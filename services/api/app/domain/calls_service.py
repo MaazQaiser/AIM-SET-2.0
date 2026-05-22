@@ -166,14 +166,15 @@ class CallsService:
             return
         tenant_uuid = self._tenant_uuid(ctx)
         supabase = get_supabase()
-        supabase.table("call_briefs").insert(
+        supabase.table("call_briefs").upsert(
             {
                 "tenant_id": tenant_uuid,
                 "call_id": call_id,
                 "version": 1,
                 "payload": payload,
                 "citations": payload.get("citations", []),
-            }
+            },
+            on_conflict="tenant_id,call_id,version",
         ).execute()
 
         supabase.table("calls").update({"brief_ready": True}).eq("tenant_id", tenant_uuid).eq("id", call_id).execute()

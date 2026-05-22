@@ -2,7 +2,16 @@ import { auth } from "@/lib/api/auth";
 import { NextResponse } from "next/server";
 import type { ActivityEvent, AgentId } from "@/types/agents";
 
-const AGENT_IDS: AgentId[] = ["live-call", "content", "content_generation", "knowledge", "coaching", "task"];
+const AGENT_IDS: AgentId[] = [
+  "live-call",
+  "discovery-checklist",
+  "content",
+  "workflow",
+  "content_generation",
+  "knowledge",
+  "coaching",
+  "task",
+];
 
 export async function GET() {
   const { userId, orgId } = await auth();
