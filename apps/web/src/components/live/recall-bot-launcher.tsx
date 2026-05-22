@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertCircle, Bot, CheckCircle2, Send } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 
 interface RecallBotLauncherProps {
   callId: string;
@@ -17,20 +17,18 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
   const [status, setStatus] = useState<"idle" | "ready" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
 
+  const launchedUrlRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (meetingUrl && !value) {
       setValue(meetingUrl);
     }
   }, [meetingUrl, value]);
 
-  async function launchBot(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const meetingUrlValue = value.trim();
-    if (!meetingUrlValue) {
-      setStatus("error");
-      setMessage("Meeting URL is required");
-      return;
-    }
+  async function doLaunch(meetingUrlValue: string) {
+    if (!meetingUrlValue || loading || status === "ready") return;
+    // Prevent duplicate launches for the same URL
+    if (launchedUrlRef.current === meetingUrlValue) return;
 
     setLoading(true);
     setStatus("idle");
@@ -52,6 +50,7 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
           body.error ?? body.detail ?? `Recall bot launch failed (${res.status})`
         );
       }
+      launchedUrlRef.current = meetingUrlValue;
       setStatus("ready");
       setMessage(body.botId ? `Bot invited: ${body.botId}` : "Bot invited");
     } catch (err) {
@@ -62,6 +61,26 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
     }
   }
 
+  async function launchBot(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const meetingUrlValue = value.trim();
+    if (!meetingUrlValue) {
+      setStatus("error");
+      setMessage("Meeting URL is required");
+      return;
+    }
+    await doLaunch(meetingUrlValue);
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const pasted = e.clipboardData.getData("text").trim();
+    if (pasted && /^https?:\/\/.+/.test(pasted)) {
+      setValue(pasted);
+      // Auto-launch after paste
+      setTimeout(() => void doLaunch(pasted), 0);
+    }
+  }
+
   return (
     <form className="flex min-w-0 items-center gap-2" onSubmit={(event) => void launchBot(event)}>
       <Bot className="hidden h-4 w-4 shrink-0 text-muted-foreground sm:block" aria-hidden="true" />
@@ -69,6 +88,7 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
         aria-label="Meeting URL"
         value={value}
         onChange={(event) => setValue(event.target.value)}
+        onPaste={handlePaste}
         placeholder="Meeting URL"
         className="h-7 w-[180px] min-w-0 text-xs sm:w-[260px] lg:w-[320px]"
         disabled={loading || status === "ready"}

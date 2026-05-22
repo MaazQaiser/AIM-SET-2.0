@@ -46,8 +46,8 @@ export function BANTScorecard({ bant, compact = false, layout, plain = false }: 
     return (
       <div className="flex items-center gap-1">
         {keys.map((key) => {
-          const status = bant[key];
-          const config = statusConfig[status];
+          const status = bant[key] ?? "unknown";
+          const config = statusConfig[status] ?? statusConfig.unknown;
           const Icon = config.icon;
           return (
             <span
@@ -74,8 +74,8 @@ export function BANTScorecard({ bant, compact = false, layout, plain = false }: 
   return (
     <div className={gridClass}>
       {keys.map((key) => {
-        const status = bant[key];
-        const config = statusConfig[status];
+        const status = bant[key] ?? "unknown";
+        const config = statusConfig[status] ?? statusConfig.unknown;
         const Icon = config.icon;
         return (
           <div

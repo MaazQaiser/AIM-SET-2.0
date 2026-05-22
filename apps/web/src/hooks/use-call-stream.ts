@@ -140,11 +140,19 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
             case "keyword_stats":
               applyKeywordStats(msg.payload);
               break;
-            case "bant_signal":
-              addBantSignal(msg.payload);
+            case "bant_signal": {
+              const bp = msg.payload;
+              if (Array.isArray(bp)) {
+                for (const s of bp) addBantSignal(s as BantSignal);
+              } else {
+                addBantSignal(bp);
+              }
               break;
+            }
             case "checklist_update":
-              applyChecklistUpdate(msg.payload as DiscoveryChecklistState);
+              if (msg.payload && typeof msg.payload === "object") {
+                applyChecklistUpdate(msg.payload as DiscoveryChecklistState);
+              }
               break;
             case "kb_assets":
               setSurfacedKbAssets(msg.payload as SurfacedKbAsset[]);
