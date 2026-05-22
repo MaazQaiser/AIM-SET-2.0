@@ -33,14 +33,30 @@ def verify_recall_signature(
 
 def parse_recall_payload(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Map Recall-style webhook bodies to internal TranscriptSegment fields."""
+    import logging as _log
+
+    _log.getLogger("recall.webhook").info("Raw payload: %s", body)
+
+    # --- Recall realtime_endpoints sends: {"data": {"data": {...}, "is_final": bool}} ---
+    # Skip interim (non-final) transcripts to avoid duplicates.
     event = body.get("event") or body.get("type") or ""
     envelope = _dict_or_empty(body.get("data"))
+
+    # Recall streaming sends is_final at the envelope level
+    is_final = envelope.get("is_final")
+    if is_final is None:
+        is_final = body.get("is_final")
+    # If is_final is explicitly False, skip this interim transcript
+    if is_final is False:
+        return None
+
     data = _dict_or_empty(envelope.get("data")) or envelope or _dict_or_empty(body.get("transcript")) or body
 
     if isinstance(body.get("data"), list):
         data = body["data"][-1] if body["data"] else {}
 
     words = data.get("words") or []
+    # Recall streaming puts the full sentence in data.transcript or words
     text = data.get("text") or data.get("transcript") or data.get("sentence") or body.get("text") or ""
     if isinstance(text, list):
         text = " ".join(str(t) for t in text)
@@ -57,8 +73,13 @@ def parse_recall_payload(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         or data.get("participant_name")
         or "unknown"
     )
+    # Prefer participant name over numeric id for display
     speaker_id = str(
-        participant.get("id") or data.get("speaker_id") or data.get("participant_id") or speaker
+        participant.get("name")
+        or participant.get("id")
+        or data.get("speaker_id")
+        or data.get("participant_id")
+        or speaker
     )
     role_raw = (data.get("speaker_role") or data.get("role") or "").lower()
     if role_raw in ("agent", "host", "rep", "ae", "sales"):
@@ -72,9 +93,15 @@ def parse_recall_payload(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     else:
         speaker_role = "customer" if "?" in text else "ae"
 
+    # Extract timestamp — try words first, then original_transcript_timings, then data.timestamp
     offset = _first_relative_timestamp(words)
     if offset is None:
-        offset = _relative_timestamp(data.get("timestamp"))
+        # Recall streaming uses original_transcript_timings or start_time
+        timings = data.get("original_transcript_timings") or []
+        if timings and isinstance(timings, list) and isinstance(timings[0], dict):
+            offset = _relative_timestamp(timings[0].get("start_time"))
+        if offset is None:
+            offset = _relative_timestamp(data.get("timestamp"))
     if offset is None:
         offset = float(
             data.get("start_time")

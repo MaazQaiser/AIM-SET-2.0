@@ -170,22 +170,30 @@ class LiveCallRepository:
             "provider_event_id": event.get("provider_event_id"),
             "created_at": event.get("created_at") or _now_iso(),
         }
-        if get_settings().supabase_configured and row.get("provider_event_id"):
-            try:
-                existing = (
-                    get_supabase()
-                    .table("call_transcript_events")
-                    .select("id")
-                    .eq("tenant_id", tenant_uuid)
-                    .eq("call_id", call_id)
-                    .eq("provider_event_id", row["provider_event_id"])
-                    .limit(1)
-                    .execute()
-                )
-                if existing.data:
-                    return row
-            except Exception:
-                pass
+        # Dedup by provider_event_id — check both Supabase and in-memory store
+        peid = row.get("provider_event_id")
+        if peid:
+            # Check in-memory first (fast path)
+            mem_events = get_memory_store().transcript_events.get(clerk_key, {}).get(call_id, [])
+            if any(e.get("provider_event_id") == peid for e in mem_events):
+                return row
+            # Check Supabase
+            if get_settings().supabase_configured:
+                try:
+                    existing = (
+                        get_supabase()
+                        .table("call_transcript_events")
+                        .select("id")
+                        .eq("tenant_id", tenant_uuid)
+                        .eq("call_id", call_id)
+                        .eq("provider_event_id", peid)
+                        .limit(1)
+                        .execute()
+                    )
+                    if existing.data:
+                        return row
+                except Exception:
+                    pass
         if get_settings().supabase_configured:
             try:
                 get_supabase().table("call_transcript_events").insert(

@@ -160,6 +160,10 @@ class Orchestrator:
             segment = {"text": str(segment), "timestamp": elapsed_seconds}
 
         text = (segment.get("text") or "").strip()
+        # Use segment offset as elapsed_seconds if not explicitly provided
+        seg_offset = int(float(segment.get("offset_seconds") or segment.get("timestamp") or 0))
+        if elapsed_seconds == 0 and seg_offset > 0:
+            elapsed_seconds = seg_offset
         if segment.get("timestamp") is None:
             segment["timestamp"] = elapsed_seconds
 
@@ -193,15 +197,29 @@ class Orchestrator:
         live_result = live_envelope.result or {}
         live_nudge = live_result.get("nudge")
 
+        # Broadcast discovery checklist update via WebSocket
+        ws_messages = intent_out.get("ws_messages") or []
+        checklist_data = discovery_out["checklist"]
+        checklist_ws = {"type": "checklist_update", "payload": checklist_data}
+        ws_messages.append(checklist_ws)
+        get_call_channel().broadcast_sync(call_id, checklist_ws)
+
+        # Broadcast BANT signals if any
+        bant_signals = discovery_out.get("bant_signals") or []
+        if bant_signals:
+            bant_ws = {"type": "bant_signal", "payload": bant_signals}
+            ws_messages.append(bant_ws)
+            get_call_channel().broadcast_sync(call_id, bant_ws)
+
         nudge = discovery_out.get("nudge") or live_nudge
         return {
             "discovery": checklist_env.model_dump(),
             "live": live_envelope.model_dump(),
-            "checklist": discovery_out["checklist"],
+            "checklist": checklist_data,
             "nudge": nudge,
-            "bant_signals": discovery_out.get("bant_signals") or [],
+            "bant_signals": bant_signals,
             "live_nudge": live_nudge,
-            "ws_messages": intent_out.get("ws_messages") or [],
+            "ws_messages": ws_messages,
         }
 
     def _finalize_discovery_checklist(
