@@ -94,10 +94,10 @@ export function KbUploadButton() {
         throw new Error(data.job.errorMessage ?? data.asset?.ingestError ?? "Ingest failed");
       }
 
-      toast.success(`Uploaded ${data.asset.title}`);
       await queryClient.invalidateQueries({ queryKey: ["kb-assets"] });
 
       if (data.job?.id && data.job.status !== "done") {
+        toast.success(`Uploaded ${data.asset.title}`);
         toast.info("Processing document…");
         const finalJob = await pollJob(data.job.id);
         await queryClient.invalidateQueries({ queryKey: ["kb-assets"] });
@@ -106,6 +106,8 @@ export function KbUploadButton() {
         } else {
           toast.success("Document ready in knowledge base");
         }
+      } else {
+        toast.success(`Uploaded ${data.asset.title}`);
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");

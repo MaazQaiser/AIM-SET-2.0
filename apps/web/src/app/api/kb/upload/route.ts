@@ -2,7 +2,7 @@ import { auth } from "@/lib/api/auth";
 import { getInternalApiSecret } from "@/lib/public-env";
 import { NextResponse, type NextRequest } from "next/server";
 
-/** Sync KB ingest via upstream API can exceed default Vercel serverless timeout. */
+/** File transfer to Railway; ingest runs async on the API after upload returns. */
 export const maxDuration = 60;
 
 const internalApiUrl = () => process.env.INTERNAL_API_URL ?? process.env.API_URL ?? "http://localhost:8000";

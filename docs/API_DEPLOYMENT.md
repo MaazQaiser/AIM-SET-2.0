@@ -45,7 +45,7 @@ CORS_ALLOWED_ORIGINS=https://aim-set-2-0-web.vercel.app,http://localhost:3000
 
 ### Why `KB_INGEST_SYNC=true`
 
-When `false`, uploads queue `kb_ingest_jobs` but nothing processes them unless you run `python -m app.workers.kb_ingest_worker`. With `true`, parse/chunk/embed runs in the upload request (simplest single-instance production setup).
+When `false`, uploads queue `kb_ingest_jobs` but nothing processes them unless you run `python -m app.workers.kb_ingest_worker`. With `true`, parse/chunk/embed runs on the API server **after** the upload HTTP response returns (FastAPI background task), so Vercel’s `/api/kb/upload` proxy does not hit `FUNCTION_INVOCATION_TIMEOUT`. The web app polls `/api/kb/ingest-jobs/{id}` until the job is `done` or `failed`.
 
 ### Optional (Recall, Content Studio)
 

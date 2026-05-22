@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
 from dc_core.tenancy import TenantContext
@@ -19,6 +19,11 @@ from app.services.kb_ingest_service import process_ingest_job
 
 router = APIRouter(prefix="/api/v1/kb", tags=["kb"])
 _orch = Orchestrator()
+
+
+def _run_ingest_job_background(job: Dict[str, Any]) -> None:
+    """Run ingest after HTTP response (avoids Vercel proxy timeout on sync ingest)."""
+    process_ingest_job(job, get_kb_repository())
 
 
 class IngestAssetBody(BaseModel):
@@ -51,6 +56,7 @@ def ingest_asset_metadata(
 
 @router.post("/assets/upload")
 async def upload_asset(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
     asset_type: Optional[str] = Form(None),
@@ -105,13 +111,8 @@ async def upload_asset(
             "_clerk_key": clerk_key,
             "_uploaded_by": ctx.user_id,
         }
-        try:
-            process_ingest_job(sync_job, repo)
-        except Exception:
-            # process_ingest_job records failed job/asset state; upload still returns JSON.
-            pass
-        result["asset"] = repo.get_asset(ctx, result["asset"]["id"]) or result["asset"]
-        result["job"] = repo.get_job(ctx, result["job"]["id"]) or result["job"]
+        # Defer ingest so Vercel /api/kb/upload returns before parse/embed finish.
+        background_tasks.add_task(_run_ingest_job_background, sync_job)
 
     return result
 
@@ -133,15 +134,27 @@ def delete_asset(asset_id: str, ctx: TenantContext = Depends(get_tenant_context)
 
 
 @router.post("/assets/{asset_id}/re-embed")
-def re_embed_asset(asset_id: str, ctx: TenantContext = Depends(get_tenant_context)) -> Dict[str, Any]:
-    job = get_kb_repository().requeue_asset(ctx, asset_id)
+def re_embed_asset(
+    asset_id: str,
+    background_tasks: BackgroundTasks,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    repo = get_kb_repository()
+    job = repo.requeue_asset(ctx, asset_id)
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
 
     settings = get_settings()
-    if settings.kb_ingest_sync:
-        claimed = get_kb_repository().claim_job("sync")
-        if claimed:
-            process_ingest_job(claimed, get_kb_repository())
+    if settings.kb_ingest_sync or os.environ.get("KB_INGEST_SYNC", "").lower() == "true":
+        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+        background_tasks.add_task(
+            _run_ingest_job_background,
+            {
+                "id": job["id"],
+                "tenant_id": tenant_uuid,
+                "asset_id": asset_id,
+                "_clerk_key": clerk_key,
+            },
+        )
 
     return {"job": job}
