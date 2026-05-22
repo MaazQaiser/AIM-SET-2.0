@@ -87,14 +87,18 @@ def create_recall_live_bot(
 
 
 def poll_recall_transcript(bot_id: str) -> list[Dict[str, Any]]:
-    """Fetch transcript directly from Recall API (polling fallback when webhooks fail)."""
+    """Fetch transcript from Recall bot object (polling fallback when webhooks fail).
+
+    During a live call, the bot object's `transcript` field accumulates
+    completed sentences. We read that field directly.
+    """
     settings = get_settings()
     if not settings.recall_api_key:
         return []
     base_url = _recall_base_url(settings.recall_region)
     try:
         response = httpx.get(
-            f"{base_url}/api/v1/bot/{bot_id}/transcript/",
+            f"{base_url}/api/v1/bot/{bot_id}/",
             headers={
                 "Authorization": _authorization_header(settings.recall_api_key),
                 "accept": "application/json",
@@ -106,9 +110,14 @@ def poll_recall_transcript(bot_id: str) -> list[Dict[str, Any]]:
     if response.status_code >= 400:
         return []
     try:
-        return response.json() if isinstance(response.json(), list) else []
+        data = response.json()
     except ValueError:
         return []
+    # The bot object has a `transcript` list with completed utterances
+    transcript = data.get("transcript")
+    if isinstance(transcript, list):
+        return transcript
+    return []
 
 
 def _missing_settings(values: Dict[str, str]) -> Iterable[str]:

@@ -24,7 +24,30 @@ export default function KnowledgeAssetPage({ params }: { params: Promise<{ asset
     );
   }
 
-  if (!asset) return null;
+  if (!asset) {
+    return (
+      <div className="p-6 space-y-4 max-w-3xl mx-auto">
+        <Link href="/knowledge" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="h-4 w-4" />
+          Knowledge base
+        </Link>
+        <Card>
+          <CardContent className="py-8 text-center space-y-3">
+            <p className="text-muted-foreground">Asset not found or could not be loaded.</p>
+            <p className="text-xs text-muted-foreground">ID: {assetId}</p>
+            <div className="flex justify-center gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/knowledge">Back to Knowledge base</Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/content/studio">Open Content Studio</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const onReEmbed = async () => {
     const res = await fetch(`/api/kb/assets/${assetId}/re-embed`, { method: "POST" });
