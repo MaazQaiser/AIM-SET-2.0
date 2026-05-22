@@ -176,6 +176,7 @@ class LiveCallRepository:
             # Check in-memory first (fast path)
             mem_events = get_memory_store().transcript_events.get(clerk_key, {}).get(call_id, [])
             if any(e.get("provider_event_id") == peid for e in mem_events):
+                row["_deduped"] = True
                 return row
             # Check Supabase
             if get_settings().supabase_configured:
@@ -191,6 +192,7 @@ class LiveCallRepository:
                         .execute()
                     )
                     if existing.data:
+                        row["_deduped"] = True
                         return row
                 except Exception:
                     pass

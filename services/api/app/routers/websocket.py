@@ -50,17 +50,9 @@ async def _process_live_segment(
                 segment,
                 elapsed_seconds=elapsed_seconds,
             )
-        checklist = out.get("checklist")
-        if checklist:
-            await channel.broadcast(
-                call_id, {"type": "checklist_update", "payload": checklist}
-            )
-        for signal in out.get("bant_signals") or []:
-            await channel.broadcast(call_id, {"type": "bant_signal", "payload": signal})
-        nudge = out.get("nudge")
-        ws_msgs = out.get("ws_messages") or []
-        if nudge and not any(m.get("type") == "nudge" for m in ws_msgs):
-            await channel.broadcast(call_id, {"type": "nudge", "payload": nudge})
+        # Broadcast ALL ws_messages from the async event loop (reliable)
+        for msg in out.get("ws_messages") or []:
+            await channel.broadcast(call_id, msg)
     except Exception:
         _logger.exception("live segment dispatch failed call_id=%s", call_id)
 

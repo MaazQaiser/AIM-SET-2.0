@@ -9,6 +9,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request
 from dc_core.tenancy import TenantContext
 
 from app.config import get_settings
+from app.domain.call_channel import get_call_channel
 from app.orchestrator.dispatcher import Orchestrator
 from app.services.transcript_provider.recall_webhook import (
     parse_recall_payload,
@@ -72,7 +73,11 @@ async def recall_transcript_webhook(
         )
 
     event = segment_to_event_dict(parsed, cid)
-    return await asyncio.to_thread(_orch.dispatch_live_segment, ctx, cid, event)
+    result = await asyncio.to_thread(_orch.dispatch_live_segment, ctx, cid, event)
+    channel = get_call_channel()
+    for msg in result.get("ws_messages") or []:
+        await channel.broadcast(cid, msg)
+    return result
 
 
 @router.post("/recall/demo-segment")
@@ -95,4 +100,17 @@ async def demo_segment(
         "provider": "demo",
         "provider_event_id": body.get("provider_event_id"),
     }
-    return await asyncio.to_thread(_orch.dispatch_live_segment, ctx, call_id, event)
+    result = await asyncio.to_thread(_orch.dispatch_live_segment, ctx, call_id, event)
+    # Broadcast all WS messages from the async event loop (reliable)
+    channel = get_call_channel()
+    for msg in result.get("ws_messages") or []:
+        await channel.broadcast(call_id, msg)
+    # Also include the transcript event in the response as fallback
+    result["transcript_event"] = {
+        "id": event.get("id") or event.get("provider_event_id"),
+        "speaker_id": event["speaker_id"],
+        "speaker_role": event["speaker_role"],
+        "text": event["text"],
+        "offset_seconds": event["offset_seconds"],
+    }
+    return result

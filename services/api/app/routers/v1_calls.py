@@ -82,18 +82,22 @@ def start_recall_bot(
 
 
 @router.post("/{call_id}/bot-chat")
-def bot_chat(
+async def bot_chat(
     call_id: str,
     body: Dict[str, Any],
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> Dict[str, Any]:
+    import asyncio
+    from app.domain.call_channel import get_call_channel
+
     message = (body.get("message") or "").strip()
     if not message:
         raise HTTPException(status_code=400, detail="message is required")
     mode = (body.get("mode") or "group").strip().lower()
     if mode not in ("direct", "group"):
         mode = "group"
-    return _orch.dispatch_bot_chat(
+    result = await asyncio.to_thread(
+        _orch.dispatch_bot_chat,
         ctx,
         call_id,
         message,
@@ -101,6 +105,10 @@ def bot_chat(
         sender_name=(body.get("sender_name") or "").strip() or None,
         sender_role=(body.get("sender_role") or "").strip() or None,
     )
+    channel = get_call_channel()
+    for msg in result.get("ws_messages") or []:
+        await channel.broadcast(call_id, msg)
+    return result
 
 
 @router.get("/{call_id}/transcript-events")
@@ -113,10 +121,14 @@ def list_transcript_events(
 
 
 @router.post("/{call_id}/poll-transcript")
-def poll_transcript(
+async def poll_transcript(
     call_id: str, ctx: TenantContext = Depends(get_tenant_context)
 ) -> Dict[str, Any]:
     """Poll Recall API for transcript when webhooks fail (tunnel down)."""
+    import asyncio
+    import hashlib
+
+    from app.domain.call_channel import get_call_channel
     from app.domain.live_call_repository import get_live_call_repository
     from app.services.transcript_provider.recall_client import poll_recall_transcript
 
@@ -126,11 +138,13 @@ def poll_transcript(
         raise HTTPException(status_code=404, detail="No active Recall bot for this call")
 
     bot_id = session["provider_meeting_id"]
-    raw_segments = poll_recall_transcript(bot_id)
+    raw_segments = await asyncio.to_thread(poll_recall_transcript, bot_id)
     if not raw_segments:
         return {"ok": True, "new_segments": 0}
 
+    channel = get_call_channel()
     new_count = 0
+    new_events: List[Dict[str, Any]] = []
     for seg in raw_segments:
         words = seg.get("words") or []
         text = " ".join(w.get("text", "") if isinstance(w, dict) else str(w) for w in words).strip()
@@ -144,8 +158,6 @@ def poll_transcript(
         if isinstance(seg.get("participant"), dict):
             speaker_name = seg["participant"].get("name") or speaker
 
-        # Use speaker + text hash as dedup key
-        import hashlib
         peid = hashlib.sha256(f"{bot_id}:{speaker}:{text[:50]}".encode()).hexdigest()[:32]
 
         offset = 0.0
@@ -169,16 +181,25 @@ def poll_transcript(
             "provider_event_id": peid,
         }
         stored = repo.append_transcript_event(ctx, call_id, event)
-        # Check if it was actually new (not deduped)
-        if stored.get("id") == peid:
+        if not stored.get("_deduped"):
             new_count += 1
-            # Dispatch through orchestrator for BANT/intent analysis
+            new_events.append(stored)
             try:
-                _orch.dispatch_live_segment(ctx, call_id, event, elapsed_seconds=int(event.get("offset_seconds", 0)))
+                result = await asyncio.to_thread(
+                    _orch.dispatch_live_segment, ctx, call_id, event,
+                    elapsed_seconds=int(event.get("offset_seconds", 0)),
+                )
+                for msg in result.get("ws_messages") or []:
+                    await channel.broadcast(call_id, msg)
             except Exception:
                 pass
 
-    return {"ok": True, "new_segments": new_count, "total_from_recall": len(raw_segments)}
+    return {
+        "ok": True,
+        "new_segments": new_count,
+        "total_from_recall": len(raw_segments),
+        "events": new_events,
+    }
 
 
 @router.get("/{call_id}/suggestions")

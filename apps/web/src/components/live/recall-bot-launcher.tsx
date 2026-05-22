@@ -3,6 +3,8 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useLiveCall } from "@/stores/use-live-call";
+import type { TranscriptEvent } from "@/types";
 import { AlertCircle, Bot, CheckCircle2, Send } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
@@ -75,13 +77,44 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
   }
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const appendTranscriptEvent = useLiveCall((s) => s.appendTranscriptEvent);
 
   function startPolling() {
     if (pollRef.current) return;
     pollRef.current = setInterval(() => {
-      void fetch(`/api/calls/${encodeURIComponent(callId)}/poll-transcript`, {
-        method: "POST",
-      }).catch(() => {});
+      void (async () => {
+        try {
+          const res = await fetch(`/api/calls/${encodeURIComponent(callId)}/poll-transcript`, {
+            method: "POST",
+          });
+          if (!res.ok) return;
+          const data = (await res.json()) as {
+            events?: Array<{
+              id?: string;
+              speaker_id?: string;
+              speaker_role?: string;
+              text?: string;
+              offset_seconds?: number;
+              keywords?: string[];
+            }>;
+          };
+          // Directly push new transcript events into the store
+          for (const ev of data.events ?? []) {
+            const mapped: TranscriptEvent = {
+              id: ev.id ?? crypto.randomUUID(),
+              speakerId: ev.speaker_id ?? "unknown",
+              speakerName: ev.speaker_id ?? "Speaker",
+              speakerRole: (ev.speaker_role as TranscriptEvent["speakerRole"]) ?? "customer",
+              text: ev.text ?? "",
+              timestamp: ev.offset_seconds ?? 0,
+              keywords: ev.keywords ?? [],
+            };
+            appendTranscriptEvent(mapped);
+          }
+        } catch {
+          // ignore poll errors
+        }
+      })();
     }, 5000);
   }
 

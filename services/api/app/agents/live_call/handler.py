@@ -9,7 +9,6 @@ from dc_core.tenancy import TenantContext
 
 from app.agents.live_call.intent_detection import analyze_segment
 from app.agents.live_call_agent import bot_chat_response, build_session_summary, process_transcript_segment
-from app.domain.call_channel import get_call_channel
 from app.domain.calls_service import CallsService
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.live_call_repository import get_live_call_repository
@@ -50,19 +49,19 @@ def _analysis_to_envelope(call_id: str, analysis: Dict[str, Any]) -> AgentEnvelo
     )
 
 
-def _persist_and_broadcast(
+def _persist_and_collect_messages(
     ctx: TenantContext,
     call_id: str,
     envelopes: List[AgentEnvelope],
     transcript_event: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
+    """Persist suggestions and collect WS messages. Does NOT broadcast —
+    the async caller is responsible for broadcasting the returned messages."""
     repo = get_live_call_repository()
-    channel = get_call_channel()
     ws_messages: List[Dict[str, Any]] = []
 
     transcript_ws_msg = transcript_event_to_ws(transcript_event)
     ws_messages.append(transcript_ws_msg)
-    channel.broadcast_sync(call_id, transcript_ws_msg)
 
     for envelope in envelopes:
         validate_envelope(envelope)
@@ -95,7 +94,6 @@ def _persist_and_broadcast(
             envelope, suggestion_id=suggestion_id, shown_at=shown_at
         ):
             ws_messages.append(ws_msg)
-            channel.broadcast_sync(call_id, ws_msg)
 
     analysis_intent = None
     for envelope in envelopes:
@@ -103,9 +101,7 @@ def _persist_and_broadcast(
             analysis_intent = envelope.result["intent_update"]
             break
     if analysis_intent and not any(m.get("type") == "intent_update" for m in ws_messages):
-        ws_msg = {"type": "intent_update", "payload": analysis_intent}
-        ws_messages.append(ws_msg)
-        channel.broadcast_sync(call_id, ws_msg)
+        ws_messages.append({"type": "intent_update", "payload": analysis_intent})
 
     return ws_messages
 
@@ -176,7 +172,7 @@ def handle_transcript_segment(
         ):
             envelopes.append(env)
 
-    ws_messages = _persist_and_broadcast(ctx, call_id, envelopes, stored)
+    ws_messages = _persist_and_collect_messages(ctx, call_id, envelopes, stored)
 
     primary = envelopes[0]
     for e in envelopes:
@@ -185,18 +181,14 @@ def handle_transcript_segment(
             break
 
     if analysis.get("keyword_stats"):
-        ks = {"type": "keyword_stats", "payload": analysis["keyword_stats"]}
-        ws_messages.append(ks)
-        get_call_channel().broadcast_sync(call_id, ks)
+        ws_messages.append({"type": "keyword_stats", "payload": analysis["keyword_stats"]})
 
     if analysis.get("sentiment"):
         sent = analysis["sentiment"]
         payload = {"ae": sent.get("ae", 0), "customer": sent.get("customer", 0)}
         if sent.get("shift"):
             payload["shift"] = sent["shift"]
-        ws_msg = {"type": "sentiment", "payload": payload}
-        ws_messages.append(ws_msg)
-        get_call_channel().broadcast_sync(call_id, ws_msg)
+        ws_messages.append({"type": "sentiment", "payload": payload})
 
     nudge = analysis.get("nudge")
     for e in envelopes:

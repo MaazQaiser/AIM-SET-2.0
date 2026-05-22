@@ -21,7 +21,6 @@ from app.domain.content_studio_repository import get_content_studio_repository
 from app.domain.agent_runs_repository import get_agent_runs_repository
 from app.domain.memory_store import get_memory_store
 from app.agents.live_call_agent import bot_chat_response
-from app.domain.call_channel import get_call_channel
 from app.services.content_export_service import export_revision
 from app.services.template_ingest_service import process_template_ingest
 
@@ -165,7 +164,6 @@ class Orchestrator:
                     payload["message_id"] = sid
                     payload["sender_name"] = sender_name
                     payload["sender_role"] = sender_role
-                get_call_channel().broadcast_sync(call_id, msg)
         return {
             "envelope": env.model_dump(),
             "content": env.result.get("answer"),
@@ -231,19 +229,14 @@ class Orchestrator:
         live_result = live_envelope.result or {}
         live_nudge = live_result.get("nudge")
 
-        # Broadcast discovery checklist update via WebSocket
+        # Collect WS messages — the async caller broadcasts them
         ws_messages = intent_out.get("ws_messages") or []
         checklist_data = discovery_out["checklist"]
-        checklist_ws = {"type": "checklist_update", "payload": checklist_data}
-        ws_messages.append(checklist_ws)
-        get_call_channel().broadcast_sync(call_id, checklist_ws)
+        ws_messages.append({"type": "checklist_update", "payload": checklist_data})
 
-        # Broadcast BANT signals if any
         bant_signals = discovery_out.get("bant_signals") or []
         if bant_signals:
-            bant_ws = {"type": "bant_signal", "payload": bant_signals}
-            ws_messages.append(bant_ws)
-            get_call_channel().broadcast_sync(call_id, bant_ws)
+            ws_messages.append({"type": "bant_signal", "payload": bant_signals})
 
         nudge = discovery_out.get("nudge") or live_nudge
         return {
