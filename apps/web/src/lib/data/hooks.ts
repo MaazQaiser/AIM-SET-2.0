@@ -59,15 +59,49 @@ export function useCall(callId: string) {
   });
 }
 
+function mergeCallBrief(local: CallBrief, api: CallBrief): CallBrief {
+  return {
+    ...local,
+    ...api,
+    callId: local.callId,
+    accountName: api.accountName || local.accountName,
+    newSignals: api.newSignals?.length ? api.newSignals : local.newSignals,
+    pains: api.pains?.length ? api.pains : local.pains,
+    objections: api.objections?.length ? api.objections : local.objections,
+    researchSections: api.researchSections?.length
+      ? api.researchSections
+      : local.researchSections,
+    artifactPlan: api.artifactPlan?.length ? api.artifactPlan : local.artifactPlan,
+    artifactFulfillment: api.artifactFulfillment?.length
+      ? api.artifactFulfillment
+      : local.artifactFulfillment,
+    relevantDocuments: api.relevantDocuments?.length
+      ? api.relevantDocuments
+      : local.relevantDocuments,
+    relevantProjects: api.relevantProjects?.length
+      ? api.relevantProjects
+      : local.relevantProjects,
+  };
+}
+
 export function useCallBrief(callId: string) {
   return useQuery({
     queryKey: ["call-brief", callId, getImportVersion()],
     queryFn: async () => {
+      const local = resolveCallBrief(callId);
       const api = await bffFetch<CallBrief>(`/api/calls/${callId}/brief`);
+      if (api && local) return mergeCallBrief(local, api);
       if (api) return api;
-      return resolveCallBrief(callId);
+      return local;
     },
-    staleTime: REFETCH_MS,
+    staleTime: 5_000,
+    refetchInterval: (query) => {
+      const brief = query.state.data;
+      if (!brief) return 8_000;
+      if (brief.agentStatus === "success" || brief.agentStatus === "failed") return false;
+      if (brief.artifactPlan?.length || brief.artifactFulfillment?.length) return false;
+      return 8_000;
+    },
   });
 }
 

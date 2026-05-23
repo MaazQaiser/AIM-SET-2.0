@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { KbFileFormatBadge } from "@/components/knowledge/kb-file-format-badge";
 import { KB_ASSET_TYPES, defaultAssetTypeForFile } from "@/lib/kb/asset-types";
 import type { AssetType } from "@/types";
 import type { KBIngestJob, KBUploadResponse } from "@dc-copilot/types";
@@ -22,20 +23,74 @@ import type { KBIngestJob, KBUploadResponse } from "@dc-copilot/types";
 const ACCEPT =
   ".png,.pdf,.docx,.jpeg,.jpg,.csv,.ppt,.pptx,image/png,image/jpeg,application/pdf";
 
-async function pollJob(jobId: string): Promise<KBIngestJob> {
+type UploadPhase = "idle" | "uploading" | "processing" | "done";
+
+async function pollJob(
+  jobId: string,
+  onProgress: (pct: number, stage: string) => void
+): Promise<KBIngestJob> {
   for (let i = 0; i < 120; i++) {
     const res = await fetch(`/api/kb/ingest-jobs/${jobId}`);
     if (!res.ok) throw new Error("Failed to check ingest status");
     const job = (await res.json()) as KBIngestJob;
+    onProgress(job.progressPct ?? 0, job.stage ?? job.status);
     if (job.status === "done" || job.status === "failed") return job;
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 1500));
   }
   throw new Error("Ingest timed out");
 }
 
+function uploadWithProgress(
+  form: FormData,
+  onUploadPct: (pct: number) => void
+): Promise<KBUploadResponse & { detail?: string; error?: string }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/kb/upload");
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        onUploadPct(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText || "{}") as KBUploadResponse & {
+          detail?: string;
+          error?: string;
+        };
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(data);
+        } else {
+          const detail = data.detail ?? data.error ?? xhr.responseText?.slice(0, 300);
+          reject(new Error(detail || `Upload failed (${xhr.status})`));
+        }
+      } catch {
+        reject(new Error(xhr.responseText || `Upload failed (${xhr.status})`));
+      }
+    };
+    xhr.onerror = () =>
+      reject(
+        new Error(
+          "Network error during upload. Check that the API is running and INTERNAL_API_SECRET matches services/api/.env."
+        )
+      );
+    xhr.send(form);
+  });
+}
+
+function combinedProgress(phase: UploadPhase, uploadPct: number, ingestPct: number): number {
+  if (phase === "uploading") return Math.round(uploadPct * 0.45);
+  if (phase === "processing") return 45 + Math.round(ingestPct * 0.55);
+  if (phase === "done") return 100;
+  return 0;
+}
+
 export function KbUploadButton() {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
+  const [phase, setPhase] = useState<UploadPhase>("idle");
+  const [uploadPct, setUploadPct] = useState(0);
+  const [ingestPct, setIngestPct] = useState(0);
+  const [stageLabel, setStageLabel] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
@@ -43,11 +98,18 @@ export function KbUploadButton() {
   const [tags, setTags] = useState("");
   const queryClient = useQueryClient();
 
+  const busy = phase === "uploading" || phase === "processing";
+  const overallPct = combinedProgress(phase, uploadPct, ingestPct);
+
   const resetForm = () => {
     setPendingFile(null);
     setTitle("");
     setAssetType("deck");
     setTags("");
+    setUploadPct(0);
+    setIngestPct(0);
+    setStageLabel("");
+    setPhase("idle");
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -61,34 +123,19 @@ export function KbUploadButton() {
 
   const onUpload = async () => {
     if (!pendingFile) return;
-    setUploading(true);
+    setPhase("uploading");
+    setUploadPct(0);
+    setIngestPct(0);
+    setStageLabel("Uploading file…");
+
     try {
       const form = new FormData();
       form.append("file", pendingFile);
       form.append("title", title.trim() || pendingFile.name.replace(/\.[^.]+$/, ""));
       form.append("asset_type", assetType);
-      if (tags.trim()) {
-        form.append("tags", tags.trim());
-      }
+      if (tags.trim()) form.append("tags", tags.trim());
 
-      const res = await fetch("/api/kb/upload", { method: "POST", body: form });
-      const responseText = await res.text();
-      let data: KBUploadResponse & { detail?: string; error?: string };
-      try {
-        data = JSON.parse(responseText) as KBUploadResponse & { detail?: string; error?: string };
-      } catch {
-        throw new Error(
-          responseText.trim()
-            ? `Upload failed (${res.status}): ${responseText.slice(0, 200)}`
-            : `Upload failed (${res.status}): empty response from server`
-        );
-      }
-      if (!res.ok) {
-        throw new Error(data.detail ?? data.error ?? "Upload failed");
-      }
-
-      setDialogOpen(false);
-      resetForm();
+      const data = await uploadWithProgress(form, setUploadPct);
 
       if (data.job?.status === "failed") {
         throw new Error(data.job.errorMessage ?? data.asset?.ingestError ?? "Ingest failed");
@@ -97,22 +144,35 @@ export function KbUploadButton() {
       await queryClient.invalidateQueries({ queryKey: ["kb-assets"] });
 
       if (data.job?.id && data.job.status !== "done") {
-        toast.success(`Uploaded ${data.asset.title}`);
-        toast.info("Processing document…");
-        const finalJob = await pollJob(data.job.id);
+        setPhase("processing");
+        setStageLabel("Processing & indexing…");
+        const finalJob = await pollJob(data.job.id, (pct, stage) => {
+          setIngestPct(pct);
+          setStageLabel(
+            stage === "embedding"
+              ? "Embedding for search…"
+              : stage === "chunking"
+                ? "Chunking document…"
+                : stage === "parsing"
+                  ? "Parsing document…"
+                  : "Processing…"
+          );
+        });
         await queryClient.invalidateQueries({ queryKey: ["kb-assets"] });
         if (finalJob.status === "failed") {
-          toast.error(finalJob.errorMessage ?? "Ingest failed");
-        } else {
-          toast.success("Document ready in knowledge base");
+          throw new Error(finalJob.errorMessage ?? "Ingest failed");
         }
-      } else {
-        toast.success(`Uploaded ${data.asset.title}`);
       }
+
+      setPhase("done");
+      setStageLabel("Ready");
+      toast.success(`${data.asset.title} is ready in the knowledge base`);
+      setDialogOpen(false);
+      resetForm();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setUploading(false);
+      setPhase("idle");
+      setStageLabel("");
     }
   };
 
@@ -128,33 +188,48 @@ export function KbUploadButton() {
           if (file) onFileSelected(file);
         }}
       />
-      <Button
-        type="button"
-        disabled={uploading}
-        onClick={() => inputRef.current?.click()}
-      >
-        {uploading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Upload className="h-4 w-4" />
-        )}
-        {uploading ? "Uploading…" : "Upload asset"}
+      <Button type="button" disabled={busy} onClick={() => inputRef.current?.click()}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+        {busy ? `Uploading ${overallPct}%` : "Upload asset"}
       </Button>
 
       <Dialog
         open={dialogOpen}
         onOpenChange={(open) => {
+          if (busy) return;
           setDialogOpen(open);
-          if (!open && !uploading) resetForm();
+          if (!open) resetForm();
         }}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Upload asset</DialogTitle>
-            <DialogDescription>
-              {pendingFile ? pendingFile.name : "Add metadata before ingesting into the knowledge base."}
+            <DialogDescription className="flex flex-wrap items-center gap-2">
+              {pendingFile ? (
+                <>
+                  <span className="truncate max-w-[240px]">{pendingFile.name}</span>
+                  <KbFileFormatBadge fileName={pendingFile.name} />
+                </>
+              ) : (
+                "Add metadata before ingesting into the knowledge base."
+              )}
             </DialogDescription>
           </DialogHeader>
+
+          {busy && (
+            <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{stageLabel}</span>
+                <span className="tabular-nums font-medium text-foreground">{overallPct}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-300"
+                  style={{ width: `${overallPct}%` }}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-4 py-2">
             <div className="space-y-2">
@@ -163,19 +238,17 @@ export function KbUploadButton() {
                 id="kb-upload-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Asset title"
-                disabled={uploading}
+                disabled={busy}
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="kb-upload-type">Asset type</Label>
               <select
                 id="kb-upload-type"
                 value={assetType}
                 onChange={(e) => setAssetType(e.target.value as AssetType)}
-                disabled={uploading}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={busy}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
                 {KB_ASSET_TYPES.map(({ value, label }) => (
                   <option key={value} value={value}>
@@ -184,7 +257,6 @@ export function KbUploadButton() {
                 ))}
               </select>
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="kb-upload-tags">Tags</Label>
               <Input
@@ -192,29 +264,20 @@ export function KbUploadButton() {
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
                 placeholder="e.g. healthcare, Q4-2025"
-                disabled={uploading}
+                disabled={busy}
               />
-              <p className="text-xs text-muted-foreground">Comma-separated</p>
             </div>
           </div>
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={uploading}
-              onClick={() => {
-                setDialogOpen(false);
-                resetForm();
-              }}
-            >
+            <Button type="button" variant="outline" disabled={busy} onClick={() => { setDialogOpen(false); resetForm(); }}>
               Cancel
             </Button>
-            <Button type="button" disabled={uploading || !pendingFile} onClick={() => void onUpload()}>
-              {uploading ? (
+            <Button type="button" disabled={busy || !pendingFile} onClick={() => void onUpload()}>
+              {busy ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Uploading…
+                  {overallPct}%
                 </>
               ) : (
                 "Upload"

@@ -11,7 +11,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCall } from "@/lib/data/hooks";
 import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
-import { discoveryQuestionsFromPreDc, slugifyCompany } from "@/lib/dc-notes/build-from-import";
+import {
+  discoveryQuestionsFromPreDc,
+  findPreDcRecordForCall,
+} from "@/lib/dc-notes/build-from-import";
 import { preDcField } from "@/types/dc-notes";
 
 interface CallDetailViewProps {
@@ -22,7 +25,7 @@ interface CallDetailViewProps {
 export function CallDetailView({ callId, initialTab = "brief" }: CallDetailViewProps) {
   const { data: call, isLoading } = useCall(callId);
   const preRecord = useDcImportsStore((s) =>
-    s.preDcRecords.find((r) => slugifyCompany(preDcField(r, "companyName")) === callId)
+    findPreDcRecordForCall(s.preDcRecords, callId, call?.accountName)
   );
   const isEditingLayout = useDashboardLayoutStore((s) => s.isEditing);
   const setEditingLayout = useDashboardLayoutStore((s) => s.setEditing);

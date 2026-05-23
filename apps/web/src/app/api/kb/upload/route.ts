@@ -7,6 +7,25 @@ export const maxDuration = 60;
 
 const internalApiUrl = () => process.env.INTERNAL_API_URL ?? process.env.API_URL ?? "http://localhost:8000";
 
+function tenantHeaders(userId: string, orgId: string | null | undefined) {
+  const shared = process.env.NEXT_PUBLIC_KB_SHARED === "true";
+  const tenantId = shared ? "dc-copilot-shared" : (orgId ?? userId);
+  return {
+    "x-user-id": userId,
+    "x-tenant-id": tenantId,
+    ...(shared || orgId ? { "x-clerk-org-id": tenantId } : {}),
+  };
+}
+
+function appendFormField(target: FormData, key: string, value: FormDataEntryValue) {
+  if (typeof value === "string") {
+    target.append(key, value);
+    return;
+  }
+  const file = value as File;
+  target.append(key, file, file.name || "upload.bin");
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { userId, orgId } = await auth();
@@ -32,7 +51,7 @@ export async function POST(req: NextRequest) {
           error: "Failed to read upload",
           detail:
             message.includes("FormData") || message.includes("formData")
-              ? "File upload was blocked or truncated by the server proxy. Try a smaller file or restart the dev server after updating next.config."
+              ? "File upload was blocked or truncated by the server proxy. Try a smaller file or restart the dev server."
               : message,
         },
         { status: 400 }
@@ -41,7 +60,7 @@ export async function POST(req: NextRequest) {
 
     const upstream = new FormData();
     for (const [key, value] of formData.entries()) {
-      upstream.append(key, value);
+      appendFormField(upstream, key, value);
     }
 
     const upstreamUrl = `${internalApiUrl()}/api/v1/kb/assets/upload`;
@@ -51,13 +70,18 @@ export async function POST(req: NextRequest) {
         method: "POST",
         headers: {
           "X-Internal-Secret": secret,
-          "x-user-id": userId,
-          ...(orgId ? { "x-tenant-id": orgId, "x-clerk-org-id": orgId } : { "x-tenant-id": userId }),
+          ...tenantHeaders(userId, orgId),
         },
         body: upstream,
       });
-    } catch {
-      return NextResponse.json({ error: "API unreachable", detail: "Upstream fetch failed" }, { status: 502 });
+    } catch (err) {
+      return NextResponse.json(
+        {
+          error: "API unreachable",
+          detail: err instanceof Error ? err.message : "Upstream fetch failed",
+        },
+        { status: 502 }
+      );
     }
 
     const upstreamText = await res.text();
@@ -65,8 +89,18 @@ export async function POST(req: NextRequest) {
     try {
       data = upstreamText ? (JSON.parse(upstreamText) as Record<string, unknown>) : {};
     } catch {
-      data = { error: "Invalid upstream response", detail: upstreamText.slice(0, 200) };
+      data = { error: "Invalid upstream response", detail: upstreamText.slice(0, 500) };
     }
+
+    if (!res.ok) {
+      const detail =
+        (typeof data.detail === "string" && data.detail) ||
+        (typeof data.error === "string" && data.error) ||
+        upstreamText.slice(0, 300) ||
+        `Upload failed (${res.status})`;
+      return NextResponse.json({ ...data, detail, error: data.error ?? "Upload failed" }, { status: res.status });
+    }
+
     return NextResponse.json(data, { status: res.status });
   } catch (err) {
     return NextResponse.json(

@@ -53,7 +53,7 @@ export function FocusAreasBar({ areas, intentLabel, bantSignals = [] }: FocusAre
         {intentLabel && (
           <Badge variant="secondary" className="text-[10px] font-normal capitalize ml-auto shrink-0">
             <Target className="h-3 w-3 mr-1 inline" aria-hidden />
-            {intentLabel.replace(/_/g, " ")}
+            {intentLabel.includes("_") ? intentLabel.replace(/_/g, " ") : intentLabel}
           </Badge>
         )}
       </div>

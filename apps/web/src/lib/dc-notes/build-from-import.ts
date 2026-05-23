@@ -29,6 +29,29 @@ export function slugifyCompany(name: string): string {
   return slug ? `call-${slug}` : `call-${Date.now()}`;
 }
 
+/** Normalize call id for matching (demo ids omit the `call-` prefix). */
+export function normalizeCallId(callId: string): string {
+  return callId.replace(/^call-/, "");
+}
+
+/** Find a Pre-DC CSV row for a call page id or account name. */
+export function findPreDcRecordForCall(
+  records: PreDCRecord[],
+  callId: string,
+  accountName?: string | null
+): PreDCRecord | undefined {
+  const target = normalizeCallId(callId);
+  const accountKey = accountName?.trim().toLowerCase();
+
+  for (const record of records) {
+    const company = preDcField(record, "companyName");
+    const slug = slugifyCompany(company);
+    if (slug === callId || normalizeCallId(slug) === target) return record;
+    if (accountKey && company.trim().toLowerCase() === accountKey) return record;
+  }
+  return undefined;
+}
+
 function icpScoreFromBucket(bucket: string): number {
   const b = bucket.toLowerCase();
   if (b.includes("enterprise") || b.includes("desirable")) return 0.88;

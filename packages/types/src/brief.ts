@@ -110,6 +110,32 @@ export interface ArtifactFulfillment {
 
 export type PreDcAgentStatus = "pending" | "running" | "success" | "failed";
 
+export type RelevantDocumentFormat = "pdf" | "ppt" | "pptx";
+
+export type RelevantProjectSource = "knowledge_base" | "project_database" | "dc_notes";
+
+export interface RelevantDocument {
+  assetId: string;
+  title: string;
+  fileName?: string;
+  mimeType?: string;
+  format: RelevantDocumentFormat;
+  relevanceScore: number;
+  snippet?: string;
+  /** Indexed text from KB (used for in-app PPT preview when slides cannot render). */
+  previewText?: string;
+}
+
+export interface RelevantProject {
+  id: string;
+  title: string;
+  source: RelevantProjectSource;
+  relevanceScore: number;
+  summary: string;
+  details: string;
+  assetId?: string;
+}
+
 export interface CallBrief {
   callId: string;
   accountName: string;
@@ -132,6 +158,8 @@ export interface CallBrief {
   postDcResearchSections?: BriefResearchSection[];
   artifactPlan?: PlannedArtifact[];
   artifactFulfillment?: ArtifactFulfillment[];
+  relevantDocuments?: RelevantDocument[];
+  relevantProjects?: RelevantProject[];
   agentStatus?: PreDcAgentStatus;
   agentRunId?: string;
 }

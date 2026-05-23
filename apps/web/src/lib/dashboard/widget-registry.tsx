@@ -8,12 +8,14 @@ import {
   type AccountSnapshotRow,
 } from "@/components/calls/account-widget-cards";
 import { BriefAISummary } from "@/components/pre-call/brief-ai-summary";
+import { BriefArtifactsPanel } from "@/components/pre-call/brief-artifacts-panel";
 import { ClientAttendeesCard } from "@/components/pre-call/client-attendees-card";
 import { InternalAttendeesCard } from "@/components/pre-call/internal-attendees-card";
 import { resolveInternalAttendees } from "@/lib/attendees/build-internal-attendees";
 import { ClientHistoryCard } from "@/components/pre-call/client-history-card";
 import { PostDcBriefPreviewCard } from "@/components/pre-call/post-dc-brief-preview";
 import { PreDcResearchCard } from "@/components/pre-call/pre-dc-research-card";
+import { BriefRelevantContentLoader } from "@/components/pre-call/brief-relevant-content";
 import {
   BriefBANTCard,
   BriefDeckCard,
@@ -31,6 +33,7 @@ import {
 } from "@/components/post-dc/post-dc-widget-cards";
 import { PostDiscoveryGapsCard } from "@/components/post-dc/post-discovery-gaps-card";
 import type { CallBrief, PostCallReview } from "@/lib/brief-types";
+import { arrayLen } from "@/lib/dashboard/normalize-widget-props";
 import type { BANTScore, Call } from "@/types";
 
 type DefaultLayout = Pick<LayoutItem, "x" | "y" | "w" | "h" | "minW" | "minH">;
@@ -76,13 +79,23 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     render: ({ brief }) => <BriefAISummary brief={brief} />,
   },
   {
+    id: "brief.workflow-artifacts",
+    title: "PRE-DC Workflow artifacts",
+    category: "content",
+    column: "center",
+    sortOrder: 0.5,
+    isAvailable: ({ brief }) =>
+      arrayLen(brief.artifactPlan) > 0 || arrayLen(brief.artifactFulfillment) > 0,
+    render: ({ brief }) => <BriefArtifactsPanel brief={brief} />,
+  },
+  {
     id: "brief.signals",
     title: "New signals",
     category: "ai",
     column: "center",
     sortOrder: 1,
-    isAvailable: ({ brief }) => brief.newSignals.length > 0,
-    render: ({ brief }) => <BriefSignalsCard signals={brief.newSignals} />,
+    isAvailable: ({ brief }) => arrayLen(brief.newSignals) > 0,
+    render: ({ brief }) => <BriefSignalsCard signals={brief.newSignals ?? []} />,
   },
   {
     id: "brief.discovery",
@@ -90,8 +103,10 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "qualification",
     column: "center",
     sortOrder: 2,
-    isAvailable: ({ discoveryQuestions }) => discoveryQuestions.length > 0,
-    render: ({ discoveryQuestions }) => <BriefDiscoveryQuestionsCard questions={discoveryQuestions} />,
+    isAvailable: ({ discoveryQuestions }) => arrayLen(discoveryQuestions) > 0,
+    render: ({ discoveryQuestions }) => (
+      <BriefDiscoveryQuestionsCard questions={discoveryQuestions ?? []} />
+    ),
   },
   {
     id: "brief.deck",
@@ -99,7 +114,18 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "content",
     column: "center",
     sortOrder: 3,
-    render: ({ brief }) => <BriefDeckCard slides={brief.deckSlides} />,
+    render: ({ brief }) => <BriefDeckCard slides={brief.deckSlides ?? []} />,
+  },
+  {
+    id: "brief.relevant-content",
+    title: "Relevant content",
+    category: "content",
+    column: "center",
+    sortOrder: 3.5,
+    isAvailable: ({ call }) => Boolean(call.id),
+    render: ({ brief, call }) => (
+      <BriefRelevantContentLoader callId={call.id} brief={brief} />
+    ),
   },
   {
     id: "brief.pains",
@@ -107,7 +133,7 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "qualification",
     column: "center",
     sortOrder: 4,
-    render: ({ brief }) => <BriefPainsCard pains={brief.pains} />,
+    render: ({ brief }) => <BriefPainsCard pains={brief.pains ?? []} />,
   },
   {
     id: "brief.objections",
@@ -115,8 +141,8 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "content",
     column: "center",
     sortOrder: 5,
-    isAvailable: ({ brief }) => brief.objections.length > 0,
-    render: ({ brief }) => <BriefObjectionsCard objections={brief.objections} />,
+    isAvailable: ({ brief }) => arrayLen(brief.objections) > 0,
+    render: ({ brief }) => <BriefObjectionsCard objections={brief.objections ?? []} />,
   },
   {
     id: "account.snapshot",
@@ -124,8 +150,8 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "client",
     column: "left",
     sortOrder: 0,
-    isAvailable: ({ accountSnapshot }) => accountSnapshot.length > 0,
-    render: ({ accountSnapshot }) => <AccountSnapshotCard rows={accountSnapshot} />,
+    isAvailable: ({ accountSnapshot }) => arrayLen(accountSnapshot) > 0,
+    render: ({ accountSnapshot }) => <AccountSnapshotCard rows={accountSnapshot ?? []} />,
   },
   {
     id: "account.metrics",
@@ -142,7 +168,7 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "content",
     column: "left",
     sortOrder: 2,
-    isAvailable: ({ brief }) => Boolean(brief.researchSections && brief.researchSections.length > 0),
+    isAvailable: ({ brief }) => arrayLen(brief.researchSections) > 0,
     render: ({ brief }) => <PreDcResearchCard sections={brief.researchSections!} />,
   },
   {
@@ -163,8 +189,8 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "client",
     column: "left",
     sortOrder: 4,
-    isAvailable: ({ brief }) => brief.clientAttendees.length > 0,
-    render: ({ brief }) => <ClientAttendeesCard attendees={brief.clientAttendees} />,
+    isAvailable: ({ brief }) => arrayLen(brief.clientAttendees) > 0,
+    render: ({ brief }) => <ClientAttendeesCard attendees={brief.clientAttendees ?? []} />,
   },
   {
     id: "brief.history",
@@ -172,8 +198,8 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "client",
     column: "left",
     sortOrder: 5,
-    isAvailable: ({ brief }) => brief.interactionHistory.length > 0,
-    render: ({ brief }) => <ClientHistoryCard interactions={brief.interactionHistory} />,
+    isAvailable: ({ brief }) => arrayLen(brief.interactionHistory) > 0,
+    render: ({ brief }) => <ClientHistoryCard interactions={brief.interactionHistory ?? []} />,
   },
   {
     id: "brief.post-preview",
@@ -199,8 +225,8 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "pod",
     column: "right",
     sortOrder: 1,
-    isAvailable: ({ brief }) => brief.podNotes.length > 0,
-    render: ({ brief }) => <BriefPodNotesCard notes={brief.podNotes} />,
+    isAvailable: ({ brief }) => arrayLen(brief.podNotes) > 0,
+    render: ({ brief }) => <BriefPodNotesCard notes={brief.podNotes ?? []} />,
   },
 ];
 
@@ -212,8 +238,8 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     category: "client",
     column: "left",
     sortOrder: 0,
-    isAvailable: ({ accountSnapshot }) => accountSnapshot.length > 0,
-    render: ({ accountSnapshot }) => <AccountSnapshotCard rows={accountSnapshot} />,
+    isAvailable: ({ accountSnapshot }) => arrayLen(accountSnapshot) > 0,
+    render: ({ accountSnapshot }) => <AccountSnapshotCard rows={accountSnapshot ?? []} />,
   },
   {
     id: "account.metrics",
@@ -238,7 +264,7 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     category: "ai",
     column: "center",
     sortOrder: 1,
-    render: ({ review }) => <PostSummaryCard summary={review.summary} />,
+    render: ({ review }) => <PostSummaryCard summary={review.summary ?? []} />,
   },
   {
     id: "post.learned",
@@ -246,7 +272,7 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     category: "qualification",
     column: "center",
     sortOrder: 2,
-    render: ({ review }) => <PostLearnedCard learned={review.learned} />,
+    render: ({ review }) => <PostLearnedCard learned={review.learned ?? []} />,
   },
   {
     id: "post.discovery_gaps",
@@ -255,10 +281,7 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     column: "center",
     sortOrder: 3,
     isAvailable: ({ review }) =>
-      Boolean(
-        (review.openDiscoveryGaps && review.openDiscoveryGaps.length > 0) ||
-          review.discoveryBantCoverage !== undefined
-      ),
+      arrayLen(review.openDiscoveryGaps) > 0 || review.discoveryBantCoverage !== undefined,
     render: ({ review }) => (
       <PostDiscoveryGapsCard
         gaps={review.openDiscoveryGaps ?? []}
@@ -272,7 +295,7 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     category: "content",
     column: "right",
     sortOrder: 0,
-    isAvailable: ({ review }) => Boolean(review.researchSections && review.researchSections.length > 0),
+    isAvailable: ({ review }) => arrayLen(review.researchSections) > 0,
     render: ({ review }) => (
       <PreDcResearchCard sections={review.researchSections!} title="Post-DC import (all fields)" />
     ),
@@ -283,7 +306,7 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     category: "pod",
     column: "right",
     sortOrder: 1,
-    isAvailable: ({ review }) => review.podScorecard.length > 0,
-    render: ({ review }) => <PostScorecardCard scorecard={review.podScorecard} />,
+    isAvailable: ({ review }) => arrayLen(review.podScorecard) > 0,
+    render: ({ review }) => <PostScorecardCard scorecard={review.podScorecard ?? []} />,
   },
 ];

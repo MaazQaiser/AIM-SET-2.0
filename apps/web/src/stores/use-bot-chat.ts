@@ -18,10 +18,12 @@ interface BotChatStore {
   seedGroupWelcome: (callId: string, accountName?: string) => void;
 }
 
+export const EMPTY_BOT_CHAT_MESSAGES: BotChatMessage[] = [];
+
 const defaultCallState = (): CallChatState => ({
   mode: "group",
-  directMessages: [],
-  groupMessages: [],
+  directMessages: EMPTY_BOT_CHAT_MESSAGES,
+  groupMessages: EMPTY_BOT_CHAT_MESSAGES,
 });
 
 export const useBotChatStore = create<BotChatStore>()(
@@ -43,7 +45,8 @@ export const useBotChatStore = create<BotChatStore>()(
         }),
 
       getMessages: (callId, mode) => {
-        const st = get().byCallId[callId] ?? defaultCallState();
+        const st = get().byCallId[callId];
+        if (!st) return EMPTY_BOT_CHAT_MESSAGES;
         return mode === "group" ? st.groupMessages : st.directMessages;
       },
 

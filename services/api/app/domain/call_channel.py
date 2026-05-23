@@ -12,6 +12,7 @@ class CallChannelManager:
 
     def __init__(self) -> None:
         self._rooms: Dict[str, Set[WebSocket]] = {}
+        self._pending: Dict[str, List[Dict[str, Any]]] = {}
         self._lock = asyncio.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
 
@@ -20,6 +21,12 @@ class CallChannelManager:
             self._loop = asyncio.get_running_loop()
         async with self._lock:
             self._rooms.setdefault(call_id, set()).add(ws)
+            pending = list(self._pending.pop(call_id, []))
+        for message in pending[-50:]:
+            try:
+                await ws.send_text(json.dumps(message))
+            except Exception:
+                break
 
     async def unsubscribe(self, call_id: str, ws: WebSocket) -> None:
         async with self._lock:
@@ -33,8 +40,12 @@ class CallChannelManager:
     async def broadcast(self, call_id: str, message: Dict[str, Any]) -> None:
         async with self._lock:
             targets = list(self._rooms.get(call_id, set()))
-        if not targets:
-            return
+            if not targets:
+                queue = self._pending.setdefault(call_id, [])
+                queue.append(message)
+                if len(queue) > 100:
+                    self._pending[call_id] = queue[-100:]
+                return
         payload = json.dumps(message)
         dead: List[WebSocket] = []
         for ws in targets:
@@ -55,7 +66,12 @@ class CallChannelManager:
         if loop is None:
             try:
                 loop = asyncio.get_running_loop()
+                self._loop = loop
             except RuntimeError:
+                queue = self._pending.setdefault(call_id, [])
+                queue.append(message)
+                if len(queue) > 100:
+                    self._pending[call_id] = queue[-100:]
                 return
         coro = self.broadcast(call_id, message)
         try:

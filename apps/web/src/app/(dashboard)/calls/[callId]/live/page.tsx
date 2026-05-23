@@ -25,6 +25,7 @@ import { useLiveCallInit } from "@/hooks/use-live-call-init";
 import { usePersona } from "@/hooks/use-persona";
 import { useCall, useCallBrief, useKbAssets, usePostCallReview } from "@/lib/data/hooks";
 import { seedChecklistFromCall } from "@/lib/discovery-checklist-seed";
+import { isUsefulLiveKeyword } from "@/lib/live/keyword-filter";
 import { postSuggestionFeedback } from "@/lib/live-suggestion-feedback";
 import { useCallUI } from "@/stores/use-call-ui";
 import { useLiveCall } from "@/stores/use-live-call";
@@ -46,13 +47,14 @@ interface LivePageParams {
 
 export default function LiveCallPage({ params }: LivePageParams) {
   const { callId } = use(params);
+  useLiveCallInit(callId);
+  useCallStream({ callId, enabled: Boolean(callId) });
+
   const persona = usePersona();
   const { data: call } = useCall(callId);
   const { data: brief } = useCallBrief(callId);
   const { data: postReview } = usePostCallReview(callId);
   const { data: kbAssets = [] } = useKbAssets();
-  useLiveCallInit(callId);
-  useCallStream({ callId, enabled: true });
 
   const transcript = useLiveCall((s) => s.transcript);
   const pendingNudges = useLiveCall((s) => s.pendingNudges);
@@ -116,7 +118,13 @@ export default function LiveCallPage({ params }: LivePageParams) {
   }, [transcript, keywordStats]);
 
   const accountName = call?.accountName ?? "Live call";
-  const intentLabel = intentSnapshot?.intent?.label;
+  const intentLabel =
+    intentSnapshot?.intent?.display ?? intentSnapshot?.intent?.label;
+  const nextActions = intentSnapshot?.next_actions ?? [];
+  const focusAreasFiltered = useMemo(
+    () => focusAreas.filter((a) => isUsefulLiveKeyword(a) || a.includes(" ") || a.length > 12),
+    [focusAreas]
+  );
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -157,7 +165,7 @@ export default function LiveCallPage({ params }: LivePageParams) {
             bodyClassName="p-0"
           >
             <FocusAreasBar
-              areas={focusAreas}
+              areas={focusAreasFiltered}
               intentLabel={intentLabel}
               bantSignals={bantSignals}
             />
@@ -192,6 +200,7 @@ export default function LiveCallPage({ params }: LivePageParams) {
               intentLabel={intentLabel}
               intent={intentSnapshot?.intent ?? null}
               pains={intentSnapshot?.pains ?? []}
+              nextActions={nextActions}
               sentimentAE={sentimentAE}
               sentimentCustomer={sentimentCustomer}
               sentimentShift={sentimentShift}
@@ -222,6 +231,7 @@ export default function LiveCallPage({ params }: LivePageParams) {
               <IntentPainStream
                 intent={intentSnapshot?.intent ?? null}
                 pains={intentSnapshot?.pains ?? []}
+                nextActions={nextActions}
               />
             </LiveCollapsibleSection>
             <div className="mt-3">
@@ -334,6 +344,7 @@ export default function LiveCallPage({ params }: LivePageParams) {
                 intentLabel={intentLabel}
                 intent={intentSnapshot?.intent ?? null}
                 pains={intentSnapshot?.pains ?? []}
+                nextActions={nextActions}
                 sentimentAE={sentimentAE}
                 sentimentCustomer={sentimentCustomer}
                 sentimentShift={sentimentShift}
@@ -354,6 +365,8 @@ export default function LiveCallPage({ params }: LivePageParams) {
               <IntentPainStream
                 intent={intentSnapshot?.intent ?? null}
                 pains={intentSnapshot?.pains ?? []}
+                nextActions={nextActions}
+                nextActions={nextActions}
               />
               <DiscoveryChecklistPanel state={checklistDisplay} />
             </TabsContent>

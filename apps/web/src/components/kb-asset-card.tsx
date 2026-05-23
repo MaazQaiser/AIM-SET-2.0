@@ -1,20 +1,15 @@
 "use client";
 
-import { FileText, Presentation, Layout, Map, Shield, TrendingUp, Image as ImageIcon } from "lucide-react";
+import Link from "next/link";
 import { format } from "date-fns";
+import { Eye, ExternalLink, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Chip } from "@/components/ui/chip";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { KbFileFormatBadge } from "@/components/knowledge/kb-file-format-badge";
 import type { KBAsset } from "@/types";
-
-const typeConfig: Record<string, { icon: typeof FileText; label: string }> = {
-  deck: { icon: Presentation, label: "Deck" },
-  "case-study": { icon: FileText, label: "Case Study" },
-  image: { icon: ImageIcon, label: "Image" },
-  "one-pager": { icon: Layout, label: "OnePager" },
-  architecture: { icon: Map, label: "Architecture Diagram" },
-  battlecard: { icon: Shield, label: "Battle Card" },
-};
 
 function EffectivenessBar({ score }: { score: number }) {
   return (
@@ -32,59 +27,50 @@ function EffectivenessBar({ score }: { score: number }) {
 
 interface KBAssetCardProps {
   asset: KBAsset;
-  onSelect?: (asset: KBAsset) => void;
+  onPreview?: (asset: KBAsset) => void;
 }
 
-export function KBAssetCard({ asset, onSelect }: KBAssetCardProps) {
-  const config = typeConfig[asset.type] ?? { icon: FileText, label: asset.type };
-  const Icon = config.icon;
+export function KBAssetCard({ asset, onPreview }: KBAssetCardProps) {
+  const status = asset.status ?? "ready";
 
   return (
-    <Card
-      className={cn(
-        "hover:shadow-soft-sm transition-shadow",
-        onSelect && "cursor-pointer hover:border-primary/50"
-      )}
-      onClick={() => onSelect?.(asset)}
-      tabIndex={onSelect ? 0 : undefined}
-      onKeyDown={(e) => {
-        if (onSelect && (e.key === "Enter" || e.key === " ")) {
-          e.preventDefault();
-          onSelect(asset);
-        }
-      }}
-      role={onSelect ? "button" : undefined}
-      aria-label={onSelect ? `Select ${asset.title}` : undefined}
-    >
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent">
-            <Icon className="h-5 w-5 text-accent-foreground" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground truncate">{asset.title}</p>
-            <p className="text-xs text-muted-foreground">
-              {config.label} · v{asset.version}
-              {asset.status && asset.status !== "ready" && (
-                <span className="ml-1 capitalize">· {asset.status}</span>
-              )}
-            </p>
-          </div>
+    <Card className="hover:shadow-soft-sm transition-shadow h-full flex flex-col">
+      <CardContent className="p-4 flex flex-col flex-1 gap-3">
+        <div className="flex items-start justify-between gap-2">
+          <KbFileFormatBadge fileName={asset.fileName} mimeType={asset.mimeType} />
+          {status !== "ready" && (
+            <Badge
+              variant={status === "failed" ? "destructive" : "secondary"}
+              className="text-[9px] capitalize shrink-0"
+            >
+              {status}
+            </Badge>
+          )}
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-1.5">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground line-clamp-2">{asset.title}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 capitalize">
+            {asset.type} · v{asset.version}
+          </p>
+          {asset.fileName && (
+            <p className="text-[10px] text-muted-foreground mt-1 truncate" title={asset.fileName}>
+              {asset.fileName}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
           {asset.tags.slice(0, 3).map((tag) => (
             <Chip key={tag} variant="tag">
               {tag}
             </Chip>
           ))}
-          {asset.tags.length > 3 && (
-            <Chip variant="muted">+{asset.tags.length - 3}</Chip>
-          )}
+          {asset.tags.length > 3 && <Chip variant="muted">+{asset.tags.length - 3}</Chip>}
         </div>
 
         {asset.effectivenessScore !== undefined && (
-          <div className="mt-3 space-y-1">
+          <div className="space-y-1">
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <TrendingUp className="h-3 w-3" />
               Effectiveness
@@ -94,10 +80,30 @@ export function KBAssetCard({ asset, onSelect }: KBAssetCardProps) {
         )}
 
         {asset.lastUsed && (
-          <p className="mt-2 text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Last used {format(new Date(asset.lastUsed), "MMM d")}
           </p>
         )}
+
+        <div className="flex gap-2 pt-1 mt-auto border-t border-border/60">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="h-8 flex-1 text-xs"
+            disabled={status === "pending" || status === "processing"}
+            onClick={() => onPreview?.(asset)}
+          >
+            <Eye className="h-3.5 w-3.5 mr-1" />
+            Preview
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 flex-1 text-xs" asChild>
+            <Link href={`/knowledge/${asset.id}`}>
+              <ExternalLink className="h-3.5 w-3.5 mr-1" />
+              Open
+            </Link>
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

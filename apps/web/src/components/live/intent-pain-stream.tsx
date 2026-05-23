@@ -6,10 +6,11 @@ import { Badge } from "@/components/ui/badge";
 interface IntentPainStreamProps {
   intent: CallIntent | null;
   pains: PainSignal[];
+  nextActions?: string[];
 }
 
-export function IntentPainStream({ intent, pains }: IntentPainStreamProps) {
-  if (!intent && pains.length === 0) {
+export function IntentPainStream({ intent, pains, nextActions = [] }: IntentPainStreamProps) {
+  if (!intent && pains.length === 0 && nextActions.length === 0) {
     return (
       <p className="text-xs text-muted-foreground px-1">
         Intent and pain points appear as the customer speaks.
@@ -24,12 +25,27 @@ export function IntentPainStream({ intent, pains }: IntentPainStreamProps) {
           <p className="font-semibold uppercase tracking-wide text-muted-foreground mb-1">
             Call intent
           </p>
-          <p className="text-foreground font-medium capitalize">
-            {(intent.label || "general_discovery").replace(/_/g, " ")}
+          <p className="text-foreground font-medium">
+            {intent.display ||
+              (intent.label || "general_discovery").replace(/_/g, " ")}
           </p>
           {intent.evidence && (
             <p className="text-muted-foreground mt-1 line-clamp-2">&ldquo;{intent.evidence}&rdquo;</p>
           )}
+        </div>
+      )}
+      {nextActions.length > 0 && (
+        <div className="rounded-lg border border-primary/25 bg-primary/5 p-2.5">
+          <p className="font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+            Next actions
+          </p>
+          <ul className="space-y-1.5">
+            {nextActions.map((action) => (
+              <li key={action} className="text-foreground leading-snug">
+                {action}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {pains.length > 0 && (

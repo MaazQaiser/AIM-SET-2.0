@@ -1,0 +1,115 @@
+import { test, expect } from "@playwright/test";
+
+test.setTimeout(120_000);
+
+const CALL_ID = "frontera-franchise-group";
+const API_BASE = process.env.PLAYWRIGHT_API_URL ?? "http://localhost:8000";
+const TENANT = "e2e-tenant";
+const USER = "e2e-user";
+
+const KEY_SEGMENTS = [
+  {
+    text: "For budget we carved four hundred fifty to six hundred thousand for year one — board blesses it in May.",
+    speaker_role: "customer",
+    offset_seconds: 95,
+  },
+  {
+    text: "Timeline-wise we want a Q3 pilot with ten franchisees — production go-live by Q1 next year.",
+    speaker_role: "customer",
+    offset_seconds: 108,
+  },
+  {
+    text: "Operators live in spreadsheets — manual compliance audits bottleneck us before expansion.",
+    speaker_role: "customer",
+    offset_seconds: 68,
+  },
+];
+
+async function postDemoSegment(
+  request: import("@playwright/test").APIRequestContext,
+  segment: { text: string; speaker_role: string; offset_seconds: number }
+) {
+  const url = `${API_BASE}/api/v1/webhooks/recall/demo-segment?call_id=${CALL_ID}&tenant_id=${TENANT}&user_id=${USER}`;
+  const res = await request.post(url, {
+    data: {
+      text: segment.text,
+      speaker_role: segment.speaker_role,
+      offset_seconds: segment.offset_seconds,
+      provider_event_id: `e2e-${segment.offset_seconds}-${Date.now()}`,
+    },
+  });
+  expect(res.ok(), `demo-segment failed: ${res.status()} ${await res.text()}`).toBeTruthy();
+  const body = (await res.json()) as {
+    checklist?: { bantCoverage?: number; bant?: Record<string, string> };
+    ws_messages?: unknown[];
+  };
+  expect(body.checklist).toBeTruthy();
+  return body;
+}
+
+test.describe.configure({ mode: "serial" });
+
+test.describe("Live call cockpit — DOM + API", () => {
+  test.beforeAll(async ({ request }) => {
+    const health = await request.get(`${API_BASE}/health`);
+    expect(health.ok(), "API must be running on :8000 with DEMO_TRANSCRIPT_REPLAY=true").toBeTruthy();
+  });
+
+  test("BANT, checklist, intent, and keywords update in the UI", async ({ page, request }) => {
+    await page.goto(`/calls/${CALL_ID}/live`, { waitUntil: "domcontentloaded" });
+
+    await expect(page.locator(`a[href="/calls/${CALL_ID}"]`).first()).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await expect(page.getByText("Connecting stream…")).toBeHidden({ timeout: 25_000 });
+
+    const playDemo = page.getByRole("button", { name: /Play demo transcript/i });
+    await expect(playDemo).toBeEnabled({ timeout: 10_000 });
+    await playDemo.click();
+
+    await expect(page.getByText(/budget|four hundred|six hundred|carved/i).first()).toBeVisible({
+      timeout: 90_000,
+    });
+
+    await expect(page.getByText(/Discovery coverage/i).first()).toBeVisible();
+    await expect
+      .poll(
+        async () => {
+          const text = await page.locator("body").innerText();
+          const match = text.match(/(\d+)%\s*BANT/i);
+          return match ? Number(match[1]) : 0;
+        },
+        { timeout: 90_000 }
+      )
+      .toBeGreaterThan(0);
+
+    await expect(page.getByText(/Next actions/i).first()).toBeVisible({ timeout: 15_000 });
+
+    await expect(page.getByText(/Call intent/i).first()).toBeVisible();
+    await expect(
+      page.getByText(/commercial|timeline|budget|discovery|focus/i).first()
+    ).toBeVisible();
+
+    const bodyText = await page.locator("body").innerText();
+    expect(bodyText).not.toMatch(/\bif\s*×|\bso\s*×|\bthey\s*×/i);
+    expect(bodyText).toMatch(/budget|franchise|pilot|q3|platform|compliance/i);
+
+    const lastSegment = await postDemoSegment(request, {
+      text: "We need board approval on budget before Q3 pilot kickoff.",
+      speaker_role: "customer",
+      offset_seconds: 120,
+    });
+    expect((lastSegment.checklist?.bantCoverage ?? 0) > 0).toBeTruthy();
+    const bant = lastSegment.checklist?.bant ?? {};
+    expect(["partial", "confirmed"]).toContainEqual(bant.budget);
+    expect(["partial", "confirmed"]).toContainEqual(bant.timeline);
+  });
+
+  test("API demo-segment updates BANT checklist", async ({ request }) => {
+    test.setTimeout(60_000);
+    const out = await postDemoSegment(request, KEY_SEGMENTS[0]);
+    expect(out.checklist?.bant?.budget).toBeTruthy();
+    expect((out.checklist?.bantCoverage ?? 0) > 0).toBeTruthy();
+  });
+});

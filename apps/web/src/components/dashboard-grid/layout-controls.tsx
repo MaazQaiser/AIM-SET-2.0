@@ -38,11 +38,11 @@ export function LayoutControls<P>({ layoutKey, widgets, widgetProps }: LayoutCon
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
       <p className="w-full text-xs text-muted-foreground sm:w-auto sm:flex-1">
-        Hide widgets you do not need. Reset restores the default three-column layout.
+        Hide, reorder, and resize widgets. Reset restores the state from when you entered Customize.
       </p>
       <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={handleReset}>
         <RotateCcw className="h-3.5 w-3.5" />
-        Reset layout
+        Reset widgets
       </Button>
       {hiddenWidgets.length > 0 && (
         <Popover>

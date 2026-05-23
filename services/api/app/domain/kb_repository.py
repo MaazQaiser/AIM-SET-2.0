@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -14,10 +16,19 @@ from app.domain.kb_constants import ALLOWED_ASSET_TYPES, EXTENSION_ASSET_TYPE, E
 from app.domain.memory_store import get_memory_store
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.tenant_service import get_tenant_service
+from app.services.office_preview import slide_storage_path
 
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _safe_storage_file_name(file_name: str) -> str:
+    """Supabase object keys: avoid spaces/special chars while keeping extension."""
+    path = Path(file_name)
+    ext = path.suffix.lower()
+    stem = re.sub(r"[^\w.\-]+", "_", path.stem).strip("._") or "upload"
+    return f"{stem[:96]}{ext}" if ext else f"{stem[:96]}.bin"
 
 
 def _row_to_asset(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -34,6 +45,8 @@ def _row_to_asset(row: Dict[str, Any]) -> Dict[str, Any]:
         "mimeType": row.get("mime_type"),
         "chunkCount": row.get("chunk_count", 0),
         "ingestError": row.get("ingest_error"),
+        "hasPreview": bool(row.get("preview_slide_count") or row.get("preview_storage_path")),
+        "previewSlideCount": int(row.get("preview_slide_count") or 0),
     }
 
 
@@ -70,6 +83,39 @@ class KbRepository:
         assets = self.list_assets(ctx)
         return next((a for a in assets if a["id"] == asset_id), None)
 
+    def list_asset_chunk_texts(self, ctx: TenantContext, asset_id: str, limit: int = 20) -> List[str]:
+        tenant_uuid, clerk_key = self._ctx_keys(ctx)
+        settings = get_settings()
+        texts: List[str] = []
+
+        if settings.supabase_configured:
+            try:
+                supabase = get_supabase()
+                result = (
+                    supabase.table("kb_chunks")
+                    .select("chunk_text, chunk_index")
+                    .eq("tenant_id", tenant_uuid)
+                    .eq("asset_id", asset_id)
+                    .order("chunk_index")
+                    .limit(limit)
+                    .execute()
+                )
+                for row in result.data or []:
+                    text = (row.get("chunk_text") or "").strip()
+                    if text:
+                        texts.append(text)
+                if texts:
+                    return texts
+            except Exception:
+                pass
+
+        for ch in get_memory_store().kb_chunks.get(clerk_key, []):
+            if ch.get("asset_id") == asset_id and ch.get("tenant_id") == tenant_uuid:
+                text = (ch.get("chunk_text") or "").strip()
+                if text:
+                    texts.append(text)
+        return texts[:limit]
+
     def create_upload(
         self,
         ctx: TenantContext,
@@ -91,7 +137,8 @@ class KbRepository:
             else EXTENSION_ASSET_TYPE.get(ext, "deck")
         )
         checksum = hashlib.sha256(file_bytes).hexdigest()
-        storage_path = f"{tenant_uuid}/{asset_id}/{file_name}"
+        storage_file_name = _safe_storage_file_name(file_name)
+        storage_path = f"{tenant_uuid}/{asset_id}/{storage_file_name}"
         display_title = title or file_name.rsplit(".", 1)[0]
 
         asset_row = {
@@ -154,6 +201,117 @@ class KbRepository:
         if blob is None:
             raise FileNotFoundError(storage_path)
         return blob
+
+    def upload_file(
+        self,
+        storage_path: str,
+        file_bytes: bytes,
+        *,
+        content_type: str = "application/octet-stream",
+    ) -> None:
+        settings = get_settings()
+        if settings.supabase_configured:
+            supabase = get_supabase()
+            supabase.storage.from_(settings.kb_storage_bucket).upload(
+                storage_path,
+                file_bytes,
+                {"content-type": content_type, "upsert": "true"},
+            )
+            return
+
+        get_memory_store().kb_files[storage_path] = file_bytes
+
+    def save_preview_slides(
+        self,
+        tenant_id: str,
+        asset_id: str,
+        slide_pngs: List[bytes],
+        *,
+        clerk_key: Optional[str] = None,
+    ) -> int:
+        self.delete_preview_slides(tenant_id, asset_id, clerk_key=clerk_key)
+        for index, png in enumerate(slide_pngs, start=1):
+            path = slide_storage_path(tenant_id, asset_id, index)
+            self.upload_file(path, png, content_type="image/png")
+
+        patch = {
+            "preview_slide_count": len(slide_pngs),
+            "preview_storage_path": None,
+        }
+        settings = get_settings()
+        if settings.supabase_configured:
+            try:
+                supabase = get_supabase()
+                supabase.table("kb_assets").update(patch).eq("tenant_id", tenant_id).eq("id", asset_id).execute()
+            except Exception:
+                pass
+
+        if clerk_key:
+            for asset in get_memory_store().kb_assets.get(clerk_key, []):
+                if asset["id"] == asset_id:
+                    asset["hasPreview"] = len(slide_pngs) > 0
+                    asset["previewSlideCount"] = len(slide_pngs)
+                    asset["previewStoragePath"] = None
+        return len(slide_pngs)
+
+    def delete_preview_slides(
+        self,
+        tenant_id: str,
+        asset_id: str,
+        *,
+        clerk_key: Optional[str] = None,
+        slide_count: Optional[int] = None,
+    ) -> None:
+        count = slide_count
+        if count is None:
+            row = self.get_asset_row(tenant_id, asset_id, clerk_key or tenant_id)
+            count = int((row or {}).get("preview_slide_count") or 0)
+
+        paths = [slide_storage_path(tenant_id, asset_id, i) for i in range(1, (count or 0) + 1)]
+        preview_pdf = f"{tenant_id}/{asset_id}/preview.pdf"
+        paths.append(preview_pdf)
+
+        settings = get_settings()
+        if settings.supabase_configured and paths:
+            try:
+                supabase = get_supabase()
+                supabase.storage.from_(settings.kb_storage_bucket).remove(paths)
+            except Exception:
+                pass
+
+        store = get_memory_store()
+        for path in paths:
+            if path in store.kb_files:
+                del store.kb_files[path]
+
+    def save_preview_pdf(
+        self,
+        tenant_id: str,
+        asset_id: str,
+        pdf_bytes: bytes,
+        *,
+        clerk_key: Optional[str] = None,
+    ) -> str:
+        preview_path = f"{tenant_id}/{asset_id}/preview.pdf"
+        self.upload_file(preview_path, pdf_bytes, content_type="application/pdf")
+
+        settings = get_settings()
+        if settings.supabase_configured:
+            try:
+                supabase = get_supabase()
+                supabase.table("kb_assets").update({"preview_storage_path": preview_path}).eq(
+                    "tenant_id", tenant_id
+                ).eq("id", asset_id).execute()
+                return preview_path
+            except Exception:
+                pass
+
+        if clerk_key:
+            for asset in get_memory_store().kb_assets.get(clerk_key, []):
+                if asset["id"] == asset_id:
+                    asset["hasPreview"] = True
+                    asset["previewStoragePath"] = preview_path
+        return preview_path
 
     def get_job(self, ctx: TenantContext, job_id: str) -> Optional[Dict[str, Any]]:
         tenant_uuid, clerk_key = self._ctx_keys(ctx)
@@ -378,6 +536,54 @@ class KbRepository:
             return []
         return _memory_vector_search(clerk_key, tenant_id, query_embedding, limit)
 
+    def list_presentation_assets(
+        self,
+        tenant_id: str,
+        clerk_key: str,
+        *,
+        missing_preview_only: bool = True,
+    ) -> List[Dict[str, Any]]:
+        settings = get_settings()
+        rows: List[Dict[str, Any]] = []
+
+        if settings.supabase_configured:
+            try:
+                supabase = get_supabase()
+                query = supabase.table("kb_assets").select("*").eq("tenant_id", tenant_id)
+                if missing_preview_only:
+                    query = query.eq("preview_slide_count", 0)
+                result = query.order("uploaded_at", desc=True).execute()
+                rows = result.data or []
+            except Exception:
+                pass
+
+        if not rows:
+            for asset in get_memory_store().list_kb_assets(clerk_key):
+                fname = asset.get("fileName") or ""
+                ext = Path(fname).suffix.lower()
+                if ext not in {".ppt", ".pptx"}:
+                    continue
+                if missing_preview_only and (asset.get("hasPreview") or asset.get("previewSlideCount")):
+                    continue
+                rows.append(
+                    {
+                        "id": asset["id"],
+                        "file_name": fname,
+                        "preview_storage_path": asset.get("previewStoragePath"),
+                        "storage_path": f"{tenant_id}/{asset['id']}/{fname}",
+                    }
+                )
+
+        filtered: List[Dict[str, Any]] = []
+        for row in rows:
+            fname = row.get("file_name") or ""
+            ext = Path(fname).suffix.lower()
+            mime = (row.get("mime_type") or "").lower()
+            is_deck = ext in {".ppt", ".pptx"} or "presentation" in mime or "ms-powerpoint" in mime
+            if is_deck:
+                filtered.append(row)
+        return filtered
+
     def get_asset_row(self, tenant_id: str, asset_id: str, clerk_key: str) -> Optional[Dict[str, Any]]:
         settings = get_settings()
         if settings.supabase_configured:
@@ -400,12 +606,15 @@ class KbRepository:
         for asset in get_memory_store().list_kb_assets(clerk_key):
             if asset["id"] == asset_id:
                 fname = asset.get("fileName") or "upload.bin"
+                preview_storage_path = asset.get("previewStoragePath")
                 return {
                     "id": asset_id,
                     "title": asset.get("title"),
                     "asset_type": asset.get("type") or asset.get("asset_type", "deck"),
                     "tags": asset.get("tags") or [],
                     "storage_path": f"{tenant_id}/{asset_id}/{fname}",
+                    "preview_storage_path": preview_storage_path,
+                    "preview_slide_count": asset.get("previewSlideCount") or 0,
                     "file_name": fname,
                     "mime_type": asset.get("mimeType"),
                     "status": asset.get("status", "ready"),
@@ -420,11 +629,15 @@ class KbRepository:
             return False
 
         storage_path = row.get("storage_path")
+        preview_path = row.get("preview_storage_path")
+        slide_count = int(row.get("preview_slide_count") or 0)
         if settings.supabase_configured:
             try:
                 supabase = get_supabase()
-                if storage_path:
-                    supabase.storage.from_(settings.kb_storage_bucket).remove([storage_path])
+                paths = [p for p in (storage_path, preview_path) if p]
+                paths.extend(slide_storage_path(tenant_uuid, asset_id, i) for i in range(1, slide_count + 1))
+                if paths:
+                    supabase.storage.from_(settings.kb_storage_bucket).remove(paths)
                 supabase.table("kb_chunks").delete().eq("tenant_id", tenant_uuid).eq("asset_id", asset_id).execute()
                 supabase.table("kb_ingest_jobs").delete().eq("tenant_id", tenant_uuid).eq("asset_id", asset_id).execute()
                 supabase.table("kb_assets").delete().eq("tenant_id", tenant_uuid).eq("id", asset_id).execute()
@@ -437,6 +650,12 @@ class KbRepository:
         self.delete_chunks_for_asset(tenant_uuid, asset_id, clerk_key)
         if storage_path and storage_path in store.kb_files:
             del store.kb_files[storage_path]
+        if preview_path and preview_path in store.kb_files:
+            del store.kb_files[preview_path]
+        for i in range(1, slide_count + 1):
+            slide_path = slide_storage_path(tenant_uuid, asset_id, i)
+            if slide_path in store.kb_files:
+                del store.kb_files[slide_path]
         return True
 
     def requeue_asset(self, ctx: TenantContext, asset_id: str) -> Optional[Dict[str, Any]]:

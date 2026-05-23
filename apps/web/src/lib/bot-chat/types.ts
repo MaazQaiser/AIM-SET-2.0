@@ -1,6 +1,6 @@
 import type { Citation, PodRole } from "@/types";
 
-export type BotChatMode = "direct" | "group";
+export type BotChatMode = "direct" | "group" | "copilot";
 
 export type BotChatPhase = "prep" | "live";
 

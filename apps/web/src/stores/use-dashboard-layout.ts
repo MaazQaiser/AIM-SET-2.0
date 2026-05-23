@@ -32,9 +32,23 @@ interface DashboardLayoutState {
   layouts: Record<LayoutKey, ResponsiveLayouts>;
   columnOrder: Record<LayoutKey, ColumnOrder>;
   hidden: Record<LayoutKey, string[]>;
+  widgetHeights: Record<LayoutKey, Record<string, number>>;
+  editBaseline: Record<
+    LayoutKey,
+    {
+      columnOrder: ColumnOrder;
+      hidden: string[];
+      widgetHeights: Record<string, number>;
+    } | null
+  >;
   setEditing: (value: boolean) => void;
+  setEditBaseline: (
+    key: LayoutKey,
+    baseline: { columnOrder: ColumnOrder; hidden: string[]; widgetHeights: Record<string, number> }
+  ) => void;
   setLayout: (key: LayoutKey, layouts: ResponsiveLayouts) => void;
   setColumnOrder: (key: LayoutKey, order: ColumnOrder) => void;
+  setWidgetHeight: (key: LayoutKey, id: string, height: number) => void;
   hideWidget: (key: LayoutKey, id: string) => void;
   showWidget: (key: LayoutKey, id: string) => void;
   resetLayout: (key: LayoutKey, defaultLayouts: ResponsiveLayouts) => void;
@@ -54,8 +68,31 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
         "post-dc": { ...EMPTY_COLUMN_ORDER },
       },
       hidden: { ...EMPTY_HIDDEN },
+      widgetHeights: {
+        brief: {},
+        "post-dc": {},
+      },
+      editBaseline: {
+        brief: null,
+        "post-dc": null,
+      },
 
       setEditing: (value) => set({ isEditing: value }),
+      setEditBaseline: (key, baseline) =>
+        set((state) => ({
+          editBaseline: {
+            ...state.editBaseline,
+            [key]: {
+              columnOrder: {
+                left: [...baseline.columnOrder.left],
+                center: [...baseline.columnOrder.center],
+                right: [...baseline.columnOrder.right],
+              },
+              hidden: [...baseline.hidden],
+              widgetHeights: { ...baseline.widgetHeights },
+            },
+          },
+        })),
 
       setLayout: (key, layouts) => {
         if (layoutDebounceTimer) clearTimeout(layoutDebounceTimer);
@@ -97,6 +134,17 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
           },
         }));
       },
+      setWidgetHeight: (key, id, height) => {
+        set((state) => ({
+          widgetHeights: {
+            ...state.widgetHeights,
+            [key]: {
+              ...state.widgetHeights[key],
+              [id]: height,
+            },
+          },
+        }));
+      },
 
       resetLayout: (key, defaultLayouts) => {
         set((state) => ({
@@ -112,16 +160,28 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
       },
 
       resetColumnLayout: (key, defaultOrder) => {
-        set((state) => ({
-          columnOrder: {
-            ...state.columnOrder,
-            [key]: defaultOrder,
-          },
-          hidden: {
-            ...state.hidden,
-            [key]: [],
-          },
-        }));
+        set((state) => {
+          const baseline = state.editBaseline[key];
+          return {
+            columnOrder: {
+              ...state.columnOrder,
+              [key]:
+                baseline?.columnOrder ?? {
+                  left: [...defaultOrder.left],
+                  center: [...defaultOrder.center],
+                  right: [...defaultOrder.right],
+                },
+            },
+            hidden: {
+              ...state.hidden,
+              [key]: baseline?.hidden ?? [],
+            },
+            widgetHeights: {
+              ...state.widgetHeights,
+              [key]: baseline?.widgetHeights ?? {},
+            },
+          };
+        });
       },
     }),
     {
@@ -138,11 +198,14 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
           "post-dc": { ...EMPTY_COLUMN_ORDER },
         },
         hidden: { ...EMPTY_HIDDEN },
+        widgetHeights: { brief: {}, "post-dc": {} },
+        editBaseline: { brief: null, "post-dc": null },
       }),
       partialize: (state) => ({
         layouts: state.layouts,
         columnOrder: state.columnOrder,
         hidden: state.hidden,
+        widgetHeights: state.widgetHeights,
       }),
       merge: (persisted, current) => {
         const p = persisted as Partial<DashboardLayoutState> | undefined;
@@ -160,6 +223,10 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
           hidden: {
             brief: p?.hidden?.brief ?? [],
             "post-dc": p?.hidden?.["post-dc"] ?? [],
+          },
+          widgetHeights: {
+            brief: p?.widgetHeights?.brief ?? {},
+            "post-dc": p?.widgetHeights?.["post-dc"] ?? {},
           },
         };
       },

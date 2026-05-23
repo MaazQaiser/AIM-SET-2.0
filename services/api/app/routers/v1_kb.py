@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from dc_core.tenancy import TenantContext
@@ -44,6 +45,108 @@ def get_asset(asset_id: str, ctx: TenantContext = Depends(get_tenant_context)) -
     if not asset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
     return asset
+
+
+@router.get("/assets/{asset_id}/preview-text")
+def get_asset_preview_text(
+    asset_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    texts = get_kb_repository().list_asset_chunk_texts(ctx, asset_id)
+    combined = "\n\n".join(texts)
+    return {"assetId": asset_id, "text": combined[:12000], "chunkCount": len(texts)}
+
+
+@router.get("/assets/{asset_id}/preview/slides")
+def get_asset_preview_slides_meta(
+    asset_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    repo = get_kb_repository()
+    tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+    row = repo.get_asset_row(tenant_uuid, asset_id, clerk_key)
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+    slide_count = int(row.get("preview_slide_count") or 0)
+    if slide_count <= 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Slide preview not found for asset")
+    return {"assetId": asset_id, "slideCount": slide_count}
+
+
+@router.get("/assets/{asset_id}/preview/slides/{slide_index}")
+def get_asset_preview_slide(
+    asset_id: str,
+    slide_index: int,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Response:
+    if slide_index < 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="slide_index must be >= 1")
+
+    repo = get_kb_repository()
+    tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+    row = repo.get_asset_row(tenant_uuid, asset_id, clerk_key)
+    slide_count = int((row or {}).get("preview_slide_count") or 0)
+    if not row or slide_count <= 0 or slide_index > slide_count:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Slide not found")
+
+    from app.services.office_preview import slide_storage_path
+
+    path = slide_storage_path(tenant_uuid, asset_id, slide_index)
+    try:
+        data = repo.download_file(ctx, path)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Slide file not found") from exc
+
+    return Response(
+        content=data,
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
+@router.get("/assets/{asset_id}/preview")
+def get_asset_preview(asset_id: str, ctx: TenantContext = Depends(get_tenant_context)) -> Response:
+    repo = get_kb_repository()
+    tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+    row = repo.get_asset_row(tenant_uuid, asset_id, clerk_key)
+    preview_path = row.get("preview_storage_path") if row else None
+    if not row or not preview_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Preview not found for asset")
+
+    try:
+        data = repo.download_file(ctx, str(preview_path))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Preview file not found") from exc
+
+    file_name = row.get("file_name") or "asset"
+    stem = Path(file_name).stem
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{stem}-preview.pdf"'},
+    )
+
+
+@router.get("/assets/{asset_id}/file")
+def get_asset_file(asset_id: str, ctx: TenantContext = Depends(get_tenant_context)) -> Response:
+    repo = get_kb_repository()
+    tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+    row = repo.get_asset_row(tenant_uuid, asset_id, clerk_key)
+    if not row or not row.get("storage_path"):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found for asset")
+
+    try:
+        data = repo.download_file(ctx, str(row["storage_path"]))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found") from exc
+
+    mime = row.get("mime_type") or "application/octet-stream"
+    file_name = row.get("file_name") or "asset"
+    return Response(
+        content=data,
+        media_type=mime,
+        headers={"Content-Disposition": f'inline; filename="{file_name}"'},
+    )
 
 
 @router.post("/assets")
@@ -87,15 +190,26 @@ async def upload_asset(
     tag_list = [t.strip() for t in (tags or "").split(",") if t.strip()]
     mime = file.content_type or EXTENSION_MIME.get(ext, "application/octet-stream")
 
-    result = repo.create_upload(
-        ctx,
-        file_name=file_name,
-        file_bytes=content,
-        ext=ext,
-        title=title,
-        tags=tag_list,
-        asset_type=asset_type,
-    )
+    try:
+        result = repo.create_upload(
+            ctx,
+            file_name=file_name,
+            file_bytes=content,
+            ext=ext,
+            title=title,
+            tags=tag_list,
+            asset_type=asset_type,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Upload failed: {exc}",
+        ) from exc
 
     run_sync = (
         settings.kb_ingest_sync

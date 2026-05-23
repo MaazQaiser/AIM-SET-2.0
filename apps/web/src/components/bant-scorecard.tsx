@@ -31,6 +31,8 @@ type BANTLayout = "inline" | "stack" | "grid" | "row";
 
 interface BANTScorecardProps {
   bant: BANTScore;
+  /** Latest transcript snippet per dimension (from live checklist) */
+  evidenceByDimension?: Partial<Record<keyof BANTScore, string>>;
   /** @deprecated use `layout="inline"` instead */
   compact?: boolean;
   layout?: BANTLayout;
@@ -38,7 +40,13 @@ interface BANTScorecardProps {
   plain?: boolean;
 }
 
-export function BANTScorecard({ bant, compact = false, layout, plain = false }: BANTScorecardProps) {
+export function BANTScorecard({
+  bant,
+  evidenceByDimension,
+  compact = false,
+  layout,
+  plain = false,
+}: BANTScorecardProps) {
   const resolvedLayout: BANTLayout = layout ?? (compact ? "inline" : "grid");
   const keys = ["budget", "authority", "need", "timeline"] as const;
 
@@ -91,6 +99,11 @@ export function BANTScorecard({ bant, compact = false, layout, plain = false }: 
                 {bantLabels[key]}
               </p>
               <p className={cn("text-sm font-semibold truncate", config.color)}>{config.label}</p>
+              {evidenceByDimension?.[key] && (
+                <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
+                  &ldquo;{evidenceByDimension[key]}&rdquo;
+                </p>
+              )}
             </div>
           </div>
         );

@@ -1,0 +1,64 @@
+import type { CallBrief, PostCallReview } from "@/lib/brief-types";
+import type { BriefWidgetProps, PostDcWidgetProps } from "@/lib/dashboard/widget-registry";
+import type { AccountSnapshotRow } from "@/components/calls/account-widget-cards";
+export function arrayLen(value: unknown): number {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+export function normalizeCallBrief(brief: CallBrief): CallBrief {
+  return {
+    ...brief,
+    newSignals: brief.newSignals ?? [],
+    clientAttendees: brief.clientAttendees ?? [],
+    internalAttendees: brief.internalAttendees ?? [],
+    interactionHistory: brief.interactionHistory ?? [],
+    pains: brief.pains ?? [],
+    objections: brief.objections ?? [],
+    deckSlides: brief.deckSlides ?? [],
+    podNotes: brief.podNotes ?? [],
+    researchSections: brief.researchSections ?? [],
+    relevantDocuments: brief.relevantDocuments ?? [],
+    relevantProjects: brief.relevantProjects ?? [],
+    artifactPlan: brief.artifactPlan ?? [],
+    artifactFulfillment: brief.artifactFulfillment ?? [],
+  };
+}
+
+export function normalizePostCallReview(review: PostCallReview): PostCallReview {
+  return {
+    ...review,
+    summary: review.summary ?? [],
+    podScorecard: review.podScorecard ?? [],
+    learned: review.learned ?? [],
+    researchSections: review.researchSections ?? [],
+    openDiscoveryGaps: review.openDiscoveryGaps ?? [],
+  };
+}
+
+export function normalizeBriefWidgetProps(
+  props: Omit<BriefWidgetProps, "brief" | "discoveryQuestions" | "accountSnapshot"> & {
+    brief: CallBrief;
+    discoveryQuestions?: string[] | null;
+    accountSnapshot?: AccountSnapshotRow[] | null;
+  }
+): BriefWidgetProps {
+  return {
+    ...props,
+    brief: normalizeCallBrief(props.brief),
+    discoveryQuestions: Array.isArray(props.discoveryQuestions) ? props.discoveryQuestions : [],
+    accountSnapshot: Array.isArray(props.accountSnapshot) ? props.accountSnapshot : [],
+  };
+}
+
+export function normalizePostDcWidgetProps(
+  props: Omit<PostDcWidgetProps, "review" | "accountSnapshot"> & {
+    review: PostCallReview;
+    accountSnapshot?: AccountSnapshotRow[] | null;
+  }
+): PostDcWidgetProps {
+  return {
+    ...props,
+    review: normalizePostCallReview(props.review),
+    accountSnapshot: Array.isArray(props.accountSnapshot) ? props.accountSnapshot : [],
+  };
+}

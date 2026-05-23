@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildBriefFromPreDc,
   discoveryQuestionsFromPreDc,
+  findPreDcRecordForCall,
   matchPostDcToCall,
   slugifyCompany,
 } from "./build-from-import";
@@ -21,6 +22,14 @@ function preRecord(overrides: Record<string, string>): PreDCRecord {
 describe("slugifyCompany", () => {
   it("slugifies company name", () => {
     expect(slugifyCompany("Acme Corp")).toBe("call-acme-corp");
+  });
+});
+
+describe("findPreDcRecordForCall", () => {
+  it("matches demo call id to ingested company slug", () => {
+    const records = [preRecord({ [PRE_DC_HEADERS.companyName]: "Frontera Franchise Group" })];
+    expect(findPreDcRecordForCall(records, "frontera-franchise-group")?.id).toBe("pre-1");
+    expect(findPreDcRecordForCall(records, "call-frontera-franchise-group")?.id).toBe("pre-1");
   });
 });
 

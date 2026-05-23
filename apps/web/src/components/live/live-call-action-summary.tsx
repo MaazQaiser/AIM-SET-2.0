@@ -12,6 +12,7 @@ interface LiveCallActionSummaryProps {
   intentLabel?: string;
   intent?: CallIntent | null;
   pains: PainSignal[];
+  nextActions?: string[];
   sentimentAE: number;
   sentimentCustomer: number;
   sentimentShift: SentimentShift | null;
@@ -52,6 +53,7 @@ export function LiveCallActionSummary({
   intentLabel,
   intent,
   pains,
+  nextActions = [],
   sentimentAE,
   sentimentCustomer,
   sentimentShift,
@@ -60,9 +62,14 @@ export function LiveCallActionSummary({
 }: LiveCallActionSummaryProps) {
   const bantPct = checklist ? Math.round(checklist.bantCoverage * 100) : null;
   const openGaps = checklist?.openGaps ?? [];
-  const intentDisplay = (intent?.label ?? intentLabel ?? "detecting…").replace(/_/g, " ");
+  const intentDisplay =
+    intent?.display ??
+    (intent?.label ?? intentLabel ?? "detecting…").replace(/_/g, " ");
 
   const actions = useMemo(() => {
+    if (nextActions.length > 0) {
+      return nextActions.slice(0, 4);
+    }
     const items: string[] = [];
     const latestPain = pains.length > 0 ? pains[pains.length - 1]?.text?.slice(0, 60) : "";
     const bantItems = checklist?.items?.filter((i) => i.tier === "bant") ?? [];
@@ -114,7 +121,7 @@ export function LiveCallActionSummary({
       items.push("Continue discovery — ask open-ended questions to uncover pain and BANT.");
     }
     return items.slice(0, 4);
-  }, [openGaps, sentimentShift, pains, bantPct, checklist]);
+  }, [openGaps, sentimentShift, pains, bantPct, checklist, nextActions]);
 
   const hasLiveSignals =
     intent ||

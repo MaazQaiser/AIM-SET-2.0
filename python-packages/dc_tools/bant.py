@@ -54,14 +54,14 @@ DEFAULT_PLAYBOOK: Dict[str, str] = {
 
 # keyword groups -> item id, minimum match tier (partial vs confirmed)
 SIGNAL_RULES: List[Tuple[str, List[str], ChecklistItemStatus]] = [
-    ("budget", ["budget", "pricing", "cost", "spend", "investment", "approved budget", "dollar", "price", "afford", "expensive", "cheap", "limited budget", "money", "funding", "financial"], "partial"),
-    ("budget", ["budget approved", "allocated", "signed off", "funding approved", "set aside", "earmarked"], "confirmed"),
+    ("budget", ["budget", "pricing", "cost", "spend", "investment", "approved budget", "dollar", "price", "afford", "expensive", "cheap", "limited budget", "money", "funding", "financial", "carved", "envelope", "year one", "year-one", "four hundred", "six hundred", "million", "thousand"], "partial"),
+    ("budget", ["budget approved", "allocated", "signed off", "funding approved", "set aside", "earmarked", "board still has to bless", "board has to bless"], "confirmed"),
     ("authority", ["decision maker", "economic buyer", "sign off", "cio", "cto", "vp ", "director", "board", "manager", "head of", "lead", "chief", "executive", "owner"], "partial"),
     ("authority", ["reports to", "final say", "signatory", "approves", "i decide", "my call", "i approve"], "confirmed"),
     ("need", ["pain", "problem", "challenge", "struggling", "need to", "priority", "impact", "pain point", "overcome", "solution", "looking for", "looking forward", "require", "want to", "wish we", "gap", "issue", "bottleneck", "friction", "limitation", "automat"], "partial"),
     ("need", ["must have", "critical", "urgent need", "business case", "top priority", "deal breaker", "non-negotiable"], "confirmed"),
-    ("timeline", ["timeline", "deadline", "go-live", "launch", "q1", "q2", "q3", "q4", "by end of", "this quarter", "next quarter", "this year", "next month", "asap", "soon", "urgent", "immediately"], "partial"),
-    ("timeline", ["board meeting", "decision by", "kick off", "start date", "go live date", "target date"], "confirmed"),
+    ("timeline", ["timeline", "deadline", "go-live", "go live", "launch", "q1", "q2", "q3", "q4", "by end of", "this quarter", "next quarter", "this year", "next month", "asap", "soon", "urgent", "immediately", "production-grade", "pilot", "next year"], "partial"),
+    ("timeline", ["board meeting", "decision by", "kick off", "start date", "go live date", "target date", "production-grade by"], "confirmed"),
     ("success_criteria", ["success looks like", "success criteria", "kpi", "outcome", "measure", "metric"], "partial"),
     ("stakeholders", ["stakeholder", "who else", "involved", "team members", "evaluating", "colleague"], "partial"),
     ("decision_process", ["procurement", "rfp", "evaluation process", "steps to", "approval process"], "partial"),
@@ -268,24 +268,99 @@ def initial_checklist_state(
 
 
 def _apply_signals(text: str, items: List[ChecklistItemState], snippet: str) -> List[str]:
-    """Returns list of item ids that changed."""
+    """Returns list of item ids touched by this segment (status or new evidence)."""
     lower = text.lower()
     changed: List[str] = []
+
+    money_hit = bool(
+        re.search(
+            r"\$[\d,.]+[kmb]?|\b\d+(?:\.\d+)?\s*(?:million|billion|thousand|k|m|b)\b",
+            lower,
+        )
+    )
     for item_id, keywords, tier_status in SIGNAL_RULES:
-        if not any(kw in lower for kw in keywords):
+        matched = any(kw in lower for kw in keywords)
+        if item_id == "budget" and money_hit:
+            matched = True
+        if not matched:
             continue
         for it in items:
             if it.id != item_id:
                 continue
             new_status = _merge_status(it.status, tier_status)
-            if new_status != it.status:
+            status_changed = new_status != it.status
+            if status_changed:
                 it.status = new_status
-                changed.append(item_id)
             it.evidence.append(ChecklistEvidence(snippet=snippet[:200], confidence=0.75))
             if len(it.evidence) > 5:
                 it.evidence = it.evidence[-5:]
+            if item_id not in changed:
+                changed.append(item_id)
             break
     return changed
+
+
+def build_next_actions(checklist: Dict[str, Any], *, intent_label: Optional[str] = None) -> List[str]:
+    """Actionable AE prompts from open BANT gaps and live checklist evidence."""
+    items = {it["id"]: it for it in (checklist.get("items") or []) if isinstance(it, dict)}
+    open_gaps = list(checklist.get("openGaps") or [])
+    actions: List[str] = []
+
+    def evidence_snippet(item_id: str) -> str:
+        it = items.get(item_id) or {}
+        ev = (it.get("evidence") or [{}])[0] if it.get("evidence") else {}
+        return str(ev.get("snippet") or "")[:80]
+
+    gap_prompts = {
+        "budget": (
+            "Clarify budget range and who signs off — ask for approved envelope vs exploratory.",
+            "Probe budget — customer mentioned money on the call; confirm range and approval path.",
+        ),
+        "authority": (
+            "Identify economic buyer and signatory — map who must approve before procurement.",
+            "Confirm decision authority — ask who else must be in the room for a yes.",
+        ),
+        "need": (
+            "Quantify the core pain — ask what metric moves first if this problem is solved.",
+            "Dig into urgency — tie the stated pain to business impact and priority.",
+        ),
+        "timeline": (
+            "Pin target go-live and decision deadline — ask what must be true before the board says yes.",
+            "Confirm timeline — customer gave timing cues; validate pilot vs production dates.",
+        ),
+        "next_step": (
+            "Lock a concrete next step — propose calendar hold with the right attendees.",
+        ),
+    }
+
+    for gap in open_gaps:
+        if gap not in gap_prompts:
+            continue
+        snippet = evidence_snippet(gap)
+        if snippet and gap in ("budget", "timeline", "authority"):
+            actions.append(f'{gap_prompts[gap][1]} Quote: "{snippet}…"')
+        else:
+            actions.append(gap_prompts[gap][0])
+
+    bant = checklist.get("bant") or {}
+    confirmed = [k for k in ("budget", "authority", "need", "timeline") if bant.get(k) == "confirmed"]
+    if len(confirmed) >= 3 and "next_step" not in open_gaps:
+        actions.append("Strong BANT coverage — propose pilot scope, proposal timeline, and executive readout.")
+
+    if intent_label in ("commercial_discovery", "timeline_planning"):
+        actions.append("Align pitch to commercial + timeline signals — reference proposal path and dates.")
+
+    if not actions:
+        actions.append("Continue discovery — open questions on budget, authority, need, and timeline.")
+
+    seen: set[str] = set()
+    unique: List[str] = []
+    for a in actions:
+        if a in seen:
+            continue
+        seen.add(a)
+        unique.append(a)
+    return unique[:4]
 
 
 def update_checklist_from_segment(

@@ -50,9 +50,15 @@ class TenantService:
                     return str(inserted.data[0]["id"])
                 return None
 
-            tenant_uuid = run_with_timeout(_resolve_from_db, default=None)
+            # Upload/ingest need a real tenants row (kb_assets.tenant_id FK). Do not fall back
+            # to an in-memory UUID that was never inserted.
+            tenant_uuid = run_with_timeout(_resolve_from_db, default=None, timeout_sec=12.0)
             if tenant_uuid:
                 return tenant_uuid, clerk_key
+            raise RuntimeError(
+                f"Could not resolve tenant '{clerk_key}' in Supabase. "
+                "Check SUPABASE_URL, service role key, and network connectivity."
+            )
 
         store = get_memory_store()
         mapped = store.tenant_uuid_map.get(clerk_key)

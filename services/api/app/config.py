@@ -40,6 +40,11 @@ class Settings(BaseSettings):
         default=True,
         validation_alias=AliasChoices("workflow_agent_on_ingest", "pre_dc_agent_on_ingest"),
     )
+    # When false (default), PRE-DC Workflow runs after ingest HTTP response (avoids UI timeouts).
+    workflow_agent_ingest_sync: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("workflow_agent_ingest_sync", "pre_dc_agent_ingest_sync"),
+    )
     cors_allowed_origins: str = (
         "http://localhost:3000,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3002"
     )

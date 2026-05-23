@@ -2,6 +2,7 @@ import {
   buildBriefFromPreDc,
   buildPostDcBriefPreview,
   buildPostReviewFromPostDc,
+  findPreDcRecordForCall,
   slugifyCompany,
 } from "@/lib/dc-notes/build-from-import";
 import { buildCallsFromPreDc } from "@/lib/dc-data/build-calls-from-pre-dc";
@@ -35,28 +36,48 @@ export function resolveCall(callId: string): Call | undefined {
 export function resolveCallBrief(callId: string): CallBrief | null {
   const state = useDcImportsStore.getState();
   const preDcRecords = state.preDcRecords ?? [];
+  const call = resolveCall(callId);
+  const accountName =
+    call?.accountName ??
+    (callId === FRANCHISE_DEMO_CALL_ID ? franchiseDemoCall.accountName : undefined);
+
+  const preRecord = findPreDcRecordForCall(preDcRecords, callId, accountName);
+
+  if (preRecord) {
+    const canonicalId = slugifyCompany(preDcField(preRecord, "companyName"));
+    let brief = buildBriefFromPreDc(preRecord, callId);
+    const stored =
+      state.briefsByCallId?.[canonicalId] ??
+      state.briefsByCallId?.[callId] ??
+      state.briefsByCallId?.[FRANCHISE_DEMO_CALL_ID];
+    if (stored) {
+      brief = { ...brief, ...stored, callId };
+    }
+
+    const postRecord = (state.postDcRecords ?? []).find(
+      (r) =>
+        r.matchedCallId === callId ||
+        r.matchedCallId === canonicalId ||
+        r.matchedCallId === FRANCHISE_DEMO_CALL_ID
+    );
+    if (postRecord) {
+      brief = {
+        ...brief,
+        postDcPreview: buildPostDcBriefPreview(postRecord),
+      };
+    }
+    return brief;
+  }
+
+  if (callId === FRANCHISE_DEMO_CALL_ID) {
+    return franchiseDemoBrief;
+  }
+
   if (preDcRecords.length === 0) {
-    if (callId === FRANCHISE_DEMO_CALL_ID) return franchiseDemoBrief;
     return state.briefsByCallId?.[callId] ?? null;
   }
 
-  const preRecord = preDcRecords.find(
-    (r) => slugifyCompany(preDcField(r, "companyName")) === callId
-  );
-
-  if (!preRecord) return null;
-
-  let brief = buildBriefFromPreDc(preRecord, callId);
-
-  const postRecord = (state.postDcRecords ?? []).find((r) => r.matchedCallId === callId);
-  if (postRecord) {
-    brief = {
-      ...brief,
-      postDcPreview: buildPostDcBriefPreview(postRecord),
-    };
-  }
-
-  return brief;
+  return state.briefsByCallId?.[callId] ?? null;
 }
 
 export function resolvePostCallReview(callId: string): PostCallReview | null {

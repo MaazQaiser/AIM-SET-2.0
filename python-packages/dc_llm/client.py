@@ -84,7 +84,7 @@ class LlmClient:
         try:
             import anthropic  # type: ignore
 
-            client = anthropic.Anthropic(api_key=self.api_key)
+            client = anthropic.Anthropic(api_key=self.api_key, timeout=120.0)
             msg = client.messages.create(
                 model=model,
                 max_tokens=max_tokens,
@@ -172,7 +172,7 @@ class LlmClient:
         try:
             import anthropic  # type: ignore
 
-            client = anthropic.Anthropic(api_key=self.api_key)
+            client = anthropic.Anthropic(api_key=self.api_key, timeout=120.0)
             msg = client.messages.create(
                 model=model,
                 max_tokens=max_tokens,

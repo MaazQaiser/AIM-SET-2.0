@@ -16,6 +16,8 @@ from app.domain.kb_repository import get_kb_repository
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.live_call_session import BriefContext, LiveCallSession, get_live_session
 from app.domain.memory_store import get_memory_store
+from dc_tools.salient_keywords import filter_salient_terms, is_salient_term
+
 from app.tools.keyword_extract import extract_keywords
 from app.tools.sentiment import analyze_sentiment
 
@@ -25,6 +27,20 @@ _INTENT_FROM_SIGNAL = {
     "technical_question": "technical_deep_dive",
     "timeline_signal": "timeline_planning",
     "design_query": "design_exploration",
+    "objection_raised": "objection_handling",
+    "prospect_question": "discovery_q_and_a",
+}
+
+_INTENT_DISPLAY: Dict[str, str] = {
+    "commercial_discovery": "Budget & commercial discovery",
+    "competitive_evaluation": "Competitive evaluation",
+    "technical_deep_dive": "Technical deep dive",
+    "timeline_planning": "Timeline & go-live planning",
+    "design_exploration": "Design exploration",
+    "objection_handling": "Objection handling",
+    "discovery_q_and_a": "Discovery Q&A",
+    "topic_focus": "Topic focus",
+    "general_discovery": "General discovery",
 }
 
 _PAIN_EMERGENT_PATTERNS = [
@@ -117,15 +133,17 @@ def _update_keyword_counts(
     terms: List[str],
 ) -> None:
     counts = session.keyword_counts.setdefault(speaker_id, {})
-    for term in terms:
+    for term in filter_salient_terms(terms):
         counts[term] = counts.get(term, 0) + 1
 
     global_counts: Dict[str, int] = {}
     for speaker_counts in session.keyword_counts.values():
         for term, count in speaker_counts.items():
+            if not is_salient_term(term):
+                continue
             global_counts[term] = global_counts.get(term, 0) + count
     session.top_keywords = sorted(
-        [{"term": t, "count": c} for t, c in global_counts.items()],
+        [{"term": t, "count": c} for t, c in global_counts.items() if is_salient_term(t)],
         key=lambda x: x["count"],
         reverse=True,
     )[:10]
@@ -133,20 +151,29 @@ def _update_keyword_counts(
 
 def _recompute_focus_areas(session: LiveCallSession, signal_type: Optional[str]) -> None:
     areas: List[str] = []
-    intent_label = session.current_intent.get("label", "")
-    if intent_label and intent_label != "general_discovery":
-        areas.append(intent_label.replace("_", " ").title())
+    display = session.current_intent.get("display") or ""
+    if display:
+        areas.append(display)
     for kw in session.top_keywords[:3]:
-        areas.append(kw["term"])
+        areas.append(kw["term"].replace("-", " ").title())
     if signal_type:
-        areas.append(signal_type.replace("_", " "))
+        signal_labels = {
+            "budget_signal": "Budget",
+            "timeline_signal": "Timeline",
+            "competitor_mentioned": "Competition",
+            "technical_question": "Technical",
+            "objection_raised": "Objection",
+        }
+        areas.append(signal_labels.get(signal_type, signal_type.replace("_", " ").title()))
     session.focus_areas = list(dict.fromkeys(areas))[:4]
 
 
 def _update_intent(session: LiveCallSession, signal_type: Optional[str], text: str, confidence: float) -> None:
     if signal_type and signal_type in _INTENT_FROM_SIGNAL:
+        label = _INTENT_FROM_SIGNAL[signal_type]
         session.current_intent = {
-            "label": _INTENT_FROM_SIGNAL[signal_type],
+            "label": label,
+            "display": _INTENT_DISPLAY.get(label, label.replace("_", " ").title()),
             "confidence": confidence,
             "evidence": text[:160],
             "signal_type": signal_type,
@@ -155,6 +182,7 @@ def _update_intent(session: LiveCallSession, signal_type: Optional[str], text: s
         top = session.top_keywords[0]["term"]
         session.current_intent = {
             "label": "topic_focus",
+            "display": f"Focus: {top.replace('-', ' ').title()}",
             "confidence": 0.55,
             "evidence": f"Recurring topic: {top}",
             "signal_type": None,
@@ -381,14 +409,17 @@ def analyze_segment(
                         },
                     }
 
+    intent_payload = {
+        "intent": session.current_intent,
+        "focus_areas": session.focus_areas,
+        "pains": session.detected_pains[-10:],
+        "top_keywords": session.top_keywords,
+        "next_actions": [],
+    }
+
     return {
         "transcript": transcript_payload,
-        "intent_update": {
-            "intent": session.current_intent,
-            "focus_areas": session.focus_areas,
-            "pains": session.detected_pains[-10:],
-            "top_keywords": session.top_keywords,
-        },
+        "intent_update": intent_payload,
         "keyword_stats": session.keyword_stats_payload(),
         "sentiment": {
             "ae": session.last_ae_score,

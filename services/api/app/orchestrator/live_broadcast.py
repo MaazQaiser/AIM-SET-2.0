@@ -39,7 +39,7 @@ def envelope_to_ws_messages(
     elif op == "signal_annotation":
         bant = result.get("bant")
         if bant:
-            messages.append({"type": "signal", "payload": bant})
+            messages.append({"type": "bant_signal", "payload": bant})
         keywords = result.get("keywords")
         if keywords:
             messages.append({"type": "keywords", "payload": keywords})

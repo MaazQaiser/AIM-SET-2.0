@@ -15,6 +15,7 @@ from app.domain.agent_config_repository import get_agent_config_repository
 from app.domain.kb_repository import get_kb_repository
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.memory_store import get_memory_store
+from app.agents.relevant_content import build_relevant_content
 from dc_tools.retrieve_kb import default_embed_fn, retrieve_kb
 
 PROMPTS_ROOT = Path(__file__).resolve().parents[4] / "prompts"
@@ -291,6 +292,8 @@ def run_pre_dc_pipeline(
         elif "potential" in b:
             icp_match = 0.62
 
+    relevant = build_relevant_content(ctx, account_name, research)
+
     result: Dict[str, Any] = {
         "callId": call_id,
         "accountName": account_name,
@@ -314,6 +317,8 @@ def run_pre_dc_pipeline(
         "podNotes": [],
         "artifactPlan": artifact_plan,
         "artifactFulfillment": fulfillments,
+        "relevantDocuments": relevant.get("relevantDocuments") or [],
+        "relevantProjects": relevant.get("relevantProjects") or [],
         "agentStatus": "success",
     }
 

@@ -15,7 +15,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createEmptyPreDcRecord, PRE_DC_FIELD_ENTRIES } from "@/lib/dc-notes/create-pre-dc-record";
+import {
+  createEmptyPreDcRecord,
+  createSamplePreDcRecord,
+  PRE_DC_FIELD_ENTRIES,
+} from "@/lib/dc-notes/create-pre-dc-record";
 import { slugifyCompany } from "@/lib/dc-notes/build-from-import";
 import { PRE_DC_HEADERS, preDcField, type PreDCRecord } from "@/types/dc-notes";
 
@@ -26,10 +30,10 @@ interface AddPreDcLeadDialogProps {
 export function AddPreDcLeadDialog({ onCreated }: AddPreDcLeadDialogProps) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [record, setRecord] = useState<PreDCRecord>(() => createEmptyPreDcRecord());
+  const [record, setRecord] = useState<PreDCRecord>(() => createSamplePreDcRecord());
 
   const resetForm = useCallback(() => {
-    setRecord(createEmptyPreDcRecord());
+    setRecord(createSamplePreDcRecord());
   }, []);
 
   const updateField = useCallback((header: string, value: string) => {
@@ -45,7 +49,12 @@ export function AddPreDcLeadDialog({ onCreated }: AddPreDcLeadDialogProps) {
     [companyName]
   );
 
-  const handleGenerateTemplate = () => {
+  const handleLoadSample = () => {
+    setRecord(createSamplePreDcRecord());
+    toast.message("Sample lead loaded — edit any field before saving.");
+  };
+
+  const handleClearForm = () => {
     setRecord(
       createEmptyPreDcRecord({
         companyName: companyName || undefined,
@@ -54,7 +63,7 @@ export function AddPreDcLeadDialog({ onCreated }: AddPreDcLeadDialogProps) {
         discoveryCallTimePkt: preDcField(record, "discoveryCallTimePkt") || undefined,
       })
     );
-    toast.message("Template ready — fill in research fields below.");
+    toast.message("Cleared — only company, lead, and DC date/time kept.");
   };
 
   const handleCreate = async () => {
@@ -63,11 +72,14 @@ export function AddPreDcLeadDialog({ onCreated }: AddPreDcLeadDialogProps) {
       return;
     }
     setSaving(true);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 90_000);
     try {
       const res = await fetch("/api/dc-notes/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kind: "pre-dc", records: [record] }),
+        signal: controller.signal,
       });
       if (!res.ok) {
         const err = (await res.json().catch(() => null)) as {
@@ -82,22 +94,31 @@ export function AddPreDcLeadDialog({ onCreated }: AddPreDcLeadDialogProps) {
               : undefined;
         throw new Error(detail ?? err?.error ?? `Save failed (${res.status})`);
       }
-      const body = (await res.json()) as { agent_processed?: number };
+      const body = (await res.json()) as { agent_processed?: number; agent_queued?: number };
       onCreated?.(record, callId);
       setOpen(false);
       resetForm();
-      const agentNote =
+      const workflowNote =
         body.agent_processed != null && body.agent_processed > 0
-          ? " PRE-DC Workflow ran on this lead."
-          : "";
-      toast.success(`Lead created.${agentNote}`, {
+          ? " PRE-DC Workflow finished for this lead."
+          : body.agent_queued != null && body.agent_queued > 0
+            ? " PRE-DC Workflow is running in the background — refresh the Pre-call brief in a minute."
+            : "";
+      toast.success(`Lead saved.${workflowNote}`, {
         action: callId
           ? { label: "View call", onClick: () => window.location.assign(`/calls/${callId}`) }
           : undefined,
       });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not create lead");
+      if (e instanceof Error && e.name === "AbortError") {
+        toast.error(
+          "Save timed out. Check that the API is running on port 8000, then try again."
+        );
+      } else {
+        toast.error(e instanceof Error ? e.message : "Could not create lead");
+      }
     } finally {
+      window.clearTimeout(timeoutId);
       setSaving(false);
     }
   };
@@ -120,8 +141,8 @@ export function AddPreDcLeadDialog({ onCreated }: AddPreDcLeadDialogProps) {
         <DialogHeader>
           <DialogTitle>Add new Pre-DC lead</DialogTitle>
           <DialogDescription>
-            Create a lead in Pre-DC CSV format. Required: company name. PRE-DC Workflow runs after save
-            and shows the summary and artifacts on the Pre-DC screen.
+            Form opens with sample research you can edit. Required: company name. PRE-DC Workflow runs
+            after save and shows the summary and artifacts on the Pre-DC screen.
           </DialogDescription>
         </DialogHeader>
 
@@ -158,9 +179,14 @@ export function AddPreDcLeadDialog({ onCreated }: AddPreDcLeadDialogProps) {
             </div>
           </div>
 
-          <Button type="button" variant="outline" size="sm" onClick={handleGenerateTemplate}>
-            Generate empty template
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={handleLoadSample}>
+              Reload sample data
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={handleClearForm}>
+              Clear form
+            </Button>
+          </div>
 
           <div className="rounded-lg border p-3 max-h-[40vh] overflow-y-auto space-y-3">
             <p className="text-xs font-medium text-muted-foreground">All Pre-DC fields</p>

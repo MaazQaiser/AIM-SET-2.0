@@ -10,7 +10,19 @@ import {
   BriefDetailRow,
 } from "@/components/pre-call/brief-detail-card";
 import { cn } from "@/lib/cn";
+import type { BANTScore } from "@/types";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
+
+function bantEvidenceFromChecklist(state: DiscoveryChecklistState): Partial<Record<keyof BANTScore, string>> {
+  const out: Partial<Record<keyof BANTScore, string>> = {};
+  for (const item of state.items.filter((i) => i.tier === "bant")) {
+    const snippet = item.evidence?.[0]?.snippet;
+    if (snippet) {
+      out[item.id as keyof BANTScore] = snippet;
+    }
+  }
+  return out;
+}
 
 const statusLabel: Record<string, string> = {
   pending: "Open",
@@ -94,7 +106,12 @@ function DiscoveryChecklistBriefCard({
           title="BANT breakdown"
           summary={`Budget, authority, need, timeline — ${bantPct}% covered`}
         >
-          <BANTScorecard bant={state.bant} compact layout="stack" />
+          <BANTScorecard
+            bant={state.bant}
+            evidenceByDimension={bantEvidenceFromChecklist(state)}
+            compact
+            layout="stack"
+          />
         </BriefDetailAccordion>
 
         {bantItems.length > 0 && (
@@ -200,7 +217,12 @@ function DiscoveryChecklistFullPanel({
       </div>
 
       <div className="p-3 space-y-3">
-        <BANTScorecard bant={state.bant} compact layout="row" />
+        <BANTScorecard
+          bant={state.bant}
+          evidenceByDimension={bantEvidenceFromChecklist(state)}
+          compact
+          layout="row"
+        />
 
         {state.openGaps.length > 0 && (
           <p className="text-xs text-muted-foreground">

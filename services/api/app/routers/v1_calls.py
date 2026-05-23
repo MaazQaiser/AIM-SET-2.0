@@ -41,6 +41,14 @@ def get_brief(call_id: str, ctx: TenantContext = Depends(get_tenant_context)) ->
     return brief
 
 
+@router.get("/{call_id}/relevant-content")
+def get_relevant_content(call_id: str, ctx: TenantContext = Depends(get_tenant_context)) -> Dict[str, Any]:
+    try:
+        return _orch.dispatch_relevant_content(ctx, call_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.post("/{call_id}/generate-brief")
 def generate_brief(call_id: str, ctx: TenantContext = Depends(get_tenant_context)) -> Dict[str, Any]:
     return _orch.dispatch_pre_dc_brief(ctx, call_id)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status
 
 from app.config import get_settings
 from app.deps import verify_internal_secret
@@ -26,6 +26,18 @@ router = APIRouter(prefix="/dc-notes", tags=["dc-notes"])
 _calls = CallsService()
 _dc = get_dc_notes_repository()
 _orch = Orchestrator()
+
+
+def _run_pre_dc_pipeline_background(
+    ctx: TenantContext,
+    call_id: str,
+    fields: Dict[str, str],
+) -> None:
+    try:
+        _orch.dispatch_pre_dc_pipeline(ctx, call_id, fields, trigger="ingest")
+    except Exception:
+        # Pipeline failures are persisted on the brief by the orchestrator.
+        return
 
 
 def _tenant_id(
@@ -66,6 +78,7 @@ def get_dc_notes(
 @router.post("/ingest", response_model=IngestResponse, dependencies=[Depends(verify_internal_secret)])
 def ingest_dc_notes(
     body: IngestRequest,
+    background_tasks: BackgroundTasks,
     tenant_id: str = Depends(_tenant_id),
     x_user_id: Optional[str] = Header(default=None, alias="x-user-id"),
 ) -> IngestResponse:
@@ -102,23 +115,29 @@ def ingest_dc_notes(
     except Exception as exc:
         raise _service_error(exc) from exc
 
+    settings = get_settings()
     agent_processed = 0
-    if body.kind == "pre-dc" and get_settings().workflow_agent_on_ingest:
+    agent_queued = 0
+    if body.kind == "pre-dc" and settings.workflow_agent_on_ingest:
         for row in rows:
-            fields = row.get("fields") or {}
+            fields = {str(k): str(v) for k, v in (row.get("fields") or {}).items()}
             company = (fields.get("Company Name-PreDC") or "").strip()
             if not company:
                 continue
             call_id = slugify_company(company)
-            try:
-                _orch.dispatch_pre_dc_pipeline(
-                    ctx,
-                    call_id,
-                    {str(k): str(v) for k, v in fields.items()},
-                    trigger="ingest",
-                )
-                agent_processed += 1
-            except Exception:
-                continue
+            if settings.workflow_agent_ingest_sync:
+                try:
+                    _orch.dispatch_pre_dc_pipeline(ctx, call_id, fields, trigger="ingest")
+                    agent_processed += 1
+                except Exception:
+                    continue
+            else:
+                background_tasks.add_task(_run_pre_dc_pipeline_background, ctx, call_id, fields)
+                agent_queued += 1
 
-    return IngestResponse(upserted=len(rows), kind=body.kind, agent_processed=agent_processed)
+    return IngestResponse(
+        upserted=len(rows),
+        kind=body.kind,
+        agent_processed=agent_processed,
+        agent_queued=agent_queued,
+    )

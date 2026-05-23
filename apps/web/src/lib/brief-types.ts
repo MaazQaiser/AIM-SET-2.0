@@ -17,4 +17,8 @@ export type {
   PlannedArtifactType,
   ArtifactFulfillmentStatus,
   PreDcAgentStatus,
+  RelevantDocument,
+  RelevantProject,
+  RelevantProjectSource,
+  RelevantDocumentFormat,
 } from "@dc-copilot/types/brief";

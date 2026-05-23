@@ -1,7 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Lock, Send, Users } from "lucide-react";
+import {
+  Bot,
+  ChevronDown,
+  Download,
+  Lock,
+  Paperclip,
+  Send,
+  Sparkles,
+  Users,
+  X,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { BotChatSuggestedActions } from "@/components/bot-chat/bot-chat-suggested-actions";
@@ -18,7 +28,13 @@ import {
 } from "@/lib/bot-chat/suggested-actions";
 import { podDisplayForRole } from "@/lib/bot-chat/pod-display";
 import type { BotChatMessage, BotChatMode, BotChatPhase, SuggestedAction } from "@/lib/bot-chat/types";
-import { useBotChatStore } from "@/stores/use-bot-chat";
+import { EMPTY_BOT_CHAT_MESSAGES, useBotChatStore } from "@/stores/use-bot-chat";
+import {
+  type CopilotAgentAction,
+  type CopilotCallExport,
+  type CopilotMessage,
+  useSalesCopilotStore,
+} from "@/stores/use-sales-copilot";
 import { usePersona } from "@/hooks/use-persona";
 import type { CallBrief } from "@/lib/brief-types";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
@@ -27,6 +43,8 @@ import type { Citation, PodRole } from "@/types";
 interface BotChatPanelProps {
   callId: string;
   className?: string;
+  /** Embedded in page layout, or fixed floating dock at bottom center */
+  variant?: "embedded" | "floating";
   phase?: BotChatPhase;
   accountName?: string;
   brief?: CallBrief | null;
@@ -38,12 +56,107 @@ interface BotChatPanelProps {
   hasObjections?: boolean;
 }
 
-function authorBadge(msg: BotChatMessage) {
+function downloadExport(exportPayload: CopilotCallExport, format: "json" | "markdown") {
+  const cid = exportPayload.call_id ?? "call";
+  let content: string;
+  let mime: string;
+  let ext: string;
+  if (format === "markdown" && exportPayload.markdown) {
+    content = exportPayload.markdown;
+    mime = "text/markdown";
+    ext = "md";
+  } else {
+    content = JSON.stringify(exportPayload, null, 2);
+    mime = "application/json";
+    ext = "json";
+  }
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${cid}-summary.${ext}`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function CopilotActionCards({ actions }: { actions: CopilotAgentAction[] }) {
+  if (!actions.length) return null;
+  return (
+    <div className="mt-2 flex flex-col gap-1.5">
+      {actions.map((a, i) => (
+        <div
+          key={`${a.tool ?? a.agent}-${i}`}
+          className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-[11px]"
+        >
+          <span className="font-medium text-primary">
+            {a.agent ? `Agent: ${a.agent}` : a.tool ?? "Action"}
+          </span>
+          {a.summary && <p className="text-muted-foreground mt-0.5">{a.summary}</p>}
+          {a.callId && (
+            <p className="text-muted-foreground/80 text-[10px]">Call: {a.callId}</p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CopilotCallExports({ exports }: { exports: CopilotCallExport[] }) {
+  if (!exports.length) return null;
+  return (
+    <details className="mt-2 rounded-md border border-border/60 bg-muted/30 px-2 py-1.5 text-[11px]">
+      <summary className="cursor-pointer font-medium text-foreground">Call detail</summary>
+      <div className="mt-2 space-y-2">
+        {exports.map((ex, i) => (
+          <div key={ex.call_id ?? i} className="space-y-1">
+            <p className="text-muted-foreground">
+              {(ex.call as { accountName?: string } | undefined)?.accountName ??
+                ex.call_id ??
+                "Call"}
+            </p>
+            {(ex.brief as { aiSummary?: string } | undefined)?.aiSummary && (
+              <p className="line-clamp-3 text-foreground/90">
+                {(ex.brief as { aiSummary?: string }).aiSummary}
+              </p>
+            )}
+            <div className="flex gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px]"
+                onClick={() => downloadExport(ex, "json")}
+              >
+                <Download className="h-3 w-3 mr-1" />
+                JSON
+              </Button>
+              {ex.markdown && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-[10px]"
+                  onClick={() => downloadExport(ex, "markdown")}
+                >
+                  <Download className="h-3 w-3 mr-1" />
+                  Markdown
+                </Button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function authorBadge(msg: BotChatMessage | CopilotMessage, copilotMode?: boolean) {
   if (msg.role === "assistant") {
+    const label = copilotMode ? "Sales Co-pilot" : "DC Copilot";
     return (
       <span className="text-[10px] font-semibold text-primary flex items-center gap-1 mb-1">
         <Bot className="h-3 w-3" aria-hidden />
-        DC Copilot
+        {label}
       </span>
     );
   }
@@ -65,6 +178,7 @@ function authorBadge(msg: BotChatMessage) {
 export function BotChatPanel({
   callId,
   className,
+  variant = "embedded",
   phase = "live",
   accountName,
   brief,
@@ -79,26 +193,66 @@ export function BotChatPanel({
     persona === "leadership" || persona === "content-owner" ? "leadership" : persona;
   const podMember = podDisplayForRole(viewerRole);
 
-  const mode = useBotChatStore((s) => s.getMode(callId));
+  const mode = useBotChatStore((s) => s.byCallId[callId]?.mode ?? "group");
   const setMode = useBotChatStore((s) => s.setMode);
-  const messages = useBotChatStore((s) => s.getMessages(callId, mode));
+  const callMessages = useBotChatStore((s) => {
+    const st = s.byCallId[callId];
+    if (!st) return EMPTY_BOT_CHAT_MESSAGES;
+    return mode === "group" ? st.groupMessages : st.directMessages;
+  });
   const appendMessage = useBotChatStore((s) => s.appendMessage);
   const seedGroupWelcome = useBotChatStore((s) => s.seedGroupWelcome);
 
+  const copilotMessages = useSalesCopilotStore((s) => s.messages);
+  const copilotLoading = useSalesCopilotStore((s) => s.isLoading);
+  const pendingFile = useSalesCopilotStore((s) => s.pendingFile);
+  const appendCopilotMessage = useSalesCopilotStore((s) => s.appendMessage);
+  const setCopilotLoading = useSalesCopilotStore((s) => s.setLoading);
+  const setPendingFile = useSalesCopilotStore((s) => s.setPendingFile);
+  const seedCopilotWelcome = useSalesCopilotStore((s) => s.seedWelcome);
+
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [localLoading, setLocalLoading] = useState(false);
+
+  const isCopilotMode = mode === "copilot";
+  const messages: (BotChatMessage | CopilotMessage)[] = isCopilotMode
+    ? copilotMessages
+    : callMessages;
+  const isLoading = isCopilotMode ? copilotLoading : localLoading;
   const [error, setError] = useState<string | null>(null);
+  const [floatingExpanded, setFloatingExpanded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const userScrolledRef = useRef(false);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isFloating = variant === "floating";
+
+  useEffect(() => {
+    if (!isFloating || !floatingExpanded) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (dockRef.current && !dockRef.current.contains(e.target as Node)) {
+        setFloatingExpanded(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [isFloating, floatingExpanded]);
+
+  useEffect(() => {
+    if (isFloating && messages.length > 0) setFloatingExpanded(true);
+  }, [isFloating, messages.length]);
 
   useEffect(() => {
     if (mode === "group") seedGroupWelcome(callId, accountName);
-  }, [callId, accountName, mode, seedGroupWelcome]);
+    if (mode === "copilot") seedCopilotWelcome();
+  }, [callId, accountName, mode, seedGroupWelcome, seedCopilotWelcome]);
 
   const suggestedCtx: SuggestedActionsContext = useMemo(
     () => ({
       phase,
+      mode,
       persona: viewerRole,
       accountName,
       brief,
@@ -111,6 +265,7 @@ export function BotChatPanel({
     }),
     [
       phase,
+      mode,
       viewerRole,
       accountName,
       brief,
@@ -136,7 +291,113 @@ export function BotChatPanel({
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed || isLoading) return;
+      if (isLoading) return;
+      if (!trimmed && !(isCopilotMode && pendingFile)) return;
+
+      setInput("");
+      if (isFloating) setFloatingExpanded(true);
+      setError(null);
+
+      if (isCopilotMode) {
+        let uploadNote = "";
+        const file = pendingFile;
+        if (file) {
+          setCopilotLoading(true);
+          try {
+            const form = new FormData();
+            form.append("file", file);
+            form.append("title", file.name);
+            const upRes = await fetch("/api/copilot/upload", { method: "POST", body: form });
+            if (!upRes.ok) {
+              const errBody = (await upRes.json().catch(() => ({}))) as { error?: string };
+              throw new Error(errBody.error ?? "File upload failed");
+            }
+            const upData = (await upRes.json()) as { asset?: { id?: string; title?: string } };
+            uploadNote = `\n[Uploaded to KB: ${upData.asset?.title ?? file.name} (asset ${upData.asset?.id ?? "pending"})]`;
+            setPendingFile(null);
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Upload failed");
+            setCopilotLoading(false);
+            return;
+          }
+        }
+
+        const userContent = (trimmed || `Upload file: ${file?.name ?? "document"}`) + uploadNote;
+        appendCopilotMessage({
+          id: crypto.randomUUID(),
+          role: "user",
+          content: userContent,
+          createdAt: Date.now(),
+        });
+
+        const history = copilotMessages
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .slice(-20)
+          .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+
+        setCopilotLoading(true);
+        const ctrl = new AbortController();
+        const timeout = window.setTimeout(() => ctrl.abort(), 45000);
+        try {
+          const res = await fetch("/api/copilot/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: ctrl.signal,
+            body: JSON.stringify({
+              message: userContent,
+              history,
+              callId,
+            }),
+          });
+
+          if (!res.ok) {
+            const body = (await res.json().catch(() => ({}))) as { error?: string };
+            throw new Error(body.error ?? "Sales Co-pilot is not available");
+          }
+
+          const data = (await res.json()) as {
+            content: string;
+            citations?: Citation[];
+            message_id?: string;
+            actions_taken?: CopilotAgentAction[];
+            call_exports?: CopilotCallExport[];
+          };
+
+          appendCopilotMessage({
+            id: data.message_id ?? crypto.randomUUID(),
+            role: "assistant",
+            content: data.content,
+            citations: data.citations,
+            actions: (data.actions_taken ?? []).map((a) => {
+              const row = a as Record<string, unknown>;
+              return {
+                tool: typeof row.tool === "string" ? row.tool : undefined,
+                agent: typeof row.agent === "string" ? row.agent : undefined,
+                callId:
+                  typeof row.call_id === "string"
+                    ? row.call_id
+                    : typeof row.callId === "string"
+                      ? row.callId
+                      : undefined,
+                status: typeof row.status === "string" ? row.status : undefined,
+                summary: typeof row.summary === "string" ? row.summary : undefined,
+              };
+            }),
+            callExports: data.call_exports as CopilotCallExport[] | undefined,
+            createdAt: Date.now(),
+          });
+        } catch (err) {
+          if (err instanceof DOMException && err.name === "AbortError") {
+            setError("Sales Co-pilot timed out after 45s. Please try a shorter prompt.");
+          } else {
+            setError(err instanceof Error ? err.message : "Failed to send message");
+          }
+        } finally {
+          window.clearTimeout(timeout);
+          setCopilotLoading(false);
+        }
+        return;
+      }
 
       const userMessage: BotChatMessage = {
         id: crypto.randomUUID(),
@@ -150,9 +411,7 @@ export function BotChatPanel({
       };
 
       appendMessage(callId, mode, userMessage);
-      setInput("");
-      setIsLoading(true);
-      setError(null);
+      setLocalLoading(true);
 
       try {
         const res = await fetch(`/api/calls/${callId}/bot-chat`, {
@@ -188,10 +447,24 @@ export function BotChatPanel({
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to send message");
       } finally {
-        setIsLoading(false);
+        setLocalLoading(false);
       }
     },
-    [callId, mode, isLoading, appendMessage, podMember, viewerRole]
+    [
+      callId,
+      mode,
+      isLoading,
+      isFloating,
+      isCopilotMode,
+      appendMessage,
+      appendCopilotMessage,
+      copilotMessages,
+      pendingFile,
+      podMember,
+      viewerRole,
+      setPendingFile,
+      setCopilotLoading,
+    ]
   );
 
   async function handleSubmit(e: React.FormEvent) {
@@ -200,15 +473,176 @@ export function BotChatPanel({
   }
 
   function handleSuggestedAction(action: SuggestedAction) {
+    setFloatingExpanded(true);
     void sendMessage(action.prompt);
   }
 
-  return (
-    <div className={cn("flex flex-col h-full min-h-0 bg-card", className)}>
+  const inputPlaceholder = isCopilotMode
+    ? isFloating
+      ? "Ask Sales Co-pilot anything…"
+      : "Search KB, run agents, inspect calls…"
+    : mode === "group"
+      ? isFloating
+        ? "Ask me anything…"
+        : "Message the pod or ask Copilot…"
+      : isFloating
+        ? "Ask Copilot privately…"
+        : "Private question for Copilot…";
+
+  const attachmentChip =
+    isCopilotMode && pendingFile ? (
+      <div className="flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-1 text-[11px] shrink-0 mb-2">
+        <Paperclip className="h-3 w-3" aria-hidden />
+        <span className="truncate max-w-[12rem]">{pendingFile.name}</span>
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground"
+          aria-label="Remove attachment"
+          onClick={() => setPendingFile(null)}
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+    ) : null;
+
+  const chatInput = (
+    <form
+      onSubmit={handleSubmit}
+      className={cn(
+        "flex flex-col gap-2 shrink-0",
+        isFloating ? "p-0" : "border-t border-border p-3"
+      )}
+    >
+      {attachmentChip}
+      {isFloating ? (
+        <div className="w-full rounded-full p-[3px] bg-gradient-to-r from-primary via-primary/70 to-primary/35 shadow-lg shadow-primary/20">
+          <div className="flex items-center gap-2 rounded-full bg-background pl-3 pr-1.5 py-1.5">
+            {isCopilotMode && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) setPendingFile(f);
+                    e.target.value = "";
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 shrink-0 rounded-full"
+                  aria-label="Attach file to knowledge base"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onFocus={() => setFloatingExpanded(true)}
+              placeholder={inputPlaceholder}
+              disabled={isLoading}
+              className="flex-1 min-w-0 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none border-0 pl-2"
+              aria-label={
+                isCopilotMode
+                  ? "Sales Co-pilot message"
+                  : mode === "group"
+                    ? "Pod group message"
+                    : "Direct message to Copilot"
+              }
+            />
+            <Button
+              type="submit"
+              size="icon"
+              variant="ghost"
+              disabled={isLoading || (!input.trim() && !pendingFile)}
+              aria-label="Send"
+              className="relative h-9 w-9 shrink-0 rounded-full hover:bg-primary/10"
+            >
+              <Send className="h-4 w-4 text-foreground" />
+              <Sparkles className="absolute -top-0.5 -right-0.5 h-3 w-3 text-primary" aria-hidden />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-2 w-full">
+          {isCopilotMode && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setPendingFile(f);
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                aria-label="Attach file"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={inputPlaceholder}
+            disabled={isLoading}
+            className="flex-1 text-sm"
+            aria-label={
+              isCopilotMode
+                ? "Sales Co-pilot message"
+                : mode === "group"
+                  ? "Pod group message"
+                  : "Direct message to Copilot"
+            }
+          />
+          <Button
+            type="submit"
+            size="icon"
+            disabled={isLoading || (!input.trim() && !pendingFile)}
+            aria-label="Send"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+    </form>
+  );
+
+  const panelBody = (
+    <>
       <div className="flex items-center gap-2 border-b border-border px-3 py-2 shrink-0">
         <Bot className="h-4 w-4 text-primary shrink-0" aria-hidden />
-        <span className="text-sm font-medium truncate">DC Copilot</span>
+        <span className="text-sm font-medium truncate">
+          {isCopilotMode ? "Sales Co-pilot" : "DC Copilot Pod"}
+        </span>
         <div className="ml-auto flex items-center gap-1 shrink-0">
+          {isFloating && floatingExpanded && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0"
+              aria-label="Minimize copilot"
+              onClick={() => setFloatingExpanded(false)}
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          )}
           <div
             className="inline-flex rounded-md border border-border p-0.5 bg-muted/30"
             role="tablist"
@@ -244,12 +678,31 @@ export function BotChatPanel({
               <Lock className="h-3 w-3" aria-hidden />
               Direct
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "copilot"}
+              className={cn(
+                "inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-colors",
+                mode === "copilot"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              onClick={() => setMode(callId, "copilot")}
+            >
+              <Sparkles className="h-3 w-3" aria-hidden />
+              Co-pilot
+            </button>
           </div>
           <AIGeneratedBadge />
         </div>
       </div>
 
-      {mode === "group" ? (
+      {isCopilotMode ? (
+        <p className="text-[10px] text-muted-foreground px-3 py-1.5 border-b border-border/60 shrink-0">
+          Global assistant — search KB (vector store), inspect any call, run agents, or upload files.
+        </p>
+      ) : mode === "group" ? (
         <p className="text-[10px] text-muted-foreground px-3 py-1.5 border-b border-border/60 shrink-0">
           Shared with everyone on this call. Copilot replies appear for the whole pod.
         </p>
@@ -285,69 +738,101 @@ export function BotChatPanel({
             {error}
           </p>
         )}
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={cn(
-              "flex",
-              msg.role === "user" ? "justify-end" : "justify-start",
-              msg.role === "system" && "justify-center"
-            )}
-          >
+        {messages.map((msg) => {
+          const copilotMsg = msg as CopilotMessage;
+          const isPrivate = "isPrivate" in msg && msg.isPrivate;
+          return (
             <div
+              key={msg.id}
               className={cn(
-                "max-w-[92%] rounded-lg px-3 py-2 text-sm min-w-0",
-                msg.role === "user" && "bg-primary text-primary-foreground",
-                msg.role === "assistant" && "bg-muted text-foreground border border-border/60",
-                msg.role === "system" &&
-                  "bg-muted/40 text-muted-foreground text-xs text-center border border-dashed border-border max-w-full"
+                "flex",
+                msg.role === "user" ? "justify-end" : "justify-start",
+                msg.role === "system" && "justify-center"
               )}
             >
-              {authorBadge(msg)}
-              {msg.role === "assistant" ? (
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                  {msg.citations && msg.citations.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {msg.citations.map((c, i) => (
-                        <CitationMarker key={c.id ?? i} index={i + 1} citation={c} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <span className="whitespace-pre-wrap break-words">{msg.content}</span>
-              )}
+              <div
+                className={cn(
+                  "max-w-[92%] rounded-lg px-3 py-2 text-sm min-w-0",
+                  msg.role === "user" && "bg-primary text-primary-foreground",
+                  msg.role === "assistant" && "bg-muted text-foreground border border-border/60",
+                  msg.role === "system" &&
+                    "bg-muted/40 text-muted-foreground text-xs text-center border border-dashed border-border max-w-full"
+                )}
+              >
+                {authorBadge(msg, isCopilotMode)}
+                {msg.role === "assistant" ? (
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                    {msg.citations && msg.citations.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {msg.citations.map((c, i) => (
+                          <CitationMarker key={c.id ?? i} index={i + 1} citation={c} />
+                        ))}
+                      </div>
+                    )}
+                    {isCopilotMode && copilotMsg.actions && copilotMsg.actions.length > 0 && (
+                      <CopilotActionCards actions={copilotMsg.actions} />
+                    )}
+                    {isCopilotMode &&
+                      copilotMsg.callExports &&
+                      copilotMsg.callExports.length > 0 && (
+                        <CopilotCallExports exports={copilotMsg.callExports} />
+                      )}
+                  </div>
+                ) : (
+                  <span className="whitespace-pre-wrap break-words">{msg.content}</span>
+                )}
+                {isPrivate && (
+                  <span className="sr-only">Private message</span>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {isLoading && (
           <div className="flex justify-start">
             <Badge variant="secondary" className="text-[10px] animate-pulse">
-              DC Copilot is thinking…
+              {isCopilotMode ? "Sales Co-pilot is thinking…" : "DC Copilot is thinking…"}
             </Badge>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="border-t border-border p-3 flex gap-2 shrink-0">
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={
-            mode === "group"
-              ? "Message the pod or ask Copilot…"
-              : "Private question for Copilot…"
-          }
-          disabled={isLoading}
-          className="flex-1 text-sm"
-          aria-label={mode === "group" ? "Pod group message" : "Direct message to Copilot"}
-        />
-        <Button type="submit" size="icon" disabled={isLoading || !input.trim()} aria-label="Send">
-          <Send className="h-4 w-4" />
-        </Button>
-      </form>
+      {!isFloating && chatInput}
+    </>
+  );
+
+  if (isFloating) {
+    return (
+      <div
+        ref={dockRef}
+        className={cn(
+          "fixed bottom-6 left-1/2 z-50 flex w-[min(100%,42rem)] -translate-x-1/2 flex-col px-4 pointer-events-none",
+          className
+        )}
+        aria-label="DC Copilot floating chat"
+      >
+        <div className="pointer-events-auto flex flex-col gap-3">
+          {floatingExpanded && (
+            <div
+              className={cn(
+                "flex min-h-[240px] max-h-[min(420px,50vh)] flex-col overflow-hidden rounded-2xl border border-border/80",
+                "bg-card/95 shadow-2xl backdrop-blur-md"
+              )}
+            >
+              <div className="flex min-h-0 flex-1 flex-col">{panelBody}</div>
+            </div>
+          )}
+          {chatInput}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("flex flex-col h-full min-h-0 bg-card", className)}>
+      {panelBody}
     </div>
   );
 }

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -12,6 +11,7 @@ from dc_llm.client import LlmClient
 from app.config import get_settings
 from app.domain.agent_runtime import get_content_generation_runtime
 from app.domain.content_studio_repository import get_content_studio_repository
+from app.services.office_preview import convert_office_file_to_pdf
 
 PROMPTS_ROOT = Path(__file__).resolve().parents[4] / "prompts"
 
@@ -91,64 +91,11 @@ def _rasterize(file_bytes: bytes, ext: str) -> List[bytes]:
         pdf_path = src
 
         if ext in {".pptx", ".ppt"}:
-            pdf_path = _convert_office_to_pdf(src, tmp_path)
+            pdf_path = convert_office_file_to_pdf(src, tmp_path, allow_text_fallback=True)
         elif ext != ".pdf":
             raise ValueError(f"Unsupported extension: {ext}")
 
         return _pdf_to_pngs(pdf_path)
-
-
-def _convert_office_to_pdf(src: Path, work_dir: Path) -> Path:
-    try:
-        subprocess.run(
-            [
-                "soffice",
-                "--headless",
-                "--convert-to",
-                "pdf",
-                "--outdir",
-                str(work_dir),
-                str(src),
-            ],
-            check=True,
-            capture_output=True,
-            timeout=120,
-        )
-        pdf = work_dir / f"{src.stem}.pdf"
-        if pdf.is_file():
-            return pdf
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        pass
-
-    try:
-        from pptx import Presentation  # type: ignore
-
-        if src.suffix.lower() in {".pptx", ".ppt"}:
-            return _pptx_fallback_raster_via_pillow(src)
-    except Exception:
-        pass
-
-    raise ValueError("Could not convert presentation to PDF (install LibreOffice or use PDF/PNG upload)")
-
-
-def _pptx_fallback_raster_via_pillow(src: Path) -> Path:
-    """Fallback: export slide text placeholders as single-page PDF via pymupdf."""
-    import fitz  # type: ignore
-    from pptx import Presentation  # type: ignore
-
-    prs = Presentation(str(src))
-    doc = fitz.open()
-    for slide in prs.slides:
-        page = doc.new_page(width=1280, height=720)
-        texts = []
-        for shape in slide.shapes:
-            if hasattr(shape, "text") and shape.text:
-                texts.append(shape.text[:200])
-        page.insert_text((40, 40), "\n".join(texts[:8]) or "Slide", fontsize=14)
-    out = src.parent / f"{src.stem}_fallback.pdf"
-    doc.save(str(out))
-    doc.close()
-    return out
 
 
 def _pdf_to_pngs(pdf_path: Path) -> List[bytes]:

@@ -9,6 +9,7 @@ if (process.env.VERCEL === "1") {
 }
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   experimental: {
     // Clerk proxy.ts buffers request bodies; raise limit for KB file uploads (API allows ~50MB).
     proxyClientMaxBodySize: "52mb",

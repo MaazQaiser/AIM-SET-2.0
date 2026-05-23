@@ -355,3 +355,11 @@ CREATE INDEX IF NOT EXISTS live_call_suggestions_call_time_idx
 ALTER TABLE call_live_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE call_transcript_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE live_call_suggestions ENABLE ROW LEVEL SECURITY;
+
+-- KB preview (007)
+ALTER TABLE kb_assets
+  ADD COLUMN IF NOT EXISTS preview_storage_path TEXT;
+
+-- KB slide preview (008)
+ALTER TABLE kb_assets
+  ADD COLUMN IF NOT EXISTS preview_slide_count INT NOT NULL DEFAULT 0;

@@ -315,6 +315,10 @@ export const FRANCHISE_DEMO_TRANSCRIPT: DemoTranscriptLine[] = [
 
 export function mergeFranchiseDemoCalls(calls: Call[]): Call[] {
   if (calls.some((c) => c.id === FRANCHISE_DEMO_CALL_ID)) return calls;
+  const hasSameAccount = calls.some(
+    (c) => c.accountName?.trim().toLowerCase() === franchiseDemoCall.accountName.trim().toLowerCase()
+  );
+  if (hasSameAccount) return calls;
   return [franchiseDemoCall, ...calls];
 }
 

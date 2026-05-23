@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from dc_tools.salient_keywords import is_salient_term
+
 
 @dataclass
 class BriefContext:
@@ -54,17 +56,18 @@ class LiveCallSession:
             for term, count in speaker_counts.items():
                 global_counts[term] = global_counts.get(term, 0) + count
         global_top = sorted(
-            [{"term": t, "count": c} for t, c in global_counts.items()],
+            [{"term": t, "count": c} for t, c in global_counts.items() if is_salient_term(t)],
             key=lambda x: x["count"],
             reverse=True,
         )[:10]
         by_speaker = {
             sid: sorted(
-                [{"term": t, "count": c} for t, c in counts.items()],
+                [{"term": t, "count": c} for t, c in counts.items() if is_salient_term(t)],
                 key=lambda x: x["count"],
                 reverse=True,
             )[:8]
             for sid, counts in self.keyword_counts.items()
+            if any(is_salient_term(t) for t in counts)
         }
         return {"by_speaker": by_speaker, "global_top": global_top}
 

@@ -32,8 +32,9 @@ def project_ref_from_url(url: str) -> str:
 def connection_candidates(ref: str, password: str) -> list[str]:
     encoded = quote_plus(password)
     pools = [
-        f"postgresql://postgres.{ref}:{encoded}@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres",
         f"postgresql://postgres.{ref}:{encoded}@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres",
+        f"postgresql://postgres.{ref}:{encoded}@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres",
+        f"postgresql://postgres.{ref}:{encoded}@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres",
         f"postgresql://postgres.{ref}:{encoded}@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres",
         f"postgresql://postgres:{encoded}@db.{ref}.supabase.co:5432/postgres",
     ]

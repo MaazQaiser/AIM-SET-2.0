@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { DashboardWidget } from "@/components/dashboard-grid/dashboard-widget";
 import {
   buildDefaultColumnOrder,
@@ -10,6 +10,7 @@ import {
 import type { WidgetColumn, WidgetSpec } from "@/lib/dashboard/widget-registry";
 import { cn } from "@/lib/cn";
 import { useDashboardLayoutStore, type LayoutKey } from "@/stores/use-dashboard-layout";
+import { EditableColumnGrid } from "@/components/calls/editable-column-grid";
 
 interface CallDetailColumnLayoutProps<P> {
   layoutKey: LayoutKey;
@@ -34,7 +35,9 @@ export function CallDetailColumnLayout<P>({
   const isEditing = useDashboardLayoutStore((s) => s.isEditing);
   const hidden = useDashboardLayoutStore((s) => s.hidden[layoutKey] ?? []);
   const storedOrder = useDashboardLayoutStore((s) => s.columnOrder[layoutKey]);
+  const widgetHeights = useDashboardLayoutStore((s) => s.widgetHeights[layoutKey] ?? {});
   const hideWidget = useDashboardLayoutStore((s) => s.hideWidget);
+  const setEditBaseline = useDashboardLayoutStore((s) => s.setEditBaseline);
 
   const visibleWidgets = useMemo(
     () =>
@@ -58,10 +61,32 @@ export function CallDetailColumnLayout<P>({
     [storedOrder, defaultOrder, visibleIds]
   );
 
-  const grouped = useMemo(
-    () => orderWidgetsByColumn(visibleWidgets, columnOrder),
-    [visibleWidgets, columnOrder]
-  );
+  // Capture the baseline the first time edit mode opens so Reset can restore it.
+  const capturedForSession = useRef(false);
+  useEffect(() => {
+    if (isEditing && !capturedForSession.current) {
+      setEditBaseline(layoutKey, { columnOrder, hidden, widgetHeights });
+      capturedForSession.current = true;
+    }
+    if (!isEditing) {
+      capturedForSession.current = false;
+    }
+  }, [isEditing, layoutKey, columnOrder, hidden, widgetHeights, setEditBaseline]);
+
+  // Edit mode: full drag + resize via react-grid-layout.
+  if (isEditing) {
+    return (
+      <EditableColumnGrid
+        layoutKey={layoutKey}
+        widgets={visibleWidgets}
+        widgetProps={widgetProps}
+        columnOrder={columnOrder}
+      />
+    );
+  }
+
+  // Static 3-column view.
+  const grouped = orderWidgetsByColumn(visibleWidgets, columnOrder);
 
   return (
     <div
@@ -77,7 +102,6 @@ export function CallDetailColumnLayout<P>({
         label={COLUMN_LABELS.left}
         widgets={grouped.left}
         widgetProps={widgetProps}
-        isEditing={isEditing}
         onHide={(id) => hideWidget(layoutKey, id)}
       />
       <ColumnRail
@@ -85,7 +109,6 @@ export function CallDetailColumnLayout<P>({
         label={COLUMN_LABELS.center}
         widgets={grouped.center}
         widgetProps={widgetProps}
-        isEditing={isEditing}
         onHide={(id) => hideWidget(layoutKey, id)}
         header={centerHeader}
         isPrimary
@@ -95,7 +118,6 @@ export function CallDetailColumnLayout<P>({
         label={COLUMN_LABELS.right}
         widgets={grouped.right}
         widgetProps={widgetProps}
-        isEditing={isEditing}
         onHide={(id) => hideWidget(layoutKey, id)}
       />
     </div>
@@ -107,7 +129,6 @@ function ColumnRail<P>({
   label,
   widgets,
   widgetProps,
-  isEditing,
   onHide,
   header,
   isPrimary,
@@ -116,7 +137,6 @@ function ColumnRail<P>({
   label: string;
   widgets: WidgetSpec<P>[];
   widgetProps: P;
-  isEditing: boolean;
   onHide: (id: string) => void;
   header?: React.ReactNode;
   isPrimary?: boolean;
@@ -127,22 +147,19 @@ function ColumnRail<P>({
     <section
       className={cn(
         "flex min-w-0 flex-col gap-3",
-        zone === "center" ? "min-h-0" : "lg:sticky lg:top-4 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto"
+        zone === "center"
+          ? "min-h-0"
+          : "lg:sticky lg:top-4 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto"
       )}
       aria-label={label}
     >
-      {isEditing && (
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-0.5">
-          {label}
-        </p>
-      )}
       {header}
       <div className={cn("flex flex-col gap-3 min-w-0", isPrimary && "gap-4")}>
         {widgets.map((spec) => (
           <DashboardWidget
             key={spec.id}
             title={spec.title}
-            isEditing={isEditing}
+            isEditing={false}
             columnZone={zone}
             onHide={() => onHide(spec.id)}
           >

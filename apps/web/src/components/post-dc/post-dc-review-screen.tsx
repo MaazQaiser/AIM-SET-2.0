@@ -1,16 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, FileSpreadsheet, Radio } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileSpreadsheet, Pencil, Radio } from "lucide-react";
 import { CallDetailColumnLayout } from "@/components/calls/call-detail-column-layout";
 import { LayoutControls } from "@/components/dashboard-grid/layout-controls";
 import { POST_DC_WIDGETS } from "@/lib/dashboard/widget-registry";
+import { normalizePostDcWidgetProps } from "@/lib/dashboard/normalize-widget-props";
 import { useCall, usePostCallReview } from "@/lib/data/hooks";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import type { AccountSnapshotRow } from "@/components/calls/account-widget-cards";
+import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
 
 interface PostDcReviewScreenProps {
   callId: string;
@@ -29,6 +32,8 @@ export function PostDcReviewScreen({
 }: PostDcReviewScreenProps) {
   const { data: call, isLoading: callLoading } = useCall(callId);
   const { data: review, isLoading: reviewLoading } = usePostCallReview(callId);
+  const isEditingLayout = useDashboardLayoutStore((s) => s.isEditing);
+  const setEditingLayout = useDashboardLayoutStore((s) => s.setEditing);
 
   const snapshot =
     accountSnapshot.length > 0
@@ -92,12 +97,30 @@ export function PostDcReviewScreen({
               </p>
             </div>
           </div>
-          <CallWrapUpActions
-            callId={callId}
-            hasReview={Boolean(review)}
-            showLiveLink
-            className="shrink-0"
-          />
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {isEditingLayout ? (
+              <Button type="button" size="sm" onClick={() => setEditingLayout(false)}>
+                Done
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setEditingLayout(true)}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Customize layout
+              </Button>
+            )}
+            <CallWrapUpActions
+              callId={callId}
+              hasReview={Boolean(review)}
+              showLiveLink
+              className="shrink-0"
+            />
+          </div>
         </div>
       )}
       {embedded && (
@@ -151,12 +174,20 @@ export function PostDcReviewScreen({
           <LayoutControls
             layoutKey="post-dc"
             widgets={POST_DC_WIDGETS}
-            widgetProps={{ review, call, accountSnapshot: snapshot }}
+            widgetProps={normalizePostDcWidgetProps({
+              review,
+              call,
+              accountSnapshot: snapshot,
+            })}
           />
           <CallDetailColumnLayout
             layoutKey="post-dc"
             widgets={POST_DC_WIDGETS}
-            widgetProps={{ review, call, accountSnapshot: snapshot }}
+            widgetProps={normalizePostDcWidgetProps({
+              review,
+              call,
+              accountSnapshot: snapshot,
+            })}
           />
         </>
       )}

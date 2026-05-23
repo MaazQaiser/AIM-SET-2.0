@@ -35,6 +35,7 @@ class IngestResponse(BaseModel):
     upserted: int
     kind: Literal["pre-dc", "post-dc"]
     agent_processed: int = 0
+    agent_queued: int = 0
 
 
 class PreDCRecordOut(BaseModel):
@@ -61,6 +62,45 @@ def row_to_pre_record(row: Dict[str, Any]) -> PreDCRecordOut:
         id=str(row["id"]),
         fields={str(k): str(v) for k, v in fields.items()},
     )
+
+
+class CopilotHistoryTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class CopilotChatIn(BaseModel):
+    message: str
+    history: List[CopilotHistoryTurn] = Field(default_factory=list)
+    call_id: Optional[str] = Field(default=None, alias="callId")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class CopilotActionTaken(BaseModel):
+    tool: Optional[str] = None
+    agent: Optional[str] = None
+    call_id: Optional[str] = Field(default=None, alias="callId")
+    status: Optional[str] = None
+    summary: Optional[str] = None
+    export: Optional[Dict[str, Any]] = None
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+
+class CopilotCitationOut(BaseModel):
+    source_type: str = "kb_document"
+    source_id: str = ""
+    snippet: str = ""
+    confidence: float = 0.8
+
+
+class CopilotChatResponse(BaseModel):
+    answer: str
+    message_id: str
+    citations: List[CopilotCitationOut] = Field(default_factory=list)
+    actions_taken: List[Dict[str, Any]] = Field(default_factory=list)
+    call_exports: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 def row_to_post_record(row: Dict[str, Any]) -> PostDCRecordOut:

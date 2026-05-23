@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { filterKeywordStats } from "@/lib/live/keyword-filter";
 import type {
   TranscriptEvent,
   NudgePayload,
@@ -139,10 +140,11 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
 
   applyIntentUpdate: (payload) => {
     const focusAreas = Array.from(new Set(payload.focus_areas ?? []));
-    const intentSnapshot = {
+    const intentSnapshot: IntentSnapshot = {
       ...payload,
       focus_areas: focusAreas,
       pains: uniqueBy(payload.pains ?? [], (pain) => pain.id),
+      next_actions: payload.next_actions ?? [],
     };
     set({
       intentSnapshot,
@@ -150,7 +152,7 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
     });
   },
 
-  applyKeywordStats: (stats) => set({ keywordStats: stats }),
+  applyKeywordStats: (stats) => set({ keywordStats: filterKeywordStats(stats) }),
 
   applyChecklistUpdate: (state) =>
     set({ checklistState: state as DiscoveryChecklistState }),

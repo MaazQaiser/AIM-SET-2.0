@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { BookOpen } from "lucide-react";
-import Link from "next/link";
 import { SearchInput } from "@/components/ui/search-input";
 import { KBAssetCard } from "@/components/kb-asset-card";
 import { KbUploadButton } from "@/components/knowledge/kb-upload-button";
+import { KnowledgePreviewDialog } from "@/components/knowledge/knowledge-preview-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { FilterChip } from "@/components/ui/chip";
@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { useKbAssets, useKbWatchlist } from "@/lib/data/hooks";
 import { usePersona } from "@/hooks/use-persona";
+import type { KBAsset } from "@/types";
 
 const filterTypes = ["All", "Deck", "Case Study", "Image", "Architecture Diagram", "Battle Card", "OnePager"];
 
@@ -24,6 +25,7 @@ export function KnowledgePageClient() {
   const { data: watchlist = [] } = useKbWatchlist();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
+  const [previewAsset, setPreviewAsset] = useState<KBAsset | null>(null);
 
   const filtered = assets.filter((a) => {
     const matchesSearch = a.title.toLowerCase().includes(search.toLowerCase());
@@ -65,11 +67,7 @@ export function KnowledgePageClient() {
             />
             <div className="flex flex-wrap gap-1.5">
               {filterTypes.map((type) => (
-                <FilterChip
-                  key={type}
-                  active={type === filter}
-                  onClick={() => setFilter(type)}
-                >
+                <FilterChip key={type} active={type === filter} onClick={() => setFilter(type)}>
                   {type}
                 </FilterChip>
               ))}
@@ -79,9 +77,7 @@ export function KnowledgePageClient() {
           {filtered.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filtered.map((asset) => (
-                <Link key={asset.id} href={`/knowledge/${asset.id}`}>
-                  <KBAssetCard asset={asset} />
-                </Link>
+                <KBAssetCard key={asset.id} asset={asset} onPreview={setPreviewAsset} />
               ))}
             </div>
           ) : (
@@ -109,6 +105,12 @@ export function KnowledgePageClient() {
           ))}
         </TabsContent>
       </Tabs>
+
+      <KnowledgePreviewDialog
+        asset={previewAsset}
+        open={previewAsset !== null}
+        onOpenChange={(open) => !open && setPreviewAsset(null)}
+      />
     </div>
   );
 }

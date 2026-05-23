@@ -74,6 +74,8 @@ export type CallIntentLabel =
 
 export interface CallIntent {
   label: CallIntentLabel | string;
+  /** Human-readable intent for live UI */
+  display?: string;
   confidence: number;
   evidence?: string;
   signal_type?: string | null;
@@ -103,6 +105,7 @@ export interface IntentSnapshot {
   focus_areas: string[];
   pains: PainSignal[];
   top_keywords: KeywordCount[];
+  next_actions?: string[];
 }
 
 export interface SentimentShift {
@@ -190,6 +193,8 @@ export interface KBAsset {
   mimeType?: string;
   chunkCount?: number;
   ingestError?: string;
+  hasPreview?: boolean;
+  previewSlideCount?: number;
 }
 
 export interface CoachingInsight {

@@ -7,20 +7,22 @@ from dc_core.evidence import AgentEnvelope, validate_envelope
 from dc_core.tenancy import TenantContext
 
 from app.agents.content_agent import generate_pre_dc_brief
-from app.agents.pre_dc_agent import run_pre_dc_pipeline
+from app.agents.pre_dc_agent import run_pre_dc_pipeline, research_from_fields
+from app.agents.relevant_content import build_relevant_content
 from app.agents.content_generation_agent import run_studio_turn
 from app.agents.coaching_agent import generate_scorecard
 from app.agents.knowledge_agent import ingest_asset_metadata
 from app.agents.discovery_checklist_agent import finalize_session, handle_segment, seed_checklist
 from app.agents.live_call.handler import handle_call_end, handle_transcript_segment
 from app.agents.task_agent import draft_post_call_artifacts
-from dc_tools.bant import checklist_from_dict
+from dc_tools.bant import build_next_actions, checklist_from_dict
 from app.domain.calls_service import CallsService
 from app.domain.dc_notes_repository import get_dc_notes_repository
 from app.domain.content_studio_repository import get_content_studio_repository
 from app.domain.agent_runs_repository import get_agent_runs_repository
 from app.domain.memory_store import get_memory_store
 from app.agents.live_call_agent import bot_chat_response
+from app.agents.sales_copilot_agent import copilot_chat_response
 from app.domain.call_channel import get_call_channel
 from app.services.content_export_service import export_revision
 from app.services.template_ingest_service import process_template_ingest
@@ -73,6 +75,26 @@ class Orchestrator:
             self.calls.save_brief(ctx, call_id, failed)
             raise
 
+    def dispatch_relevant_content(self, ctx: TenantContext, call_id: str) -> Dict[str, Any]:
+        fields = self._pre_dc_fields_for_call(ctx, call_id)
+        call = self.calls.get_call(ctx, call_id)
+        account_name = (fields.get("Company Name-PreDC") or (call or {}).get("accountName") or "").strip()
+        if not account_name:
+            raise ValueError("Account name required to load relevant content")
+
+        research = research_from_fields(fields) if fields else {}
+        relevant = build_relevant_content(ctx, account_name, research)
+
+        existing = self.calls.get_brief(ctx, call_id) or {}
+        merged = {
+            **existing,
+            "callId": call_id,
+            "accountName": account_name,
+            **relevant,
+        }
+        self.calls.save_brief(ctx, call_id, merged)
+        return relevant
+
     def dispatch_pre_dc_brief(self, ctx: TenantContext, call_id: str) -> Dict[str, Any]:
         fields = self._pre_dc_fields_for_call(ctx, call_id)
         if fields:
@@ -123,6 +145,33 @@ class Orchestrator:
 
     def dispatch_call_end(self, ctx: TenantContext, call_id: str) -> Dict[str, Any]:
         return handle_call_end(ctx, call_id)
+
+    def dispatch_copilot_chat(
+        self,
+        ctx: TenantContext,
+        message: str,
+        history: Optional[List[Dict[str, str]]] = None,
+        *,
+        call_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        env = copilot_chat_response(
+            ctx,
+            message,
+            history,
+            call_id=call_id,
+            orchestrator=self,
+        )
+        validate_envelope(env)
+        self._log_run(ctx, env)
+        sid = str(uuid.uuid4())
+        return {
+            "envelope": env.model_dump(),
+            "answer": env.result.get("answer"),
+            "message_id": sid,
+            "citations": [c.model_dump() for c in env.citations],
+            "actions_taken": env.result.get("actions_taken") or [],
+            "call_exports": env.result.get("call_exports") or [],
+        }
 
     def dispatch_bot_chat(
         self,
@@ -234,6 +283,17 @@ class Orchestrator:
         # Broadcast discovery checklist update via WebSocket
         ws_messages = intent_out.get("ws_messages") or []
         checklist_data = discovery_out["checklist"]
+        intent_label = None
+        for msg in ws_messages:
+            if msg.get("type") != "intent_update":
+                continue
+            payload = msg.get("payload") or {}
+            intent_label = (payload.get("intent") or {}).get("label")
+            payload["next_actions"] = build_next_actions(
+                checklist_data, intent_label=intent_label
+            )
+            enriched = {"type": "intent_update", "payload": payload}
+            get_call_channel().broadcast_sync(call_id, enriched)
         checklist_ws = {"type": "checklist_update", "payload": checklist_data}
         ws_messages.append(checklist_ws)
         get_call_channel().broadcast_sync(call_id, checklist_ws)

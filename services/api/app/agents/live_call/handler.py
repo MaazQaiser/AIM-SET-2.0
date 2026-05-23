@@ -164,9 +164,15 @@ def handle_transcript_segment(
     )
 
     envelopes: List[AgentEnvelope] = [_analysis_to_envelope(call_id, analysis)]
+    channel = get_call_channel()
     for env in advanced:
-        if env.operation == "signal_annotation" and envelopes[0].operation != "proactive_nudge":
-            continue
+        if env.operation == "signal_annotation":
+            bant = (env.result or {}).get("bant")
+            if bant:
+                bant_ws = {"type": "bant_signal", "payload": bant}
+                channel.broadcast_sync(call_id, bant_ws)
+            if envelopes[0].operation != "proactive_nudge":
+                continue
         if env.operation in (
             "proactive_nudge",
             "objection_detected",

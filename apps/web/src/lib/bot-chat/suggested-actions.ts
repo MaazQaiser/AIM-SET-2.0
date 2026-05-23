@@ -1,10 +1,38 @@
 import type { CallBrief } from "@/lib/brief-types";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
 import type { PodRole } from "@/types";
-import type { BotChatPhase, SuggestedAction } from "@/lib/bot-chat/types";
+import type { BotChatMode, BotChatPhase, SuggestedAction } from "@/lib/bot-chat/types";
+
+const COPILOT_STARTERS: SuggestedAction[] = [
+  {
+    id: "copilot-calls-week",
+    label: "Calls this week",
+    prompt: "Summarise all discovery calls on the calendar this week and flag any without a ready brief.",
+    category: "prepare",
+  },
+  {
+    id: "copilot-kb-security",
+    label: "KB: security",
+    prompt: "Find knowledge base documents about enterprise security, compliance, or SOC2.",
+    category: "prepare",
+  },
+  {
+    id: "copilot-generate-brief",
+    label: "Generate brief",
+    prompt: "Generate or refresh the pre-DC brief for this call and list the top three discovery questions.",
+    category: "prepare",
+  },
+  {
+    id: "copilot-upload",
+    label: "Upload battlecard",
+    prompt: "I want to upload a battlecard to the knowledge base — what file types are supported and how will it be used on calls?",
+    category: "follow-up",
+  },
+];
 
 export interface SuggestedActionsContext {
   phase: BotChatPhase;
+  mode?: BotChatMode;
   persona: PodRole | "leadership";
   accountName?: string;
   brief?: CallBrief | null;
@@ -113,6 +141,10 @@ const LIVE_COMMON: SuggestedAction[] = [
 ];
 
 export function buildSuggestedActions(ctx: SuggestedActionsContext): SuggestedAction[] {
+  if (ctx.mode === "copilot") {
+    return COPILOT_STARTERS;
+  }
+
   const actions: SuggestedAction[] = [];
   const role = ctx.persona === "leadership" ? "ae" : ctx.persona;
 

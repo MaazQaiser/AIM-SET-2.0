@@ -2,14 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ExternalLink, FileSpreadsheet } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ExternalLink, FileSpreadsheet, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { CallDetailColumnLayout } from "@/components/calls/call-detail-column-layout";
-import { WorkflowOutputSection } from "@/components/pre-call/workflow-output-section";
 import { LayoutControls } from "@/components/dashboard-grid/layout-controls";
 import { BRIEF_WIDGETS, POST_DC_WIDGETS } from "@/lib/dashboard/widget-registry";
+import {
+  normalizeBriefWidgetProps,
+  normalizePostDcWidgetProps,
+} from "@/lib/dashboard/normalize-widget-props";
 import { BotChatPanel } from "@/components/bot-chat-panel";
 import { useCallBrief, usePostCallReview } from "@/lib/data/hooks";
 import { seedChecklistFromCall } from "@/lib/discovery-checklist-seed";
@@ -37,8 +42,10 @@ export function CallDetailTabs({
   call,
   accountSnapshot,
 }: CallDetailTabsProps) {
-  const { data: brief, isLoading: briefLoading } = useCallBrief(callId);
+  const queryClient = useQueryClient();
+  const { data: brief, isLoading: briefLoading, refetch: refetchBrief } = useCallBrief(callId);
   const { data: review, isLoading: reviewLoading } = usePostCallReview(callId);
+  const [runningWorkflow, setRunningWorkflow] = useState(false);
   const persona = usePersona();
   const setEditing = useDashboardLayoutStore((s) => s.setEditing);
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -49,6 +56,24 @@ export function CallDetailTabs({
   const handleTabChange = (value: string) => {
     setActiveTab(value === "post-dc" ? "post-dc" : "brief");
     setEditing(false);
+  };
+
+  const runPreDcWorkflow = async () => {
+    setRunningWorkflow(true);
+    try {
+      const res = await fetch(`/api/calls/${callId}/generate-brief`, { method: "POST" });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => null)) as { detail?: string; error?: string } | null;
+        throw new Error(err?.detail ?? err?.error ?? `Workflow failed (${res.status})`);
+      }
+      await refetchBrief();
+      void queryClient.invalidateQueries({ queryKey: ["call-brief", callId] });
+      toast.success("PRE-DC Workflow completed for this lead.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not run PRE-DC Workflow");
+    } finally {
+      setRunningWorkflow(false);
+    }
   };
 
   const centerActions = showJoinCall ? (
@@ -101,43 +126,55 @@ export function CallDetailTabs({
           <BriefTabSkeleton />
         ) : !brief ? (
           <EmptyState
-            icon={FileSpreadsheet}
-            title="No Pre-DC brief for this call"
-            description="Import pre_dc_notes_data.csv in Settings with this company included."
-            action={{ label: "Import CSV", href: "/settings" }}
+            icon={Sparkles}
+            title="Pre-DC brief is still loading"
+            description="Your lead was saved. PRE-DC Workflow builds the AI summary and artifacts from that data — usually under a minute. You do not need to import a CSV."
+            action={{
+              label: runningWorkflow ? "Running…" : "Run PRE-DC Workflow now",
+              onClick: () => void runPreDcWorkflow(),
+            }}
           />
         ) : (
-          <>
+          <div className="pb-28">
             {leadershipPreview && (
               <div className="rounded-md border border-dashed border-primary/40 bg-primary/5 px-4 py-2 text-xs text-muted-foreground mb-4">
                 Leadership read-only preview — brief updates as the AE prepares.
               </div>
             )}
-            <div className="mb-4">
-              <WorkflowOutputSection brief={brief} />
-            </div>
             <LayoutControls
               layoutKey="brief"
               widgets={BRIEF_WIDGETS}
-              widgetProps={{ brief, bant, discoveryQuestions, leadershipPreview, call, accountSnapshot }}
+              widgetProps={normalizeBriefWidgetProps({
+                brief,
+                bant,
+                discoveryQuestions,
+                leadershipPreview,
+                call,
+                accountSnapshot,
+              })}
             />
             <CallDetailColumnLayout
               layoutKey="brief"
               widgets={BRIEF_WIDGETS}
-              widgetProps={{ brief, bant, discoveryQuestions, leadershipPreview, call, accountSnapshot }}
+              widgetProps={normalizeBriefWidgetProps({
+                brief,
+                bant,
+                discoveryQuestions,
+                leadershipPreview,
+                call,
+                accountSnapshot,
+              })}
               centerHeader={centerActions}
             />
-            <div className="mt-4 rounded-xl border border-border overflow-hidden min-h-[420px] flex flex-col">
-              <BotChatPanel
-                callId={callId}
-                phase="prep"
-                className="flex-1 min-h-[400px]"
-                accountName={call.accountName}
-                brief={brief}
-                checklist={seedChecklistFromCall(call)}
-              />
-            </div>
-          </>
+            <BotChatPanel
+              callId={callId}
+              variant="floating"
+              phase="prep"
+              accountName={call.accountName}
+              brief={brief}
+              checklist={seedChecklistFromCall(call)}
+            />
+          </div>
         )}
       </TabsContent>
 
@@ -164,12 +201,12 @@ export function CallDetailTabs({
             <LayoutControls
               layoutKey="post-dc"
               widgets={POST_DC_WIDGETS}
-              widgetProps={{ review, call, accountSnapshot }}
+              widgetProps={normalizePostDcWidgetProps({ review, call, accountSnapshot })}
             />
             <CallDetailColumnLayout
               layoutKey="post-dc"
               widgets={POST_DC_WIDGETS}
-              widgetProps={{ review, call, accountSnapshot }}
+              widgetProps={normalizePostDcWidgetProps({ review, call, accountSnapshot })}
             />
           </>
         )}

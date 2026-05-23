@@ -50,6 +50,8 @@ interface DashboardWidgetProps {
   title: string;
   isEditing: boolean;
   onHide?: () => void;
+  /** When true the widget fills its RGL cell — removes max-height caps */
+  gridMode?: boolean;
   columnZone?: ColumnZone;
   children: React.ReactNode;
 }
@@ -58,6 +60,7 @@ export function DashboardWidget({
   title,
   isEditing,
   onHide,
+  gridMode = false,
   columnZone = "center",
   children,
 }: DashboardWidgetProps) {
@@ -119,7 +122,7 @@ export function DashboardWidget({
     <div
       className={cn(
         "relative flex min-h-0 flex-col overflow-hidden rounded-xl ring-1 ring-primary/30 bg-card shadow-sm",
-        columnZone === "center" ? "min-h-0" : "max-h-[min(28rem,55vh)] shrink-0"
+        gridMode ? "h-full" : columnZone === "center" ? "min-h-0" : "max-h-[min(28rem,55vh)] shrink-0"
       )}
     >
       <WidgetToolbar title={title} onHide={onHide} />

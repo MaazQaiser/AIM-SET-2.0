@@ -31,6 +31,8 @@ def _clear_memory(monkeypatch):
 
 def test_pre_dc_ingest_runs_agent_and_saves_brief(monkeypatch):
     _clear_memory(monkeypatch)
+    monkeypatch.setenv("WORKFLOW_AGENT_INGEST_SYNC", "true")
+    get_settings.cache_clear()
 
     payload = {
         "kind": "pre-dc",
@@ -65,6 +67,8 @@ def test_pre_dc_ingest_runs_agent_and_saves_brief(monkeypatch):
     assert isinstance(brief.get("artifactPlan"), list)
     assert len(brief["artifactPlan"]) >= 1
     assert brief.get("artifactFulfillment")
+    assert "relevantDocuments" in brief
+    assert "relevantProjects" in brief
     assert brief.get("agentStatus") == "success"
 
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional, TypedDict
 
+from dc_tools.salient_keywords import extract_salient_phrases, filter_salient_terms, is_salient_term
+
 _STOPWORDS = frozenset(
     {
         "a",
@@ -153,7 +155,8 @@ class KeywordExtractResult(TypedDict):
 
 def _tokenize(text: str) -> List[str]:
     raw = re.findall(r"[a-z][a-z0-9'-]{2,}", text.lower())
-    return [t for t in raw if t not in _STOPWORDS and len(t) > 2]
+    tokens = [t for t in raw if t not in _STOPWORDS and len(t) > 2]
+    return filter_salient_terms(tokens)
 
 
 def extract_keywords(
@@ -163,11 +166,14 @@ def extract_keywords(
 ) -> KeywordExtractResult:
     """Extract salient terms and apply signal routing rules from live-call config."""
     terms = _tokenize(text)
+    for phrase in extract_salient_phrases(text):
+        if phrase not in terms:
+            terms.append(phrase)
     if glossary:
         lower = text.lower()
         for term in glossary:
             t = term.lower().strip()
-            if len(t) > 2 and t in lower and t not in terms:
+            if is_salient_term(t) and t in lower and t not in terms:
                 terms.append(t)
 
     signal_type: Optional[str] = None

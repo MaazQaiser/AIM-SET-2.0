@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
+import { getPublicWsUrl } from "@/lib/public-env";
 import { useBotChatStore } from "@/stores/use-bot-chat";
 import { useLiveCall } from "@/stores/use-live-call";
 import type {
@@ -75,165 +76,140 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
   const reconnectAttempts = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const shouldReconnectRef = useRef(false);
+  const callIdRef = useRef(callId);
+  callIdRef.current = callId;
 
-  const {
-    setConnected,
-    appendTranscriptEvent,
-    addNudge,
-    updateSentiment,
-    applyIntentUpdate,
-    applyKeywordStats,
-    addBantSignal,
-    applyChecklistUpdate,
-    setSurfacedKbAssets,
-    addObjection,
-    addUnansweredQuestion,
-    appendSuggestionLog,
-  } = useLiveCall();
-
-  const connect = useCallback(() => {
-    if (!enabled || !callId) return;
+  useEffect(() => {
+    if (!enabled || !callId) {
+      return undefined;
+    }
 
     shouldReconnectRef.current = true;
 
-    const existing = wsRef.current;
-    if (
-      existing &&
-      (existing.readyState === WebSocket.CONNECTING || existing.readyState === WebSocket.OPEN)
-    ) {
-      return;
-    }
+    const openSocket = () => {
+      const existing = wsRef.current;
+      if (
+        existing &&
+        (existing.readyState === WebSocket.CONNECTING || existing.readyState === WebSocket.OPEN)
+      ) {
+        return;
+      }
 
-    const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000"}/ws/calls/${callId}`;
+      const wsUrl = `${getPublicWsUrl()}/ws/calls/${callIdRef.current}`;
 
-    try {
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
+      try {
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
 
-      ws.onopen = () => {
-        setConnected(true);
-        reconnectAttempts.current = 0;
-      };
+        ws.onopen = () => {
+          useLiveCall.getState().setConnected(true);
+          reconnectAttempts.current = 0;
+        };
 
-      ws.onmessage = (event: MessageEvent) => {
-        if (wsRef.current !== ws) return;
-        try {
-          const raw = JSON.parse(event.data as string) as { type: string; payload?: unknown };
-          const msg = raw as StreamMessage;
-          switch (msg.type) {
-            case "transcript":
-              appendTranscriptEvent(msg.payload);
-              break;
-            case "nudge":
-              addNudge(normalizeNudge(msg.payload as unknown as Record<string, unknown>));
-              break;
-            case "sentiment":
-              updateSentiment(
-                msg.payload.ae,
-                msg.payload.customer,
-                msg.payload.shift ?? null
-              );
-              break;
-            case "intent_update":
-              applyIntentUpdate(msg.payload);
-              break;
-            case "keyword_stats":
-              applyKeywordStats(msg.payload);
-              break;
-            case "bant_signal": {
-              const bp = msg.payload;
-              if (Array.isArray(bp)) {
-                for (const s of bp) addBantSignal(s as BantSignal);
-              } else {
-                addBantSignal(bp);
+        ws.onmessage = (event: MessageEvent) => {
+          if (wsRef.current !== ws) return;
+          try {
+            const raw = JSON.parse(event.data as string) as { type: string; payload?: unknown };
+            const msg = raw as StreamMessage;
+            const store = useLiveCall.getState();
+            switch (msg.type) {
+              case "transcript":
+                store.appendTranscriptEvent(msg.payload);
+                break;
+              case "nudge":
+                store.addNudge(normalizeNudge(msg.payload as unknown as Record<string, unknown>));
+                break;
+              case "sentiment":
+                store.updateSentiment(
+                  msg.payload.ae,
+                  msg.payload.customer,
+                  msg.payload.shift ?? null
+                );
+                break;
+              case "intent_update":
+                store.applyIntentUpdate(msg.payload);
+                break;
+              case "keyword_stats":
+                store.applyKeywordStats(msg.payload);
+                break;
+              case "bant_signal": {
+                const bp = msg.payload;
+                if (Array.isArray(bp)) {
+                  for (const s of bp) store.addBantSignal(s as BantSignal);
+                } else {
+                  store.addBantSignal(bp);
+                }
+                break;
               }
-              break;
+              case "checklist_update":
+                if (msg.payload && typeof msg.payload === "object") {
+                  store.applyChecklistUpdate(msg.payload as DiscoveryChecklistState);
+                }
+                break;
+              case "kb_assets":
+                store.setSurfacedKbAssets(msg.payload as SurfacedKbAsset[]);
+                break;
+              case "objection":
+                store.addObjection(msg.payload as ObjectionPayload);
+                break;
+              case "unanswered_question":
+                store.addUnansweredQuestion(msg.payload as UnansweredQuestionPayload);
+                break;
+              case "suggestion_log":
+                store.appendSuggestionLog(msg.payload as SuggestionLogEntry);
+                break;
+              case "bot_chat": {
+                const p = msg.payload;
+                if (p?.answer) {
+                  useBotChatStore.getState().appendGroupFromWs(callIdRef.current, {
+                    id: p.message_id ?? crypto.randomUUID(),
+                    role: "assistant",
+                    content: p.answer,
+                    citations: (p.citations ?? []).map(
+                      (c, i): Citation => ({
+                        id: c.id ?? `cite-${i}`,
+                        title: c.title ?? "Source",
+                        type: (c.type as Citation["type"]) ?? "transcript",
+                        excerpt: c.excerpt,
+                      })
+                    ),
+                    authorName: "DC Copilot",
+                    createdAt: Date.now(),
+                  });
+                }
+                break;
+              }
             }
-            case "checklist_update":
-              if (msg.payload && typeof msg.payload === "object") {
-                applyChecklistUpdate(msg.payload as DiscoveryChecklistState);
-              }
-              break;
-            case "kb_assets":
-              setSurfacedKbAssets(msg.payload as SurfacedKbAsset[]);
-              break;
-            case "objection":
-              addObjection(msg.payload as ObjectionPayload);
-              break;
-            case "unanswered_question":
-              addUnansweredQuestion(msg.payload as UnansweredQuestionPayload);
-              break;
-            case "suggestion_log":
-              appendSuggestionLog(msg.payload as SuggestionLogEntry);
-              break;
-            case "bot_chat": {
-              const p = msg.payload;
-              if (p?.answer) {
-                useBotChatStore.getState().appendGroupFromWs(callId, {
-                  id: p.message_id ?? crypto.randomUUID(),
-                  role: "assistant",
-                  content: p.answer,
-                  citations: (p.citations ?? []).map(
-                    (c, i): Citation => ({
-                      id: c.id ?? `cite-${i}`,
-                      title: c.title ?? "Source",
-                      type: (c.type as Citation["type"]) ?? "transcript",
-                      excerpt: c.excerpt,
-                    })
-                  ),
-                  authorName: "DC Copilot",
-                  createdAt: Date.now(),
-                });
-              }
-              break;
-            }
+          } catch {
+            // Malformed message; ignore
           }
-        } catch {
-          // Malformed message; ignore
-        }
-      };
+        };
 
-      ws.onclose = () => {
-        if (wsRef.current !== ws) return;
+        ws.onclose = () => {
+          if (wsRef.current !== ws) return;
 
-        setConnected(false);
-        wsRef.current = null;
+          useLiveCall.getState().setConnected(false);
+          wsRef.current = null;
 
-        if (shouldReconnectRef.current && reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
-          const delay = BASE_DELAY_MS * Math.pow(2, reconnectAttempts.current);
-          reconnectAttempts.current++;
-          reconnectTimer.current = setTimeout(connect, delay);
-        }
-      };
+          if (shouldReconnectRef.current && reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
+            const delay = BASE_DELAY_MS * Math.pow(2, reconnectAttempts.current);
+            reconnectAttempts.current++;
+            reconnectTimer.current = setTimeout(openSocket, delay);
+          }
+        };
 
-      ws.onerror = () => {
-        if (wsRef.current === ws) {
-          ws.close();
-        }
-      };
-    } catch {
-      setConnected(false);
-    }
-  }, [
-    callId,
-    enabled,
-    setConnected,
-    appendTranscriptEvent,
-    addNudge,
-    updateSentiment,
-    applyIntentUpdate,
-    applyKeywordStats,
-    addBantSignal,
-    applyChecklistUpdate,
-    setSurfacedKbAssets,
-    addObjection,
-    addUnansweredQuestion,
-    appendSuggestionLog,
-  ]);
+        ws.onerror = () => {
+          if (wsRef.current === ws) {
+            ws.close();
+          }
+        };
+      } catch {
+        useLiveCall.getState().setConnected(false);
+      }
+    };
 
-  useEffect(() => {
-    shouldReconnectRef.current = enabled;
-    connect();
+    openSocket();
+
     return () => {
       shouldReconnectRef.current = false;
       clearTimeout(reconnectTimer.current);
@@ -247,9 +223,9 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
         ws.onerror = null;
         ws.close();
       }
-      setConnected(false);
+      useLiveCall.getState().setConnected(false);
     };
-  }, [connect, enabled, setConnected]);
+  }, [callId, enabled]);
 
   const sendTranscript = useCallback(
     (segment: {
