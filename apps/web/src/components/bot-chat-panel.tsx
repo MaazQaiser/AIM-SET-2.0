@@ -161,11 +161,14 @@ function authorBadge(msg: BotChatMessage | CopilotMessage, copilotMode?: boolean
     );
   }
   if (msg.role === "system") return null;
+  const authorName = "authorName" in msg ? msg.authorName : "You";
+  const authorRole = "authorRole" in msg ? msg.authorRole : undefined;
+  const isPrivate = "isPrivate" in msg ? msg.isPrivate : false;
   return (
     <span className="text-[10px] font-medium text-muted-foreground mb-1 block">
-      {msg.authorName}
-      {msg.authorRole ? ` · ${msg.authorRole.toUpperCase()}` : ""}
-      {msg.isPrivate && (
+      {authorName}
+      {authorRole ? ` · ${authorRole.toUpperCase()}` : ""}
+      {isPrivate && (
         <span className="ml-1 inline-flex items-center gap-0.5 text-muted-foreground/80">
           <Lock className="h-2.5 w-2.5" aria-hidden />
           private

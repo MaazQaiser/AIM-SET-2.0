@@ -366,7 +366,6 @@ export default function LiveCallPage({ params }: LivePageParams) {
                 intent={intentSnapshot?.intent ?? null}
                 pains={intentSnapshot?.pains ?? []}
                 nextActions={nextActions}
-                nextActions={nextActions}
               />
               <DiscoveryChecklistPanel state={checklistDisplay} />
             </TabsContent>

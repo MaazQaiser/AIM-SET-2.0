@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Responsive, WidthProvider } from "react-grid-layout/legacy";
-import type { Layout } from "react-grid-layout";
+import type { LayoutItem } from "react-grid-layout";
 import { DashboardWidget } from "@/components/dashboard-grid/dashboard-widget";
 import type { WidgetColumn, WidgetSpec } from "@/lib/dashboard/widget-registry";
 import {
@@ -40,8 +40,8 @@ function xToColumn(x: number, w: number): WidgetColumn {
 function columnOrderToLayout(
   columnOrder: ColumnOrder,
   widgetHeights: Record<string, number>
-): Layout[] {
-  const items: Layout[] = [];
+): LayoutItem[] {
+  const items: LayoutItem[] = [];
   for (const col of ["left", "center", "right"] as const) {
     const { x, w, defaultH } = COL_DEF[col];
     let y = 0;
@@ -54,8 +54,8 @@ function columnOrderToLayout(
   return items;
 }
 
-function layoutToColumnOrder(layout: Layout[]): ColumnOrder {
-  const grouped: Record<WidgetColumn, Layout[]> = { left: [], center: [], right: [] };
+function layoutToColumnOrder(layout: readonly LayoutItem[]): ColumnOrder {
+  const grouped: Record<WidgetColumn, LayoutItem[]> = { left: [], center: [], right: [] };
   for (const item of layout) {
     grouped[xToColumn(item.x, item.w)].push(item);
   }
@@ -88,12 +88,12 @@ export function EditableColumnGrid<P>({
   const visibleIds = useMemo(() => new Set(widgets.map((w) => w.id)), [widgets]);
 
   // Build layout once on first render, then keep local control during the session.
-  const initRef = useRef<Layout[] | null>(null);
+  const initRef = useRef<LayoutItem[] | null>(null);
   if (initRef.current === null) {
     initRef.current = columnOrderToLayout(columnOrder, widgetHeights);
   }
 
-  const [localLayout, setLocalLayout] = useState<Layout[]>(initRef.current);
+  const [localLayout, setLocalLayout] = useState<LayoutItem[]>(initRef.current);
 
   // When a widget is hidden, remove it from the local layout.
   useEffect(() => {
@@ -104,20 +104,22 @@ export function EditableColumnGrid<P>({
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
 
-  const handleDragStop = (layout: Layout[]) => {
-    setLocalLayout(layout);
-    setColumnOrder(layoutKey, layoutToColumnOrder(layout));
+  const handleDragStop = (layout: readonly LayoutItem[]) => {
+    const next = [...layout];
+    setLocalLayout(next);
+    setColumnOrder(layoutKey, layoutToColumnOrder(next));
   };
 
-  const handleResizeStop = (layout: Layout[]) => {
-    setLocalLayout(layout);
-    for (const item of layout) {
+  const handleResizeStop = (layout: readonly LayoutItem[]) => {
+    const next = [...layout];
+    setLocalLayout(next);
+    for (const item of next) {
       setWidgetHeight(layoutKey, item.i, item.h * ROW_HEIGHT);
     }
   };
 
-  const handleLayoutChange = (layout: Layout[]) => {
-    setLocalLayout(layout);
+  const handleLayoutChange = (layout: readonly LayoutItem[]) => {
+    setLocalLayout([...layout]);
   };
 
   return (
