@@ -135,15 +135,16 @@ export function BriefSignalsCard({ signals }: { signals: string[] }) {
 }
 
 export function BriefPainsCard({ pains }: { pains: HypothesizedPain[] }) {
+  const safePains = pains ?? [];
   return (
     <BriefDetailCard
       title="Hypothesized pain points"
       headerExtra={
-        <span className="text-xs text-muted-foreground shrink-0">{pains.length} items</span>
+        <span className="text-xs text-muted-foreground shrink-0">{safePains.length} items</span>
       }
     >
       <ul className="space-y-2">
-        {pains.map((pain, i) => (
+        {safePains.map((pain, i) => (
           <li key={i}>
             <BriefDetailRow>
               <div className="flex items-start justify-between gap-3 min-w-0">
@@ -229,6 +230,13 @@ export function BriefObjectionsCard({ objections }: { objections: AnticipatedObj
 }
 
 export function BriefDeckCard({ slides }: { slides: CallBrief["deckSlides"] }) {
+  if (!slides || slides.length === 0) {
+    return (
+      <BriefDetailCard title="Recommended deck" icon={Presentation}>
+        <p className="text-xs text-muted-foreground">No deck slides available.</p>
+      </BriefDetailCard>
+    );
+  }
   return (
     <BriefDetailCard title="Recommended deck" icon={Presentation} scrollMaxHeight="14rem">
       <ul className="space-y-2">

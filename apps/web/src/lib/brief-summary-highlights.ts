@@ -52,6 +52,7 @@ const RULES: SummaryHighlightRule[] = [
 type TextPart = { type: "text"; value: string } | { type: "highlight"; value: string; className: string };
 
 function applyRules(text: string, rules: SummaryHighlightRule[]): TextPart[] {
+  if (!text) return [{ type: "text", value: text ?? "" }];
   let parts: TextPart[] = [{ type: "text", value: text }];
   for (const rule of rules) {
     const next: TextPart[] = [];

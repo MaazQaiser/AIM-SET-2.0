@@ -79,9 +79,13 @@ export function BotChatPanel({
     persona === "leadership" || persona === "content-owner" ? "leadership" : persona;
   const podMember = podDisplayForRole(viewerRole);
 
-  const mode = useBotChatStore((s) => s.getMode(callId));
+  const mode = useBotChatStore((s) => s.byCallId[callId]?.mode ?? "group");
   const setMode = useBotChatStore((s) => s.setMode);
-  const messages = useBotChatStore((s) => s.getMessages(callId, mode));
+  const messages = useBotChatStore((s) => {
+    const st = s.byCallId[callId];
+    if (!st) return [];
+    return mode === "group" ? st.groupMessages : st.directMessages;
+  });
   const appendMessage = useBotChatStore((s) => s.appendMessage);
   const seedGroupWelcome = useBotChatStore((s) => s.seedGroupWelcome);
 

@@ -127,7 +127,7 @@ export function CallCard({ call }: CallCardProps) {
         </div>
 
         {/* ── Pod members ──────────────────────────────────────────────── */}
-        {call.pod.length > 0 && (
+        {call.pod?.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {call.pod.map((member) => (
               <PodMemberBadge key={member.id} member={member} />

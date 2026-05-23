@@ -9,7 +9,7 @@ import { useRef, useState } from "react";
 
 interface DemoTranscriptPlayerProps {
   callId: string;
-  isConnected: boolean;
+  isConnected?: boolean;
 }
 
 export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlayerProps) {
@@ -21,7 +21,7 @@ export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlay
   const appendTranscriptEvent = useLiveCall((s) => s.appendTranscriptEvent);
 
   async function playDemo() {
-    if (!isConnected || playing) return;
+    if (playing) return;
     stopRef.current = false;
     setPlaying(true);
     setLineIndex(0);
@@ -113,16 +113,12 @@ export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlay
           variant="outline"
           size="sm"
           className="h-7 text-xs"
-          disabled={!isConnected}
-          title={
-            isConnected
-              ? "Replay scripted discovery call segments through the live-call agent"
-              : "Wait for the live stream to connect (WebSocket) before playing demo"
-          }
+          disabled={false}
+          title="Replay scripted discovery call segments through the live-call agent"
           onClick={() => void playDemo()}
         >
           <Play className="h-3 w-3 mr-1" />
-          {isConnected ? "Play demo transcript" : "Stream connecting…"}
+          Play demo transcript
         </Button>
       ) : (
         <Button

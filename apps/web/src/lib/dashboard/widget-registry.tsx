@@ -81,7 +81,7 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "ai",
     column: "center",
     sortOrder: 1,
-    isAvailable: ({ brief }) => brief.newSignals.length > 0,
+    isAvailable: ({ brief }) => (brief.newSignals?.length ?? 0) > 0,
     render: ({ brief }) => <BriefSignalsCard signals={brief.newSignals} />,
   },
   {
@@ -115,7 +115,7 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "content",
     column: "center",
     sortOrder: 5,
-    isAvailable: ({ brief }) => brief.objections.length > 0,
+    isAvailable: ({ brief }) => (brief.objections?.length ?? 0) > 0,
     render: ({ brief }) => <BriefObjectionsCard objections={brief.objections} />,
   },
   {
@@ -163,7 +163,7 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "client",
     column: "left",
     sortOrder: 4,
-    isAvailable: ({ brief }) => brief.clientAttendees.length > 0,
+    isAvailable: ({ brief }) => (brief.clientAttendees?.length ?? 0) > 0,
     render: ({ brief }) => <ClientAttendeesCard attendees={brief.clientAttendees} />,
   },
   {
@@ -172,7 +172,7 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "client",
     column: "left",
     sortOrder: 5,
-    isAvailable: ({ brief }) => brief.interactionHistory.length > 0,
+    isAvailable: ({ brief }) => (brief.interactionHistory?.length ?? 0) > 0,
     render: ({ brief }) => <ClientHistoryCard interactions={brief.interactionHistory} />,
   },
   {
@@ -199,7 +199,7 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "pod",
     column: "right",
     sortOrder: 1,
-    isAvailable: ({ brief }) => brief.podNotes.length > 0,
+    isAvailable: ({ brief }) => (brief.podNotes?.length ?? 0) > 0,
     render: ({ brief }) => <BriefPodNotesCard notes={brief.podNotes} />,
   },
 ];

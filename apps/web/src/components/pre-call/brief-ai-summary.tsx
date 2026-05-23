@@ -134,7 +134,7 @@ export function BriefAISummary({ brief }: BriefAISummaryProps) {
         </div>
 
         <HighlightedSummary
-          text={brief.aiSummary}
+          text={brief.aiSummary ?? ""}
           clamp={!isCenter && compact}
           rules={highlightRules}
         />
