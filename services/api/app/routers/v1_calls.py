@@ -130,6 +130,7 @@ async def poll_transcript(
 
     from app.domain.call_channel import get_call_channel
     from app.domain.live_call_repository import get_live_call_repository
+    from app.orchestrator.live_broadcast import transcript_event_to_ws
     from app.services.transcript_provider.recall_client import poll_recall_transcript
 
     repo = get_live_call_repository()
@@ -184,12 +185,17 @@ async def poll_transcript(
         if not stored.get("_deduped"):
             new_count += 1
             new_events.append(stored)
+            # Broadcast transcript IMMEDIATELY
+            await channel.broadcast(call_id, transcript_event_to_ws(event))
+            # Run analysis in background
             try:
                 result = await asyncio.to_thread(
                     _orch.dispatch_live_segment, ctx, call_id, event,
                     elapsed_seconds=int(event.get("offset_seconds", 0)),
                 )
                 for msg in result.get("ws_messages") or []:
+                    if msg.get("type") == "transcript":
+                        continue
                     await channel.broadcast(call_id, msg)
             except Exception:
                 pass

@@ -10,6 +10,7 @@ from dc_core.tenancy import TenantContext
 
 from app.domain.call_channel import get_call_channel
 from app.orchestrator.dispatcher import Orchestrator
+from app.orchestrator.live_broadcast import transcript_event_to_ws
 
 router = APIRouter()
 _orch = Orchestrator()
@@ -38,9 +39,15 @@ async def _process_live_segment(
     *,
     elapsed_seconds: int,
 ) -> None:
-    """Process one segment without blocking the WebSocket receive loop."""
+    """Broadcast transcript instantly, then run analysis in background."""
     lock = _dispatch_locks.setdefault(call_id, asyncio.Lock())
     channel = get_call_channel()
+
+    # Broadcast transcript IMMEDIATELY (<1s)
+    transcript_ws = transcript_event_to_ws(segment)
+    await channel.broadcast(call_id, transcript_ws)
+
+    # Run heavy analysis with lock (LLM, KB, BANT) — results trickle in
     try:
         async with lock:
             out = await asyncio.to_thread(
@@ -50,8 +57,9 @@ async def _process_live_segment(
                 segment,
                 elapsed_seconds=elapsed_seconds,
             )
-        # Broadcast ALL ws_messages from the async event loop (reliable)
         for msg in out.get("ws_messages") or []:
+            if msg.get("type") == "transcript":
+                continue  # already sent above
             await channel.broadcast(call_id, msg)
     except Exception:
         _logger.exception("live segment dispatch failed call_id=%s", call_id)
