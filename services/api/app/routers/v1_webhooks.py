@@ -127,18 +127,27 @@ async def demo_segment(
     transcript_ws = transcript_event_to_ws(event)
     await channel.broadcast(call_id, transcript_ws)
 
-    # Run analysis — still synchronous for demo so response includes full results
-    result = await asyncio.to_thread(_orch.dispatch_live_segment, ctx, call_id, event)
-    for msg in result.get("ws_messages") or []:
-        if msg.get("type") == "transcript":
-            continue
-        await channel.broadcast(call_id, msg)
+    # Run analysis in background — don't block the response
+    async def _demo_analyze():
+        try:
+            result = await asyncio.to_thread(_orch.dispatch_live_segment, ctx, call_id, event)
+            for msg in result.get("ws_messages") or []:
+                if msg.get("type") == "transcript":
+                    continue
+                await channel.broadcast(call_id, msg)
+        except Exception:
+            _logger.exception("demo analysis failed call_id=%s", call_id)
 
-    result["transcript_event"] = {
-        "id": event.get("id") or event.get("provider_event_id"),
-        "speaker_id": event["speaker_id"],
-        "speaker_role": event["speaker_role"],
-        "text": event["text"],
-        "offset_seconds": event["offset_seconds"],
+    asyncio.create_task(_demo_analyze())
+
+    return {
+        "ok": True,
+        "call_id": call_id,
+        "transcript_event": {
+            "id": event.get("id") or event.get("provider_event_id"),
+            "speaker_id": event["speaker_id"],
+            "speaker_role": event["speaker_role"],
+            "text": event["text"],
+            "offset_seconds": event["offset_seconds"],
+        },
     }
-    return result
