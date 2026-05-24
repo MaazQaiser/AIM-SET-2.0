@@ -30,7 +30,6 @@ def envelope_to_ws_messages(
                     "role": nudge.get("role", "ae"),
                     "timestamp": ts,
                     "citation": _first_citation_dict(envelope),
-                    "suggestionId": suggestion_id,
                     "shownAt": shown_at,
                     "nudge_type": nudge.get("nudge_type"),
                 },

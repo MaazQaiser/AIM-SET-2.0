@@ -2,12 +2,14 @@
 
 import { Button } from "@/components/ui/button";
 import { getDemoTranscriptForCall } from "@/lib/demo-live-transcript";
+import { useLiveCall } from "@/stores/use-live-call";
+import type { TranscriptEvent } from "@/types";
 import { Play, Square } from "lucide-react";
 import { useRef, useState } from "react";
 
 interface DemoTranscriptPlayerProps {
   callId: string;
-  isConnected: boolean;
+  isConnected?: boolean;
 }
 
 export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlayerProps) {
@@ -16,9 +18,10 @@ export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlay
   const [error, setError] = useState<string | null>(null);
   const stopRef = useRef(false);
   const lines = getDemoTranscriptForCall(callId);
+  const appendTranscriptEvent = useLiveCall((s) => s.appendTranscriptEvent);
 
   async function playDemo() {
-    if (!isConnected || playing) return;
+    if (playing) return;
     stopRef.current = false;
     setPlaying(true);
     setLineIndex(0);
@@ -41,9 +44,33 @@ export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlay
             provider_event_id: `demo-${callId}-${i}`,
           }),
         });
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          transcript_event?: {
+            id?: string;
+            speaker_id?: string;
+            speaker_role?: string;
+            text?: string;
+            offset_seconds?: number;
+          };
+        };
         if (!res.ok) {
-          const body = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(body.error ?? `Segment ${i + 1} failed (${res.status})`);
+          throw new Error(data.error ?? `Segment ${i + 1} failed (${res.status})`);
+        }
+        // Push transcript event directly into the store as a fallback
+        // in case the WebSocket broadcast didn't arrive.
+        const ev = data.transcript_event;
+        if (ev?.text) {
+          const mapped: TranscriptEvent = {
+            id: ev.id ?? `demo-${callId}-${i}`,
+            speakerId: ev.speaker_id ?? line.speakerId,
+            speakerName: ev.speaker_id ?? line.speakerId,
+            speakerRole: (ev.speaker_role as TranscriptEvent["speakerRole"]) ?? "customer",
+            text: ev.text,
+            timestamp: ev.offset_seconds ?? line.offsetSeconds,
+            keywords: [],
+          };
+          appendTranscriptEvent(mapped);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Demo playback failed");
@@ -86,16 +113,12 @@ export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlay
           variant="outline"
           size="sm"
           className="h-7 text-xs"
-          disabled={!isConnected}
-          title={
-            isConnected
-              ? "Replay scripted discovery call segments through the live-call agent"
-              : "Wait for the live stream to connect (WebSocket) before playing demo"
-          }
+          disabled={false}
+          title="Replay scripted discovery call segments through the live-call agent"
           onClick={() => void playDemo()}
         >
           <Play className="h-3 w-3 mr-1" />
-          {isConnected ? "Play demo transcript" : "Stream connecting…"}
+          Play demo transcript
         </Button>
       ) : (
         <Button

@@ -10,6 +10,7 @@ from dc_core.tenancy import TenantContext
 
 from app.domain.call_channel import get_call_channel
 from app.orchestrator.dispatcher import Orchestrator
+from app.orchestrator.live_broadcast import transcript_event_to_ws
 
 router = APIRouter()
 _orch = Orchestrator()
@@ -38,9 +39,15 @@ async def _process_live_segment(
     *,
     elapsed_seconds: int,
 ) -> None:
-    """Process one segment without blocking the WebSocket receive loop."""
+    """Broadcast transcript instantly, then run analysis in background."""
     lock = _dispatch_locks.setdefault(call_id, asyncio.Lock())
     channel = get_call_channel()
+
+    # Broadcast transcript IMMEDIATELY (<1s)
+    transcript_ws = transcript_event_to_ws(segment)
+    await channel.broadcast(call_id, transcript_ws)
+
+    # Run heavy analysis with lock (LLM, KB, BANT) — results trickle in
     try:
         async with lock:
             out = await asyncio.to_thread(
@@ -50,17 +57,10 @@ async def _process_live_segment(
                 segment,
                 elapsed_seconds=elapsed_seconds,
             )
-        checklist = out.get("checklist")
-        if checklist:
-            await channel.broadcast(
-                call_id, {"type": "checklist_update", "payload": checklist}
-            )
-        for signal in out.get("bant_signals") or []:
-            await channel.broadcast(call_id, {"type": "bant_signal", "payload": signal})
-        nudge = out.get("nudge")
-        ws_msgs = out.get("ws_messages") or []
-        if nudge and not any(m.get("type") == "nudge" for m in ws_msgs):
-            await channel.broadcast(call_id, {"type": "nudge", "payload": nudge})
+        for msg in out.get("ws_messages") or []:
+            if msg.get("type") == "transcript":
+                continue  # already sent above
+            await channel.broadcast(call_id, msg)
     except Exception:
         _logger.exception("live segment dispatch failed call_id=%s", call_id)
 
@@ -78,7 +78,10 @@ async def call_stream(websocket: WebSocket, call_id: str) -> None:
             except json.JSONDecodeError:
                 continue
             if msg.get("type") == "ping":
-                await websocket.send_json({"type": "ping"})
+                try:
+                    await websocket.send_json({"type": "pong"})
+                except Exception:
+                    break
                 continue
             if msg.get("type") == "transcript":
                 ctx = TenantContext.from_headers(
@@ -95,5 +98,8 @@ async def call_stream(websocket: WebSocket, call_id: str) -> None:
                     )
                 )
     except WebSocketDisconnect:
+        pass
+    except Exception:
+        _logger.exception("unexpected error in ws loop call_id=%s", call_id)
+    finally:
         await channel.unsubscribe(call_id, websocket)
-        return

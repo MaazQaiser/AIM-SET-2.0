@@ -8,14 +8,20 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request
 
 from dc_core.tenancy import TenantContext
 
+import logging
+
 from app.config import get_settings
+from app.domain.call_channel import get_call_channel
 from app.orchestrator.dispatcher import Orchestrator
+from app.orchestrator.live_broadcast import transcript_event_to_ws
 from app.services.transcript_provider.recall_webhook import (
     parse_recall_payload,
     resolve_call_id,
     segment_to_event_dict,
     verify_recall_signature,
 )
+
+_logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/webhooks", tags=["webhooks"])
 _orch = Orchestrator()
@@ -72,7 +78,27 @@ async def recall_transcript_webhook(
         )
 
     event = segment_to_event_dict(parsed, cid)
-    return await asyncio.to_thread(_orch.dispatch_live_segment, ctx, cid, event)
+    channel = get_call_channel()
+
+    # Broadcast transcript IMMEDIATELY so the user sees it in <1 second
+    transcript_ws = transcript_event_to_ws(event)
+    await channel.broadcast(cid, transcript_ws)
+
+    # Run the heavy analysis pipeline in the background
+    async def _analyze_and_broadcast():
+        try:
+            result = await asyncio.to_thread(_orch.dispatch_live_segment, ctx, cid, event)
+            for msg in result.get("ws_messages") or []:
+                # Skip the transcript message — already sent above
+                if msg.get("type") == "transcript":
+                    continue
+                await channel.broadcast(cid, msg)
+        except Exception:
+            _logger.exception("background analysis failed call_id=%s", cid)
+
+    asyncio.create_task(_analyze_and_broadcast())
+
+    return {"ok": True, "call_id": cid}
 
 
 @router.post("/recall/demo-segment")
@@ -95,4 +121,33 @@ async def demo_segment(
         "provider": "demo",
         "provider_event_id": body.get("provider_event_id"),
     }
-    return await asyncio.to_thread(_orch.dispatch_live_segment, ctx, call_id, event)
+    channel = get_call_channel()
+
+    # Broadcast transcript IMMEDIATELY
+    transcript_ws = transcript_event_to_ws(event)
+    await channel.broadcast(call_id, transcript_ws)
+
+    # Run analysis in background — don't block the response
+    async def _demo_analyze():
+        try:
+            result = await asyncio.to_thread(_orch.dispatch_live_segment, ctx, call_id, event)
+            for msg in result.get("ws_messages") or []:
+                if msg.get("type") == "transcript":
+                    continue
+                await channel.broadcast(call_id, msg)
+        except Exception:
+            _logger.exception("demo analysis failed call_id=%s", call_id)
+
+    asyncio.create_task(_demo_analyze())
+
+    return {
+        "ok": True,
+        "call_id": call_id,
+        "transcript_event": {
+            "id": event.get("id") or event.get("provider_event_id"),
+            "speaker_id": event["speaker_id"],
+            "speaker_role": event["speaker_role"],
+            "text": event["text"],
+            "offset_seconds": event["offset_seconds"],
+        },
+    }

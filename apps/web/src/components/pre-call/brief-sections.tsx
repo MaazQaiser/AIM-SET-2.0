@@ -62,17 +62,17 @@ export function BriefSections({
 
       {brief.postDcPreview && <PostDcBriefPreviewCard preview={brief.postDcPreview} />}
 
-      {brief.newSignals.length > 0 && <BriefSignalsCard signals={brief.newSignals} />}
+      {brief.newSignals?.length > 0 && <BriefSignalsCard signals={brief.newSignals} />}
 
       <InternalAttendeesCard
         attendees={resolveInternalAttendees(brief.internalAttendees, call)}
       />
 
-      {brief.clientAttendees.length > 0 && (
+      {brief.clientAttendees?.length > 0 && (
         <ClientAttendeesCard attendees={brief.clientAttendees} />
       )}
 
-      {brief.interactionHistory.length > 0 && (
+      {brief.interactionHistory?.length > 0 && (
         <ClientHistoryCard interactions={brief.interactionHistory} />
       )}
 
@@ -88,11 +88,11 @@ export function BriefSections({
         <BriefDiscoveryQuestionsCard questions={discoveryQuestions} />
       )}
 
-      {brief.objections.length > 0 && <BriefObjectionsCard objections={brief.objections} />}
+      {brief.objections?.length > 0 && <BriefObjectionsCard objections={brief.objections} />}
 
       <BriefDeckCard slides={brief.deckSlides} />
 
-      {brief.podNotes.length > 0 && <BriefPodNotesCard notes={brief.podNotes} />}
+      {brief.podNotes?.length > 0 && <BriefPodNotesCard notes={brief.podNotes} />}
     </div>
   );
 }
