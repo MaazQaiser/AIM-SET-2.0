@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { Linkedin, Clock, MessageCircle, ExternalLink } from "lucide-react";
 import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
-import { Button } from "@/components/ui/button";
+import { Button } from "@dc-copilot/ui/components/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@dc-copilot/ui/components/dialog";
 import { cn } from "@/lib/cn";
 import type { ClientAttendee, InfluenceLevel } from "@/lib/brief-types";
 

@@ -238,15 +238,21 @@ export { buildDefaultColumnOrder, mergeColumnOrder };
 export type { ColumnOrderSeed };
 
 export function buildDefaultLayouts(items: WidgetLayoutSeed[], hidden: string[]): ResponsiveLayouts {
-  const visible = items.filter((w) => !hidden.includes(w.id) && w.defaultLayout);
+  const visible = items.filter(
+    (
+      w
+    ): w is WidgetLayoutSeed & {
+      defaultLayout: NonNullable<WidgetLayoutSeed["defaultLayout"]>;
+    } => !hidden.includes(w.id) && Boolean(w.defaultLayout)
+  );
   const lg: LayoutItem[] = visible.map((w) => ({
     i: w.id,
-    x: w.defaultLayout!.x,
-    y: w.defaultLayout!.y,
-    w: w.defaultLayout!.w,
-    h: w.defaultLayout!.h,
-    minW: w.defaultLayout!.minW ?? 3,
-    minH: w.defaultLayout!.minH ?? 2,
+    x: w.defaultLayout.x,
+    y: w.defaultLayout.y,
+    w: w.defaultLayout.w,
+    h: w.defaultLayout.h,
+    minW: w.defaultLayout.minW ?? 3,
+    minH: w.defaultLayout.minH ?? 2,
     maxW: 12,
   }));
 

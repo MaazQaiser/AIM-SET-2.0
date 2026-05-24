@@ -15,12 +15,14 @@ export function normalizeCallBrief(brief: CallBrief): CallBrief {
     pains: brief.pains ?? [],
     objections: brief.objections ?? [],
     deckSlides: brief.deckSlides ?? [],
+    preDeck: brief.preDeck,
     podNotes: brief.podNotes ?? [],
     researchSections: brief.researchSections ?? [],
     relevantDocuments: brief.relevantDocuments ?? [],
     relevantProjects: brief.relevantProjects ?? [],
     artifactPlan: brief.artifactPlan ?? [],
     artifactFulfillment: brief.artifactFulfillment ?? [],
+    contentToGenerate: brief.contentToGenerate ?? [],
   };
 }
 

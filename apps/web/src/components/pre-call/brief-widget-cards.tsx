@@ -116,7 +116,7 @@ export function BriefSignalsCard({ signals }: { signals: string[] }) {
     >
       <ul className="space-y-2">
         {signals.map((signal, i) => (
-          <li key={`${signal}-${i}`}>
+          <li key={signal}>
             <BriefDetailRow className="bg-warning/5 border-warning/30">
               <div className="flex items-start gap-2 min-w-0">
                 <span className="shrink-0 rounded-md bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-warning">
@@ -145,7 +145,7 @@ export function BriefPainsCard({ pains }: { pains: HypothesizedPain[] }) {
     >
       <ul className="space-y-2">
         {safePains.map((pain, i) => (
-          <li key={i}>
+          <li key={pain.text}>
             <BriefDetailRow>
               <div className="flex items-start justify-between gap-3 min-w-0">
                 <div className="flex items-start gap-2 min-w-0 flex-1">
@@ -188,7 +188,7 @@ export function BriefDiscoveryQuestionsCard({ questions }: { questions: string[]
       <ol className="divide-y divide-border">
         {questions.map((q, i) => (
           <li
-            key={i}
+            key={q}
             className="flex gap-3 py-2.5 text-sm min-w-0 first:pt-0 last:pb-0"
           >
             <span className="shrink-0 font-mono text-xs text-primary font-bold w-6">
@@ -208,9 +208,9 @@ export function BriefObjectionsCard({ objections }: { objections: AnticipatedObj
   return (
     <BriefDetailCard title="Anticipated objections">
       <div className="space-y-2">
-        {objections.map((o, i) => (
+        {objections.map((o) => (
           <BriefDetailAccordion
-            key={i}
+            key={o.objection}
             title={o.objection}
             summary={`Response · ${(o.confidence * 100).toFixed(0)}% confidence`}
           >

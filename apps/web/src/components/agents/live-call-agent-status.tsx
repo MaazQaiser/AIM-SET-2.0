@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Activity, Zap, DollarSign, ToggleLeft, ToggleRight } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@dc-copilot/ui/components/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@dc-copilot/ui/components/tooltip";
 import { cn } from "@/lib/cn";
 
 interface LiveCallAgentStatusProps {
@@ -101,6 +101,7 @@ export function LiveCallAgentStatus({
         <>
           <div className="h-3 w-px bg-border ml-auto" />
           <button
+            type="button"
             onClick={toggle}
             className="text-muted-foreground hover:text-foreground transition-colors"
             aria-label={active ? "Disable Live Call Agent" : "Enable Live Call Agent"}

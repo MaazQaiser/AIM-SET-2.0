@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { Plus, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Input } from "@dc-copilot/ui/components/input";
 import type { SignalRoutingRule, NudgeType, TargetRole } from "@/types/agents";
 import { cn } from "@/lib/cn";
 
@@ -118,6 +117,7 @@ export function SignalRoutingTable({ rules, onChange, readOnly = false }: Signal
             {!readOnly && (
               <div className="flex items-center gap-1">
                 <button
+                  type="button"
                   onClick={() => toggle(rule.id)}
                   className="text-muted-foreground hover:text-foreground transition-colors"
                   aria-label={rule.enabled ? "Disable rule" : "Enable rule"}
@@ -127,6 +127,7 @@ export function SignalRoutingTable({ rules, onChange, readOnly = false }: Signal
                     : <ToggleLeft className="h-4 w-4" />}
                 </button>
                 <button
+                  type="button"
                   onClick={() => remove(rule.id)}
                   className="text-muted-foreground hover:text-destructive transition-colors"
                   aria-label="Delete rule"

@@ -1,9 +1,9 @@
 "use client";
 
 import { ClipboardList } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/data-table";
-import { EmptyState } from "@/components/ui/empty-state";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
+import { DataTable } from "@dc-copilot/ui/components/data-table";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { useAgentAudit } from "@/lib/data/hooks";
 import type { ColumnDef } from "@tanstack/react-table";
 

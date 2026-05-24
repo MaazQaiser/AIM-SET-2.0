@@ -21,6 +21,6 @@ const EXTENSION_ASSET_TYPE: Record<string, AssetType> = {
 };
 
 export function defaultAssetTypeForFile(fileName: string): AssetType {
-  const ext = fileName.includes(".") ? `.${fileName.split(".").pop()!.toLowerCase()}` : "";
+  const ext = fileName.includes(".") ? `.${(fileName.split(".").pop() ?? "").toLowerCase()}` : "";
   return EXTENSION_ASSET_TYPE[ext] ?? "deck";
 }

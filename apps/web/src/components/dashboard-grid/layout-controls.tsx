@@ -1,8 +1,8 @@
 "use client";
 
 import { Plus, RotateCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@dc-copilot/ui/components/popover";
 import { buildDefaultColumnOrder } from "@/lib/dashboard/column-order";
 import type { WidgetSpec } from "@/lib/dashboard/widget-registry";
 import { useDashboardLayoutStore, type LayoutKey } from "@/stores/use-dashboard-layout";

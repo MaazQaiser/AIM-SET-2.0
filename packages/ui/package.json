@@ -2,9 +2,17 @@
   "name": "@dc-copilot/ui",
   "version": "0.1.0",
   "private": true,
+  "sideEffects": [
+    "./src/**/*.css"
+  ],
   "exports": {
     ".": "./src/index.ts",
-    "./globals.css": "./src/globals.css"
+    "./globals.css": "./src/globals.css",
+    "./tokens.css": "./src/styles/tokens.css",
+    "./typography.css": "./src/styles/typography.css",
+    "./components/*": "./src/components/*.tsx",
+    "./lib/*": "./src/lib/*.ts",
+    "./tokens": "./src/tokens.ts"
   },
   "scripts": {
     "lint": "biome lint ./src",
@@ -36,6 +44,7 @@
     "@radix-ui/react-tabs": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.1.6",
+    "@tanstack/react-table": "^8.21.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.4",

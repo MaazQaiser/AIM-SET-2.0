@@ -63,14 +63,13 @@ export function SentimentDisplayPanel({
         <SentimentChip label="Customer" score={customerScore} />
       </div>
       {shift && (
-        <div
+        <output
           className={cn(
             "rounded-md border px-2.5 py-2 text-xs",
             shift.direction === "negative"
               ? "border-amber-200/80 bg-amber-50/50 dark:border-amber-900/50 dark:bg-amber-950/25"
               : "border-success/30 bg-success/5"
           )}
-          role="status"
         >
           <p className="font-medium text-foreground flex items-center gap-1.5 flex-wrap">
             <span aria-hidden>
@@ -84,7 +83,7 @@ export function SentimentDisplayPanel({
           {shift.message && (
             <p className="text-muted-foreground mt-1 leading-snug">{shift.message}</p>
           )}
-        </div>
+        </output>
       )}
     </div>
   );

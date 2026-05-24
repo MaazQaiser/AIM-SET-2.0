@@ -2,7 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import { cn } from "@/lib/cn";
 
 interface LiveCollapsibleSectionProps {

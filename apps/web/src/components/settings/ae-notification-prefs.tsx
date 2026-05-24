@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
+import { Label } from "@dc-copilot/ui/components/label";
+import { Slider } from "@dc-copilot/ui/components/slider";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Separator } from "@dc-copilot/ui/components/separator";
 
 export function AeNotificationPrefs() {
   const [nudgesPerWindow, setNudgesPerWindow] = useState(3);

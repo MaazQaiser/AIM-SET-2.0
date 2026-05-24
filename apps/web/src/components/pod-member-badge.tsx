@@ -1,5 +1,5 @@
 import { cn } from "@/lib/cn";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@dc-copilot/ui/components/avatar";
 import type { PodMember } from "@/types";
 
 const roleLabels: Record<string, string> = {

@@ -1,11 +1,8 @@
 "use client";
-
-import Link from "next/link";
-import { Video, Users, Clock, ExternalLink, Calendar } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/ui/empty-state";
+import { Video, Users, Clock, Calendar } from "lucide-react";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Skeleton } from "@dc-copilot/ui/components/skeleton";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { useCalendarEvents } from "@/hooks/use-google-calendar";
 import { format } from "date-fns";
 import type { CalendarMappedCall } from "@/types/integrations";

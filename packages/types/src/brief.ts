@@ -19,6 +19,22 @@ export interface DeckSlide {
   included: boolean;
 }
 
+export interface PreDeckSlide {
+  id: string;
+  title: string;
+  narrative: string;
+  sourceType: "workflow" | "knowledge_base";
+  assetId?: string;
+  previewText?: string;
+}
+
+export interface PreDeck {
+  title: string;
+  status: "ready" | "needs_content";
+  summary: string;
+  slides: PreDeckSlide[];
+}
+
 export type InfluenceLevel =
   | "decision-maker"
   | "influencer"
@@ -108,6 +124,17 @@ export interface ArtifactFulfillment {
   requiredData?: string;
 }
 
+export interface ContentToGenerate {
+  id: string;
+  sourceArtifactId?: string;
+  name: string;
+  type: PlannedArtifactType;
+  priority: number;
+  status: "missing" | "partial";
+  reason: string;
+  neededFor: string;
+}
+
 export type PreDcAgentStatus = "pending" | "running" | "success" | "failed";
 
 export type RelevantDocumentFormat = "pdf" | "ppt" | "pptx";
@@ -152,12 +179,14 @@ export interface CallBrief {
   pains: HypothesizedPain[];
   objections: AnticipatedObjection[];
   deckSlides: DeckSlide[];
+  preDeck?: PreDeck;
   podNotes: { memberName: string; role: string; note: string; reviewedAt?: string }[];
   researchSections?: BriefResearchSection[];
   postDcPreview?: PostDcBriefPreview;
   postDcResearchSections?: BriefResearchSection[];
   artifactPlan?: PlannedArtifact[];
   artifactFulfillment?: ArtifactFulfillment[];
+  contentToGenerate?: ContentToGenerate[];
   relevantDocuments?: RelevantDocument[];
   relevantProjects?: RelevantProject[];
   agentStatus?: PreDcAgentStatus;

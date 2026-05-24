@@ -174,6 +174,145 @@ def _fulfill_artifacts_heuristic(
     return out
 
 
+def _artifact_type_label(value: Any) -> str:
+    text = str(value or "content").replace("_", " ").strip()
+    return text or "content"
+
+
+def _artifact_priority(item: Dict[str, Any], fallback: int = 99) -> int:
+    try:
+        return int(item.get("priority") or fallback)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _build_pre_deck(
+    account_name: str,
+    research: Dict[str, str],
+    plan: List[Dict[str, Any]],
+    hits: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Build a lightweight previewable pre-call deck for the Pre-DC screen."""
+    slides: List[Dict[str, Any]] = []
+
+    def add_slide(
+        title: str,
+        narrative: str,
+        *,
+        source_type: str = "workflow",
+        asset_id: Optional[str] = None,
+        preview_text: Optional[str] = None,
+    ) -> None:
+        clean = narrative.strip()
+        if not clean:
+            return
+        slides.append(
+            {
+                "id": f"predeck-{len(slides) + 1}",
+                "title": title,
+                "narrative": clean[:700],
+                "sourceType": source_type,
+                "assetId": asset_id,
+                "previewText": (preview_text or clean)[:1200],
+            }
+        )
+
+    context_bits = [
+        research.get("company_description", ""),
+        research.get("industry", ""),
+        research.get("icp_bucket", ""),
+        research.get("deal_stage", ""),
+    ]
+    add_slide(
+        "Account context",
+        " ".join(bit for bit in context_bits if bit).strip()
+        or f"Prepare discovery context for {account_name}.",
+    )
+
+    add_slide(
+        "Likely need and discovery angle",
+        " ".join(
+            bit
+            for bit in [
+                research.get("needs", ""),
+                research.get("intersection", ""),
+                research.get("campaign_service", ""),
+            ]
+            if bit
+        ),
+    )
+
+    for hit in hits[:3]:
+        snippet = (hit.get("chunk_text") or "").strip()
+        if not snippet:
+            continue
+        add_slide(
+            "Relevant proof point",
+            snippet,
+            source_type="knowledge_base",
+            asset_id=str(hit.get("asset_id", "")) or None,
+            preview_text=snippet,
+        )
+
+    planned_names = [
+        f"{item.get('name', 'Artifact')} ({_artifact_type_label(item.get('type'))})"
+        for item in sorted(plan, key=_artifact_priority)[:4]
+    ]
+    if planned_names:
+        add_slide(
+            "Recommended talk track",
+            "Prepare these assets for the call: " + "; ".join(planned_names) + ".",
+        )
+
+    return {
+        "title": f"{account_name} pre-call deck",
+        "status": "ready" if any(s.get("sourceType") == "knowledge_base" for s in slides) else "needs_content",
+        "summary": "Preview deck assembled from Pre-DC research and the strongest KB matches.",
+        "slides": slides[:6],
+    }
+
+
+def _content_to_generate(
+    plan: List[Dict[str, Any]],
+    fulfillments: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    planned_by_id = {str(item.get("id", "")): item for item in plan}
+    output: List[Dict[str, Any]] = []
+    for row in fulfillments:
+        status = str(row.get("status") or "").lower()
+        if status not in ("missing", "partial"):
+            continue
+        artifact_id = str(row.get("artifactId") or "")
+        planned = planned_by_id.get(artifact_id, {})
+        name = row.get("name") or planned.get("name") or "New content"
+        rationale = str(planned.get("rationale") or "").strip()
+        required = str(row.get("requiredData") or "").strip()
+        reason_parts = []
+        if required:
+            reason_parts.append(required)
+        if rationale:
+            reason_parts.append(f"It matters for this call because {rationale}")
+        if not reason_parts:
+            reason_parts.append(
+                "The workflow could not find a strong enough knowledge-base match for this planned call asset."
+            )
+        output.append(
+            {
+                "id": f"gap-{artifact_id or len(output) + 1}",
+                "sourceArtifactId": artifact_id or None,
+                "name": name,
+                "type": planned.get("type") or "one_pager",
+                "priority": _artifact_priority(planned, len(output) + 1),
+                "status": status,
+                "reason": " ".join(reason_parts),
+                "neededFor": rationale
+                or "Give the pod stronger call-specific material than the current KB can provide.",
+            }
+        )
+    output.sort(key=lambda item: _artifact_priority(item))
+    return output
+
+
 def run_pre_dc_pipeline(
     ctx: TenantContext,
     call_id: str,
@@ -261,6 +400,9 @@ def run_pre_dc_pipeline(
     else:
         fulfillments = _fulfill_artifacts_heuristic(artifact_plan, hits)
 
+    pre_deck = _build_pre_deck(account_name, research, artifact_plan, hits)
+    content_to_generate = _content_to_generate(artifact_plan, fulfillments)
+
     citations: List[Citation] = []
     for i, hit in enumerate(hits[:3]):
         citations.append(
@@ -271,12 +413,19 @@ def run_pre_dc_pipeline(
                 confidence=float(hit.get("score", 0.85)),
             )
         )
-    if research.get("company_description"):
+    crm_snippet = (
+        research.get("company_description")
+        or research.get("needs")
+        or research.get("intersection")
+        or research.get("industry")
+        or account_name
+    )
+    if crm_snippet:
         citations.append(
             Citation(
                 source_type="crm_record",
                 source_id=call_id,
-                snippet=research["company_description"][:200],
+                snippet=crm_snippet[:200],
                 confidence=0.9,
             )
         )
@@ -315,8 +464,10 @@ def run_pre_dc_pipeline(
         "clientAttendees": [],
         "interactionHistory": [],
         "podNotes": [],
+        "preDeck": pre_deck,
         "artifactPlan": artifact_plan,
         "artifactFulfillment": fulfillments,
+        "contentToGenerate": content_to_generate,
         "relevantDocuments": relevant.get("relevantDocuments") or [],
         "relevantProjects": relevant.get("relevantProjects") or [],
         "agentStatus": "success",

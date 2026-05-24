@@ -14,10 +14,10 @@ import {
   setHours,
 } from "date-fns";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, Radio } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Badge } from "@dc-copilot/ui/components/badge";
+import { Card, CardContent } from "@dc-copilot/ui/components/card";
 import { cn } from "@/lib/cn";
 import type { Call } from "@/types";
 
@@ -93,7 +93,7 @@ function TodayView({ calls, day }: { calls: Call[]; day: Date }) {
       const hour = new Date(call.scheduledAt).getHours();
       const bucket = hour >= HOUR_START && hour <= HOUR_END ? hour : HOUR_START;
       if (!byHour.has(bucket)) byHour.set(bucket, []);
-      byHour.get(bucket)!.push(call);
+      byHour.get(bucket)?.push(call);
     }
     return Array.from(byHour.entries())
       .map(([hour, list]) => ({ hour, calls: list }))
@@ -144,10 +144,11 @@ function WeekView({ calls, weekStart }: { calls: Call[]; weekStart: Date }) {
     for (const call of calls) {
       const d = new Date(call.scheduledAt);
       const key = format(d, "yyyy-MM-dd");
-      if (map.has(key)) map.get(key)!.push(call);
+      map.get(key)?.push(call);
     }
     for (const key of map.keys()) {
-      map.set(key, sortByTime(map.get(key)!));
+      const list = map.get(key);
+      if (list) map.set(key, sortByTime(list));
     }
     return map;
   }, [calls, days]);

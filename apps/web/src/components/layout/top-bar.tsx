@@ -3,7 +3,7 @@
 import { UserButton } from "@clerk/nextjs";
 import { Bell, Moon, Search, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { Button } from "@/components/ui/button";
+import { Button } from "@dc-copilot/ui/components/button";
 import { PersonaSwitcher } from "@/components/layout/persona-switcher";
 import { useClerkGate } from "@/components/providers/clerk-gate";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";

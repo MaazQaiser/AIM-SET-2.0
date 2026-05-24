@@ -1,7 +1,7 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@dc-copilot/ui/components/popover";
 import type { Citation } from "@/types";
 
 interface CitationMarkerProps {
@@ -24,6 +24,7 @@ export function CitationMarker({ index, citation }: CitationMarkerProps) {
     <Popover>
       <PopoverTrigger asChild>
         <button
+          type="button"
           className="inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary hover:bg-primary/20 transition-colors align-super ml-0.5"
           aria-label={`Citation ${index}: ${citation.title}`}
         >

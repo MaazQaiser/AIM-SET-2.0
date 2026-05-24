@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { RefreshCw, Calendar, CheckSquare, Square, Loader2, Info } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@dc-copilot/ui/components/tooltip";
 import { IntegrationCard } from "./integration-card";
 import {
   useGoogleCalendarConnection,
@@ -37,6 +37,7 @@ function CalendarToggle({
 }) {
   return (
     <button
+      type="button"
       onClick={() => onToggle(calendar.id, !calendar.selected)}
       disabled={disabled}
       className={cn(

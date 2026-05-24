@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { Eye, ExternalLink, TrendingUp } from "lucide-react";
-import { cn } from "@/lib/cn";
-import { Chip } from "@/components/ui/chip";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Chip } from "@dc-copilot/ui/components/chip";
+import { Card, CardContent } from "@dc-copilot/ui/components/card";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import { KbFileFormatBadge } from "@/components/knowledge/kb-file-format-badge";
 import type { KBAsset } from "@/types";
 

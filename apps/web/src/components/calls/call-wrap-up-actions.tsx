@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ClipboardCheck, Loader2, PlayCircle, Presentation } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@dc-copilot/ui/components/button";
 import { useRunPostCallPipeline } from "@/lib/data/hooks";
 import { FRANCHISE_DEMO_CALL_ID } from "@/lib/demo/franchise-ai-platform-demo";
 import { cn } from "@/lib/cn";

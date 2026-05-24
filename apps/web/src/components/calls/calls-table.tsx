@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/data-table";
+import { Badge } from "@dc-copilot/ui/components/badge";
+import { Button } from "@dc-copilot/ui/components/button";
+import { DataTable } from "@dc-copilot/ui/components/data-table";
 import type { Call, CallStatus } from "@/types";
 
 const STATUS_CONFIG: Record<

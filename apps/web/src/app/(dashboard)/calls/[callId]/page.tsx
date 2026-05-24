@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { CallDetailPageClient } from "@/components/calls/call-detail-page-client";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@dc-copilot/ui/components/skeleton";
 
 export const metadata: Metadata = { title: "Call brief" };
 

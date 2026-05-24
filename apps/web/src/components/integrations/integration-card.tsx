@@ -1,8 +1,7 @@
 "use client";
 
 import { ExternalLink, CheckCircle2, XCircle, AlertTriangle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@dc-copilot/ui/components/button";
 import type { ConnectionStatus } from "@/types/integrations";
 import { cn } from "@/lib/cn";
 

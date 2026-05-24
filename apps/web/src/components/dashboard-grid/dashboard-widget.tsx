@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { GripVertical, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@dc-copilot/ui/components/button";
 import { cn } from "@/lib/cn";
 
 /**

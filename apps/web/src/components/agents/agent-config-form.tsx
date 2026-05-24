@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Save, RotateCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Label } from "@dc-copilot/ui/components/label";
+import { Input } from "@dc-copilot/ui/components/input";
+import { Separator } from "@dc-copilot/ui/components/separator";
 import { ModelPolicyBadge } from "./model-policy-badge";
 import { NudgeThrottleControl } from "./nudge-throttle-control";
 import { SignalRoutingTable } from "./signal-routing-table";
@@ -172,7 +172,7 @@ export function AgentConfigForm({
               onChange={(e) =>
                 patch("cost_cap", {
                   ...local.cost_cap,
-                  per_run_ceiling_usd: parseFloat(e.target.value) || 0,
+                  per_run_ceiling_usd: Number.parseFloat(e.target.value) || 0,
                 })
               }
               className="w-36 h-8 text-sm"
@@ -190,7 +190,7 @@ export function AgentConfigForm({
                 onChange={(e) =>
                   patch("cost_cap", {
                     ...local.cost_cap,
-                    project_ceiling_usd: parseFloat(e.target.value) || 0,
+                    project_ceiling_usd: Number.parseFloat(e.target.value) || 0,
                   })
                 }
                 className="w-36 h-8 text-sm"
@@ -264,7 +264,7 @@ export function AgentConfigForm({
               onChange={(e) =>
                 patch("failure_behaviour", {
                   ...local.failure_behaviour,
-                  max_retries: parseInt(e.target.value, 10) || 0,
+                  max_retries: Number.parseInt(e.target.value, 10) || 0,
                 })
               }
               className="w-24 h-8 text-sm"
@@ -281,7 +281,7 @@ export function AgentConfigForm({
               onChange={(e) =>
                 patch("failure_behaviour", {
                   ...local.failure_behaviour,
-                  retry_delay_ms: parseInt(e.target.value, 10) || 0,
+                  retry_delay_ms: Number.parseInt(e.target.value, 10) || 0,
                 })
               }
               className="w-24 h-8 text-sm"

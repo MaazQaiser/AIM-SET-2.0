@@ -3,7 +3,7 @@
 import { FileCheck, FileQuestion, FileSearch, Package } from "lucide-react";
 import { WorkflowAgentBadge } from "@/components/pre-call/workflow-agent-badge";
 import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import type { CallBrief } from "@/lib/brief-types";
 import { cn } from "@/lib/cn";
 

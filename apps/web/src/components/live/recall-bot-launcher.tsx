@@ -1,8 +1,8 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Input } from "@dc-copilot/ui/components/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@dc-copilot/ui/components/tooltip";
 import { useLiveCall } from "@/stores/use-live-call";
 import type { TranscriptEvent } from "@/types";
 import { AlertCircle, Bot, CheckCircle2, Send } from "lucide-react";

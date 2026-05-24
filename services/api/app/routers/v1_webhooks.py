@@ -127,18 +127,15 @@ async def demo_segment(
     transcript_ws = transcript_event_to_ws(event)
     await channel.broadcast(call_id, transcript_ws)
 
-    # Run analysis in background — don't block the response
-    async def _demo_analyze():
-        try:
-            result = await asyncio.to_thread(_orch.dispatch_live_segment, ctx, call_id, event)
-            for msg in result.get("ws_messages") or []:
-                if msg.get("type") == "transcript":
-                    continue
-                await channel.broadcast(call_id, msg)
-        except Exception:
-            _logger.exception("demo analysis failed call_id=%s", call_id)
-
-    asyncio.create_task(_demo_analyze())
+    try:
+        result = await asyncio.to_thread(_orch.dispatch_live_segment, ctx, call_id, event)
+        for msg in result.get("ws_messages") or []:
+            if msg.get("type") == "transcript":
+                continue
+            await channel.broadcast(call_id, msg)
+    except Exception as exc:
+        _logger.exception("demo analysis failed call_id=%s", call_id)
+        raise HTTPException(status_code=500, detail="Demo analysis failed") from exc
 
     return {
         "ok": True,
@@ -150,4 +147,5 @@ async def demo_segment(
             "text": event["text"],
             "offset_seconds": event["offset_seconds"],
         },
+        **result,
     }

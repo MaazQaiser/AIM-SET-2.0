@@ -1,7 +1,7 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import { useQuarterlyPatterns } from "@/lib/data/hooks";
 
 export function WeeklyPatterns() {

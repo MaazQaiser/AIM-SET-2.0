@@ -2,12 +2,12 @@
 
 import { ArrowLeft, Pencil } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import { AIGeneratedBadge } from "@/components/ai-generated-badge";
 import { CallDetailTabs } from "@/components/calls/call-detail-tabs";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
+import { Skeleton } from "@dc-copilot/ui/components/skeleton";
 import { useCall } from "@/lib/data/hooks";
 import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
 import { useDcImportsStore } from "@/stores/use-dc-imports";

@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { CheckCircle2, AlertTriangle, XCircle, Activity, Zap } from "lucide-react";
 import { AgentStatusCard } from "@/components/agents/agent-status-card";
 import { AgentActivityFeed } from "@/components/agents/agent-activity-feed";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { useAgentAudit, useAgentRuns } from "@/lib/data/hooks";
 import { buildAgentStatuses } from "@/lib/agents/catalog";
 

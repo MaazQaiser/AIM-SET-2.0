@@ -103,7 +103,11 @@ async function googleFetch<T>(
   params?: Record<string, string>
 ): Promise<T> {
   const url = new URL(`${GOOGLE_CALENDAR_API}${path}`);
-  if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      url.searchParams.set(key, value);
+    }
+  }
 
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${accessToken}` },

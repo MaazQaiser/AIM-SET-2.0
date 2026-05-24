@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { exchangeCodeForTokens, listCalendars, registerPushChannel } from "@/lib/google-calendar";
+import { type NextRequest, NextResponse } from "next/server";
+import { exchangeCodeForTokens, } from "@/lib/google-calendar";
 
 /**
  * GET /api/integrations/google/callback?code=...&state=...

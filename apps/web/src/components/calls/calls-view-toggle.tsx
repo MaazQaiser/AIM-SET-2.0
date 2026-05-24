@@ -1,7 +1,7 @@
 "use client";
 
 import { LayoutGrid, List } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@dc-copilot/ui/components/button";
 import { cn } from "@/lib/cn";
 
 export type CallsViewMode = "list" | "cards";
@@ -14,9 +14,8 @@ interface CallsViewToggleProps {
 
 export function CallsViewToggle({ view, onChange, className }: CallsViewToggleProps) {
   return (
-    <div
+    <fieldset
       className={cn("inline-flex rounded-lg border border-border bg-muted/30 p-0.5", className)}
-      role="group"
       aria-label="Calls layout"
     >
       <Button
@@ -41,6 +40,6 @@ export function CallsViewToggle({ view, onChange, className }: CallsViewTogglePr
         <LayoutGrid className="h-4 w-4" />
         <span className="hidden sm:inline">Cards</span>
       </Button>
-    </div>
+    </fieldset>
   );
 }

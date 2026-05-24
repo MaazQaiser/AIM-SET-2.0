@@ -1,5 +1,5 @@
 import { auth } from "@/lib/api/auth";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 interface Params {
   params: Promise<{ callId: string; suggestionId: string }>;

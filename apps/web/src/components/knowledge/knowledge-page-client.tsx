@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import { BookOpen } from "lucide-react";
-import { SearchInput } from "@/components/ui/search-input";
+import { SearchInput } from "@dc-copilot/ui/components/search-input";
 import { KBAssetCard } from "@/components/kb-asset-card";
 import { KbUploadButton } from "@/components/knowledge/kb-upload-button";
 import { KnowledgePreviewDialog } from "@/components/knowledge/knowledge-preview-dialog";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Badge } from "@/components/ui/badge";
-import { FilterChip } from "@/components/ui/chip";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
+import { Badge } from "@dc-copilot/ui/components/badge";
+import { FilterChip } from "@dc-copilot/ui/components/chip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
+import { Card, CardContent } from "@dc-copilot/ui/components/card";
 import { useKbAssets, useKbWatchlist } from "@/lib/data/hooks";
 import { usePersona } from "@/hooks/use-persona";
 import type { KBAsset } from "@/types";

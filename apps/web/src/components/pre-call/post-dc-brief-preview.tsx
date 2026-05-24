@@ -1,7 +1,7 @@
 "use client";
 
 import { ClipboardList } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import {
   BriefDetailAccordion,
   BriefDetailCard,

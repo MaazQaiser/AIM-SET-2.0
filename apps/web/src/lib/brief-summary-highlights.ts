@@ -63,13 +63,14 @@ function applyRules(text: string, rules: SummaryHighlightRule[]): TextPart[] {
       }
       const re = ruleToRegExp(rule);
       let last = 0;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(part.value)) !== null) {
+      let m = re.exec(part.value);
+      while (m !== null) {
         if (m.index > last) {
           next.push({ type: "text", value: part.value.slice(last, m.index) });
         }
         next.push({ type: "highlight", value: m[0], className: rule.className });
         last = m.index + m[0].length;
+        m = re.exec(part.value);
       }
       if (last < part.value.length) {
         next.push({ type: "text", value: part.value.slice(last) });
@@ -90,8 +91,8 @@ function applyBoldMarkers(parts: TextPart[]): TextPart[] {
       continue;
     }
     let last = 0;
-    let m: RegExpExecArray | null;
-    while ((m = boldRe.exec(part.value)) !== null) {
+    let m = boldRe.exec(part.value);
+    while (m !== null) {
       if (m.index > last) {
         out.push({ type: "text", value: part.value.slice(last, m.index) });
       }
@@ -102,6 +103,7 @@ function applyBoldMarkers(parts: TextPart[]): TextPart[] {
           "rounded px-1 py-0.5 bg-primary/15 text-primary font-semibold dark:bg-primary/25",
       });
       last = m.index + m[0].length;
+      m = boldRe.exec(part.value);
     }
     if (last < part.value.length) {
       out.push({ type: "text", value: part.value.slice(last) });

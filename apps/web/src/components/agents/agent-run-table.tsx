@@ -1,8 +1,8 @@
 "use client";
 
 import { CheckCircle2, XCircle, AlertTriangle, Minus } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { DataTable } from "@/components/ui/data-table";
+import { Badge } from "@dc-copilot/ui/components/badge";
+import { DataTable } from "@dc-copilot/ui/components/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { AgentRun, RunOutcome } from "@/types/agents";
 import { cn } from "@/lib/cn";

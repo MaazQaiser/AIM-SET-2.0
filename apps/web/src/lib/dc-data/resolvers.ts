@@ -11,7 +11,6 @@ import {
   franchiseDemoBrief,
   franchiseDemoCall,
   franchiseDemoPostReview,
-  mergeFranchiseDemoCalls,
 } from "@/lib/demo/franchise-ai-platform-demo";
 import { preDcField } from "@/types/dc-notes";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
@@ -24,9 +23,9 @@ export function resolveCalls(): Call[] {
   const preDcRecords = state.preDcRecords ?? [];
   const postDcRecords = state.postDcRecords ?? [];
   if (preDcRecords.length === 0) {
-    return mergeFranchiseDemoCalls(state.calls ?? []);
+    return state.calls ?? [];
   }
-  return mergeFranchiseDemoCalls(buildCallsFromPreDc(preDcRecords, postDcRecords).calls);
+  return buildCallsFromPreDc(preDcRecords, postDcRecords).calls;
 }
 
 export function resolveCall(callId: string): Call | undefined {

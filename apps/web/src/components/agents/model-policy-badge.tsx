@@ -1,7 +1,5 @@
 "use client";
-
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@dc-copilot/ui/components/tooltip";
 import type { ModelPolicy } from "@/types/agents";
 
 interface ModelPolicyBadgeProps {

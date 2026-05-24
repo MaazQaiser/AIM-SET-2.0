@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, ListChecks } from "lucide-react";
 import { BANTScorecard } from "@/components/bant-scorecard";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import {
   BriefDetailAccordion,
   BriefDetailCard,
@@ -267,6 +267,7 @@ function CoverageRing({ percent, label }: { percent: number; label: string }) {
       aria-label={`${label} coverage ${percent} percent`}
     >
       <svg className="h-9 w-9 -rotate-90" viewBox="0 0 36 36">
+        <title>{`${label} coverage`}</title>
         <circle cx="18" cy="18" r={r} fill="none" className="stroke-muted" strokeWidth="3" />
         <circle
           cx="18"

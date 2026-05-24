@@ -2,13 +2,22 @@
 
 import { useMemo } from "react";
 import type { KeywordDefinitions } from "@/lib/live-types";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@dc-copilot/ui/components/popover";
 
 const EMPTY_DEFINITIONS: KeywordDefinitions = {};
 
 function findKeywordInText(text: string, keys: string[]): string | undefined {
   const lower = text.toLowerCase();
   return keys.find((k) => lower.includes(k.toLowerCase()));
+}
+
+function splitWithOffsets(text: string) {
+  let offset = 0;
+  return text.split(/(\s+)/).map((value) => {
+    const part = { value, offset };
+    offset += value.length;
+    return part;
+  });
 }
 
 interface KeywordHighlightProps {
@@ -23,24 +32,24 @@ export function KeywordHighlight({ text, definitions = EMPTY_DEFINITIONS }: Keyw
     return <span>{text}</span>;
   }
 
-  const parts = text.split(/(\s+)/);
+  const parts = splitWithOffsets(text);
 
   return (
     <span>
-      {parts.map((part, i) => {
-        const matchedKey = findKeywordInText(part, keys);
+      {parts.map((part) => {
+        const matchedKey = findKeywordInText(part.value, keys);
         const defKey = matchedKey
           ? Object.keys(definitions).find((k) => k.toLowerCase() === matchedKey.toLowerCase())
-          : findKeywordInText(part, keys);
+          : findKeywordInText(part.value, keys);
 
         const def = defKey ? definitions[defKey] : null;
-        if (!def) return <span key={i}>{part}</span>;
+        if (!def) return <span key={`${part.offset}-${part.value}`}>{part.value}</span>;
 
         return (
-          <Popover key={i}>
+          <Popover key={`${part.offset}-${part.value}`}>
             <PopoverTrigger asChild>
               <button type="button" className="underline decoration-dotted decoration-primary/60 cursor-help">
-                {part}
+                {part.value}
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-72 text-sm">

@@ -93,6 +93,7 @@ export function Sidebar({ defaultCollapsed = true }: SidebarProps) {
 
       {/* Collapse toggle */}
       <button
+        type="button"
         onClick={() => setCollapsed((c) => !c)}
         className="glass absolute -right-3 top-20 flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}

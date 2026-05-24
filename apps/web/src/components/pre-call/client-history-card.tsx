@@ -80,6 +80,7 @@ function InteractionRow({
       />
 
       <button
+        type="button"
         className="w-full text-left min-w-0"
         onClick={() => setExpanded((e) => !e)}
         aria-expanded={expanded}
@@ -146,8 +147,8 @@ function InteractionRow({
           </div>
 
           <div className="rounded-md bg-muted/40 px-3 py-2 space-y-1.5">
-            {interaction.keyMoments.map((moment, i) => (
-              <div key={i} className="flex items-start gap-2 text-xs text-foreground/80 min-w-0">
+            {interaction.keyMoments.map((moment) => (
+              <div key={moment} className="flex items-start gap-2 text-xs text-foreground/80 min-w-0">
                 <span className="text-primary font-bold shrink-0 mt-0.5">·</span>
                 <span className={cn("break-words min-w-0", compact && "line-clamp-3")}>
                   {moment}

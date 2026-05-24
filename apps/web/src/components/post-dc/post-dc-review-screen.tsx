@@ -7,10 +7,10 @@ import { LayoutControls } from "@/components/dashboard-grid/layout-controls";
 import { POST_DC_WIDGETS } from "@/lib/dashboard/widget-registry";
 import { normalizePostDcWidgetProps } from "@/lib/dashboard/normalize-widget-props";
 import { useCall, usePostCallReview } from "@/lib/data/hooks";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
+import { Skeleton } from "@dc-copilot/ui/components/skeleton";
+import { Badge } from "@dc-copilot/ui/components/badge";
+import { Button } from "@dc-copilot/ui/components/button";
 import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import type { AccountSnapshotRow } from "@/components/calls/account-widget-cards";
 import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
@@ -135,9 +135,8 @@ export function PostDcReviewScreen({
       )}
 
       {justWrapped && (
-        <div
+        <output
           className="rounded-xl border border-success/30 bg-success/5 px-4 py-3 flex items-start gap-3"
-          role="status"
         >
           <CheckCircle2 className="h-5 w-5 text-success shrink-0 mt-0.5" aria-hidden />
           <div>
@@ -147,7 +146,7 @@ export function PostDcReviewScreen({
               discovery gaps from the conversation.
             </p>
           </div>
-        </div>
+        </output>
       )}
 
       {!review ? (

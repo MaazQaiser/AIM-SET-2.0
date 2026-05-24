@@ -1,7 +1,7 @@
 "use client";
 
 import { Activity, Target } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import { cn } from "@/lib/cn";
 import type { BantSignal } from "@/lib/live-types";
 

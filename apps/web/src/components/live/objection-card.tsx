@@ -13,8 +13,8 @@ export function ObjectionCard({ objection }: ObjectionCardProps) {
       <p className="text-sm text-foreground">{objection.objection_text}</p>
       {objection.counter_points?.length > 0 && (
         <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-1">
-          {objection.counter_points.map((point, i) => (
-            <li key={i}>{point}</li>
+          {objection.counter_points.map((point) => (
+            <li key={point}>{point}</li>
           ))}
         </ul>
       )}

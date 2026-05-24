@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Send, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Textarea } from "@dc-copilot/ui/components/textarea";
 import { useStudioMessage } from "@/lib/data/content-studio-hooks";
 import type { StudioTurnResult } from "@/types/content_studio";
 

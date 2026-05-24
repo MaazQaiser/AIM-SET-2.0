@@ -1,0 +1,82 @@
+@layer base {
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: 0;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p {
+    overflow-wrap: anywhere;
+  }
+}
+
+@layer utilities {
+  .type-display {
+    font-size: var(--text-display);
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .type-headline {
+    font-size: var(--text-headline);
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .type-title {
+    font-size: var(--text-title);
+    line-height: 1.35;
+    font-weight: 650;
+    letter-spacing: 0;
+  }
+
+  .type-subtitle {
+    font-size: var(--text-subtitle);
+    line-height: 1.5;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  .type-body {
+    font-size: var(--text-body);
+    line-height: 1.6;
+    letter-spacing: 0;
+  }
+
+  .type-body-sm {
+    font-size: var(--text-body-sm);
+    line-height: 1.5;
+    letter-spacing: 0;
+  }
+
+  .type-label {
+    font-size: var(--text-label);
+    line-height: 1.35;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  .type-caption {
+    font-size: var(--text-caption);
+    line-height: 1.45;
+    letter-spacing: 0;
+  }
+
+  .type-mono {
+    font-family: var(--font-mono);
+    font-size: var(--text-body-sm);
+    line-height: 1.5;
+    letter-spacing: 0;
+  }
+}

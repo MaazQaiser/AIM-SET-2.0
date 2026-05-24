@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { Gauge } from "lucide-react";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
+import { Label } from "@dc-copilot/ui/components/label";
+import { Input } from "@dc-copilot/ui/components/input";
+import { Slider } from "@dc-copilot/ui/components/slider";
 import type { ThrottleConfig } from "@/types/agents";
 
 interface NudgeThrottleControlProps {

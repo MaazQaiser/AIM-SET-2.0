@@ -9,6 +9,7 @@ from dc_core.tenancy import TenantContext
 
 from app.agents.live_call.intent_detection import analyze_segment
 from app.agents.live_call_agent import bot_chat_response, build_session_summary, process_transcript_segment
+from app.domain.call_channel import get_call_channel
 from app.domain.calls_service import CallsService
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.live_call_repository import get_live_call_repository

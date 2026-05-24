@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { LiveCollapsibleSection } from "@/components/live/live-collapsible-section";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import { scoreEmoji, scoreToTone } from "@/lib/live/sentiment-display";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
 import type { CallIntent, PainSignal, SentimentShift } from "@/types";

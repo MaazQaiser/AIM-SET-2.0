@@ -5,7 +5,8 @@ describe("parseDiscoveryDateTime", () => {
   it("parses US date with time", () => {
     const iso = parseDiscoveryDateTime("5/19/2026", "10:30 AM");
     expect(iso).toBeTruthy();
-    const d = new Date(iso!);
+    if (!iso) throw new Error("Expected an ISO datetime");
+    const d = new Date(iso);
     expect(d.getHours()).toBe(10);
     expect(d.getMinutes()).toBe(30);
   });

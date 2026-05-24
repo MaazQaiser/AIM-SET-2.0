@@ -14,11 +14,11 @@ import {
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { DataTable } from "@/components/ui/data-table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Badge } from "@dc-copilot/ui/components/badge";
+import { DataTable } from "@dc-copilot/ui/components/data-table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import { cn } from "@/lib/cn";
 import { parseDcNotesCsv } from "@/lib/dc-notes/parse-dc-csv";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
@@ -27,7 +27,7 @@ import { AddPreDcLeadDialog } from "@/components/settings/add-pre-dc-lead-dialog
 
 const PRE_DC_TEMPLATE_HEADER = `Company Name-PreDC,Company Type ICP - PreDC,Annual Revenue - PreDC,No. of Employees - PreDC,Industry - PreDC,Company LinkedIn-PreDC,Company Description,Website-PreDC,Company Stage-PreDC,Company Stage,ICP Bucket,Need-PreDC,Campaign Service - PreDC,Discovery Call Time (PKT),Discovery Call Date (PKT),Prospect's Persona,Person LinkedIn-PreDC,Lead Name-PreDC`;
 
-const POST_DC_TEMPLATE_HEADER = `Lead Stage,Reason Not A Fit - Post-DC,Bottom Line Context,Engagement Model,Sales Strategy,Additional Info,Attendees,Was Pre DC ICP bucket correct,Budget,Authority,Need,Timeline,Accounts Annual Potential,Service Line`;
+const POST_DC_TEMPLATE_HEADER = "Lead Stage,Reason Not A Fit - Post-DC,Bottom Line Context,Engagement Model,Sales Strategy,Additional Info,Attendees,Was Pre DC ICP bucket correct,Budget,Authority,Need,Timeline,Accounts Annual Potential,Service Line";
 
 const preDcColumns: ColumnDef<PreDCRecord>[] = [
   {
@@ -125,30 +125,30 @@ function UploadZone({
   const [dragOver, setDragOver] = useState(false);
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setDragOver(true);
-      }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragOver(false);
-        const file = e.dataTransfer.files?.[0];
-        if (file) onFile(file);
-      }}
-      onClick={() => inputRef.current?.click()}
-      className={cn(
-        "flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-center cursor-pointer transition-colors",
-        dragOver ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:bg-muted/40"
-      )}
-    >
-      <Upload className="h-7 w-7 text-muted-foreground" />
-      <p className="text-sm font-medium text-foreground">{label}</p>
-      <p className="text-xs text-muted-foreground max-w-sm">{description}</p>
+    <>
+      <button
+        type="button"
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          const file = e.dataTransfer.files?.[0];
+          if (file) onFile(file);
+        }}
+        onClick={() => inputRef.current?.click()}
+        className={cn(
+          "flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-center cursor-pointer transition-colors",
+          dragOver ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:bg-muted/40"
+        )}
+      >
+        <Upload className="h-7 w-7 text-muted-foreground" />
+        <span className="text-sm font-medium text-foreground">{label}</span>
+        <span className="text-xs text-muted-foreground max-w-sm">{description}</span>
+      </button>
       <input
         ref={inputRef}
         type="file"
@@ -160,7 +160,7 @@ function UploadZone({
           e.target.value = "";
         }}
       />
-    </div>
+    </>
   );
 }
 

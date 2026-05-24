@@ -3,18 +3,18 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Code2, Eye, LayoutTemplate, Trash2, Upload } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+} from "@dc-copilot/ui/components/dialog";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import {
   useContentTemplate,
   useContentTemplates,

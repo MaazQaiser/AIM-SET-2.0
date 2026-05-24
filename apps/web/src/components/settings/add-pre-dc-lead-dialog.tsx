@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Plus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button } from "@dc-copilot/ui/components/button";
 import {
   Dialog,
   DialogContent,
@@ -12,9 +12,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@dc-copilot/ui/components/dialog";
+import { Input } from "@dc-copilot/ui/components/input";
+import { Label } from "@dc-copilot/ui/components/label";
 import {
   createEmptyPreDcRecord,
   createSamplePreDcRecord,

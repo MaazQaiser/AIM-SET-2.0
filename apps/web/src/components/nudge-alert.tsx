@@ -2,7 +2,7 @@
 
 import { Zap, X, Check } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { Button } from "@/components/ui/button";
+import { Button } from "@dc-copilot/ui/components/button";
 import { CitationMarker } from "./citation-marker";
 import type { NudgePayload } from "@/types";
 

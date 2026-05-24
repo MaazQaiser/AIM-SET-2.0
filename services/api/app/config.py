@@ -1,10 +1,11 @@
 from functools import lru_cache
+import os
 from pathlib import Path
 
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+_ENV_FILE = None if os.environ.get("DC_COPILOT_IGNORE_DOTENV") == "true" else Path(__file__).resolve().parent.parent / ".env"
 
 
 class Settings(BaseSettings):

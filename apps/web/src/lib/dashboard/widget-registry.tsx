@@ -9,6 +9,8 @@ import {
 } from "@/components/calls/account-widget-cards";
 import { BriefAISummary } from "@/components/pre-call/brief-ai-summary";
 import { BriefArtifactsPanel } from "@/components/pre-call/brief-artifacts-panel";
+import { BriefPreDeckPanel } from "@/components/pre-call/brief-pre-deck-panel";
+import { BriefContentToGeneratePanel } from "@/components/pre-call/brief-content-to-generate-panel";
 import { ClientAttendeesCard } from "@/components/pre-call/client-attendees-card";
 import { InternalAttendeesCard } from "@/components/pre-call/internal-attendees-card";
 import { resolveInternalAttendees } from "@/lib/attendees/build-internal-attendees";
@@ -79,6 +81,15 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     render: ({ brief }) => <BriefAISummary brief={brief} />,
   },
   {
+    id: "brief.pre-deck",
+    title: "Pre-call deck",
+    category: "content",
+    column: "center",
+    sortOrder: 0.25,
+    isAvailable: ({ brief }) => arrayLen(brief.preDeck?.slides) > 0,
+    render: ({ brief }) => <BriefPreDeckPanel deck={brief.preDeck} />,
+  },
+  {
     id: "brief.workflow-artifacts",
     title: "PRE-DC Workflow artifacts",
     category: "content",
@@ -87,6 +98,15 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     isAvailable: ({ brief }) =>
       arrayLen(brief.artifactPlan) > 0 || arrayLen(brief.artifactFulfillment) > 0,
     render: ({ brief }) => <BriefArtifactsPanel brief={brief} />,
+  },
+  {
+    id: "brief.content-to-generate",
+    title: "Content to generate",
+    category: "content",
+    column: "center",
+    sortOrder: 0.75,
+    isAvailable: ({ brief }) => arrayLen(brief.contentToGenerate) > 0,
+    render: ({ brief }) => <BriefContentToGeneratePanel items={brief.contentToGenerate} />,
   },
   {
     id: "brief.signals",
@@ -169,7 +189,7 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     column: "left",
     sortOrder: 2,
     isAvailable: ({ brief }) => arrayLen(brief.researchSections) > 0,
-    render: ({ brief }) => <PreDcResearchCard sections={brief.researchSections!} />,
+    render: ({ brief }) => <PreDcResearchCard sections={brief.researchSections ?? []} />,
   },
   {
     id: "brief.internal-attendees",
@@ -208,7 +228,8 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     column: "left",
     sortOrder: 6,
     isAvailable: ({ brief }) => Boolean(brief.postDcPreview),
-    render: ({ brief }) => <PostDcBriefPreviewCard preview={brief.postDcPreview!} />,
+    render: ({ brief }) =>
+      brief.postDcPreview ? <PostDcBriefPreviewCard preview={brief.postDcPreview} /> : null,
   },
   {
     id: "brief.bant",
@@ -217,7 +238,8 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     column: "right",
     sortOrder: 0,
     isAvailable: ({ bant }) => Boolean(bant),
-    render: ({ bant, brief, call }) => <BriefBANTCard bant={bant!} brief={brief} call={call} />,
+    render: ({ bant, brief, call }) =>
+      bant ? <BriefBANTCard bant={bant} brief={brief} call={call} /> : null,
   },
   {
     id: "brief.pod-notes",
@@ -297,7 +319,7 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     sortOrder: 0,
     isAvailable: ({ review }) => arrayLen(review.researchSections) > 0,
     render: ({ review }) => (
-      <PreDcResearchCard sections={review.researchSections!} title="Post-DC import (all fields)" />
+      <PreDcResearchCard sections={review.researchSections ?? []} title="Post-DC import (all fields)" />
     ),
   },
   {

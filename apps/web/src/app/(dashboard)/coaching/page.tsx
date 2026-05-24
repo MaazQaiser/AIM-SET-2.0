@@ -1,11 +1,11 @@
 "use client";
 
 import { TrendingUp, Phone, Users, BarChart3 } from "lucide-react";
-import { StatCard } from "@/components/ui/stat-card";
+import { StatCard } from "@dc-copilot/ui/components/stat-card";
 import { CoachingCard } from "@/components/coaching-card";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/data-table";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
+import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
+import { DataTable } from "@dc-copilot/ui/components/data-table";
 import { WeeklyPatterns } from "@/components/coaching/weekly-patterns";
 import { useCoachingInsights, useCalls } from "@/lib/data/hooks";
 import type { ColumnDef } from "@tanstack/react-table";

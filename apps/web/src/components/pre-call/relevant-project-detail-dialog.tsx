@@ -7,8 +7,8 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+} from "@dc-copilot/ui/components/dialog";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import type { RelevantProject, RelevantProjectSource } from "@/lib/brief-types";
 
 const SOURCE_LABEL: Record<RelevantProjectSource, string> = {

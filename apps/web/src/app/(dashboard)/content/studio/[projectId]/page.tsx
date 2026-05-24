@@ -3,8 +3,8 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, Download, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import { StudioChat } from "@/components/content/studio-chat";
 import { StudioPreview } from "@/components/content/studio-preview";
 import { TemplatePicker } from "@/components/content/template-picker";

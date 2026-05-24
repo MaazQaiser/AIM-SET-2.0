@@ -1,7 +1,7 @@
 "use client";
 
 import type { PainSignal, CallIntent } from "@/types";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@dc-copilot/ui/components/badge";
 
 interface IntentPainStreamProps {
   intent: CallIntent | null;

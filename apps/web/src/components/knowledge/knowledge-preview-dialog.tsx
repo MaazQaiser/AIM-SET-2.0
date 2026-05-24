@@ -6,7 +6,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@dc-copilot/ui/components/dialog";
 import { KbAssetPreview } from "@/components/knowledge/kb-asset-preview";
 import { KbFileFormatBadge } from "@/components/knowledge/kb-file-format-badge";
 import type { KBAsset } from "@/types";

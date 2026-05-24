@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import { BriefDetailCard, BriefDetailRow } from "@/components/pre-call/brief-detail-card";
 
 interface PostDiscoveryGapsCardProps {

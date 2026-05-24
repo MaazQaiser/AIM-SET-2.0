@@ -1,7 +1,7 @@
 "use client";
 
 import { Lightbulb } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@dc-copilot/ui/components/button";
 import type { SuggestedAction } from "@/lib/bot-chat/types";
 import { cn } from "@/lib/cn";
 

@@ -2,9 +2,9 @@ import { Calendar, Clock, Users, FileText, Radio, Building2, Briefcase, ChevronR
 import Link from "next/link";
 import { format } from "date-fns";
 import { cn } from "@/lib/cn";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@dc-copilot/ui/components/badge";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Card, CardContent } from "@dc-copilot/ui/components/card";
 import { PodMemberBadge } from "./pod-member-badge";
 import { BANTScorecard } from "./bant-scorecard";
 import type { Call } from "@/types";

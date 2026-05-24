@@ -192,7 +192,7 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
           wsRef.current = null;
 
           if (shouldReconnectRef.current && reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
-            const delay = BASE_DELAY_MS * Math.pow(2, reconnectAttempts.current);
+            const delay = BASE_DELAY_MS * 2 ** reconnectAttempts.current;
             reconnectAttempts.current++;
             reconnectTimer.current = setTimeout(openSocket, delay);
           }

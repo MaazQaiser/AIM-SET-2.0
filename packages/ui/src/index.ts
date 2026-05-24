@@ -1,3 +1,25 @@
-// Placeholder — the @dc-copilot/ui package currently has no shared components.
-// Add shared UI primitives here as needed.
-export {};
+export * from "./components/avatar";
+export * from "./components/badge";
+export * from "./components/button";
+export * from "./components/card";
+export * from "./components/chip";
+export * from "./components/data-table";
+export * from "./components/dialog";
+export * from "./components/empty-state";
+export * from "./components/input";
+export * from "./components/label";
+export * from "./components/popover";
+export * from "./components/scroll-area";
+export * from "./components/search-input";
+export * from "./components/separator";
+export * from "./components/sheet";
+export * from "./components/skeleton";
+export * from "./components/slider";
+export * from "./components/spinner";
+export * from "./components/stat-card";
+export * from "./components/tabs";
+export * from "./components/textarea";
+export * from "./components/tooltip";
+export * from "./components/typography";
+export * from "./lib/cn";
+export * from "./tokens";

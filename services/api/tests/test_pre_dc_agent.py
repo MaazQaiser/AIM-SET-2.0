@@ -67,6 +67,10 @@ def test_pre_dc_ingest_runs_agent_and_saves_brief(monkeypatch):
     assert isinstance(brief.get("artifactPlan"), list)
     assert len(brief["artifactPlan"]) >= 1
     assert brief.get("artifactFulfillment")
+    assert brief.get("preDeck")
+    assert brief["preDeck"].get("slides")
+    assert brief.get("contentToGenerate")
+    assert "reason" in brief["contentToGenerate"][0]
     assert "relevantDocuments" in brief
     assert "relevantProjects" in brief
     assert brief.get("agentStatus") == "success"

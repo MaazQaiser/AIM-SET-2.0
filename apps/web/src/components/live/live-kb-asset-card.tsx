@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink, FileText, Presentation, Layout, Map, Shield, Image as ImageIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Chip } from "@/components/ui/chip";
+import { ExternalLink, FileText, Presentation, Layout, Map as MapIcon, Shield, Image as ImageIcon } from "lucide-react";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Chip } from "@dc-copilot/ui/components/chip";
 import { cn } from "@/lib/cn";
 import type { KBAsset } from "@/types";
 
@@ -12,7 +12,7 @@ const typeConfig: Record<string, { icon: typeof FileText; label: string }> = {
   "case-study": { icon: FileText, label: "Case Study" },
   image: { icon: ImageIcon, label: "Image" },
   "one-pager": { icon: Layout, label: "OnePager" },
-  architecture: { icon: Map, label: "Architecture" },
+  architecture: { icon: MapIcon, label: "Architecture" },
   battlecard: { icon: Shield, label: "Battle Card" },
 };
 

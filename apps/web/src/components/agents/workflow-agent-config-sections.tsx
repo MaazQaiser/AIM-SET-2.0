@@ -1,8 +1,8 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Label } from "@dc-copilot/ui/components/label";
 import type { AgentConfig } from "@/types/agents";
 
 const DEFAULT_SUMMARY_PLACEHOLDER =
@@ -76,7 +76,10 @@ export function WorkflowAgentConfigSections({
         ) : null}
         <ul className="space-y-3">
           {rules.map((rule, index) => (
-            <li key={index} className="rounded-md border p-3 space-y-2">
+            <li
+              key={`${rule.pattern}-${rule.className}-${rule.flags ?? ""}`}
+              className="rounded-md border p-3 space-y-2"
+            >
               <div className="flex justify-between items-center gap-2">
                 <Label className="text-xs">Pattern {index + 1}</Label>
                 {!readOnly && (

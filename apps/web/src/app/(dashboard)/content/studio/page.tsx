@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Plus, Sparkles, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import {
   Dialog,
   DialogContent,
@@ -12,10 +12,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@dc-copilot/ui/components/dialog";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
+import { Input } from "@dc-copilot/ui/components/input";
+import { Label } from "@dc-copilot/ui/components/label";
 import {
   useCreateStudioProject,
   useDeleteStudioProject,

@@ -3,7 +3,7 @@
 import { use } from "react";
 import Link from "next/link";
 import { ChevronLeft, TrendingUp } from "lucide-react";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { useCoachingInsights } from "@/lib/data/hooks";
 
 export default function CoachingAePage({ params }: { params: Promise<{ aeId: string }> }) {

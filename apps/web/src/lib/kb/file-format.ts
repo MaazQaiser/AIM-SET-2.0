@@ -41,7 +41,7 @@ const FORMAT_META: Record<KbFileFormat, Omit<KbFormatMeta, "format">> = {
 
 export function resolveKbFileFormat(fileName?: string, mimeType?: string): KbFormatMeta {
   const ext = fileName?.includes(".")
-    ? fileName.split(".").pop()!.toLowerCase()
+    ? (fileName.split(".").pop() ?? "").toLowerCase()
     : "";
   const mime = (mimeType ?? "").toLowerCase();
 

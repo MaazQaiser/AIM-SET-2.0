@@ -53,6 +53,13 @@ function HighlightedSummary({
   rules?: SummaryHighlightRule[];
 }) {
   const parts = parseSummaryHighlights(text, rules);
+  let offset = 0;
+  const keyedParts = parts.map((part) => {
+    const key = `${offset}-${part.value}`;
+    offset += part.value.length;
+    return { ...part, key };
+  });
+
   return (
     <p
       className={cn(
@@ -60,13 +67,13 @@ function HighlightedSummary({
         clamp && "line-clamp-6"
       )}
     >
-      {parts.map((part, i) =>
+      {keyedParts.map((part) =>
         part.type === "highlight" ? (
-          <mark key={i} className={cn(part.className, "font-medium")}>
+          <mark key={part.key} className={cn(part.className, "font-medium")}>
             {part.value}
           </mark>
         ) : (
-          <span key={i}>{part.value}</span>
+          <span key={part.key}>{part.value}</span>
         )
       )}
     </p>

@@ -3,9 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, Upload } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Input } from "@dc-copilot/ui/components/input";
+import { Label } from "@dc-copilot/ui/components/label";
 import { useTemplateUpload } from "@/lib/data/content-studio-hooks";
 
 export default function TemplateUploadPage() {

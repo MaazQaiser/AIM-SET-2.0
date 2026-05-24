@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { CalendarMappedCall, GoogleCalendar, CalendarSyncState } from "@/types/integrations";
+import type { CalendarMappedCall, GoogleCalendar, } from "@/types/integrations";
 
 // ── Query keys ──────────────────────────────────────────────────────────────
 export const CALENDAR_KEYS = {

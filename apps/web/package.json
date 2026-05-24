@@ -15,6 +15,7 @@
     "@clerk/nextjs": "^6.9.9",
     "@dc-copilot/api-client": "workspace:*",
     "@dc-copilot/types": "workspace:*",
+    "@dc-copilot/ui": "workspace:*",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-avatar": "^1.1.2",
     "@radix-ui/react-checkbox": "^1.1.3",

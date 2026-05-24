@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Download, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@dc-copilot/ui/components/button";
 import { KbSlidePreview } from "@/components/knowledge/kb-slide-preview";
 import { isPresentationFormat, kbFileUrl, resolveKbFileFormat } from "@/lib/kb/file-format";
 import { cn } from "@/lib/cn";
@@ -78,7 +78,7 @@ export function KbAssetPreview({ asset, indexedText, className }: KbAssetPreview
     return () => {
       cancelled = true;
     };
-  }, [asset.id, asset.status, asset.fileName, asset.mimeType, meta.canInlinePreview, meta.format, indexedText, isPresentation]);
+  }, [asset.id, asset.status, meta.canInlinePreview, meta.format, indexedText, isPresentation]);
 
   useEffect(() => {
     return () => {

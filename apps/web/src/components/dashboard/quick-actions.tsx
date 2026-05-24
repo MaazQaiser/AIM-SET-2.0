@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FileText, Mail, TrendingUp, Bot } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@dc-copilot/ui/components/card";
 import { useCalls } from "@/lib/data/hooks";
 import type { Call } from "@/types";
 import { cn } from "@/lib/cn";

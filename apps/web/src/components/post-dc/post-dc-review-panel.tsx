@@ -1,7 +1,7 @@
 "use client";
 
 import { FileSpreadsheet } from "lucide-react";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { PreDcResearchCard } from "@/components/pre-call/pre-dc-research-card";
 import {
   PostHeadlineCard,
@@ -11,7 +11,7 @@ import {
 } from "@/components/post-dc/post-dc-widget-cards";
 import { PostDiscoveryGapsCard } from "@/components/post-dc/post-discovery-gaps-card";
 import { usePostCallReview } from "@/lib/data/hooks";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@dc-copilot/ui/components/skeleton";
 
 export {
   PostHeadlineCard,

@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { Send, Edit3, RefreshCw, Sparkles, Loader2, ChevronDown, ChevronUp } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Textarea } from "@dc-copilot/ui/components/textarea";
+import { Input } from "@dc-copilot/ui/components/input";
+import { Label } from "@dc-copilot/ui/components/label";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import { AIGeneratedBadge } from "@/components/ai-generated-badge";
-import { Separator } from "@/components/ui/separator";
+import { Separator } from "@dc-copilot/ui/components/separator";
 
 interface EmailDraft {
   id: string;
@@ -56,6 +56,7 @@ export function EmailEditor({ draft, onApprove, onRegenerate }: EmailEditorProps
         <div className="flex items-center gap-2">
           {!sent && !editing && (
             <button
+              type="button"
               onClick={() => setEditing(true)}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
@@ -65,6 +66,7 @@ export function EmailEditor({ draft, onApprove, onRegenerate }: EmailEditorProps
           )}
           {!sent && onRegenerate && (
             <button
+              type="button"
               onClick={onRegenerate}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
@@ -140,6 +142,7 @@ export function EmailEditor({ draft, onApprove, onRegenerate }: EmailEditorProps
           <Separator />
           <div className="px-4 py-2">
             <button
+              type="button"
               onClick={() => setShowCommitments(!showCommitments)}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
@@ -148,8 +151,8 @@ export function EmailEditor({ draft, onApprove, onRegenerate }: EmailEditorProps
             </button>
             {showCommitments && (
               <ul className="mt-2 space-y-1">
-                {local.commitments_referenced.map((c, i) => (
-                  <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                {local.commitments_referenced.map((c) => (
+                  <li key={c} className="text-xs text-muted-foreground flex items-start gap-1.5">
                     <span className="text-primary mt-0.5">·</span>
                     {c}
                   </li>

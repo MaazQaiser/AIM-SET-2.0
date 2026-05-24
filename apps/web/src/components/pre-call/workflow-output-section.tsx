@@ -3,6 +3,8 @@
 import { Workflow } from "lucide-react";
 import { BriefAISummary } from "@/components/pre-call/brief-ai-summary";
 import { BriefArtifactsPanel } from "@/components/pre-call/brief-artifacts-panel";
+import { BriefContentToGeneratePanel } from "@/components/pre-call/brief-content-to-generate-panel";
+import { BriefPreDeckPanel } from "@/components/pre-call/brief-pre-deck-panel";
 import { WorkflowAgentBadge } from "@/components/pre-call/workflow-agent-badge";
 import type { CallBrief } from "@/lib/brief-types";
 
@@ -14,8 +16,10 @@ interface WorkflowOutputSectionProps {
 export function WorkflowOutputSection({ brief }: WorkflowOutputSectionProps) {
   const hasWorkflowOutput =
     Boolean(brief.aiSummary) ||
+    (brief.preDeck?.slides?.length ?? 0) > 0 ||
     (brief.artifactPlan?.length ?? 0) > 0 ||
-    (brief.artifactFulfillment?.length ?? 0) > 0;
+    (brief.artifactFulfillment?.length ?? 0) > 0 ||
+    (brief.contentToGenerate?.length ?? 0) > 0;
 
   if (!hasWorkflowOutput) return null;
 
@@ -45,7 +49,9 @@ export function WorkflowOutputSection({ brief }: WorkflowOutputSectionProps) {
       )}
 
       <BriefAISummary brief={brief} />
+      <BriefPreDeckPanel deck={brief.preDeck} />
       <BriefArtifactsPanel brief={brief} />
+      <BriefContentToGeneratePanel items={brief.contentToGenerate} />
     </section>
   );
 }

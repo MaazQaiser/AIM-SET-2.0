@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Slack, Database, Mail } from "lucide-react";
+import { CalendarDays, Slack, Database, } from "lucide-react";
 import { GoogleCalendarCard } from "./google-calendar-card";
 import { IntegrationCard } from "./integration-card";
 import { CalendarEventList } from "./calendar-event-list";

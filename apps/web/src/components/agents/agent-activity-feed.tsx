@@ -5,8 +5,7 @@ import {
   MessageSquare, CheckCheck, X, FileText, Upload,
   Star, Mail, Database, AlertTriangle, Zap, RefreshCw, XCircle,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@dc-copilot/ui/components/scroll-area";
 import type { ActivityEvent, ActivityEventType } from "@/types/agents";
 import { cn } from "@/lib/cn";
 
@@ -40,12 +39,15 @@ function formatTime(iso: string) {
 
 export function AgentActivityFeed({ events, maxHeight = "400px", className }: AgentActivityFeedProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const eventCount = events.length;
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [events.length]);
+    if (eventCount > 0) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [eventCount]);
 
-  if (events.length === 0) {
+  if (eventCount === 0) {
     return (
       <div className={cn("flex items-center justify-center py-12 text-muted-foreground text-sm", className)}>
         No activity yet

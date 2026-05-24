@@ -3,12 +3,12 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, FileText, Lightbulb } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
+import { Badge } from "@dc-copilot/ui/components/badge";
+import { Textarea } from "@dc-copilot/ui/components/textarea";
 import { AIGeneratedBadge } from "@/components/ai-generated-badge";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { useContentGaps } from "@/lib/data/hooks";
 
 const EVIDENCE = [

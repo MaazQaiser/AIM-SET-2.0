@@ -1,6 +1,8 @@
 "use client";
 
 import { BriefAISummary } from "@/components/pre-call/brief-ai-summary";
+import { BriefContentToGeneratePanel } from "@/components/pre-call/brief-content-to-generate-panel";
+import { BriefPreDeckPanel } from "@/components/pre-call/brief-pre-deck-panel";
 import { ClientAttendeesCard } from "@/components/pre-call/client-attendees-card";
 import { InternalAttendeesCard } from "@/components/pre-call/internal-attendees-card";
 import { resolveInternalAttendees } from "@/lib/attendees/build-internal-attendees";
@@ -46,6 +48,8 @@ export function BriefSections({
   leadershipPreview,
   call,
 }: BriefSectionsProps) {
+  const seededChecklist = call ? seedChecklistFromCall(call) : null;
+
   return (
     <div className="space-y-5">
       {leadershipPreview && (
@@ -55,6 +59,8 @@ export function BriefSections({
       )}
 
       <BriefAISummary brief={brief} />
+
+      <BriefPreDeckPanel deck={brief.preDeck} />
 
       {brief.researchSections && brief.researchSections.length > 0 && (
         <PreDcResearchCard sections={brief.researchSections} />
@@ -78,8 +84,8 @@ export function BriefSections({
 
       {bant && <BriefBANTCard bant={bant} />}
 
-      {call && seedChecklistFromCall(call) && (
-        <DiscoveryChecklistPanel state={seedChecklistFromCall(call)!} />
+      {seededChecklist && (
+        <DiscoveryChecklistPanel state={seededChecklist} />
       )}
 
       <BriefPainsCard pains={brief.pains} />
@@ -91,6 +97,8 @@ export function BriefSections({
       {brief.objections?.length > 0 && <BriefObjectionsCard objections={brief.objections} />}
 
       <BriefDeckCard slides={brief.deckSlides} />
+
+      <BriefContentToGeneratePanel items={brief.contentToGenerate} />
 
       {brief.podNotes?.length > 0 && <BriefPodNotesCard notes={brief.podNotes} />}
     </div>

@@ -12,7 +12,7 @@ import type {
   KBAsset,
   QuarterlyPattern,
 } from "@/types";
-import type { CallBrief, PostCallReview } from "@/lib/brief-types";
+import type { CallBrief, } from "@/lib/brief-types";
 import {
   FRANCHISE_DEMO_CALL_ID,
   franchiseDemoPostReview,
@@ -71,10 +71,14 @@ function mergeCallBrief(local: CallBrief, api: CallBrief): CallBrief {
     researchSections: api.researchSections?.length
       ? api.researchSections
       : local.researchSections,
+    preDeck: api.preDeck ?? local.preDeck,
     artifactPlan: api.artifactPlan?.length ? api.artifactPlan : local.artifactPlan,
     artifactFulfillment: api.artifactFulfillment?.length
       ? api.artifactFulfillment
       : local.artifactFulfillment,
+    contentToGenerate: api.contentToGenerate?.length
+      ? api.contentToGenerate
+      : local.contentToGenerate,
     relevantDocuments: api.relevantDocuments?.length
       ? api.relevantDocuments
       : local.relevantDocuments,

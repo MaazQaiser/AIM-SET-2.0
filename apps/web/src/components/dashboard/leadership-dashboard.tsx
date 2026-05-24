@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { Radio, Users } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import { useCoachingCandidates, useCalls } from "@/lib/data/hooks";
 
 export function LeadershipDashboardExtras() {

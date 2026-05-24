@@ -1,7 +1,7 @@
 "use client";
 
 import { Upload } from "lucide-react";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { AssistantGreeting } from "./assistant-greeting";
 import { DailyBriefingCard } from "./daily-briefing-card";

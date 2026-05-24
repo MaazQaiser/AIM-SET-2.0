@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@dc-copilot/ui/components/button";
 import { kbFileUrl, kbSlideMetaUrl, kbSlideUrl } from "@/lib/kb/file-format";
 import { cn } from "@/lib/cn";
 import type { KBAsset } from "@/types";

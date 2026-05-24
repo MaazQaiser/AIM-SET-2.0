@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Check, Clock, Database, AlertCircle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import { cn } from "@/lib/cn";
 
 type TaskStatus = "pending_approval" | "approved" | "created" | "failed";
@@ -139,6 +139,7 @@ export function CrmTaskList({ tasks, onApprove, onReject }: CrmTaskListProps) {
                 </span>
                 {isPending && onReject && (
                   <button
+                    type="button"
                     onClick={() => onReject(task.id)}
                     className="text-xs text-muted-foreground hover:text-destructive transition-colors"
                   >

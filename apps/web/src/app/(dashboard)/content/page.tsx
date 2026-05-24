@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { FileText, Lightbulb, Clock } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
+import { Badge } from "@dc-copilot/ui/components/badge";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { AIGeneratedBadge } from "@/components/ai-generated-badge";
 import { useContentGaps } from "@/lib/data/hooks";
 

@@ -19,6 +19,16 @@ def slugify_company(name: str) -> str:
     return f"call-{slug}" if slug else f"call-{int(datetime.now().timestamp())}"
 
 
+def call_id_aliases(call_id: str) -> List[str]:
+    """Support legacy demo URLs that omit the persisted `call-` prefix."""
+    aliases = [call_id]
+    if call_id.startswith("call-"):
+        aliases.append(call_id.removeprefix("call-"))
+    else:
+        aliases.append(f"call-{call_id}")
+    return list(dict.fromkeys(aliases))
+
+
 def build_calls_from_pre_dc(
     pre_rows: List[Dict[str, Any]], post_rows: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
@@ -125,34 +135,45 @@ class CallsService:
         return self.sync_from_dc_notes(ctx)
 
     def get_call(self, ctx: TenantContext, call_id: str) -> Optional[Dict[str, Any]]:
-        return next((c for c in self.list_calls(ctx) if c["id"] == call_id), None)
+        aliases = set(call_id_aliases(call_id))
+        return next((c for c in self.list_calls(ctx) if c["id"] in aliases), None)
 
     def get_brief(self, ctx: TenantContext, call_id: str) -> Optional[Dict[str, Any]]:
         clerk_key = self._clerk_key(ctx)
         if not get_settings().supabase_configured:
-            return get_memory_store().get_call_brief(clerk_key, call_id)
+            for alias in call_id_aliases(call_id):
+                brief = get_memory_store().get_call_brief(clerk_key, alias)
+                if brief:
+                    return brief
+            return None
         tenant_uuid = self._tenant_uuid(ctx)
         supabase = get_supabase()
-        try:
-            result = execute_with_retry(
-                lambda: (
-                    supabase.table("call_briefs")
-                    .select("payload")
-                    .eq("tenant_id", tenant_uuid)
-                    .eq("call_id", call_id)
-                    .order("version", desc=True)
-                    .limit(1)
-                    .execute()
+        for alias in call_id_aliases(call_id):
+            try:
+                result = execute_with_retry(
+                    lambda: (
+                        supabase.table("call_briefs")
+                        .select("payload")
+                        .eq("tenant_id", tenant_uuid)
+                        .eq("call_id", alias)
+                        .order("version", desc=True)
+                        .limit(1)
+                        .execute()
+                    )
                 )
-            )
-        except Exception:
-            return get_memory_store().get_call_brief(clerk_key, call_id)
-        rows = result.data or []
-        if rows:
-            payload = rows[0].get("payload")
-            if payload:
-                get_memory_store().save_call_brief(clerk_key, call_id, payload)
-            return payload
+            except Exception:
+                brief = get_memory_store().get_call_brief(clerk_key, alias)
+                if brief:
+                    return brief
+                continue
+            rows = result.data or []
+            if rows:
+                payload = rows[0].get("payload")
+                if payload:
+                    get_memory_store().save_call_brief(clerk_key, alias, payload)
+                    if alias != call_id:
+                        get_memory_store().save_call_brief(clerk_key, call_id, payload)
+                return payload
         return None
 
     def save_brief(self, ctx: TenantContext, call_id: str, payload: Dict[str, Any]) -> None:

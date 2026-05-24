@@ -3,14 +3,14 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { ChevronLeft, Settings, Activity } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Badge } from "@dc-copilot/ui/components/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import { AgentActivityFeed } from "@/components/agents/agent-activity-feed";
 import { AgentRunTable } from "@/components/agents/agent-run-table";
 import { ModelPolicyBadge } from "@/components/agents/model-policy-badge";
 import { CostGaugeBar } from "@/components/agents/cost-gauge-bar";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import type { AgentId } from "@/types/agents";
 import { cn } from "@/lib/cn";
 import { AGENT_META, buildAgentStatuses } from "@/lib/agents/catalog";
@@ -85,7 +85,7 @@ export function AgentDetailClient({ agentId }: { agentId: AgentId }) {
   const metrics = [
     { label: "Success rate", value: Math.round(successRate), target: 0, unit: "%", is_rate: true },
     { label: "Runs recorded", value: runs.length, target: 0, unit: "count", is_rate: false },
-    { label: "Cost today", value: parseFloat(costToday.toFixed(4)), target: 0, unit: "usd", is_rate: false },
+    { label: "Cost today", value: Number.parseFloat(costToday.toFixed(4)), target: 0, unit: "usd", is_rate: false },
     { label: "Tokens today", value: tokensToday, target: 0, unit: "count", is_rate: false },
   ];
 

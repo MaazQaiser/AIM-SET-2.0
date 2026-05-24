@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/api/auth";
 
 /**
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const days = Math.min(parseInt(searchParams.get("days") ?? "14", 10), 60);
+  const days = Math.min(Number.parseInt(searchParams.get("days") ?? "14", 10), 60);
 
   // Production: retrieve OAuth token, call Google Calendar API, map events.
   void days;

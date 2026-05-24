@@ -11,10 +11,10 @@ import {
   isTomorrow,
   startOfDay,
 } from "date-fns";
-import { Phone, CalendarDays, Sparkles, Video, Clock } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Phone, CalendarDays, Sparkles, Video, Clock, ExternalLink } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import { useCalls } from "@/lib/data/hooks";
 import { useCalendarEvents, useGoogleCalendarConnection } from "@/hooks/use-google-calendar";
 import type { Call } from "@/types";
@@ -230,21 +230,7 @@ export function UnifiedAgenda() {
             className="shrink-0 rounded-md p-1 -m-1 text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <span className="sr-only">View full calendar</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-              className="size-6"
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="m4.5 19.5 15-15m0 0H8.25m11.25 0v11.25"
-              />
-            </svg>
+            <ExternalLink className="size-6" aria-hidden />
           </Link>
           <div className="min-w-0 flex-1 space-y-0.5">
             <CardTitle className="text-base flex items-center gap-2">

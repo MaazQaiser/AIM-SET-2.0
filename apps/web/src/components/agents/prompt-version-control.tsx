@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Tag, RotateCcw, ChevronDown, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Separator } from "@/components/ui/separator";
+import { Tag, RotateCcw, } from "lucide-react";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import type { PromptVersion } from "@/types/agents";
 import { cn } from "@/lib/cn";
 

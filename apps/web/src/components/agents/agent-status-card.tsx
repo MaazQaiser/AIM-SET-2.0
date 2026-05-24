@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { Activity, Settings, ChevronRight, CheckCircle2, AlertTriangle, XCircle, Clock } from "lucide-react";
-import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardHeader, CardContent, CardFooter } from "@dc-copilot/ui/components/card";
 import { ModelPolicyBadge } from "./model-policy-badge";
 import { CostGaugeBar } from "./cost-gauge-bar";
 import type { AgentStatus } from "@/types/agents";

@@ -2,7 +2,7 @@
 
 import { filterKeywordCounts } from "@/lib/live/keyword-filter";
 import type { KeywordStats } from "@/types";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@dc-copilot/ui/components/badge";
 
 interface KeywordFrequencyPanelProps {
   stats: KeywordStats | null;

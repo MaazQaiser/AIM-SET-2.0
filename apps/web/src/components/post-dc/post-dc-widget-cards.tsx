@@ -1,9 +1,8 @@
 "use client";
 
 import { Brain, Sparkles, Users } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import {
-  BriefDetailAccordion,
   BriefDetailCard,
   BriefDetailRow,
 } from "@/components/pre-call/brief-detail-card";
@@ -21,8 +20,8 @@ export function PostSummaryCard({ summary }: { summary: string[] }) {
   return (
     <BriefDetailCard title="Summary" icon={Brain}>
       <ul className="divide-y divide-border">
-        {summary.map((p, i) => (
-          <li key={i} className="py-2.5 text-sm text-muted-foreground whitespace-pre-wrap break-words first:pt-0 last:pb-0">
+        {summary.map((p) => (
+          <li key={p} className="py-2.5 text-sm text-muted-foreground whitespace-pre-wrap break-words first:pt-0 last:pb-0">
             {p}
           </li>
         ))}

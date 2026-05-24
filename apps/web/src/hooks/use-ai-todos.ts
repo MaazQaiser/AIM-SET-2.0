@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import { addHours, isWithinInterval } from "date-fns";
 import { useCalls, useCoachingInsights, usePostCallCrmTasks } from "@/lib/data/hooks";
-import type { Call } from "@/types";
 import type { AgentId } from "@/types/agents";
 
 export type AiTodoAgent = AgentId;
@@ -21,7 +20,7 @@ export interface AiTodo {
 function parseRevenue(raw?: string): number {
   if (!raw) return 0;
   const m = raw.match(/[\d.]+/);
-  return m ? parseFloat(m[0]) : 0;
+  return m ? Number.parseFloat(m[0]) : 0;
 }
 
 export function useAiTodos() {
@@ -135,7 +134,7 @@ export function useAiTodos() {
     return [...todayCalls].sort(
       (a, b) => parseRevenue(b.annualRevenue) - parseRevenue(a.annualRevenue)
     )[0];
-  }, [calls, coachingInsights, crmTasks]);
+  }, [calls]);
 
   return {
     todos,

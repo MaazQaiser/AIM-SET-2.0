@@ -60,7 +60,7 @@ export function DataTable<TData, TValue>({
       )}
 
       <div className="rounded-lg border border-border overflow-hidden">
-        <table className="w-full text-sm" role="table">
+        <table className="w-full text-sm">
           <thead className="border-b border-border bg-muted/50">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
@@ -71,6 +71,7 @@ export function DataTable<TData, TValue>({
                   >
                     {header.isPlaceholder ? null : (
                       <button
+                        type="button"
                         className={cn(
                           "flex items-center gap-1",
                           header.column.getCanSort() && "cursor-pointer hover:text-foreground"

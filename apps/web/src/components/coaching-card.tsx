@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { QuoteIcon, ArrowRight } from "lucide-react";
-import { cn } from "@/lib/cn";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@dc-copilot/ui/components/avatar";
+import { Badge } from "@dc-copilot/ui/components/badge";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Card, CardContent } from "@dc-copilot/ui/components/card";
 import type { CoachingInsight } from "@/types";
 
 const priorityConfig = {

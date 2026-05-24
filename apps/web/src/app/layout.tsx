@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ClerkGateProvider } from "@/components/providers/clerk-gate";
 import { ThemeProvider } from "@/components/providers/theme-provider";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@dc-copilot/ui/components/tooltip";
 import { Toaster } from "sonner";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
 import { getClerkPublishableKey, isClerkConfigured } from "@/lib/public-env";

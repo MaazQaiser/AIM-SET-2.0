@@ -17,9 +17,9 @@ import remarkGfm from "remark-gfm";
 import { BotChatSuggestedActions } from "@/components/bot-chat/bot-chat-suggested-actions";
 import { AIGeneratedBadge } from "@/components/ai-generated-badge";
 import { CitationMarker } from "@/components/citation-marker";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Badge } from "@dc-copilot/ui/components/badge";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Input } from "@dc-copilot/ui/components/input";
 import { cn } from "@/lib/cn";
 import {
   buildSuggestedActions,
@@ -27,7 +27,7 @@ import {
   type SuggestedActionsContext,
 } from "@/lib/bot-chat/suggested-actions";
 import { podDisplayForRole } from "@/lib/bot-chat/pod-display";
-import type { BotChatMessage, BotChatMode, BotChatPhase, SuggestedAction } from "@/lib/bot-chat/types";
+import type { BotChatMessage, BotChatPhase, SuggestedAction } from "@/lib/bot-chat/types";
 import { EMPTY_BOT_CHAT_MESSAGES, useBotChatStore } from "@/stores/use-bot-chat";
 import {
   type CopilotAgentAction,
@@ -284,12 +284,14 @@ export function BotChatPanel({
     () => buildSuggestedActions(suggestedCtx),
     [suggestedCtx]
   );
+  const messageCount = messages.length;
 
   useEffect(() => {
-    if (!userScrolledRef.current) {
+    if (messageCount === 0 && !isLoading) return;
+    if (!userScrolledRef.current || isLoading) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages.length, isLoading]);
+  }, [messageCount, isLoading]);
 
   const sendMessage = useCallback(
     async (text: string) => {

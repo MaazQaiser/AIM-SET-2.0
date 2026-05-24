@@ -48,13 +48,14 @@ export function TranscriptViewer({
     estimateSize: () => 72,
     overscan: 10,
   });
+  const eventCount = events.length;
 
   // Auto-scroll to bottom when live
   useEffect(() => {
-    if (isLive && parentRef.current) {
+    if (isLive && eventCount > 0 && parentRef.current) {
       parentRef.current.scrollTop = parentRef.current.scrollHeight;
     }
-  }, [events.length, isLive]);
+  }, [eventCount, isLive]);
 
   return (
     <div
@@ -80,6 +81,7 @@ export function TranscriptViewer({
               className="absolute left-0 top-0 w-full"
             >
               <button
+                type="button"
                 className={cn(
                   "group w-full text-left px-4 py-3 border-l-2 hover:bg-muted/50 transition-colors",
                   event.sentiment ? sentimentColor[event.sentiment] : "border-l-border",

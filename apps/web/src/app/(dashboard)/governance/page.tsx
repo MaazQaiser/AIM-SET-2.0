@@ -1,10 +1,10 @@
 import { ClipboardList, DollarSign, ShieldCheck, Activity, Rocket } from "lucide-react";
 import type { Metadata } from "next";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@dc-copilot/ui/components/card";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import { GovernanceAuditTable } from "@/components/governance/governance-audit-table";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 
 export const metadata: Metadata = { title: "Governance" };
 

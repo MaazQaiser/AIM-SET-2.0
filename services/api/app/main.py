@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 from typing import Dict
@@ -14,7 +15,8 @@ from app.config import get_settings
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_REPO_ROOT / "python-packages"))
 
-load_dotenv()
+if os.environ.get("DC_COPILOT_IGNORE_DOTENV") != "true":
+    load_dotenv()
 
 from app.routers import (  # noqa: E402
     dc_notes,

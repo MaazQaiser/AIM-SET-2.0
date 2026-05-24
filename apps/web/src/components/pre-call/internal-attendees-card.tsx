@@ -3,15 +3,15 @@
 import { useState } from "react";
 import { Users, Sparkles } from "lucide-react";
 import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
-import { Button } from "@/components/ui/button";
+import { Button } from "@dc-copilot/ui/components/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+} from "@dc-copilot/ui/components/dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@dc-copilot/ui/components/avatar";
 import { cn } from "@/lib/cn";
 import type { InternalAttendee } from "@/lib/brief-types";
 

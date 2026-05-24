@@ -1,9 +1,9 @@
 import { Users, FileSpreadsheet, Plug } from "lucide-react";
 import type { Metadata } from "next";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/data-table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@dc-copilot/ui/components/card";
+import { Button } from "@dc-copilot/ui/components/button";
+import { DataTable } from "@dc-copilot/ui/components/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
 import { AeNotificationPrefs } from "@/components/settings/ae-notification-prefs";
 import { DcNotesCsvImport } from "@/components/settings/dc-notes-csv-import";
