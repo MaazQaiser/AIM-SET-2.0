@@ -189,6 +189,7 @@ export interface CallBrief {
   contentToGenerate?: ContentToGenerate[];
   relevantDocuments?: RelevantDocument[];
   relevantProjects?: RelevantProject[];
+  recommendedDeck?: RelevantDocument;
   agentStatus?: PreDcAgentStatus;
   agentRunId?: string;
 }
@@ -208,4 +209,86 @@ export interface PostCallReview {
   learned: { label: string; from?: number; to?: number; note: string }[];
   openDiscoveryGaps?: string[];
   discoveryBantCoverage?: number;
+}
+
+export interface PostCallEmailDraft {
+  id: string;
+  to: string[];
+  cc?: string[];
+  subject: string;
+  body_markdown: string;
+  style_signals: string[];
+  commitments_referenced: string[];
+  status: "draft_pending_approval" | "approved" | "sent";
+  attachments?: PostCallEmailAttachments;
+}
+
+export interface PostCallEmailAttachmentFound {
+  name: string;
+  assetId: string;
+  snippet?: string;
+  downloadUrl?: string;
+}
+
+export interface PostCallEmailAttachmentMissing {
+  name: string;
+  requiredData: string;
+  contentStudioLink: string;
+}
+
+export interface PostCallEmailAttachments {
+  found: PostCallEmailAttachmentFound[];
+  missing: PostCallEmailAttachmentMissing[];
+}
+
+export interface PostCallCrmTask {
+  id: string;
+  crm_system: "hubspot" | "salesforce";
+  task_type: "follow_up" | "internal_review" | "content_request" | "schedule_next_meeting";
+  owner: string;
+  due_date: string;
+  description: string;
+  status: "pending_approval" | "approved" | "created" | "failed";
+  isInternalAuto?: boolean;
+}
+
+export interface PostCallJiraTicket {
+  status: "draft_pending_approval" | "created" | "failed";
+  summary: string;
+  description: string;
+  issueType: string;
+  priority: "High" | "Medium" | "Low";
+  labels: string[];
+  projectKey: string;
+  bantSnapshot: { budget: boolean; authority: boolean; need: boolean; timeline: boolean };
+  externalKey?: string;
+  externalUrl?: string;
+  error?: string;
+}
+
+export interface PostCallPipelineResult {
+  callId?: string;
+  accountName?: string;
+  review?: PostCallReview;
+  task?: {
+    emailDraft?: PostCallEmailDraft;
+    crmTasks?: PostCallCrmTask[];
+  };
+  emailAttachments?: PostCallEmailAttachments;
+  jiraTicket?: PostCallJiraTicket | null;
+  coaching?: {
+    podScorecard?: PostCallReview["podScorecard"];
+    bantProgression?: Record<string, unknown>;
+  };
+  discovery?: {
+    result?: {
+      openGaps?: string[];
+      checklist?: { bantCoverage?: number };
+      bantCoverage?: number;
+    };
+    openGaps?: string[];
+    checklist?: { bantCoverage?: number };
+    bantCoverage?: number;
+  };
+  live_signals?: Record<string, unknown>;
 }

@@ -5,8 +5,10 @@ import { bffFetch } from "@/lib/api/bff-fetch";
 import type {
   ContentExportResult,
   ContentTemplate,
+  ContentTemplateDraft,
   StudioProject,
   StudioTurnResult,
+  TemplateAssistResult,
 } from "@/types/content_studio";
 
 export interface StudioProjectDetail {
@@ -18,7 +20,12 @@ export interface StudioProjectDetail {
     content: Record<string, unknown>;
     createdAt: string;
   }>;
-  revisions: Array<{ id: string; projectId: string; createdAt: string; templateId?: string | null }>;
+  revisions: Array<{
+    id: string;
+    projectId: string;
+    createdAt: string;
+    templateId?: string | null;
+  }>;
   latestRevision?: { id: string; html: string; citations?: unknown[] } | null;
 }
 
@@ -153,6 +160,60 @@ export function useTemplateUpload() {
       return res.json();
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["content-templates"] }),
+  });
+}
+
+export function useCreateTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: ContentTemplateDraft) => {
+      const res = await fetch("/api/content/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json() as Promise<ContentTemplate>;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["content-templates"] }),
+  });
+}
+
+export function useUpdateTemplate(templateId?: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: ContentTemplateDraft) => {
+      if (!templateId) throw new Error("Template id is required");
+      const res = await fetch(`/api/content/templates/${templateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json() as Promise<ContentTemplate>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["content-templates"] });
+      qc.invalidateQueries({ queryKey: ["content-template", templateId] });
+    },
+  });
+}
+
+export function useTemplateAssist() {
+  return useMutation({
+    mutationFn: async (
+      body: ContentTemplateDraft & {
+        instruction: string;
+      }
+    ) => {
+      const res = await fetch("/api/content/templates/assist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json() as Promise<TemplateAssistResult>;
+    },
   });
 }
 

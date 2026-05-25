@@ -10,13 +10,12 @@ from app.agents.content_agent import generate_pre_dc_brief
 from app.agents.pre_dc_agent import run_pre_dc_pipeline, research_from_fields
 from app.agents.relevant_content import build_relevant_content
 from app.agents.content_generation_agent import run_studio_turn
-from app.agents.coaching_agent import generate_scorecard
 from app.agents.knowledge_agent import ingest_asset_metadata
 from app.agents.discovery_checklist_agent import finalize_session, handle_segment, seed_checklist
 from app.agents.live_call.handler import handle_call_end, handle_transcript_segment
-from app.agents.task_agent import draft_post_call_artifacts
+from app.agents.post_dc_agent import run_post_dc_pipeline
 from dc_tools.bant import build_next_actions, checklist_from_dict
-from app.domain.calls_service import CallsService
+from app.domain.calls_service import CallsService, call_id_aliases
 from app.domain.dc_notes_repository import get_dc_notes_repository
 from app.domain.content_studio_repository import get_content_studio_repository
 from app.domain.agent_runs_repository import get_agent_runs_repository
@@ -45,6 +44,15 @@ class Orchestrator:
             if company and account in company.lower():
                 return {str(k): str(v) for k, v in fields.items()}
         return {}
+
+    def _post_dc_record_for_call(self, ctx: TenantContext, call_id: str) -> Optional[Dict[str, Any]]:
+        aliases = set(call_id_aliases(call_id))
+        notes = self.dc_notes.get_notes(ctx)
+        for row in notes["post_dc_records"]:
+            matched = row.get("matched_call_id") or row.get("matchedCallId")
+            if matched and str(matched) in aliases:
+                return row
+        return None
 
     def dispatch_pre_dc_pipeline(
         self,
@@ -119,6 +127,7 @@ class Orchestrator:
     def dispatch_post_call(self, ctx: TenantContext, call_id: str) -> Dict[str, Any]:
         from app.domain.kb_tenancy import resolve_kb_tenant
         from app.domain.live_call_session import clear_live_session
+        from app.domain.live_call_repository import get_live_call_repository
 
         _, clerk_key = resolve_kb_tenant(ctx)
         live_snapshot = clear_live_session(clerk_key, call_id)
@@ -126,15 +135,28 @@ class Orchestrator:
             self.calls.save_live_signals(ctx, call_id, live_snapshot)
 
         discovery_snapshot = self._finalize_discovery_checklist(ctx, call_id)
-        task_env = draft_post_call_artifacts(call_id, discovery_snapshot=discovery_snapshot)
-        coach_env = generate_scorecard(call_id, discovery_snapshot=discovery_snapshot)
-        validate_envelope(task_env)
-        validate_envelope(coach_env)
-        self._log_run(ctx, task_env)
-        self._log_run(ctx, coach_env)
+        call = self.calls.get_call(ctx, call_id) or {}
+        brief = self.calls.get_brief(ctx, call_id) or {}
+        pre_dc_fields = self._pre_dc_fields_for_call(ctx, call_id)
+        post_dc_record = self._post_dc_record_for_call(ctx, call_id)
+        transcript_events = get_live_call_repository().list_transcript_events(ctx, call_id)
+        post_env = run_post_dc_pipeline(
+            ctx,
+            call_id,
+            call=call,
+            pre_dc_fields=pre_dc_fields,
+            call_brief=brief,
+            discovery_snapshot=discovery_snapshot,
+            live_snapshot=live_snapshot,
+            transcript_events=transcript_events,
+            post_dc_record=post_dc_record,
+        )
+        validate_envelope(post_env)
+        self.calls.save_post_review(ctx, call_id, post_env.result)
+        self._log_run(ctx, post_env)
         out: Dict[str, Any] = {
-            "task": task_env.model_dump(),
-            "coaching": coach_env.model_dump(),
+            **post_env.result,
+            "envelope": post_env.model_dump(),
         }
         if discovery_snapshot:
             out["discovery"] = discovery_snapshot

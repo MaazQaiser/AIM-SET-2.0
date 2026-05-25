@@ -24,6 +24,7 @@ from app.routers import (  # noqa: E402
     v1_calls,
     v1_content_studio,
     v1_copilot,
+    v1_integrations_jira,
     v1_kb,
     v1_workflow,
     v1_webhooks,
@@ -48,6 +49,7 @@ app.include_router(v1_workflow.router)
 app.include_router(v1_kb.router)
 app.include_router(v1_content_studio.router)
 app.include_router(v1_agents.router)
+app.include_router(v1_integrations_jira.router)
 app.include_router(v1_webhooks.router)
 app.include_router(websocket.router)
 

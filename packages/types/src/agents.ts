@@ -4,6 +4,7 @@ export type AgentId =
   | "discovery-checklist"
   | "content"
   | "workflow"
+  | "post_dc"
   | "content_generation";
 
 // ── Agent health ───────────────────────────────────────────────────────────

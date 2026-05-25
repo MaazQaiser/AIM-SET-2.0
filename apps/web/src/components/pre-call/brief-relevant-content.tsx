@@ -38,7 +38,16 @@ export function BriefRelevantContent({ brief, className }: BriefRelevantContentP
 
   return (
     <>
-      <BriefDetailCard title="Relevant content" icon={FolderKanban} className={className}>
+      <BriefDetailCard
+        title="Relevant content"
+        icon={FolderKanban}
+        className={className}
+        sourceInfo={{
+          source: "Knowledge base search",
+          detail:
+            "The system searches KB documents and project notes using the account name, needs, industry, service area, and company description, then ranks the closest matches.",
+        }}
+      >
         <p className="text-xs text-muted-foreground -mt-2 mb-3">
           From your knowledge base — click to preview in the app.
         </p>

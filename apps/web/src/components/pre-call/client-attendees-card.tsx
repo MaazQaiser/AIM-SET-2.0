@@ -152,6 +152,11 @@ export function ClientAttendeesCard({ attendees }: ClientAttendeesCardProps) {
     <>
       <BriefDetailCard
         title="Client attendees"
+        sourceInfo={{
+          source: "Imported lead/contact data",
+          detail:
+            "Attendee details are taken from the lead fields and contact history available in the imported data. Influence labels are prep hints, not confirmed org-chart truth.",
+        }}
         headerExtra={
           <span className="text-xs text-muted-foreground shrink-0">{attendees.length}</span>
         }

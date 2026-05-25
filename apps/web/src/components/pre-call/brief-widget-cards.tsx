@@ -1,17 +1,25 @@
 "use client";
 
-import { AlertCircle, FileText, HelpCircle, Presentation, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertCircle, Eye, HelpCircle, Presentation, Users } from "lucide-react";
 import { ConfidenceTag } from "@/components/confidence-tag";
 import { BANTScorecard } from "@/components/bant-scorecard";
+import { Button } from "@/components/ui/button";
+import { KbFileFormatBadge } from "@/components/knowledge/kb-file-format-badge";
+import { KbDocumentViewerDialog } from "@/components/pre-call/kb-document-viewer-dialog";
 import {
   BriefDetailAccordion,
   BriefDetailCard,
   BriefDetailFields,
   BriefDetailRow,
 } from "@/components/pre-call/brief-detail-card";
-import type { AnticipatedObjection, CallBrief, HypothesizedPain } from "@/lib/brief-types";
+import type {
+  AnticipatedObjection,
+  CallBrief,
+  HypothesizedPain,
+  RelevantDocument,
+} from "@/lib/brief-types";
 import type { BANTScore, Call } from "@/types";
-import { cn } from "@/lib/cn";
 
 const BANT_LABELS: Record<keyof BANTScore, string> = {
   budget: "Budget",
@@ -66,6 +74,20 @@ const VISIBLE_QUESTION_ROWS = 3;
 /** ~3 single-line question rows + dividers */
 const QUESTIONS_PEEK_HEIGHT = "11.25rem";
 
+function isPresentationDocument(doc: RelevantDocument): boolean {
+  const format = doc.format?.toLowerCase();
+  const fileName = doc.fileName?.toLowerCase() ?? "";
+  const mimeType = doc.mimeType?.toLowerCase() ?? "";
+  return (
+    format === "ppt" ||
+    format === "pptx" ||
+    fileName.endsWith(".ppt") ||
+    fileName.endsWith(".pptx") ||
+    mimeType.includes("presentation") ||
+    mimeType.includes("powerpoint")
+  );
+}
+
 export function BriefBANTCard({
   bant,
   brief,
@@ -81,7 +103,14 @@ export function BriefBANTCard({
   );
 
   return (
-    <BriefDetailCard title="BANT scorecard">
+    <BriefDetailCard
+      title="BANT scorecard"
+      sourceInfo={{
+        source: "Imported data + simple rules",
+        detail:
+          "This reads BANT clues from the Pre-DC/Post-DC fields and marks anything not clearly confirmed as something to verify on the call.",
+      }}
+    >
       <BANTScorecard bant={bant} layout="stack" plain />
       {provenance.length > 0 && (
         <div className="mt-4 pt-3 border-t border-border">
@@ -108,6 +137,11 @@ export function BriefSignalsCard({ signals }: { signals: string[] }) {
       icon={AlertCircle}
       variant="warning"
       className="ring-1 ring-warning/25"
+      sourceInfo={{
+        source: "AI from Pre-DC notes",
+        detail:
+          "The workflow looks for important notes that could change call prep, like urgency, unusual context, or extra research signals.",
+      }}
       headerExtra={
         <span className="text-[10px] font-semibold uppercase tracking-wide text-warning shrink-0 rounded-full bg-warning/15 px-2 py-0.5">
           {signals.length} new
@@ -139,6 +173,11 @@ export function BriefPainsCard({ pains }: { pains: HypothesizedPain[] }) {
   return (
     <BriefDetailCard
       title="Hypothesized pain points"
+      sourceInfo={{
+        source: "AI from lead research",
+        detail:
+          "These are likely pains inferred from the prospect's described needs, company context, and fit notes. They are hypotheses to validate, not confirmed facts.",
+      }}
       headerExtra={
         <span className="text-xs text-muted-foreground shrink-0">{safePains.length} items</span>
       }
@@ -179,6 +218,11 @@ export function BriefDiscoveryQuestionsCard({ questions }: { questions: string[]
       title="Suggested discovery questions"
       icon={HelpCircle}
       scrollMaxHeight={questions.length > VISIBLE_QUESTION_ROWS ? QUESTIONS_PEEK_HEIGHT : undefined}
+      sourceInfo={{
+        source: "AI and rules from Pre-DC data",
+        detail:
+          "Questions are chosen from the company needs, tech context, and strategic fit so the AE can confirm the most important unknowns.",
+      }}
       headerExtra={
         extra > 0 ? (
           <span className="text-xs text-muted-foreground shrink-0">+{extra} more</span>
@@ -206,7 +250,14 @@ export function BriefDiscoveryQuestionsCard({ questions }: { questions: string[]
 
 export function BriefObjectionsCard({ objections }: { objections: AnticipatedObjection[] }) {
   return (
-    <BriefDetailCard title="Anticipated objections">
+    <BriefDetailCard
+      title="Anticipated objections"
+      sourceInfo={{
+        source: "AI from lead context",
+        detail:
+          "The workflow predicts likely objections from the lead profile and prepares response angles. Treat these as prep notes, not confirmed buyer statements.",
+      }}
+    >
       <div className="space-y-2">
         {objections.map((o) => (
           <BriefDetailAccordion
@@ -229,53 +280,128 @@ export function BriefObjectionsCard({ objections }: { objections: AnticipatedObj
   );
 }
 
-export function BriefDeckCard({ slides }: { slides: CallBrief["deckSlides"] }) {
-  if (!slides || slides.length === 0) {
+export function BriefDeckCard({
+  recommendedDeck,
+  relevantDocuments,
+  callId,
+}: {
+  recommendedDeck?: CallBrief["recommendedDeck"];
+  relevantDocuments?: CallBrief["relevantDocuments"];
+  callId?: string;
+}) {
+  const [activeDoc, setActiveDoc] = useState<RelevantDocument | null>(null);
+  const [fetchedDeck, setFetchedDeck] = useState<RelevantDocument | null>(null);
+  const [loadingDeck, setLoadingDeck] = useState(false);
+  const localDeck = recommendedDeck ?? (relevantDocuments ?? []).find(isPresentationDocument);
+  const deck = localDeck ?? fetchedDeck;
+
+  useEffect(() => {
+    if (localDeck || fetchedDeck || !callId) return;
+    let cancelled = false;
+    setLoadingDeck(true);
+    void fetch(`/api/calls/${callId}/relevant-content`)
+      .then(async (res) => {
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { relevantDocuments?: RelevantDocument[] };
+        const match = (data.relevantDocuments ?? []).find(isPresentationDocument);
+        if (!cancelled) setFetchedDeck(match ?? null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDeck(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [callId, fetchedDeck, localDeck]);
+
+  if (loadingDeck) {
     return (
-      <BriefDetailCard title="Recommended deck" icon={Presentation}>
-        <p className="text-xs text-muted-foreground">No deck slides available.</p>
+      <BriefDetailCard
+        title="Recommended deck"
+        icon={Presentation}
+        sourceInfo={{
+          source: "Knowledge base",
+          detail:
+            "This section searches the KB for one presentation file only: a PPT or PPTX that best matches the account and call context.",
+        }}
+      >
+        <p className="text-xs text-muted-foreground">Checking the knowledge base for one PPT/PPTX deck…</p>
       </BriefDetailCard>
     );
   }
+
+  if (!deck) {
+    return (
+      <BriefDetailCard
+        title="Recommended deck"
+        icon={Presentation}
+        sourceInfo={{
+          source: "Knowledge base",
+          detail:
+            "The system looked for a PPT/PPTX deck in the KB for this call. If none appears, upload or tag a relevant deck and rerun the workflow.",
+        }}
+      >
+        <p className="text-xs text-muted-foreground">
+          No PPT/PPTX deck found in the knowledge base for this call.
+        </p>
+      </BriefDetailCard>
+    );
+  }
+
   return (
-    <BriefDetailCard title="Recommended deck" icon={Presentation} scrollMaxHeight="14rem">
-      <ul className="space-y-2">
-        {slides.map((slide) => (
-          <li key={slide.id}>
-            <BriefDetailRow
-              className={cn(
-                "flex items-center gap-2",
-                !slide.included && "opacity-50"
-              )}
-            >
-              <FileText
-                className={cn(
-                  "h-3.5 w-3.5 shrink-0",
-                  slide.included ? "text-primary" : "text-muted-foreground"
-                )}
-              />
-              <span
-                className={cn(
-                  "min-w-0 flex-1 text-sm truncate",
-                  slide.included ? "text-foreground" : "text-muted-foreground line-through"
-                )}
-              >
-                {slide.title}
-              </span>
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0">
-                {slide.progressedIn}/{slide.usedInCalls}
-              </span>
-            </BriefDetailRow>
-          </li>
-        ))}
-      </ul>
-    </BriefDetailCard>
+    <>
+      <BriefDetailCard
+        title="Recommended deck"
+        icon={Presentation}
+        sourceInfo={{
+          source: "Knowledge base",
+          detail:
+            "This deck is selected from KB presentation files. The system chooses one PPT/PPTX with the strongest relevance to the account, needs, and service area.",
+        }}
+      >
+        <BriefDetailRow className="space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1 space-y-2">
+              <KbFileFormatBadge fileName={deck.fileName} mimeType={deck.mimeType} />
+              <p className="text-sm font-medium leading-snug break-words">{deck.title}</p>
+              {deck.snippet ? (
+                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                  {deck.snippet}
+                </p>
+              ) : null}
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => setActiveDoc(deck)}>
+              <Eye className="h-3.5 w-3.5" />
+              Preview
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            {Math.round(deck.relevanceScore * 100)}% relevance from KB
+          </p>
+        </BriefDetailRow>
+      </BriefDetailCard>
+
+      <KbDocumentViewerDialog
+        document={activeDoc}
+        open={activeDoc !== null}
+        onOpenChange={(open) => !open && setActiveDoc(null)}
+      />
+    </>
   );
 }
 
 export function BriefPodNotesCard({ notes }: { notes: CallBrief["podNotes"] }) {
   return (
-    <BriefDetailCard title="Pod-specific notes" icon={Users} scrollMaxHeight="14rem">
+    <BriefDetailCard
+      title="Pod-specific notes"
+      icon={Users}
+      scrollMaxHeight="14rem"
+      sourceInfo={{
+        source: "AI from Pre-DC context",
+        detail:
+          "These notes translate the lead research into role-specific prep reminders for the pod, such as what the AE, SE, or designer should watch for.",
+      }}
+    >
       <ul className="space-y-4">
         {notes.map((note) => (
           <li key={note.memberName}>

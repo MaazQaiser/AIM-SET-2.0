@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     recall_bot_name: str = "DC Copilot Live Agent"
     recall_webhook_secret: str = ""
     public_api_base_url: str = ""
+    jira_base_url: str = ""
+    jira_api_token: str = ""
+    jira_email: str = ""
+    jira_project_key: str = "SALES"
     demo_transcript_replay: bool = False
     workflow_agent_on_ingest: bool = Field(
         default=True,
@@ -71,6 +75,10 @@ class Settings(BaseSettings):
     @property
     def openai_configured(self) -> bool:
         return bool(self.openai_api_key)
+
+    @property
+    def jira_configured(self) -> bool:
+        return bool(self.jira_base_url and self.jira_api_token)
 
 
 @lru_cache

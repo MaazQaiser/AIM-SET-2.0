@@ -99,6 +99,11 @@ export function InternalAttendeesCard({ attendees }: InternalAttendeesCardProps)
       <BriefDetailCard
         title="Internal attendees"
         icon={Users}
+        sourceInfo={{
+          source: "Rules from lead context",
+          detail:
+            "The pod list is selected from account context such as industry, needs, tech stack, and delivery angle, so the right internal roles are prepared for the call.",
+        }}
         headerExtra={
           <span className="text-xs text-muted-foreground shrink-0">{attendees.length} pod</span>
         }

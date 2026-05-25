@@ -24,6 +24,11 @@ export function BriefContentToGeneratePanel({ items }: BriefContentToGeneratePan
       title="Content to generate"
       icon={FilePlus2}
       variant="warning"
+      sourceInfo={{
+        source: "AI gap check against KB",
+        detail:
+          "If the workflow planned an asset but KB has no strong match, it lists that content here and explains why creating it would improve call prep.",
+      }}
       headerExtra={
         <span className="text-xs text-muted-foreground shrink-0">
           {gaps.length} gap{gaps.length === 1 ? "" : "s"}

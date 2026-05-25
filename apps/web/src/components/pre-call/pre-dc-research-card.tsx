@@ -24,6 +24,12 @@ export function PreDcResearchCard({
       icon={Building2}
       className={cn("border-primary/20", className)}
       scrollMaxHeight="14rem"
+      sourceInfo={{
+        source: title.startsWith("Post-DC") ? "Imported Post-DC notes" : "Imported Pre-DC notes",
+        detail: title.startsWith("Post-DC")
+          ? "These fields come directly from the uploaded Post-DC notes. The AI does not rewrite them here."
+          : "These fields come directly from the uploaded Pre-DC row or manual lead form. The AI uses them as grounding for other sections.",
+      }}
     >
       <div className="space-y-2">
         {sections.map((section) => (

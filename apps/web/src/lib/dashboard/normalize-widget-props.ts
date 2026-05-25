@@ -1,4 +1,10 @@
-import type { CallBrief, PostCallReview } from "@/lib/brief-types";
+import type {
+  CallBrief,
+  PostCallCrmTask,
+  PostCallEmailDraft,
+  PostCallJiraTicket,
+  PostCallReview,
+} from "@/lib/brief-types";
 import type { BriefWidgetProps, PostDcWidgetProps } from "@/lib/dashboard/widget-registry";
 import type { AccountSnapshotRow } from "@/components/calls/account-widget-cards";
 export function arrayLen(value: unknown): number {
@@ -20,6 +26,7 @@ export function normalizeCallBrief(brief: CallBrief): CallBrief {
     researchSections: brief.researchSections ?? [],
     relevantDocuments: brief.relevantDocuments ?? [],
     relevantProjects: brief.relevantProjects ?? [],
+    recommendedDeck: brief.recommendedDeck,
     artifactPlan: brief.artifactPlan ?? [],
     artifactFulfillment: brief.artifactFulfillment ?? [],
     contentToGenerate: brief.contentToGenerate ?? [],
@@ -56,11 +63,17 @@ export function normalizePostDcWidgetProps(
   props: Omit<PostDcWidgetProps, "review" | "accountSnapshot"> & {
     review: PostCallReview;
     accountSnapshot?: AccountSnapshotRow[] | null;
+    emailDraft?: PostCallEmailDraft | null;
+    crmTasks?: PostCallCrmTask[] | null;
+    jiraTicket?: PostCallJiraTicket | null;
   }
 ): PostDcWidgetProps {
   return {
     ...props,
     review: normalizePostCallReview(props.review),
     accountSnapshot: Array.isArray(props.accountSnapshot) ? props.accountSnapshot : [],
+    emailDraft: props.emailDraft ?? null,
+    crmTasks: Array.isArray(props.crmTasks) ? props.crmTasks : [],
+    jiraTicket: props.jiraTicket ?? null,
   };
 }

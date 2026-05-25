@@ -1,7 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Send, Edit3, RefreshCw, Sparkles, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Send,
+  Edit3,
+  RefreshCw,
+  Sparkles,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  Paperclip,
+  PlusCircle,
+} from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Textarea } from "@dc-copilot/ui/components/textarea";
 import { Input } from "@dc-copilot/ui/components/input";
@@ -9,8 +19,9 @@ import { Label } from "@dc-copilot/ui/components/label";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { AIGeneratedBadge } from "@/components/ai-generated-badge";
 import { Separator } from "@dc-copilot/ui/components/separator";
+import type { PostCallEmailAttachments } from "@/lib/brief-types";
 
-interface EmailDraft {
+export interface EmailDraft {
   id: string;
   to: string[];
   cc?: string[];
@@ -19,6 +30,7 @@ interface EmailDraft {
   style_signals: string[];
   commitments_referenced: string[];
   status: "draft_pending_approval" | "approved" | "sent";
+  attachments?: PostCallEmailAttachments;
 }
 
 interface EmailEditorProps {
@@ -158,6 +170,48 @@ export function EmailEditor({ draft, onApprove, onRegenerate }: EmailEditorProps
                   </li>
                 ))}
               </ul>
+            )}
+          </div>
+        </>
+      )}
+
+      {((local.attachments?.found.length ?? 0) > 0 || (local.attachments?.missing.length ?? 0) > 0) && (
+        <>
+          <Separator />
+          <div className="space-y-2 px-4 py-3">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+              <Paperclip className="h-3.5 w-3.5 text-primary" />
+              Suggested attachments
+            </div>
+            {(local.attachments?.found.length ?? 0) > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {local.attachments?.found.map((asset) => (
+                  <a
+                    key={asset.assetId}
+                    href={asset.downloadUrl ?? `/api/kb/assets/${asset.assetId}/file`}
+                    className="rounded-full border border-border bg-muted/40 px-2 py-1 text-[10px] text-foreground hover:bg-muted"
+                  >
+                    {asset.name}
+                  </a>
+                ))}
+              </div>
+            )}
+            {(local.attachments?.missing.length ?? 0) > 0 && (
+              <div className="space-y-1">
+                {local.attachments?.missing.map((asset) => (
+                  <a
+                    key={asset.name}
+                    href={asset.contentStudioLink}
+                    className="flex items-center justify-between gap-2 rounded-md border border-dashed px-2 py-1.5 text-xs hover:bg-muted/40"
+                  >
+                    <span className="min-w-0 truncate text-muted-foreground">{asset.name}</span>
+                    <span className="inline-flex shrink-0 items-center gap-1 text-primary">
+                      <PlusCircle className="h-3.5 w-3.5" />
+                      Generate
+                    </span>
+                  </a>
+                ))}
+              </div>
             )}
           </div>
         </>

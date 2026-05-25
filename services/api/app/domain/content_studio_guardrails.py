@@ -11,6 +11,7 @@ PROJECT_COST_CEILING_USD = 1.50
 ALLOWED_TAGS = {
     "html",
     "head",
+    "meta",
     "body",
     "style",
     "section",
@@ -51,6 +52,9 @@ ALLOWED_ATTRS = {
     "slide",
     "alt",
     "src",
+    "charset",
+    "name",
+    "content",
 }
 
 SECRET_PATTERNS = [

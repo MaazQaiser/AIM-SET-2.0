@@ -96,6 +96,11 @@ export function BriefAISummary({ brief }: BriefAISummaryProps) {
       title="PRE-DC Workflow summary"
       icon={Sparkles}
       variant="highlight"
+      sourceInfo={{
+        source: "AI from Pre-DC lead data",
+        detail:
+          "The workflow summarizes only the imported lead research: company stage, ICP fit, described need, timing, and Tkxel fit. It is instructed not to invent facts.",
+      }}
       headerExtra={<WorkflowAgentBadge />}
     >
       <div className="space-y-4 min-w-0">

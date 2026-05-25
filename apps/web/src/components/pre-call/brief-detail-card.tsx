@@ -1,9 +1,20 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ChevronDown, type LucideIcon } from "lucide-react";
+import { ChevronDown, Info, type LucideIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/cn";
+
+export interface BriefSourceInfo {
+  source: string;
+  detail: string;
+}
 
 export interface BriefDetailCardProps {
   title: string;
@@ -14,7 +25,32 @@ export interface BriefDetailCardProps {
   /** Scrollable body with optional max height (e.g. "10rem" for ~3 peek rows) */
   scrollMaxHeight?: string;
   headerExtra?: ReactNode;
+  sourceInfo?: BriefSourceInfo;
   className?: string;
+}
+
+function SourceInfoIcon({ info }: { info: BriefSourceInfo }) {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={`How ${info.source} was used for this section`}
+          >
+            <Info className="h-3.5 w-3.5" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start" className="max-w-xs space-y-1.5 p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Source: {info.source}
+          </p>
+          <p className="text-xs leading-relaxed">{info.detail}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }
 
 export function BriefDetailCard({
@@ -24,6 +60,7 @@ export function BriefDetailCard({
   variant = "default",
   scrollMaxHeight,
   headerExtra,
+  sourceInfo,
   className,
 }: BriefDetailCardProps) {
   return (
@@ -48,6 +85,7 @@ export function BriefDetailCard({
               />
             )}
             <span className="truncate">{title}</span>
+            {sourceInfo ? <SourceInfoIcon info={sourceInfo} /> : null}
           </CardTitle>
           {headerExtra}
         </div>

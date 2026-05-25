@@ -96,7 +96,11 @@ export function BriefSections({
 
       {brief.objections?.length > 0 && <BriefObjectionsCard objections={brief.objections} />}
 
-      <BriefDeckCard slides={brief.deckSlides} />
+      <BriefDeckCard
+        recommendedDeck={brief.recommendedDeck}
+        relevantDocuments={brief.relevantDocuments}
+        callId={call?.id}
+      />
 
       <BriefContentToGeneratePanel items={brief.contentToGenerate} />
 

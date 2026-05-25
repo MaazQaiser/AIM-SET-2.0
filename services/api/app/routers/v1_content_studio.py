@@ -4,13 +4,21 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from dc_core.tenancy import TenantContext
 
 from app.deps import get_tenant_context
 from app.domain.content_studio_repository import ARTIFACT_TYPES, TEMPLATE_EXTENSIONS, get_content_studio_repository
 from app.orchestrator.dispatcher import Orchestrator
+from app.services.template_editor_service import (
+    assist_template_edit,
+    build_template_document,
+    count_template_pages,
+    extract_css_variables,
+    split_template_parts,
+    validate_template_html,
+)
 
 router = APIRouter(prefix="/api/v1/content", tags=["content-studio"])
 _orch = Orchestrator()
@@ -32,6 +40,30 @@ class ExportBody(BaseModel):
     format: str
 
 
+class TemplateBody(BaseModel):
+    name: str
+    artifactType: str
+    html: str
+    css: str = ""
+    tags: List[str] = Field(default_factory=list)
+
+
+class TemplatePatchBody(BaseModel):
+    name: Optional[str] = None
+    artifactType: Optional[str] = None
+    html: Optional[str] = None
+    css: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+
+class TemplateAssistBody(BaseModel):
+    name: str = "Untitled template"
+    artifactType: str = "deck"
+    html: str
+    css: str = ""
+    instruction: str
+
+
 @router.get("/templates")
 def list_templates(
     artifact_type: Optional[str] = None,
@@ -40,12 +72,103 @@ def list_templates(
     return get_content_studio_repository().list_templates(ctx, artifact_type=artifact_type)
 
 
+@router.post("/templates")
+def create_template(
+    body: TemplateBody,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    if body.artifactType not in ARTIFACT_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid artifactType")
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Template name is required")
+    try:
+        validate_template_html(body.html, body.css)
+        document = build_template_document(body.html, body.css)
+        _, extracted_css = split_template_parts(body.html)
+        css_text = body.css or extracted_css
+        return get_content_studio_repository().create_manual_template(
+            ctx,
+            name=name,
+            artifact_type=body.artifactType,
+            tags=body.tags,
+            html=document,
+            css_variables=extract_css_variables(css_text),
+            page_count=count_template_pages(document, body.artifactType),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/templates/assist")
+def assist_template(
+    body: TemplateAssistBody,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    if body.artifactType not in ARTIFACT_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid artifactType")
+    try:
+        return assist_template_edit(
+            ctx,
+            name=body.name,
+            artifact_type=body.artifactType,
+            html=body.html,
+            css=body.css,
+            instruction=body.instruction,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
 @router.get("/templates/{template_id}")
 def get_template(
     template_id: str,
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> Dict[str, Any]:
     tpl = get_content_studio_repository().get_template(ctx, template_id)
+    if not tpl:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+    return tpl
+
+
+@router.patch("/templates/{template_id}")
+def update_template(
+    template_id: str,
+    body: TemplatePatchBody,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    existing = get_content_studio_repository().get_template(ctx, template_id)
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+
+    artifact_type = body.artifactType or existing.get("artifactType") or "deck"
+    if artifact_type not in ARTIFACT_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid artifactType")
+
+    patch: Dict[str, Any] = {}
+    if body.name is not None:
+        name = body.name.strip()
+        if not name:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Template name is required")
+        patch["name"] = name
+    if body.artifactType is not None:
+        patch["artifactType"] = body.artifactType
+    if body.tags is not None:
+        patch["tags"] = body.tags
+    if body.html is not None or body.css is not None:
+        html = body.html if body.html is not None else existing.get("html") or ""
+        _, existing_css = split_template_parts(existing.get("html") or "")
+        css = body.css if body.css is not None else existing_css
+        try:
+            validate_template_html(html, css)
+            document = build_template_document(html, css)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        patch["html"] = document
+        patch["cssVariables"] = extract_css_variables(css)
+        patch["pageCount"] = count_template_pages(document, artifact_type)
+
+    tpl = get_content_studio_repository().update_template(ctx, template_id, patch)
     if not tpl:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
     return tpl

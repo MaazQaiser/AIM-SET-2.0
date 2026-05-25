@@ -19,6 +19,11 @@ export function PostDcBriefPreviewCard({ preview }: PostDcBriefPreviewCardProps)
       title="Post-DC notes (imported)"
       icon={ClipboardList}
       className="border-dashed"
+      sourceInfo={{
+        source: "Imported Post-DC notes",
+        detail:
+          "This preview is pulled from the uploaded Post-DC row matched to the call. It shows raw post-call context, not new AI conclusions.",
+      }}
       headerExtra={
         preview.leadStage ? (
           <Badge variant="outline" className="text-[10px] capitalize font-normal shrink-0">

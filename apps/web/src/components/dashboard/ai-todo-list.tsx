@@ -36,6 +36,11 @@ const AGENT_CONFIG: Record<
     label: "PRE-DC",
     className: "text-teal-700 bg-teal-100 dark:bg-teal-950/40 dark:text-teal-300",
   },
+  post_dc: {
+    icon: Mail,
+    label: "Post-DC",
+    className: "text-sky-700 bg-sky-100 dark:bg-sky-950/40 dark:text-sky-300",
+  },
   content_generation: {
     icon: Mail,
     label: "Studio",

@@ -59,6 +59,14 @@ def post_call_pipeline(call_id: str, ctx: TenantContext = Depends(get_tenant_con
     return _orch.dispatch_post_call(ctx, call_id)
 
 
+@router.get("/{call_id}/post-call")
+def get_post_call_review(call_id: str, ctx: TenantContext = Depends(get_tenant_context)) -> Dict[str, Any]:
+    payload = _calls.get_post_review(ctx, call_id)
+    if not payload:
+        raise HTTPException(status_code=404, detail="Post-call review not found")
+    return payload
+
+
 @router.post("/{call_id}/end-live")
 def end_live_call(call_id: str, ctx: TenantContext = Depends(get_tenant_context)) -> Dict[str, Any]:
     return _orch.dispatch_call_end(ctx, call_id)

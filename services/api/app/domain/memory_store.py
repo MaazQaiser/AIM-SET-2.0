@@ -26,6 +26,7 @@ class MemoryStore:
         self.content_revisions: Dict[str, List[Dict[str, Any]]] = {}
         self.content_exports: Dict[str, bytes] = {}
         self.call_briefs: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        self.call_post_reviews: Dict[str, Dict[str, Dict[str, Any]]] = {}
         self.call_live_signals: Dict[str, Dict[str, Dict[str, Any]]] = {}
         self.live_sessions: Dict[str, Dict[str, Dict[str, Any]]] = {}
         self.transcript_events: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
@@ -80,6 +81,12 @@ class MemoryStore:
 
     def save_call_brief(self, tenant_key: str, call_id: str, payload: Dict[str, Any]) -> None:
         self.call_briefs.setdefault(tenant_key, {})[call_id] = payload
+
+    def get_post_review(self, tenant_key: str, call_id: str) -> Dict[str, Any] | None:
+        return self.call_post_reviews.get(tenant_key, {}).get(call_id)
+
+    def save_post_review(self, tenant_key: str, call_id: str, payload: Dict[str, Any]) -> None:
+        self.call_post_reviews.setdefault(tenant_key, {})[call_id] = payload
 
     def save_live_signals(self, tenant_key: str, call_id: str, snapshot: Dict[str, Any]) -> None:
         self.call_live_signals.setdefault(tenant_key, {})[call_id] = snapshot

@@ -34,7 +34,16 @@ import {
   PostSummaryCard,
 } from "@/components/post-dc/post-dc-widget-cards";
 import { PostDiscoveryGapsCard } from "@/components/post-dc/post-discovery-gaps-card";
-import type { CallBrief, PostCallReview } from "@/lib/brief-types";
+import { EmailEditor } from "@/components/post-dc/email-editor";
+import { CrmTaskList } from "@/components/post-dc/crm-task-list";
+import { JiraTicketCard } from "@/components/post-dc/jira-ticket-card";
+import type {
+  CallBrief,
+  PostCallCrmTask,
+  PostCallEmailDraft,
+  PostCallJiraTicket,
+  PostCallReview,
+} from "@/lib/brief-types";
 import { arrayLen } from "@/lib/dashboard/normalize-widget-props";
 import type { BANTScore, Call } from "@/types";
 
@@ -66,6 +75,13 @@ export interface PostDcWidgetProps {
   review: PostCallReview;
   call: Call;
   accountSnapshot: AccountSnapshotRow[];
+  emailDraft?: PostCallEmailDraft | null;
+  crmTasks?: PostCallCrmTask[];
+  jiraTicket?: PostCallJiraTicket | null;
+  onApproveEmail?: (draft: PostCallEmailDraft) => void;
+  onApproveCrmTasks?: (ids: string[]) => void;
+  onRejectCrmTask?: (id: string) => void;
+  onCreateJiraTicket?: (ticket: PostCallJiraTicket) => Promise<void> | void;
 }
 
 /**
@@ -134,7 +150,13 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "content",
     column: "center",
     sortOrder: 3,
-    render: ({ brief }) => <BriefDeckCard slides={brief.deckSlides ?? []} />,
+    render: ({ brief, call }) => (
+      <BriefDeckCard
+        recommendedDeck={brief.recommendedDeck}
+        relevantDocuments={brief.relevantDocuments ?? []}
+        callId={call.id}
+      />
+    ),
   },
   {
     id: "brief.relevant-content",
@@ -312,6 +334,16 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     ),
   },
   {
+    id: "post.email_draft",
+    title: "Follow-up email",
+    category: "ai",
+    column: "center",
+    sortOrder: 4,
+    isAvailable: ({ emailDraft }) => Boolean(emailDraft),
+    render: ({ emailDraft, onApproveEmail }) =>
+      emailDraft ? <EmailEditor draft={emailDraft} onApprove={onApproveEmail} /> : null,
+  },
+  {
     id: "post.research",
     title: "Post-DC import",
     category: "content",
@@ -330,5 +362,26 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     sortOrder: 1,
     isAvailable: ({ review }) => arrayLen(review.podScorecard) > 0,
     render: ({ review }) => <PostScorecardCard scorecard={review.podScorecard ?? []} />,
+  },
+  {
+    id: "post.crm_tasks",
+    title: "CRM tasks",
+    category: "pod",
+    column: "right",
+    sortOrder: 2,
+    isAvailable: ({ crmTasks }) => arrayLen(crmTasks) > 0,
+    render: ({ crmTasks = [], onApproveCrmTasks, onRejectCrmTask }) => (
+      <CrmTaskList tasks={crmTasks} onApprove={onApproveCrmTasks} onReject={onRejectCrmTask} />
+    ),
+  },
+  {
+    id: "post.jira_ticket",
+    title: "Jira ticket",
+    category: "pod",
+    column: "right",
+    sortOrder: 3,
+    isAvailable: ({ jiraTicket }) => Boolean(jiraTicket),
+    render: ({ jiraTicket, onCreateJiraTicket }) =>
+      jiraTicket ? <JiraTicketCard ticket={jiraTicket} onCreate={onCreateJiraTicket} /> : null,
   },
 ];

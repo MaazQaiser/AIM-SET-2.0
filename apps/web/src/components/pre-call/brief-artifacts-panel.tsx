@@ -37,6 +37,11 @@ export function BriefArtifactsPanel({ brief }: BriefArtifactsPanelProps) {
     <BriefDetailCard
       title="PRE-DC Workflow artifacts"
       icon={Package}
+      sourceInfo={{
+        source: "AI plan + KB check",
+        detail:
+          "First, AI decides which assets would help this call. Then the workflow checks the KB and marks each item as found, partial, or missing.",
+      }}
       headerExtra={<WorkflowAgentBadge />}
     >
       <div className="space-y-4 min-w-0">

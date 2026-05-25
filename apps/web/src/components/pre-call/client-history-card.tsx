@@ -167,7 +167,14 @@ export function ClientHistoryCard({ interactions }: ClientHistoryCardProps) {
   const { compact } = useWidgetSize();
   if (interactions.length === 0) {
     return (
-      <BriefDetailCard title="Client interaction history">
+      <BriefDetailCard
+        title="Client interaction history"
+        sourceInfo={{
+          source: "Imported history",
+          detail:
+            "This section shows prior interactions that are already in the imported data or connected call records. AI is not inventing history.",
+        }}
+      >
         <p className="text-sm text-muted-foreground">No prior interactions recorded.</p>
       </BriefDetailCard>
     );
@@ -181,6 +188,11 @@ export function ClientHistoryCard({ interactions }: ClientHistoryCardProps) {
     <BriefDetailCard
       title="Client interaction history"
       scrollMaxHeight="14rem"
+      sourceInfo={{
+        source: "Imported history",
+        detail:
+          "Interactions are sorted from existing call/contact history. The section helps the AE see what happened before this discovery call.",
+      }}
       headerExtra={
         <span className="text-xs text-muted-foreground shrink-0">{interactions.length}</span>
       }

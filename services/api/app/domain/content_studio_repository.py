@@ -175,6 +175,114 @@ class ContentStudioRepository:
 
         return {"template": _tpl_row_to_api(row), "storagePath": storage_path}
 
+    def create_manual_template(
+        self,
+        ctx: TenantContext,
+        *,
+        name: str,
+        artifact_type: str,
+        html: str,
+        css_variables: Dict[str, Any],
+        tags: Optional[List[str]] = None,
+        page_count: int = 1,
+    ) -> Dict[str, Any]:
+        if artifact_type not in ARTIFACT_TYPES:
+            raise ValueError(f"Invalid artifact_type: {artifact_type}")
+        tenant_uuid, clerk_key = _tenant_keys(ctx)
+        settings = get_settings()
+        template_id = str(uuid.uuid4())
+        row = {
+            "id": template_id,
+            "tenant_id": tenant_uuid,
+            "name": name,
+            "artifact_type": artifact_type,
+            "status": "ready",
+            "source_file_name": None,
+            "source_storage_path": None,
+            "tags": tags or [],
+            "html": html,
+            "css_variables": css_variables,
+            "page_count": max(1, page_count),
+            "ingest_error": None,
+            "created_by": ctx.user_id,
+            "created_at": _now_iso(),
+        }
+
+        use_memory = not settings.supabase_configured
+        if settings.supabase_configured:
+            try:
+                get_supabase().table("content_templates").insert(row).execute()
+            except Exception:
+                use_memory = True
+        if use_memory:
+            store = get_memory_store()
+            api = _tpl_row_to_api(row)
+            store.content_templates.setdefault(clerk_key, []).append(api)
+            store.content_template_html[f"{clerk_key}:{template_id}"] = html
+
+        return self.get_template(ctx, template_id) or _tpl_row_to_api(row)
+
+    def update_template(
+        self,
+        ctx: TenantContext,
+        template_id: str,
+        patch: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        tenant_uuid, clerk_key = _tenant_keys(ctx)
+        db_patch: Dict[str, Any] = {}
+        if "name" in patch:
+            db_patch["name"] = patch["name"]
+        if "artifactType" in patch:
+            db_patch["artifact_type"] = patch["artifactType"]
+        if "tags" in patch:
+            db_patch["tags"] = patch["tags"]
+        if "html" in patch:
+            db_patch["html"] = patch["html"]
+            db_patch["status"] = "ready"
+            db_patch["ingest_error"] = None
+        if "cssVariables" in patch:
+            db_patch["css_variables"] = patch["cssVariables"]
+        if "pageCount" in patch:
+            db_patch["page_count"] = max(1, int(patch["pageCount"] or 1))
+
+        if db_patch.get("artifact_type") and db_patch["artifact_type"] not in ARTIFACT_TYPES:
+            raise ValueError(f"Invalid artifact_type: {db_patch['artifact_type']}")
+
+        use_memory = not get_settings().supabase_configured
+        if get_settings().supabase_configured:
+            try:
+                get_supabase().table("content_templates").update(db_patch).eq("id", template_id).eq(
+                    "tenant_id", tenant_uuid
+                ).execute()
+            except Exception:
+                use_memory = True
+
+        if use_memory:
+            store = get_memory_store()
+            found = False
+            for t in store.content_templates.get(clerk_key, []):
+                if t.get("id") != template_id:
+                    continue
+                found = True
+                if "name" in patch:
+                    t["name"] = patch["name"]
+                if "artifactType" in patch:
+                    t["artifactType"] = patch["artifactType"]
+                if "tags" in patch:
+                    t["tags"] = patch["tags"]
+                if "cssVariables" in patch:
+                    t["cssVariables"] = patch["cssVariables"]
+                if "pageCount" in patch:
+                    t["pageCount"] = max(1, int(patch["pageCount"] or 1))
+                if "html" in patch:
+                    t["status"] = "ready"
+                    t["ingestError"] = None
+                    store.content_template_html[f"{clerk_key}:{template_id}"] = patch["html"]
+            if not found:
+                return None
+
+        return self.get_template(ctx, template_id)
+
     def finalize_template(
         self,
         ctx: TenantContext,

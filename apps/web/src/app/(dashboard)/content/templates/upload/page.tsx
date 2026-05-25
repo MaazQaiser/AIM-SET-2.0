@@ -37,8 +37,12 @@ export default function TemplateUploadPage() {
 
       <h1 className="text-2xl font-semibold">Upload template</h1>
       <p className="text-sm text-muted-foreground">
-        Supported: PPT, PPTX, PDF, PNG, JPG. Each slide/page is converted to HTML/CSS via Claude vision.
+        Supported: PPT, PPTX, PDF, PNG, JPG. Each slide/page is converted to HTML/CSS via Claude
+        vision.
       </p>
+      <Button variant="outline" asChild>
+        <Link href="/content/templates/new">Create with HTML/CSS instead</Link>
+      </Button>
 
       <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
         <div>
@@ -71,9 +75,7 @@ export default function TemplateUploadPage() {
           <Upload className="h-4 w-4 mr-1" />
           {upload.isPending ? "Processing…" : "Upload & convert"}
         </Button>
-        {upload.isError && (
-          <p className="text-sm text-destructive">{String(upload.error)}</p>
-        )}
+        {upload.isError && <p className="text-sm text-destructive">{String(upload.error)}</p>}
       </form>
     </div>
   );

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import html as html_lib
 import re
 import uuid
 from pathlib import Path
@@ -127,6 +128,7 @@ def run_studio_turn(
         project_ceiling_usd=float(runtime["project_ceiling_usd"]),
     )
     brief = _normalize_brief(project.get("brief"))
+    brief["artifact_type"] = str(project.get("artifactType") or brief.get("artifact_type") or "deck")
 
     if not allow_generation:
         updated = _update_brief_from_reply(brief, clean_msg)
@@ -141,7 +143,10 @@ def run_studio_turn(
                 result={
                     "project_id": project_id,
                     "turn_type": "ask",
-                    "ask": _questions_for_missing(missing),
+                    "ask": _questions_for_missing(
+                        missing,
+                        artifact_type=str(project.get("artifactType") or "deck"),
+                    ),
                 },
                 citations=[],
                 confidence=0.75,
@@ -151,13 +156,104 @@ def run_studio_turn(
             )
             validate_envelope(envelope)
             return envelope
+
+        if _needs_slide_outline(brief, str(project.get("artifactType") or "deck")):
+            brief["slide_outline"] = _build_slide_outline(
+                title=str(project.get("title") or "Generated Deck"),
+                brief=brief,
+            )
+            repo.update_project(ctx, project_id, {"brief": brief})
+            envelope = AgentEnvelope(
+                agent="content_generation",
+                operation="studio_ask",
+                result={
+                    "project_id": project_id,
+                    "turn_type": "ask",
+                    "message": "Here is the proposed slide plan. Tell me what to change on any slide, or click Generate when it looks right.",
+                    "slide_outline": brief["slide_outline"],
+                },
+                citations=[],
+                confidence=0.8,
+                cost={"tokens": 0, "usd": 0.0, "model": "rule-based-slide-plan"},
+                trace_id=str(uuid.uuid4()),
+                creative=True,
+            )
+            validate_envelope(envelope)
+            return envelope
+
+        if _is_slide_outline_edit(clean_msg, brief):
+            latest = repo.latest_revision(ctx, project_id)
+            if latest:
+                full_html = _build_slide_preview_html(
+                    title=str(project.get("title") or "Generated Deck"),
+                    brief=brief,
+                )
+                _, violations = sanitize_html(full_html)
+                if violations:
+                    raise ValueError(f"HTML guardrail violations: {violations}")
+                deck_err = validate_deck_slide_count(full_html, str(project.get("artifactType") or "deck"))
+                if deck_err:
+                    raise ValueError(deck_err)
+                rev = repo.create_revision(
+                    ctx,
+                    project_id,
+                    html=full_html,
+                    citations=[],
+                    template_id=project.get("templateId"),
+                )
+                repo.update_project(ctx, project_id, {"brief": brief, "status": "preview"})
+                slide_num = _slide_number_from_text(clean_msg)
+                envelope = AgentEnvelope(
+                    agent="content_generation",
+                    operation="html_patch",
+                    result={
+                        "project_id": project_id,
+                        "turn_type": "patch",
+                        "message": (
+                            f"Updated slide {slide_num} and refreshed the preview."
+                            if slide_num
+                            else "Updated the slide and refreshed the preview."
+                        ),
+                        "revision_id": rev["id"],
+                        "html": full_html,
+                        "patch": {"slide": slide_num} if slide_num else {},
+                        "slide_outline": brief.get("slide_outline") or [],
+                    },
+                    citations=[],
+                    confidence=0.85,
+                    cost={"tokens": 0, "usd": 0.0, "model": "rule-based-slide-editor"},
+                    trace_id=str(uuid.uuid4()),
+                    creative=True,
+                )
+                validate_envelope(envelope)
+                return envelope
+
+        if str(project.get("artifactType") or "deck") == "deck" and "slide" in clean_msg.lower():
+            envelope = AgentEnvelope(
+                agent="content_generation",
+                operation="studio_ask",
+                result={
+                    "project_id": project_id,
+                    "turn_type": "ask",
+                    "message": "Updated the slide plan. Tell me any other slide edits, or click Generate when it looks right.",
+                    "slide_outline": brief.get("slide_outline") or [],
+                },
+                citations=[],
+                confidence=0.8,
+                cost={"tokens": 0, "usd": 0.0, "model": "rule-based-slide-plan"},
+                trace_id=str(uuid.uuid4()),
+                creative=True,
+            )
+            validate_envelope(envelope)
+            return envelope
+
         envelope = AgentEnvelope(
             agent="content_generation",
             operation="studio_ask",
             result={
                 "project_id": project_id,
                 "turn_type": "ask",
-                "ask": ["Requirements captured. Click \"Generate slides\" to create the first draft."],
+                "ask": ["Requirements captured. Click Generate to create the first draft."],
             },
             citations=[],
             confidence=0.8,
@@ -171,6 +267,49 @@ def run_studio_turn(
     # Generate mode: use captured brief and fill safe defaults if still incomplete.
     brief = _brief_with_defaults(brief)
     repo.update_project(ctx, project_id, {"brief": brief})
+
+    if str(project.get("artifactType") or "deck") == "deck":
+        tpl_id = template_id or project.get("templateId")
+        full_html = _build_slide_preview_html(
+            title=str(project.get("title") or "Generated Deck"),
+            brief=brief,
+        )
+        _, violations = sanitize_html(full_html)
+        if violations:
+            raise ValueError(f"HTML guardrail violations: {violations}")
+        deck_err = validate_deck_slide_count(full_html, str(project.get("artifactType") or "deck"))
+        if deck_err:
+            raise ValueError(deck_err)
+        rev = repo.create_revision(
+            ctx,
+            project_id,
+            html=full_html,
+            citations=[],
+            template_id=tpl_id,
+        )
+        patch: Dict[str, Any] = {"brief": brief, "status": "preview"}
+        if tpl_id:
+            patch["templateId"] = tpl_id
+        repo.update_project(ctx, project_id, patch)
+        envelope = AgentEnvelope(
+            agent="content_generation",
+            operation="html_generate",
+            result={
+                "project_id": project_id,
+                "turn_type": "html",
+                "message": "Draft is ready in the preview. Tell me which slide to edit and I will update it from chat.",
+                "revision_id": rev["id"],
+                "html": full_html,
+                "template_id": tpl_id,
+            },
+            citations=[],
+            confidence=0.85,
+            cost={"tokens": 0, "usd": 0.0, "model": "rule-based-slide-preview"},
+            trace_id=str(uuid.uuid4()),
+            creative=True,
+        )
+        validate_envelope(envelope)
+        return envelope
 
     kb_repo = get_kb_repository()
     tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
@@ -229,18 +368,19 @@ def run_studio_turn(
     )
 
     raw = completion.text
-    if "fallback" in completion.model:
+    if "fallback" in completion.model and not allow_generation:
+        fallback_missing = _missing_brief_fields(brief)
         envelope = AgentEnvelope(
             agent="content_generation",
             operation="studio_ask",
             result={
                 "project_id": project_id,
                 "turn_type": "ask",
-                "ask": [
-                    "What deliverable do you need (deck, one-pager, or image)?",
-                    "Who is the audience?",
-                    "What are the 3 key points to include?",
-                ],
+                "ask": _questions_for_missing(
+                    fallback_missing,
+                    artifact_type=str(project.get("artifactType") or "deck"),
+                )
+                or ["Requirements captured. Click Generate to create the first draft."],
             },
             citations=[],
             confidence=0.5,
@@ -408,7 +548,7 @@ def run_studio_turn(
         else:
             operation = "studio_ask"
             turn_type = "ask"
-            next_questions = ["Requirements captured. Click \"Generate slides\" to create the first draft."]
+            next_questions = ["Requirements captured. Click Generate to create the first draft."]
             result = {
                 "project_id": project_id,
                 "turn_type": turn_type,
@@ -470,8 +610,8 @@ def _apply_patch(html: str, patch: Dict[str, Any]) -> str:
 
 def _build_fallback_html(title: str, artifact_type: str, brief: Dict[str, Any]) -> str:
     audience = str(brief.get("audience", "Executive stakeholders")).strip()
-    style = str(brief.get("style", "persuasive")).strip().capitalize()
-    points = brief.get("key_points")
+    style = str(brief.get("content_context") or brief.get("style", "executive summary")).strip().capitalize()
+    points = brief.get("pain_points_coverage") or brief.get("key_points")
     if not isinstance(points, list) or not points:
         points = [
             "Current challenge and business impact",
@@ -532,36 +672,55 @@ def _missing_brief_fields(brief: Dict[str, Any]) -> List[str]:
     missing: List[str] = []
     if not str(brief.get("audience", "")).strip():
         missing.append("audience")
-    points = brief.get("key_points")
+    points = brief.get("pain_points_coverage") or brief.get("key_points")
     if not isinstance(points, list) or len([p for p in points if str(p).strip()]) < 3:
-        missing.append("key_points")
-    if not str(brief.get("style", "")).strip():
-        missing.append("style")
+        missing.append("pain_points_coverage")
+    if not str(brief.get("content_context", "")).strip():
+        missing.append("content_context")
+    if missing:
+        return missing
+    if str(brief.get("artifact_type", "deck")) == "deck" and not _slide_count(brief):
+        missing.append("slide_count")
     return missing
 
 
-def _questions_for_missing(missing: List[str]) -> List[str]:
+def _questions_for_missing(missing: List[str], *, artifact_type: str = "deck") -> List[str]:
+    artifact_label = {
+        "deck": "deck",
+        "one_pager": "one-pager",
+        "image": "image",
+    }.get(artifact_type, "draft")
     out: List[str] = []
     if "audience" in missing:
-        out.append("Who is the audience?")
-    if "key_points" in missing:
-        out.append("What are the 3 key points to include?")
-    if "style" in missing:
-        out.append("Do you want a persuasive, educational, or summary style?")
+        out.append(f"Who is this {artifact_label} for, and what role or team should it speak to?")
+    if "pain_points_coverage" in missing:
+        out.append("Which customer pain points or business problems need to be covered?")
+    if "content_context" in missing:
+        out.append("Is this a case study, or can you describe the context this content should use?")
+    if "slide_count" in missing:
+        out.append("How many slides should this deck include?")
     return out[:3]
 
 
 def _brief_with_defaults(brief: Dict[str, Any]) -> Dict[str, Any]:
     b = dict(brief)
     b["audience"] = str(b.get("audience", "")).strip() or "Executive stakeholders"
-    points = b.get("key_points")
+    points = b.get("pain_points_coverage") or b.get("key_points")
     if not isinstance(points, list) or len([p for p in points if str(p).strip()]) < 3:
-        b["key_points"] = [
+        b["pain_points_coverage"] = [
             "Current challenge and why it matters",
             "Recommended approach and expected outcomes",
             "Roadmap with risks and next steps",
         ]
-    b["style"] = str(b.get("style", "")).strip() or "persuasive"
+    else:
+        b["pain_points_coverage"] = [str(p).strip() for p in points if str(p).strip()]
+    b["key_points"] = b.get("key_points") or b["pain_points_coverage"]
+    b["content_context"] = str(b.get("content_context", "")).strip() or str(b.get("style", "")).strip() or "executive summary"
+    b["style"] = b.get("style") or b["content_context"]
+    if not _slide_count(b):
+        b["slide_count"] = 5
+    if _needs_slide_outline(b, str(b.get("artifact_type") or "deck")):
+        b["slide_outline"] = _build_slide_outline(title="Generated Deck", brief=b)
     return b
 
 
@@ -589,6 +748,10 @@ def _split_points(text: str) -> List[str]:
     if ";" in text or "|" in text:
         parts = [p.strip("-*• \t") for p in re.split(r";|\|", text) if p.strip("-*• \t")]
         return parts
+    if "," in text:
+        parts = [p.strip("-*• \t") for p in text.split(",") if p.strip("-*• \t")]
+        if len(parts) >= 3:
+            return parts
     numbered = re.split(r"(?:^|\s)\d+[.)]\s+", text.strip())
     numbered = [p.strip() for p in numbered if p and p.strip()]
     if len(numbered) >= 3:
@@ -604,29 +767,85 @@ def _update_brief_from_reply(brief: Dict[str, Any], text: str) -> Dict[str, Any]
     if not raw:
         return b
 
+    if _apply_slide_outline_edit(b, raw):
+        return b
+
+    labeled = _extract_labeled_sections(raw)
+    if labeled:
+        audience = labeled.get("audience")
+        if audience:
+            b["audience"] = audience
+
+        pain_text = (
+            labeled.get("pain points")
+            or labeled.get("pain point")
+            or labeled.get("business problems")
+            or labeled.get("problems")
+            or labeled.get("coverage")
+            or labeled.get("key points")
+        )
+        if pain_text:
+            points = _extract_key_points(pain_text)
+            b["pain_points_coverage"] = points or [pain_text]
+            b["key_points"] = b["pain_points_coverage"]
+
+        context = labeled.get("context")
+        case_study = labeled.get("case study")
+        tone = labeled.get("tone") or labeled.get("style")
+        if case_study:
+            b["content_context"] = f"Case study: {case_study}"
+        elif context:
+            b["content_context"] = context
+        elif tone:
+            b["content_context"] = tone
+        if tone:
+            b["style"] = tone
+
+        slides = (
+            labeled.get("slides")
+            or labeled.get("slide count")
+            or labeled.get("number of slides")
+        )
+        if slides:
+            count = _parse_slide_count(slides)
+            if count:
+                b["slide_count"] = count
+
+        if any(key in labeled for key in ("audience", "pain points", "pain point", "business problems", "problems", "coverage", "key points", "context", "case study", "tone", "style", "slides", "slide count", "number of slides")):
+            return b
+
     # Users often paste the prompt + answer together; keep only the answer.
-    if low.startswith("who is the audience?"):
+    if low.startswith("who is the audience?") or low.startswith("who is this"):
         raw = raw.split("?", 1)[1].strip().strip('"').strip()
         low = raw.lower()
-    elif low.startswith("what are the 3 key points to include?"):
+    elif low.startswith("which customer pain points") or low.startswith("what needs to be covered"):
         raw = raw.split("?", 1)[1].strip().strip('"').strip()
         low = raw.lower()
-    elif low.startswith("do you want a persuasive, educational, or summary style?"):
+    elif low.startswith("is this a case study") or low.startswith("can you describe the context"):
+        raw = raw.split("?", 1)[1].strip().strip('"').strip()
+        low = raw.lower()
+    elif low.startswith("how many slides"):
         raw = raw.split("?", 1)[1].strip().strip('"').strip()
         low = raw.lower()
 
-    if low in {"persuasive", "educational", "summary"}:
-        b["style"] = low
+    slide_count = _parse_slide_count(raw)
+    if "slide_count" in _missing_brief_fields(b) and slide_count:
+        b["slide_count"] = slide_count
         return b
 
     if low.startswith("audience:"):
         b["audience"] = raw.split(":", 1)[1].strip()
         return b
-    if low.startswith("style:"):
-        b["style"] = raw.split(":", 1)[1].strip().lower()
+    if low.startswith("context:") or low.startswith("case study:"):
+        b["content_context"] = raw.split(":", 1)[1].strip()
         return b
-    if low.startswith("key points:") or low.startswith("keypoints:"):
-        b["key_points"] = _extract_key_points(raw.split(":", 1)[1])
+    if low.startswith("style:") or low.startswith("tone:"):
+        b["content_context"] = raw.split(":", 1)[1].strip()
+        b["style"] = b["content_context"]
+        return b
+    if low.startswith("pain points:") or low.startswith("pain point:") or low.startswith("coverage:") or low.startswith("key points:") or low.startswith("keypoints:"):
+        b["pain_points_coverage"] = _extract_key_points(raw.split(":", 1)[1]) or [raw.split(":", 1)[1].strip()]
+        b["key_points"] = b["pain_points_coverage"]
         return b
 
     missing = _missing_brief_fields(b)
@@ -642,11 +861,328 @@ def _update_brief_from_reply(brief: Dict[str, Any], text: str) -> Dict[str, Any]
     if "audience" in missing and not _looks_like_key_points(raw):
         b["audience"] = raw
         return b
-    if "key_points" in missing and _looks_like_key_points(raw):
-        b["key_points"] = _extract_key_points(raw)
+    if "pain_points_coverage" in missing and _looks_like_key_points(raw):
+        b["pain_points_coverage"] = _extract_key_points(raw)
+        b["key_points"] = b["pain_points_coverage"]
         return b
-    if "style" in missing:
-        if any(k in low for k in ["persuasive", "educational", "summary", "executive", "technical"]):
-            b["style"] = raw.lower()
-            return b
+    if "pain_points_coverage" in missing and any(k in low for k in ["pain", "problem", "challenge", "friction", "manual", "slow", "visibility", "cost", "risk"]):
+        points = _extract_key_points(raw)
+        b["pain_points_coverage"] = points or [raw]
+        b["key_points"] = b["pain_points_coverage"]
+        return b
+    if "content_context" in missing:
+        b["content_context"] = raw
+        b["style"] = raw
+        return b
     return b
+
+
+def _extract_labeled_sections(text: str) -> Dict[str, str]:
+    labels = (
+        "audience",
+        "pain points",
+        "pain point",
+        "business problems",
+        "problems",
+        "coverage",
+        "context",
+        "case study",
+        "slides",
+        "slide count",
+        "number of slides",
+        "key points",
+        "keypoints",
+        "style",
+        "tone",
+        "heading",
+        "title",
+        "body",
+        "body text",
+        "text",
+        "visual",
+        "image",
+        "chart",
+    )
+    label_re = "|".join(re.escape(label) for label in sorted(labels, key=len, reverse=True))
+    matches = list(re.finditer(rf"(?i)\b({label_re})\s*:", text))
+    out: Dict[str, str] = {}
+    for i, match in enumerate(matches):
+        key = match.group(1).lower()
+        if key == "keypoints":
+            key = "key points"
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        value = text[start:end].strip(" .\n\t")
+        if value:
+            out[key] = value
+    return out
+
+
+def _parse_slide_count(text: str) -> Optional[int]:
+    m = re.search(r"\b(\d{1,2})\b", text)
+    if not m:
+        return None
+    value = int(m.group(1))
+    return max(1, min(value, 20))
+
+
+def _slide_count(brief: Dict[str, Any]) -> Optional[int]:
+    value = brief.get("slide_count")
+    if isinstance(value, int):
+        return max(1, min(value, 20))
+    if isinstance(value, str):
+        return _parse_slide_count(value)
+    return None
+
+
+def _needs_slide_outline(brief: Dict[str, Any], artifact_type: str) -> bool:
+    if artifact_type != "deck":
+        return False
+    outline = brief.get("slide_outline")
+    return not isinstance(outline, list) or len(outline) == 0
+
+
+def _build_slide_outline(title: str, brief: Dict[str, Any]) -> List[Dict[str, Any]]:
+    count = _slide_count(brief) or 5
+    audience = str(brief.get("audience") or "Executive stakeholders")
+    context = str(brief.get("content_context") or "Discovery context")
+    points = brief.get("pain_points_coverage") or brief.get("key_points") or []
+    if not isinstance(points, list):
+        points = [str(points)]
+    clean_points = [str(point).strip() for point in points if str(point).strip()]
+    if not clean_points:
+        clean_points = ["Current pain point", "Recommended approach", "Expected outcome"]
+
+    outline: List[Dict[str, Any]] = []
+    outline.append(
+        {
+            "slide": 1,
+            "heading": title,
+            "body": f"Set the context for {audience} and frame why this conversation matters now.",
+            "visual": "Account logo or relevant hero image",
+        }
+    )
+
+    middle_slots = max(0, count - 2)
+    for index in range(middle_slots):
+        point = clean_points[index % len(clean_points)]
+        outline.append(
+            {
+                "slide": index + 2,
+                "heading": point[:72],
+                "body": f"Explain the pain point, business impact, and what the audience needs to believe. Context: {context}.",
+                "visual": "Pain-impact chart or workflow diagram",
+            }
+        )
+
+    if count > 1:
+        outline.append(
+            {
+                "slide": count,
+                "heading": "Recommended next steps",
+                "body": "Summarize the proposed path, ownership, and the next decision the buyer should make.",
+                "visual": "Timeline or next-step checklist",
+            }
+        )
+
+    return outline[:count]
+
+
+def _is_slide_outline_edit(text: str, brief: Dict[str, Any]) -> bool:
+    outline = brief.get("slide_outline")
+    return isinstance(outline, list) and bool(re.search(r"(?i)\bslide\s*\d{1,2}\b", text))
+
+
+def _slide_number_from_text(text: str) -> Optional[int]:
+    m = re.search(r"(?i)\bslide\s*(\d{1,2})\b", text)
+    if not m:
+        return None
+    return int(m.group(1))
+
+
+def _build_slide_preview_html(title: str, brief: Dict[str, Any]) -> str:
+    outline = brief.get("slide_outline")
+    if not isinstance(outline, list) or not outline:
+        outline = _build_slide_outline(title=title, brief=brief)
+
+    slides: List[str] = []
+    for index, item in enumerate(outline[:20], start=1):
+        if not isinstance(item, dict):
+            continue
+        slide_num = int(item.get("slide") or index)
+        heading = html_lib.escape(str(item.get("heading") or f"Slide {slide_num}").strip())
+        body = html_lib.escape(str(item.get("body") or "").strip())
+        visual = html_lib.escape(str(item.get("visual") or "").strip())
+        title_tag = "h1" if slide_num == 1 else "h2"
+        visual_block = (
+            f'<div class="visual"><strong>Visual:</strong><span>{visual}</span></div>'
+            if visual
+            else ""
+        )
+        slides.append(
+            f"""
+            <section class="slide dc-slide" data-slide="{slide_num}">
+              <div class="slide-kicker">Slide {slide_num:02d}</div>
+              <{title_tag}>{heading}</{title_tag}>
+              <p>{body}</p>
+              {visual_block}
+            </section>
+            """
+        )
+
+    if not slides:
+        return _build_fallback_html(title, "deck", brief)
+
+    return f"""
+    <html>
+      <head>
+        <style>
+          html, body {{
+            margin: 0;
+            min-height: 100%;
+            background: #e8eef7;
+            color: #0f172a;
+            font-family: Arial, sans-serif;
+          }}
+          body {{
+            box-sizing: border-box;
+          }}
+          .deck-preview {{
+            display: grid;
+            gap: 28px;
+            padding: 28px;
+          }}
+          .dc-slide {{
+            width: min(100%, 1080px);
+            aspect-ratio: 16 / 9;
+            box-sizing: border-box;
+            margin: 0 auto;
+            padding: 56px;
+            border: 1px solid #d7dfeb;
+            border-radius: 18px;
+            background: #ffffff;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14);
+            overflow: hidden;
+          }}
+          .dc-slide:nth-child(even) {{
+            background: #f8fafc;
+          }}
+          .slide-kicker {{
+            margin-bottom: 18px;
+            color: #2563eb;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 0;
+            text-transform: uppercase;
+          }}
+          h1, h2 {{
+            margin: 0;
+            max-width: 900px;
+            color: #111827;
+            font-weight: 800;
+            letter-spacing: 0;
+          }}
+          h1 {{
+            font-size: 52px;
+            line-height: 1.04;
+          }}
+          h2 {{
+            font-size: 42px;
+            line-height: 1.08;
+          }}
+          p {{
+            margin: 24px 0 0;
+            max-width: 820px;
+            color: #334155;
+            font-size: 25px;
+            line-height: 1.38;
+          }}
+          .visual {{
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 34px;
+            max-width: 760px;
+            border-left: 5px solid #2563eb;
+            border-radius: 10px;
+            background: #eff6ff;
+            padding: 16px 18px;
+            color: #1e3a8a;
+            font-size: 19px;
+            line-height: 1.35;
+          }}
+          .visual strong {{
+            color: #1d4ed8;
+            white-space: nowrap;
+          }}
+          @media (max-width: 760px) {{
+            .deck-preview {{
+              padding: 14px;
+              gap: 16px;
+            }}
+            .dc-slide {{
+              padding: 28px;
+              border-radius: 12px;
+            }}
+            h1 {{
+              font-size: 32px;
+            }}
+            h2 {{
+              font-size: 28px;
+            }}
+            p {{
+              font-size: 17px;
+            }}
+            .visual {{
+              align-items: flex-start;
+              flex-direction: column;
+              font-size: 14px;
+            }}
+          }}
+        </style>
+      </head>
+      <body>
+        <main class="deck-preview">
+          {''.join(slides)}
+        </main>
+      </body>
+    </html>
+    """
+
+
+def _apply_slide_outline_edit(brief: Dict[str, Any], text: str) -> bool:
+    outline = brief.get("slide_outline")
+    if not isinstance(outline, list) or not outline:
+        return False
+    m = re.search(r"(?i)\bslide\s*(\d{1,2})\b", text)
+    if not m:
+        return False
+    slide_num = int(m.group(1))
+    target = next((item for item in outline if isinstance(item, dict) and int(item.get("slide") or 0) == slide_num), None)
+    if not target:
+        return False
+
+    sections = _extract_labeled_sections(text)
+    changed = False
+    heading = sections.get("heading") or sections.get("title")
+    if heading:
+        target["heading"] = heading
+        changed = True
+    body = sections.get("body") or sections.get("body text") or sections.get("text")
+    if body:
+        target["body"] = body
+        changed = True
+    visual = sections.get("visual") or sections.get("image") or sections.get("chart")
+    if visual:
+        target["visual"] = visual
+        changed = True
+
+    if not changed:
+        remainder = re.sub(r"(?i).*?\bslide\s*\d{1,2}\b\s*[:,-]?", "", text, count=1).strip()
+        if remainder:
+            target["body"] = remainder
+            changed = True
+
+    if changed:
+        brief["slide_outline"] = outline
+    return changed

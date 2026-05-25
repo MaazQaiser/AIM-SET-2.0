@@ -6,7 +6,7 @@ import { CallDetailColumnLayout } from "@/components/calls/call-detail-column-la
 import { LayoutControls } from "@/components/dashboard-grid/layout-controls";
 import { POST_DC_WIDGETS } from "@/lib/dashboard/widget-registry";
 import { normalizePostDcWidgetProps } from "@/lib/dashboard/normalize-widget-props";
-import { useCall, usePostCallReview } from "@/lib/data/hooks";
+import { useCall, useCreateJiraTicket, usePostCallReview } from "@/lib/data/hooks";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { Skeleton } from "@dc-copilot/ui/components/skeleton";
 import { Badge } from "@dc-copilot/ui/components/badge";
@@ -14,6 +14,8 @@ import { Button } from "@dc-copilot/ui/components/button";
 import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import type { AccountSnapshotRow } from "@/components/calls/account-widget-cards";
 import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
+import { useDcImportsStore } from "@/stores/use-dc-imports";
+import type { PostCallCrmTask, PostCallEmailDraft, PostCallJiraTicket } from "@/lib/brief-types";
 
 interface PostDcReviewScreenProps {
   callId: string;
@@ -32,8 +34,13 @@ export function PostDcReviewScreen({
 }: PostDcReviewScreenProps) {
   const { data: call, isLoading: callLoading } = useCall(callId);
   const { data: review, isLoading: reviewLoading } = usePostCallReview(callId);
+  const createJiraTicket = useCreateJiraTicket(callId);
   const isEditingLayout = useDashboardLayoutStore((s) => s.isEditing);
   const setEditingLayout = useDashboardLayoutStore((s) => s.setEditing);
+  const emailDraft = useDcImportsStore((s) => s.emailDraftsByCallId[callId]);
+  const crmTasks = useDcImportsStore((s) => s.crmTasksByCallId[callId] ?? []);
+  const jiraTicket = useDcImportsStore((s) => s.jiraTicketsByCallId[callId]);
+  const setPostCallArtifacts = useDcImportsStore((s) => s.setPostCallArtifacts);
 
   const snapshot =
     accountSnapshot.length > 0
@@ -46,6 +53,25 @@ export function PostDcReviewScreen({
   const shellClass = embedded
     ? "p-4 space-y-4"
     : "p-6 space-y-6 max-w-[1400px] mx-auto w-full";
+
+  function handleApproveEmail(draft: PostCallEmailDraft) {
+    setPostCallArtifacts(callId, { emailDraft: { ...draft, status: "approved" } });
+  }
+
+  function handleApproveCrmTasks(ids: string[]) {
+    const approved = crmTasks.map((task) =>
+      ids.includes(task.id) ? ({ ...task, status: "created" } satisfies PostCallCrmTask) : task
+    );
+    setPostCallArtifacts(callId, { crmTasks: approved });
+  }
+
+  function handleRejectCrmTask(id: string) {
+    setPostCallArtifacts(callId, { crmTasks: crmTasks.filter((task) => task.id !== id) });
+  }
+
+  async function handleCreateJiraTicket(ticket: PostCallJiraTicket) {
+    await createJiraTicket.mutateAsync(ticket);
+  }
 
   if (callLoading || reviewLoading) {
     return (
@@ -177,6 +203,13 @@ export function PostDcReviewScreen({
               review,
               call,
               accountSnapshot: snapshot,
+              emailDraft,
+              crmTasks,
+              jiraTicket,
+              onApproveEmail: handleApproveEmail,
+              onApproveCrmTasks: handleApproveCrmTasks,
+              onRejectCrmTask: handleRejectCrmTask,
+              onCreateJiraTicket: handleCreateJiraTicket,
             })}
           />
           <CallDetailColumnLayout
@@ -186,6 +219,13 @@ export function PostDcReviewScreen({
               review,
               call,
               accountSnapshot: snapshot,
+              emailDraft,
+              crmTasks,
+              jiraTicket,
+              onApproveEmail: handleApproveEmail,
+              onApproveCrmTasks: handleApproveCrmTasks,
+              onRejectCrmTask: handleRejectCrmTask,
+              onCreateJiraTicket: handleCreateJiraTicket,
             })}
           />
         </>

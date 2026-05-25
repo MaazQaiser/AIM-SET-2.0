@@ -200,6 +200,87 @@ class CallsService:
 
         supabase.table("calls").update({"brief_ready": True}).eq("tenant_id", tenant_uuid).eq("id", call_id).execute()
 
+    def get_post_review(self, ctx: TenantContext, call_id: str) -> Optional[Dict[str, Any]]:
+        clerk_key = self._clerk_key(ctx)
+        for alias in call_id_aliases(call_id):
+            cached = get_memory_store().get_post_review(clerk_key, alias)
+            if cached:
+                return cached
+
+        if not get_settings().supabase_configured:
+            return None
+
+        tenant_uuid = self._tenant_uuid(ctx)
+        supabase = get_supabase()
+        for alias in call_id_aliases(call_id):
+            try:
+                result = execute_with_retry(
+                    lambda: (
+                        supabase.table("calls")
+                        .select("metadata")
+                        .eq("tenant_id", tenant_uuid)
+                        .eq("id", alias)
+                        .limit(1)
+                        .execute()
+                    )
+                )
+            except Exception:
+                continue
+            rows = result.data or []
+            if not rows:
+                continue
+            metadata = rows[0].get("metadata") or {}
+            if not isinstance(metadata, dict):
+                continue
+            payload = metadata.get("post_call")
+            if isinstance(payload, dict):
+                get_memory_store().save_post_review(clerk_key, alias, payload)
+                if alias != call_id:
+                    get_memory_store().save_post_review(clerk_key, call_id, payload)
+                return payload
+        return None
+
+    def save_post_review(self, ctx: TenantContext, call_id: str, payload: Dict[str, Any]) -> None:
+        clerk_key = self._clerk_key(ctx)
+        get_memory_store().save_post_review(clerk_key, call_id, payload)
+
+        if not get_settings().supabase_configured:
+            call = self.get_call(ctx, call_id)
+            if call:
+                meta = call.get("metadata") or {}
+                if not isinstance(meta, dict):
+                    meta = {}
+                meta["post_call"] = payload
+                call["metadata"] = meta
+                call["status"] = "completed"
+                get_memory_store().upsert_calls(clerk_key, [call])
+            return
+
+        tenant_uuid = self._tenant_uuid(ctx)
+        supabase = get_supabase()
+        meta: Dict[str, Any] = {}
+        try:
+            result = execute_with_retry(
+                lambda: (
+                    supabase.table("calls")
+                    .select("metadata")
+                    .eq("tenant_id", tenant_uuid)
+                    .eq("id", call_id)
+                    .limit(1)
+                    .execute()
+                )
+            )
+            rows = result.data or []
+            if rows and isinstance(rows[0].get("metadata"), dict):
+                meta = rows[0]["metadata"]
+        except Exception:
+            call = self.get_call(ctx, call_id)
+            meta = (call or {}).get("metadata") or {}
+        if not isinstance(meta, dict):
+            meta = {}
+        meta["post_call"] = payload
+        supabase.table("calls").update({"metadata": meta, "status": "completed"}).eq("tenant_id", tenant_uuid).eq("id", call_id).execute()
+
     def save_live_signals(self, ctx: TenantContext, call_id: str, snapshot: Dict[str, Any]) -> None:
         clerk_key = self._clerk_key(ctx)
         if not get_settings().supabase_configured:

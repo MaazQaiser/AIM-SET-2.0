@@ -43,7 +43,7 @@ export function useAiTodos() {
           ? "Approve follow-up email & CRM tasks"
           : `Approve ${pendingCrm.length} CRM task${pendingCrm.length > 1 ? "s" : ""}`,
         subtitle: `${pendingCrm.length} item${pendingCrm.length > 1 ? "s" : ""} · Post-call · awaiting sign-off`,
-        agent: "content",
+        agent: "post_dc",
         priority: "high",
         href: "/calls/call-001?tab=post-dc",
       });

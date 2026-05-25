@@ -6,6 +6,7 @@ export const PROJECT_AGENT_IDS: AgentId[] = [
   "discovery-checklist",
   "content",
   "workflow",
+  "post_dc",
   "content_generation",
 ];
 
@@ -14,6 +15,7 @@ export const AGENT_LABELS: Record<AgentId, string> = {
   "discovery-checklist": "Discovery Checklist Tracker",
   content: "Content Agent",
   workflow: "PRE-DC Workflow",
+  post_dc: "Post-DC Agent",
   content_generation: "Content Generation Agent",
 };
 
@@ -61,6 +63,13 @@ export const AGENT_META: Record<
       "On each Pre-DC CSV row, run PRE-DC Workflow to generate the executive summary, plan DC artifacts, and fulfill them from the KB — shown on the Pre-call brief.",
     operations: ["workflow_pipeline"],
   },
+  post_dc: {
+    display_name: "Post-DC Agent",
+    description: "Post-call review pipeline for summaries, follow-up email drafts, CRM tasks, and coaching scorecards.",
+    purpose:
+      "Eliminate post-call admin by turning transcript, live signals, and discovery coverage into review artifacts that stay pending AE approval.",
+    operations: ["review_produced"],
+  },
   content_generation: {
     display_name: "Content Generation Agent",
     description: "Chat-driven studio for decks, one-pagers, and images (HTML preview + export).",
@@ -79,6 +88,7 @@ export const DEFAULT_COST_CAPS: Record<
   "discovery-checklist": { per_run_usd: 0.02, abort_strategy: "degrade" },
   content: { per_run_usd: 0.05, abort_strategy: "degrade" },
   workflow: { per_run_usd: 0.05, abort_strategy: "degrade" },
+  post_dc: { per_run_usd: 0.05, abort_strategy: "degrade" },
   content_generation: { per_run_usd: 0.05, project_usd: 1.5, abort_strategy: "hard_stop" },
 };
 
@@ -102,6 +112,12 @@ const DEFAULT_MODEL_POLICY: Record<AgentId, ModelPolicy> = {
     fallback_model_name: "claude-sonnet-4-6",
   },
   workflow: {
+    primary: "opus",
+    fallback: "sonnet",
+    model_name: "claude-opus-4-7",
+    fallback_model_name: "claude-sonnet-4-6",
+  },
+  post_dc: {
     primary: "opus",
     fallback: "sonnet",
     model_name: "claude-opus-4-7",

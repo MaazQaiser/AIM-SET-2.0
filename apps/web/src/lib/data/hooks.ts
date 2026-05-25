@@ -12,7 +12,7 @@ import type {
   KBAsset,
   QuarterlyPattern,
 } from "@/types";
-import type { CallBrief, } from "@/lib/brief-types";
+import type { CallBrief, PostCallJiraTicket, PostCallPipelineResult } from "@/lib/brief-types";
 import {
   FRANCHISE_DEMO_CALL_ID,
   franchiseDemoPostReview,
@@ -85,6 +85,7 @@ function mergeCallBrief(local: CallBrief, api: CallBrief): CallBrief {
     relevantProjects: api.relevantProjects?.length
       ? api.relevantProjects
       : local.relevantProjects,
+    recommendedDeck: api.recommendedDeck ?? local.recommendedDeck,
   };
 }
 
@@ -113,7 +114,16 @@ export function usePostCallReview(callId: string) {
   return useQuery({
     queryKey: ["post-call", callId, getImportVersion()],
     queryFn: async () => {
-      const base = resolvePostCallReview(callId);
+      const api = await bffFetch<PostCallPipelineResult>(`/api/calls/${callId}/post-call`);
+      if (api?.review) {
+        useDcImportsStore.getState().setPostCallArtifacts(callId, {
+          review: api.review,
+          emailDraft: api.task?.emailDraft,
+          crmTasks: api.task?.crmTasks,
+          jiraTicket: api.jiraTicket,
+        });
+      }
+      const base = api?.review ?? resolvePostCallReview(callId);
       const snap =
         useDcImportsStore.getState().discoverySnapshotsByCallId[callId] ??
         (callId === FRANCHISE_DEMO_CALL_ID
@@ -148,19 +158,69 @@ export function useRunPostCallPipeline(callId: string) {
     mutationFn: async () => {
       const res = await fetch(`/api/calls/${callId}/post-call`, { method: "POST" });
       if (!res.ok) throw new Error("Post-call pipeline failed");
-      return res.json() as Promise<{
-        discovery?: { result?: { openGaps?: string[]; checklist?: { bantCoverage?: number } } };
-      }>;
+      return res.json() as Promise<PostCallPipelineResult>;
     },
     onSuccess: (data) => {
       const result = data.discovery?.result ?? data.discovery;
       const openGaps = (result as { openGaps?: string[] })?.openGaps ?? [];
       const checklist = (result as { checklist?: { bantCoverage?: number } })?.checklist;
-      useDcImportsStore.getState().setDiscoverySnapshot(callId, {
-        openGaps,
-        bantCoverage: checklist?.bantCoverage,
+      useDcImportsStore.getState().setPostCallArtifacts(callId, {
+        review: data.review,
+        emailDraft: data.task?.emailDraft,
+        crmTasks: data.task?.crmTasks,
+        jiraTicket: data.jiraTicket,
+        discoverySnapshot: {
+          openGaps,
+          bantCoverage: checklist?.bantCoverage ?? (result as { bantCoverage?: number })?.bantCoverage,
+        },
       });
       void queryClient.invalidateQueries({ queryKey: ["post-call", callId] });
+      void queryClient.invalidateQueries({ queryKey: ["post-call-tasks"] });
+    },
+  });
+}
+
+export function useCreateJiraTicket(callId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ticket: PostCallJiraTicket) => {
+      const res = await fetch("/api/integrations/jira/tickets", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(ticket),
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(err?.error ?? "Jira ticket creation failed");
+      }
+      const data = (await res.json()) as {
+        key?: string;
+        url?: string;
+        externalKey?: string;
+        externalUrl?: string;
+      };
+      return { ticket, data };
+    },
+    onSuccess: ({ ticket, data }) => {
+      useDcImportsStore.getState().setPostCallArtifacts(callId, {
+        jiraTicket: {
+          ...ticket,
+          status: "created",
+          externalKey: data.externalKey ?? data.key,
+          externalUrl: data.externalUrl ?? data.url,
+          error: undefined,
+        },
+      });
+      void queryClient.invalidateQueries({ queryKey: ["post-call", callId] });
+    },
+    onError: (error, ticket) => {
+      useDcImportsStore.getState().setPostCallArtifacts(callId, {
+        jiraTicket: {
+          ...ticket,
+          status: "failed",
+          error: error instanceof Error ? error.message : "Jira ticket creation failed",
+        },
+      });
     },
   });
 }
@@ -168,7 +228,8 @@ export function useRunPostCallPipeline(callId: string) {
 export function usePostCallCrmTasks() {
   return useQuery({
     queryKey: ["post-call-tasks", getImportVersion()],
-    queryFn: async () => [] as CrmTask[],
+    queryFn: async () =>
+      Object.values(useDcImportsStore.getState().crmTasksByCallId).flat() as CrmTask[],
     staleTime: REFETCH_MS,
   });
 }

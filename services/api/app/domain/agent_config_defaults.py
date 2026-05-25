@@ -10,6 +10,7 @@ AGENT_IDS: List[str] = [
     "discovery-checklist",
     "content",
     "workflow",
+    "post_dc",
     "content_generation",
 ]
 
@@ -18,6 +19,7 @@ AGENT_LABELS: Dict[str, str] = {
     "discovery-checklist": "Discovery Checklist Tracker",
     "content": "Content Agent",
     "workflow": "PRE-DC Workflow",
+    "post_dc": "Post-DC Agent",
     "content_generation": "Content Generation Agent",
 }
 
@@ -26,6 +28,7 @@ AGENT_DOMAINS: Dict[str, List[str]] = {
     "discovery-checklist": ["live_assist"],
     "content": ["content_generation"],
     "workflow": ["content_generation"],
+    "post_dc": ["task_execution", "coaching_insights"],
     "content_generation": ["content_generation"],
 }
 
@@ -35,6 +38,12 @@ WORKFLOW_PROMPT_FILES: Dict[str, str] = {
     "summary": "workflow/summary/v1.0.0.md",
     "artifact_plan": "workflow/artifact_plan/v1.0.0.md",
     "artifact_fulfill": "workflow/artifact_fulfill/v1.0.0.md",
+}
+
+POST_DC_PROMPT_FILES: Dict[str, str] = {
+    "summary": "post_dc/summary.txt",
+    "email": "post_dc/email.txt",
+    "coaching": "post_dc/coaching.txt",
 }
 
 
@@ -53,11 +62,16 @@ def _read_prompt_body(rel_path: str) -> str:
 def _default_workflow_prompts() -> Dict[str, str]:
     return {key: _read_prompt_body(rel) for key, rel in WORKFLOW_PROMPT_FILES.items()}
 
+
+def _default_post_dc_prompts() -> Dict[str, str]:
+    return {key: _read_prompt_body(rel) for key, rel in POST_DC_PROMPT_FILES.items()}
+
 AGENT_PROMPT_GLOBS: Dict[str, List[str]] = {
     "live-call": ["live-call/**/*.md", "live-call/intent_detection/**/*.md"],
     "discovery-checklist": ["discovery-checklist/**/*.md"],
     "content": ["content/pre_dc_brief/**/*.md"],
     "workflow": ["workflow/**/*.md", "pre-dc/**/*.md"],
+    "post_dc": ["post_dc/**/*.txt"],
     "content_generation": ["content/studio/**/*.md", "content/template_vision/**/*.md"],
 }
 
@@ -72,6 +86,7 @@ AGENT_OPERATIONS: Dict[str, List[str]] = {
     "discovery-checklist": ["checklist_updated", "discovery_nudge", "session_finalized"],
     "content": ["pre_dc_brief"],
     "workflow": ["workflow_pipeline"],
+    "post_dc": ["review_produced"],
     "content_generation": ["studio_turn", "template_ingest", "export_pdf", "export_png", "export_pptx"],
 }
 
@@ -168,7 +183,7 @@ def _workflow() -> Dict[str, Any]:
 
 
 def _model_policy(agent_id: str) -> Dict[str, Any]:
-    if agent_id in ("content", "content_generation", "workflow"):
+    if agent_id in ("content", "content_generation", "workflow", "post_dc"):
         return {
             "primary": "opus",
             "fallback": "sonnet",
@@ -190,7 +205,7 @@ def _cost_cap(agent_id: str) -> Dict[str, Any]:
             "project_ceiling_usd": 1.5,
             "abort_strategy": "hard_stop",
         }
-    if agent_id in ("content", "workflow"):
+    if agent_id in ("content", "workflow", "post_dc"):
         return {"per_run_ceiling_usd": 0.05, "abort_strategy": "degrade"}
     return {"per_run_ceiling_usd": 0.02, "abort_strategy": "degrade"}
 
@@ -352,6 +367,14 @@ def default_agent_config(agent_id: str) -> Dict[str, Any]:
             },
         ]
 
+    if agent_id == "post_dc":
+        cfg["post_dc_prompts"] = _default_post_dc_prompts()
+        cfg["jira"] = {
+            "project_key": "SALES",
+            "issue_type": "Review",
+            "high_priority_threshold_usd": 250000,
+        }
+
     if agent_id == "live-call":
         cfg["signal_routing"] = [
             {"id": "sr-1", "keyword_pattern": "competitor|alternative|vs\\s|compared to", "signal_type": "competitor_mentioned", "nudge_type": "objection_handler", "target_role": "AE", "enabled": True, "confidence_threshold": 0.75},
@@ -378,6 +401,7 @@ EDITABLE_CONFIG_KEYS = frozenset(
     {
         "system_prompt_override",
         "workflow_prompts",
+        "post_dc_prompts",
         "pre_dc_prompts",
         "summary_highlight_rules",
         "model_policy",
@@ -385,6 +409,7 @@ EDITABLE_CONFIG_KEYS = frozenset(
         "throttle",
         "signal_routing",
         "failure_behaviour",
+        "jira",
     }
 )
 
@@ -400,6 +425,8 @@ def merge_agent_config(agent_id: str, saved: Dict[str, Any] | None) -> Dict[str,
     merged = deep_merge(base, patch)
     if agent_id == "workflow":
         merged = _apply_workflow_config_defaults(merged, base)
+    if agent_id == "post_dc":
+        merged = _apply_post_dc_config_defaults(merged, base)
     merged["agent_id"] = agent_id
     merged["active_prompt_versions"] = discover_prompt_versions(agent_id)
     merged["operations"] = AGENT_OPERATIONS.get(agent_id, [])
@@ -418,4 +445,14 @@ def _apply_workflow_config_defaults(merged: Dict[str, Any], base: Dict[str, Any]
     rules = merged.get("summary_highlight_rules")
     if not isinstance(rules, list) or len(rules) == 0:
         merged["summary_highlight_rules"] = list(base.get("summary_highlight_rules") or [])
+    return merged
+
+
+def _apply_post_dc_config_defaults(merged: Dict[str, Any], base: Dict[str, Any]) -> Dict[str, Any]:
+    base_prompts = base.get("post_dc_prompts") or _default_post_dc_prompts()
+    merged_prompts = dict(merged.get("post_dc_prompts") or {})
+    for key, default_text in base_prompts.items():
+        if not str(merged_prompts.get(key) or "").strip():
+            merged_prompts[key] = default_text
+    merged["post_dc_prompts"] = merged_prompts
     return merged

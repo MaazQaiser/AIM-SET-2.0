@@ -2,7 +2,13 @@
 
 import { create } from "zustand";
 import type { Call } from "@/types";
-import type { CallBrief, PostCallReview } from "@/lib/brief-types";
+import type {
+  CallBrief,
+  PostCallCrmTask,
+  PostCallEmailDraft,
+  PostCallJiraTicket,
+  PostCallReview,
+} from "@/lib/brief-types";
 import { buildCallsFromPreDc } from "@/lib/dc-data/build-calls-from-pre-dc";
 import type { PostDCRecord, PreDCRecord } from "@/types/dc-notes";
 
@@ -12,7 +18,20 @@ interface DcImportsState {
   calls: Call[];
   briefsByCallId: Record<string, CallBrief>;
   postReviewsByCallId: Record<string, PostCallReview>;
+  emailDraftsByCallId: Record<string, PostCallEmailDraft>;
+  crmTasksByCallId: Record<string, PostCallCrmTask[]>;
+  jiraTicketsByCallId: Record<string, PostCallJiraTicket>;
   discoverySnapshotsByCallId: Record<string, { openGaps: string[]; bantCoverage?: number }>;
+  setPostCallArtifacts: (
+    callId: string,
+    artifacts: {
+      review?: PostCallReview;
+      emailDraft?: PostCallEmailDraft;
+      crmTasks?: PostCallCrmTask[];
+      jiraTicket?: PostCallJiraTicket | null;
+      discoverySnapshot?: { openGaps: string[]; bantCoverage?: number };
+    }
+  ) => void;
   setDiscoverySnapshot: (callId: string, snapshot: { openGaps: string[]; bantCoverage?: number }) => void;
   preDcFileName: string | null;
   postDcFileName: string | null;
@@ -28,6 +47,9 @@ const emptyState = {
   calls: [] as Call[],
   briefsByCallId: {} as Record<string, CallBrief>,
   postReviewsByCallId: {} as Record<string, PostCallReview>,
+  emailDraftsByCallId: {} as Record<string, PostCallEmailDraft>,
+  crmTasksByCallId: {} as Record<string, PostCallCrmTask[]>,
+  jiraTicketsByCallId: {} as Record<string, PostCallJiraTicket>,
   discoverySnapshotsByCallId: {} as Record<string, { openGaps: string[]; bantCoverage?: number }>,
   preDcFileName: null as string | null,
   postDcFileName: null as string | null,
@@ -53,6 +75,27 @@ function applyBuilt(
 
 export const useDcImportsStore = create<DcImportsState>()((set, get) => ({
   ...emptyState,
+  setPostCallArtifacts: (callId, artifacts) =>
+    set((s) => ({
+      postReviewsByCallId: artifacts.review
+        ? { ...s.postReviewsByCallId, [callId]: artifacts.review }
+        : s.postReviewsByCallId,
+      emailDraftsByCallId: artifacts.emailDraft
+        ? { ...s.emailDraftsByCallId, [callId]: artifacts.emailDraft }
+        : s.emailDraftsByCallId,
+      crmTasksByCallId: artifacts.crmTasks
+        ? { ...s.crmTasksByCallId, [callId]: artifacts.crmTasks }
+        : s.crmTasksByCallId,
+      jiraTicketsByCallId:
+        artifacts.jiraTicket === undefined
+          ? s.jiraTicketsByCallId
+          : artifacts.jiraTicket
+            ? { ...s.jiraTicketsByCallId, [callId]: artifacts.jiraTicket }
+            : Object.fromEntries(Object.entries(s.jiraTicketsByCallId).filter(([id]) => id !== callId)),
+      discoverySnapshotsByCallId: artifacts.discoverySnapshot
+        ? { ...s.discoverySnapshotsByCallId, [callId]: artifacts.discoverySnapshot }
+        : s.discoverySnapshotsByCallId,
+    })),
   setDiscoverySnapshot: (callId, snapshot) =>
     set((s) => ({
       discoverySnapshotsByCallId: { ...s.discoverySnapshotsByCallId, [callId]: snapshot },

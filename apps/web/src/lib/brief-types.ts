@@ -2,6 +2,13 @@
 export type {
   CallBrief,
   PostCallReview,
+  PostCallEmailDraft,
+  PostCallEmailAttachments,
+  PostCallEmailAttachmentFound,
+  PostCallEmailAttachmentMissing,
+  PostCallCrmTask,
+  PostCallJiraTicket,
+  PostCallPipelineResult,
   BriefResearchSection,
   PostDcBriefPreview,
   HypothesizedPain,

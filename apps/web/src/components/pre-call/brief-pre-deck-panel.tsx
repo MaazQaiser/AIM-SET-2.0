@@ -51,6 +51,11 @@ export function BriefPreDeckPanel({ deck }: BriefPreDeckPanelProps) {
       <BriefDetailCard
         title="Pre-call deck"
         icon={Presentation}
+        sourceInfo={{
+          source: "AI assembly + KB snippets",
+          detail:
+            "This preview deck is assembled from the lead research, planned talking points, and any KB proof points found for the account. It is a prep preview, not a final customer deck.",
+        }}
         headerExtra={
           <Badge
             variant="outline"

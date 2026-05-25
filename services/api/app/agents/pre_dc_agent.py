@@ -313,6 +313,26 @@ def _content_to_generate(
     return output
 
 
+def _is_presentation_document(doc: Dict[str, Any]) -> bool:
+    fmt = str(doc.get("format") or "").lower()
+    file_name = str(doc.get("fileName") or doc.get("file_name") or "").lower()
+    mime = str(doc.get("mimeType") or doc.get("mime_type") or "").lower()
+    return (
+        fmt in ("ppt", "pptx")
+        or file_name.endswith((".ppt", ".pptx"))
+        or "presentation" in mime
+        or "powerpoint" in mime
+    )
+
+
+def _select_recommended_deck(relevant: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    documents = relevant.get("relevantDocuments") or []
+    for doc in documents:
+        if isinstance(doc, dict) and _is_presentation_document(doc):
+            return doc
+    return None
+
+
 def run_pre_dc_pipeline(
     ctx: TenantContext,
     call_id: str,
@@ -442,6 +462,20 @@ def run_pre_dc_pipeline(
             icp_match = 0.62
 
     relevant = build_relevant_content(ctx, account_name, research)
+    recommended_deck = _select_recommended_deck(relevant)
+    recommended_deck_slides = (
+        [
+            {
+                "id": recommended_deck.get("assetId", "recommended-deck"),
+                "title": recommended_deck.get("title", "Recommended deck"),
+                "usedInCalls": 0,
+                "progressedIn": 0,
+                "included": True,
+            }
+        ]
+        if recommended_deck
+        else []
+    )
 
     result: Dict[str, Any] = {
         "callId": call_id,
@@ -457,10 +491,7 @@ def run_pre_dc_pipeline(
         "discovery_questions": [
             f"What does success look like for {account_name} in the next 90 days?",
         ],
-        "deckSlides": [
-            {"id": h.get("asset_id", "kb1"), "title": "KB asset", "included": True}
-            for h in hits[:2]
-        ],
+        "deckSlides": recommended_deck_slides,
         "clientAttendees": [],
         "interactionHistory": [],
         "podNotes": [],
@@ -470,6 +501,7 @@ def run_pre_dc_pipeline(
         "contentToGenerate": content_to_generate,
         "relevantDocuments": relevant.get("relevantDocuments") or [],
         "relevantProjects": relevant.get("relevantProjects") or [],
+        "recommendedDeck": recommended_deck,
         "agentStatus": "success",
     }
 

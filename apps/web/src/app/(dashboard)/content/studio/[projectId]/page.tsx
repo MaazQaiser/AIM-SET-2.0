@@ -2,7 +2,7 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, Download, Sparkles } from "lucide-react";
+import { ChevronLeft, Download, Plus, Sparkles } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import { StudioChat } from "@/components/content/studio-chat";
@@ -28,6 +28,12 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
 
   const latestHtml = previewHtml ?? data?.latestRevision?.html;
   const revisionId = data?.latestRevision?.id;
+  const artifactLabel =
+    project?.artifactType === "one_pager"
+      ? "one-pager"
+      : project?.artifactType === "image"
+        ? "image"
+        : "deck";
 
   function onTurn(result: StudioTurnResult) {
     if (result.html) setPreviewHtml(result.html);
@@ -50,8 +56,7 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
 
   async function handleGenerateSlides() {
     const envelope = await generateMut.mutateAsync({
-      message:
-        "Generate the slides now using gathered requirements and sensible defaults for any missing details. Do not ask follow-up questions unless generation is impossible.",
+      message: `Generate the ${artifactLabel} now using gathered requirements and sensible defaults for any missing details. Do not ask follow-up questions unless generation is impossible.`,
       templateId: selectedTemplateId ?? project?.templateId ?? undefined,
       generate: true,
     });
@@ -90,7 +95,7 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
             onClick={() => void handleGenerateSlides()}
           >
             <Sparkles className="h-3 w-3 mr-1" />
-            {generateMut.isPending ? "Generating..." : "Generate slides"}
+            {generateMut.isPending ? "Generating..." : `Generate ${artifactLabel}`}
           </Button>
           <Button
             size="sm"
@@ -135,7 +140,15 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
         <div className="lg:col-span-3 space-y-4 overflow-y-auto">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Templates</CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-sm">Templates</CardTitle>
+                <Button size="sm" variant="ghost" asChild>
+                  <Link href="/content/templates/new">
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    New
+                  </Link>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <TemplatePicker

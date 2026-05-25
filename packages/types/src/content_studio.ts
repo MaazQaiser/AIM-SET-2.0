@@ -22,6 +22,22 @@ export interface ContentTemplate {
   html?: string;
 }
 
+export interface ContentTemplateDraft {
+  name: string;
+  artifactType: StudioArtifactType;
+  tags: string[];
+  html: string;
+  css: string;
+}
+
+export interface TemplateAssistResult {
+  html: string;
+  css: string;
+  message: string;
+  model?: string;
+  costUsd?: number;
+}
+
 export interface StudioProject {
   id: string;
   title: string;
@@ -61,6 +77,12 @@ export interface StudioTurnResult {
   project_id: string;
   turn_type: StudioTurnType;
   ask?: string[];
+  slide_outline?: Array<{
+    slide: number;
+    heading: string;
+    body: string;
+    visual?: string;
+  }>;
   recommended_templates?: Array<{ template_id: string; rationale: string }>;
   revision_id?: string;
   html?: string;
