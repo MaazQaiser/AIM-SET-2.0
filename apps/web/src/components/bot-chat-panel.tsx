@@ -771,7 +771,7 @@ export function BotChatPanel({
                     {msg.citations && msg.citations.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {msg.citations.map((c, i) => (
-                          <CitationMarker key={c.id ?? i} index={i + 1} citation={c} />
+                          <CitationMarker key={`${c.id ?? "citation"}-${i}`} index={i + 1} citation={c} />
                         ))}
                       </div>
                     )}

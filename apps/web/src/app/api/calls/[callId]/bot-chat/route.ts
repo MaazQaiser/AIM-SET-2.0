@@ -63,7 +63,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     content: data.content ?? "",
     message_id: messageId,
     citations: (data.citations ?? []).map((c, i) => ({
-      id: c.id ?? `cite-${i}`,
+      id: `${c.id ?? "cite"}-${i}`,
       title: c.title ?? "Source",
       type: c.type ?? "transcript",
       excerpt: c.excerpt,
