@@ -14,8 +14,26 @@ class _FakeContentStudioRepo:
             "id": "project-1",
             "title": "Surgical Center Growth Deck",
             "artifactType": "deck",
+            "templateId": "template-1",
             "brief": {},
             "costUsd": 0,
+        }
+        self.template: Dict[str, Any] = {
+            "id": "template-1",
+            "name": "Premium Blue Deck",
+            "artifactType": "deck",
+            "cssVariables": {
+                "--accent": "#ff00aa",
+                "--surface": "#101827",
+                "--text": "#f8fafc",
+                "--muted": "#cbd5e1",
+            },
+            "html": (
+                "<!DOCTYPE html><html><head><style>"
+                ":root { --accent: #ff00aa; --surface: #101827; --text: #f8fafc; --muted: #cbd5e1; }"
+                ".slide { border: 4px solid var(--accent); }"
+                "</style></head><body></body></html>"
+            ),
         }
         self.revisions: List[Dict[str, Any]] = []
 
@@ -37,7 +55,7 @@ class _FakeContentStudioRepo:
         return []
 
     def get_template(self, _ctx: TenantContext, template_id: str) -> Optional[Dict[str, Any]]:
-        return None
+        return dict(self.template) if template_id == self.template["id"] else None
 
     def list_kb_asset_ids(self, _ctx: TenantContext) -> Set[str]:
         return set()
@@ -141,9 +159,11 @@ def test_studio_turn_collects_basics_then_slide_count_and_outline(monkeypatch):
     assert generated.operation == "html_generate"
     assert generated.result["turn_type"] == "html"
     assert generated.result["revision_id"] == "revision-1"
-    assert generated.result["html"].count('class="slide dc-slide"') == 5
+    assert generated.result["html"].count('class="slide dc-slide template-root"') == 5
     assert "Intake bottlenecks" in generated.result["html"]
     assert "Show staff time lost to slow patient intake" in generated.result["html"]
+    assert "#ff00aa" in generated.result["html"]
+    assert generated.result["template_id"] == "template-1"
     assert len(repo.revisions) == 1
     assert "What are the 3 key points" not in str(generated.result)
 

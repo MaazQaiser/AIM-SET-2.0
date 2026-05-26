@@ -270,9 +270,11 @@ def run_studio_turn(
 
     if str(project.get("artifactType") or "deck") == "deck":
         tpl_id = template_id or project.get("templateId")
+        chosen_template = repo.get_template(ctx, tpl_id) if tpl_id else None
         full_html = _build_slide_preview_html(
             title=str(project.get("title") or "Generated Deck"),
             brief=brief,
+            template=chosen_template,
         )
         _, violations = sanitize_html(full_html)
         if violations:
@@ -344,6 +346,7 @@ def run_studio_turn(
     tpl_id = template_id or project.get("templateId")
     if tpl_id:
         chosen_template = repo.get_template(ctx, tpl_id)
+    template_context = _template_context(chosen_template)
 
     system = runtime["system_prompt"]
     user_payload = (
@@ -352,6 +355,7 @@ def run_studio_turn(
         f"Brief: {json.dumps(brief)}\n"
         f"Template selected: {tpl_id or 'none'}\n"
         f"Template CSS variables: {(chosen_template or {}).get('cssVariables', {})}\n"
+        f"Template HTML/CSS context: {template_context}\n"
         f"Available templates: {json.dumps([{'id': t['id'], 'name': t['name'], 'type': t['artifactType']} for t in templates[:20]])}\n"
         f"KB hits: {hits[:5]}\n"
         f"Chat history:\n" + "\n".join(history_lines) + "\n"
@@ -580,6 +584,14 @@ def run_studio_turn(
 
 
 def _wrap_html(body: str, template: Optional[Dict[str, Any]]) -> str:
+    template_style = _extract_template_style(template)
+    return (
+        "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
+        f"<style>{template_style}</style></head><body>{body}</body></html>"
+    )
+
+
+def _extract_template_style(template: Optional[Dict[str, Any]]) -> str:
     vars_css = ""
     if template and template.get("cssVariables"):
         vars_lines = [f"  {k}: {v};" for k, v in template["cssVariables"].items()]
@@ -590,10 +602,26 @@ def _wrap_html(body: str, template: Optional[Dict[str, Any]]) -> str:
         m = re.search(r"<style[^>]*>(.*?)</style>", tpl_html, re.DOTALL | re.IGNORECASE)
         if m:
             base_style = m.group(1)
-    return (
-        "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
-        f"<style>{vars_css}{base_style}</style></head><body>{body}</body></html>"
-    )
+    return f"{vars_css}{base_style}".strip()
+
+
+def _template_context(template: Optional[Dict[str, Any]]) -> str:
+    if not template:
+        return "none"
+    tpl_html = str(template.get("html") or "")
+    body = re.sub(r"<style[^>]*>.*?</style>", "", tpl_html, flags=re.DOTALL | re.IGNORECASE)
+    body_match = re.search(r"<body[^>]*>(.*?)</body>", body, flags=re.DOTALL | re.IGNORECASE)
+    if body_match:
+        body = body_match.group(1)
+    context = {
+        "id": template.get("id"),
+        "name": template.get("name"),
+        "artifact_type": template.get("artifactType"),
+        "css_variables": template.get("cssVariables") or {},
+        "css_excerpt": _extract_template_style(template)[:5000],
+        "html_excerpt": body.strip()[:4000],
+    }
+    return json.dumps(context)
 
 
 def _apply_patch(html: str, patch: Dict[str, Any]) -> str:
@@ -1000,7 +1028,11 @@ def _slide_number_from_text(text: str) -> Optional[int]:
     return int(m.group(1))
 
 
-def _build_slide_preview_html(title: str, brief: Dict[str, Any]) -> str:
+def _build_slide_preview_html(
+    title: str,
+    brief: Dict[str, Any],
+    template: Optional[Dict[str, Any]] = None,
+) -> str:
     outline = brief.get("slide_outline")
     if not isinstance(outline, list) or not outline:
         outline = _build_slide_outline(title=title, brief=brief)
@@ -1021,7 +1053,7 @@ def _build_slide_preview_html(title: str, brief: Dict[str, Any]) -> str:
         )
         slides.append(
             f"""
-            <section class="slide dc-slide" data-slide="{slide_num}">
+            <section class="slide dc-slide template-root" data-slide="{slide_num}">
               <div class="slide-kicker">Slide {slide_num:02d}</div>
               <{title_tag}>{heading}</{title_tag}>
               <p>{body}</p>
@@ -1033,15 +1065,18 @@ def _build_slide_preview_html(title: str, brief: Dict[str, Any]) -> str:
     if not slides:
         return _build_fallback_html(title, "deck", brief)
 
+    template_style = _extract_template_style(template)
+
     return f"""
     <html>
       <head>
         <style>
+          {template_style}
           html, body {{
             margin: 0;
             min-height: 100%;
-            background: #e8eef7;
-            color: #0f172a;
+            background: var(--bg, #e8eef7);
+            color: var(--text, #0f172a);
             font-family: Arial, sans-serif;
           }}
           body {{
@@ -1058,18 +1093,18 @@ def _build_slide_preview_html(title: str, brief: Dict[str, Any]) -> str:
             box-sizing: border-box;
             margin: 0 auto;
             padding: 56px;
-            border: 1px solid #d7dfeb;
-            border-radius: 18px;
-            background: #ffffff;
+            border: 1px solid var(--border, #d7dfeb);
+            border-radius: 8px;
+            background: var(--surface, #ffffff);
             box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14);
             overflow: hidden;
           }}
           .dc-slide:nth-child(even) {{
-            background: #f8fafc;
+            background: color-mix(in srgb, var(--surface, #ffffff) 94%, var(--accent, #2563eb));
           }}
           .slide-kicker {{
             margin-bottom: 18px;
-            color: #2563eb;
+            color: var(--accent, #2563eb);
             font-size: 15px;
             font-weight: 700;
             letter-spacing: 0;
@@ -1078,7 +1113,7 @@ def _build_slide_preview_html(title: str, brief: Dict[str, Any]) -> str:
           h1, h2 {{
             margin: 0;
             max-width: 900px;
-            color: #111827;
+            color: var(--text, #111827);
             font-weight: 800;
             letter-spacing: 0;
           }}
@@ -1093,7 +1128,7 @@ def _build_slide_preview_html(title: str, brief: Dict[str, Any]) -> str:
           p {{
             margin: 24px 0 0;
             max-width: 820px;
-            color: #334155;
+            color: var(--muted, #334155);
             font-size: 25px;
             line-height: 1.38;
           }}
@@ -1103,16 +1138,16 @@ def _build_slide_preview_html(title: str, brief: Dict[str, Any]) -> str:
             align-items: center;
             margin-top: 34px;
             max-width: 760px;
-            border-left: 5px solid #2563eb;
-            border-radius: 10px;
-            background: #eff6ff;
+            border-left: 5px solid var(--accent, #2563eb);
+            border-radius: 8px;
+            background: color-mix(in srgb, var(--surface, #ffffff) 85%, var(--accent, #2563eb));
             padding: 16px 18px;
-            color: #1e3a8a;
+            color: var(--text, #1e3a8a);
             font-size: 19px;
             line-height: 1.35;
           }}
           .visual strong {{
-            color: #1d4ed8;
+            color: var(--accent, #1d4ed8);
             white-space: nowrap;
           }}
           @media (max-width: 760px) {{

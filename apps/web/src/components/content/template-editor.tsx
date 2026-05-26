@@ -42,6 +42,12 @@ type ChatMessage = {
   content: string;
 };
 
+const TEMPLATE_AGENT_PROMPTS = [
+  "Generate a polished executive deck template with a clean blue accent",
+  "Create a dark one-pager template with strong section hierarchy",
+  "Redesign this template with a white background, tighter spacing, and premium typography",
+] as const;
+
 interface TemplateEditorProps {
   templateId?: string;
 }
@@ -66,7 +72,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
     {
       role: "assistant",
       content:
-        "Tell me what to change in the template style or structure. I will update the HTML and CSS draft here.",
+        "Tell me to generate a full template or change the current style. I will update the HTML and CSS draft here.",
     },
   ]);
 
@@ -317,10 +323,25 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
                 void handleAssist();
               }}
             >
+              <div className="flex flex-wrap gap-1">
+                {TEMPLATE_AGENT_PROMPTS.map((prompt) => (
+                  <Button
+                    key={prompt}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-auto whitespace-normal px-2 py-1 text-left text-[11px]"
+                    onClick={() => setInstruction(prompt)}
+                    disabled={assist.isPending}
+                  >
+                    {prompt}
+                  </Button>
+                ))}
+              </div>
               <Textarea
                 value={instruction}
                 onChange={(event) => setInstruction(event.target.value)}
-                placeholder="Make the background navy and cards white"
+                placeholder="Generate a polished dark executive deck template"
                 className="min-h-[92px] resize-none"
                 disabled={assist.isPending}
               />
@@ -334,7 +355,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
                 ) : (
                   <Send className="mr-1 h-4 w-4" />
                 )}
-                Update draft
+                Generate / update draft
               </Button>
             </form>
           </CardContent>

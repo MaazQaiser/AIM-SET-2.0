@@ -88,7 +88,10 @@ def assist_template_edit(
         "Return JSON only with keys html, css, and message. "
         "html must be body markup only, not a full document. css must be plain CSS only. "
         "Do not include scripts, event handlers, iframes, external URLs, @import, or markdown fences. "
-        "Preserve useful existing structure and class names unless the instruction asks to change them."
+        "Preserve useful existing structure and class names unless the instruction asks to change them. "
+        "If the user asks to generate, create, build, redesign, or start over, you may replace the full template. "
+        "Use polished production styling: CSS variables, clear hierarchy, 8px or smaller radii, balanced spacing, "
+        "good contrast, and a complete deck/one-pager/image layout appropriate to artifact_type."
     )
     user = json.dumps(
         {
@@ -110,7 +113,10 @@ def assist_template_edit(
     )
     data = _parse_json_object(completion.text)
     if not data:
-        data = _fallback_template_edit(current_html, current_css, clean_instruction)
+        if _is_generation_request(clean_instruction):
+            data = _fallback_template_generate(artifact_type, clean_instruction)
+        else:
+            data = _fallback_template_edit(current_html, current_css, clean_instruction)
 
     next_html, css_from_html = split_template_parts(str(data.get("html") or current_html))
     next_css = _normalize_css(str(data.get("css") or current_css or css_from_html))
@@ -207,6 +213,81 @@ def _fallback_template_edit(html: str, css: str, instruction: str) -> Dict[str, 
         "css": next_css,
         "message": "Updated the CSS draft locally. Add an Anthropic API key for richer Sonnet edits.",
     }
+
+
+def _fallback_template_generate(artifact_type: str, instruction: str) -> Dict[str, str]:
+    color = _extract_color(instruction) or "#2563eb"
+    dark = any(word in instruction.lower() for word in ("dark", "navy", "black", "midnight"))
+    if artifact_type == "one_pager":
+        html = (
+            '<article class="template-root one-pager">'
+            '<header class="hero"><div class="eyebrow">One pager</div><h1>Executive brief template</h1>'
+            "<p>Frame the buyer problem, recommendation, and business impact in a concise narrative.</p></header>"
+            '<section class="summary-grid">'
+            '<div><h2>Problem</h2><p>Describe the operational friction and why it matters now.</p></div>'
+            '<div><h2>Approach</h2><p>Show the recommended path, proof, and buyer-specific fit.</p></div>'
+            '<div><h2>Outcome</h2><p>Connect the solution to measurable business value.</p></div>'
+            "</section>"
+            '<section class="proof-band"><h2>Proof points</h2><ul><li>Customer evidence</li><li>Business metric</li><li>Next decision</li></ul></section>'
+            "</article>"
+        )
+    elif artifact_type == "image":
+        html = (
+            '<figure class="template-root image-card">'
+            '<div class="eyebrow">Campaign visual</div><h1>Bold message goes here</h1>'
+            "<figcaption>Use this composition for a single high-impact image or social tile.</figcaption>"
+            "</figure>"
+        )
+    else:
+        html = (
+            '<section class="slide template-root cover-slide" data-slide="1">'
+            '<div class="eyebrow">Sales narrative</div><h1>Executive deck template</h1>'
+            "<p>Set context, urgency, and the decision this deck should drive.</p>"
+            '<div class="metric-row"><div><strong>01</strong><span>Problem</span></div><div><strong>02</strong><span>Approach</span></div><div><strong>03</strong><span>Outcome</span></div></div>'
+            "</section>"
+            '<section class="slide template-root content-slide" data-slide="2">'
+            "<h2>Problem and impact</h2><p>Explain the current-state friction and business cost.</p>"
+            '<div class="two-col"><article><h3>Current state</h3><p>Manual work, delays, risk, or missed revenue.</p></article><article><h3>Future state</h3><p>Clear path to a measurable improvement.</p></article></div>'
+            "</section>"
+            '<section class="slide template-root closing-slide" data-slide="3">'
+            "<h2>Recommended next steps</h2><ol><li>Confirm priority use case</li><li>Align stakeholders</li><li>Approve next action</li></ol>"
+            "</section>"
+        )
+
+    background = "#0f172a" if dark else "#f8fafc"
+    surface = "#111827" if dark else "#ffffff"
+    text = "#f8fafc" if dark else "#0f172a"
+    muted = "#cbd5e1" if dark else "#64748b"
+    border = "rgba(255,255,255,0.16)" if dark else "#e2e8f0"
+    css = (
+        f":root {{ --bg: {background}; --surface: {surface}; --text: {text}; --muted: {muted}; --accent: {color}; --border: {border}; }}\n"
+        "body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, Arial, sans-serif; }\n"
+        ".template-root { box-sizing: border-box; background: var(--surface); color: var(--text); }\n"
+        ".slide { width: 1280px; min-height: 720px; margin: 0 auto; padding: 58px; aspect-ratio: 16 / 9; overflow: hidden; }\n"
+        ".eyebrow { color: var(--accent); font-size: 14px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }\n"
+        "h1 { max-width: 820px; margin: 20px 0 18px; font-size: 62px; line-height: 1.02; }\n"
+        "h2 { margin: 0 0 18px; font-size: 44px; line-height: 1.08; }\n"
+        "h3 { margin: 0 0 8px; font-size: 22px; }\n"
+        "p, li, figcaption { color: var(--muted); font-size: 22px; line-height: 1.42; }\n"
+        ".metric-row, .summary-grid, .two-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 42px; }\n"
+        ".two-col { grid-template-columns: repeat(2, 1fr); }\n"
+        ".metric-row div, .summary-grid div, article { border: 1px solid var(--border); border-radius: 8px; padding: 22px; background: color-mix(in srgb, var(--surface) 88%, var(--accent)); }\n"
+        ".metric-row strong { display: block; color: var(--accent); font-size: 30px; }\n"
+        ".metric-row span { color: var(--muted); font-size: 16px; }\n"
+        ".one-pager { max-width: 980px; margin: 0 auto; padding: 56px; min-height: 1180px; }\n"
+        ".hero { border-bottom: 1px solid var(--border); padding-bottom: 34px; }\n"
+        ".proof-band { margin-top: 34px; border: 1px solid var(--border); border-radius: 8px; padding: 26px; }\n"
+        ".image-card { width: 1080px; height: 1080px; margin: 0 auto; padding: 78px; display: flex; flex-direction: column; justify-content: center; }\n"
+    )
+    return {
+        "html": html,
+        "css": css,
+        "message": "Generated a polished starter template locally. Add an Anthropic API key for richer Sonnet generation.",
+    }
+
+
+def _is_generation_request(text: str) -> bool:
+    return bool(re.search(r"\b(generate|create|build|design|redesign|start over|from scratch)\b", text, re.IGNORECASE))
 
 
 def _extract_color(text: str) -> str | None:

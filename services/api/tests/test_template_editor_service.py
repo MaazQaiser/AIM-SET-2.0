@@ -66,3 +66,23 @@ def test_assist_template_edit_fallback_updates_css_without_api_key(monkeypatch) 
     assert "#1e3a8a" in result["css"]
     assert "box-shadow" in result["css"]
     assert result["model"] == "fallback-local"
+
+
+def test_assist_template_edit_fallback_can_generate_polished_template(monkeypatch) -> None:
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    get_settings.cache_clear()
+    ctx = TenantContext(tenant_id="tenant-template-editor", user_id="user-template-editor")
+
+    result = assist_template_edit(
+        ctx,
+        name="Generated Template",
+        artifact_type="deck",
+        html="",
+        css="",
+        instruction="Generate a polished dark executive deck template with a purple accent",
+    )
+
+    assert 'class="slide template-root cover-slide"' in result["html"]
+    assert "--accent: #7c3aed" in result["css"]
+    assert "--bg: #0f172a" in result["css"]
+    validate_template_html(result["html"], result["css"])
