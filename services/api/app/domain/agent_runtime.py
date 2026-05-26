@@ -45,7 +45,7 @@ def get_live_call_runtime(ctx: TenantContext) -> Dict[str, Any]:
         prompt_path = "live-call/v1.0.0.md"
     return {
         "model_name": model_policy.get("model_name") or "claude-3-haiku-20240307",
-        "fallback_model_name": model_policy.get("fallback_model_name") or "claude-sonnet-4-6",
+        "fallback_model_name": model_policy.get("fallback_model_name") or "claude-sonnet-4-20250514",
         "system_prompt": override or load_prompt_file(prompt_path),
         "prompt_path": prompt_path,
         "config": cfg,
@@ -60,8 +60,8 @@ def get_content_generation_runtime(ctx: TenantContext) -> Dict[str, Any]:
     prompt_path = resolve_prompt_path(cfg)
 
     return {
-        "model_name": model_policy.get("model_name") or "claude-opus-4-7",
-        "fallback_model_name": model_policy.get("fallback_model_name") or "claude-sonnet-4-6",
+        "model_name": model_policy.get("model_name") or "claude-opus-4-1-20250805",
+        "fallback_model_name": model_policy.get("fallback_model_name") or "claude-sonnet-4-20250514",
         "per_run_ceiling_usd": float(cost_cap.get("per_run_ceiling_usd") or 0.05),
         "project_ceiling_usd": float(cost_cap.get("project_ceiling_usd") or 1.5),
         "abort_strategy": cost_cap.get("abort_strategy") or "hard_stop",

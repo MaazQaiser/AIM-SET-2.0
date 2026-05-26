@@ -127,7 +127,7 @@ def _invoke_llm_json(
         system=system,
         user=user,
         model=runtime.get("model_name") or "claude-3-haiku-20240307",
-        fallback_model=runtime.get("fallback_model_name") or "claude-sonnet-4-6",
+        fallback_model=runtime.get("fallback_model_name") or "claude-sonnet-4-20250514",
         max_tokens=512,
     )
     parsed = _parse_json_block(completion.text)

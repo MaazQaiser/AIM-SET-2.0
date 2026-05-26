@@ -187,14 +187,14 @@ def _model_policy(agent_id: str) -> Dict[str, Any]:
         return {
             "primary": "opus",
             "fallback": "sonnet",
-            "model_name": "claude-opus-4-7",
-            "fallback_model_name": "claude-sonnet-4-6",
+            "model_name": "claude-opus-4-1-20250805",
+            "fallback_model_name": "claude-sonnet-4-20250514",
         }
     return {
         "primary": "haiku",
         "fallback": "sonnet",
         "model_name": "claude-3-haiku-20240307",
-        "fallback_model_name": "claude-sonnet-4-6",
+        "fallback_model_name": "claude-sonnet-4-20250514",
     }
 
 

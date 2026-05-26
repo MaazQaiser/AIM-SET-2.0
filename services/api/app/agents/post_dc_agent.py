@@ -646,8 +646,8 @@ def run_post_dc_pipeline(
     settings = get_settings()
     cfg = get_agent_config_repository().get_config(ctx, "post_dc")
     model_policy = cfg.get("model_policy") or {}
-    model = model_policy.get("model_name") or "claude-sonnet-4-6"
-    fallback = model_policy.get("fallback_model_name") or "claude-sonnet-4-6"
+    model = model_policy.get("model_name") or "claude-sonnet-4-20250514"
+    fallback = model_policy.get("fallback_model_name") or "claude-sonnet-4-20250514"
     llm = LlmClient(api_key=settings.anthropic_api_key or None)
 
     account_name = _account_name(call, pre_dc_fields, call_id)

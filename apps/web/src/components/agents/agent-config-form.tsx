@@ -28,8 +28,8 @@ interface AgentConfigFormProps {
 
 const MODEL_OPTIONS: { tier: ModelTier; model: string; label: string }[] = [
   { tier: "haiku", model: "claude-3-haiku-20240307", label: "Claude 3 Haiku (fast, cheap)" },
-  { tier: "sonnet", model: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (balanced)" },
-  { tier: "opus", model: "claude-opus-4-7", label: "Claude Opus 4.7 (highest quality)" },
+  { tier: "sonnet", model: "claude-sonnet-4-20250514", label: "Claude Sonnet 4 (balanced)" },
+  { tier: "opus", model: "claude-opus-4-1-20250805", label: "Claude Opus 4.1 (highest quality)" },
   { tier: "opus", model: "claude-3-opus-20240229", label: "Claude 3 Opus (legacy)" },
 ];
 

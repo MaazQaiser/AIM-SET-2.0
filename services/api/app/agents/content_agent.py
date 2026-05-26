@@ -67,8 +67,8 @@ def generate_pre_dc_brief(
     completion = LlmClient(api_key=settings.anthropic_api_key or None).complete(
         system=system,
         user=user,
-        model=model_policy.get("model_name") or "claude-opus-4-7",
-        fallback_model=model_policy.get("fallback_model_name") or "claude-sonnet-4-6",
+        model=model_policy.get("model_name") or "claude-opus-4-1-20250805",
+        fallback_model=model_policy.get("fallback_model_name") or "claude-sonnet-4-20250514",
     )
 
     citations: List[Citation] = []

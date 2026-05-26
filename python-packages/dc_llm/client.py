@@ -27,7 +27,7 @@ class LlmClient:
         self,
         system: str,
         user: str,
-        model: str = "claude-opus-4-7",
+        model: str = "claude-opus-4-1-20250805",
         max_tokens: int = 2048,
         fallback_model: Optional[str] = None,
     ) -> LlmCompletion:
@@ -111,7 +111,7 @@ class LlmClient:
         system: str,
         image_png_bytes: bytes,
         user_text: str = "Convert this slide to HTML/CSS.",
-        model: str = "claude-opus-4-7",
+        model: str = "claude-opus-4-1-20250805",
         max_tokens: int = 4096,
         fallback_model: Optional[str] = None,
     ) -> LlmCompletion:

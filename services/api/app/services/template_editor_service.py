@@ -174,7 +174,7 @@ def _sonnet_model(runtime: Dict[str, Any]) -> str:
         model = str(runtime.get(key) or "")
         if "sonnet" in model.lower():
             return model
-    return "claude-sonnet-4-6"
+    return "claude-sonnet-4-20250514"
 
 
 def _fallback_template_edit(html: str, css: str, instruction: str) -> Dict[str, str]:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -174,6 +175,328 @@ def _hits_to_citations(hits: List[Dict[str, Any]]) -> List[Citation]:
     return out
 
 
+_PROJECT_TITLE_KEYS = (
+    "project name",
+    "project",
+    "case study",
+    "customer project",
+    "client project",
+    "account name",
+    "company name",
+    "company",
+    "client name",
+    "client",
+    "customer",
+    "opportunity name",
+    "name",
+    "title",
+)
+
+_PROJECT_DETAIL_KEYS = (
+    "linkedin industry",
+    "industry",
+    "linkedin category / sector",
+    "category",
+    "sector",
+    "technical solution",
+    "solution",
+    "technology",
+    "platform",
+    "process",
+    "skill",
+    "tool",
+    "architecture",
+    "cloud service",
+    "audit",
+    "compliance",
+)
+
+_KB_SEARCH_TERMS = (
+    "kb",
+    "knowledge base",
+    "document",
+    "case study",
+    "case studies",
+    "battlecard",
+    "project",
+    "projects",
+    "product",
+    "products",
+    "industry",
+    "security",
+    "cybersecurity",
+    "compliance",
+    "soc2",
+    "soc 2",
+)
+
+_QUERY_STOPWORDS = {
+    "about",
+    "back",
+    "base",
+    "case",
+    "come",
+    "find",
+    "for",
+    "from",
+    "give",
+    "industry",
+    "knowledge",
+    "list",
+    "match",
+    "matches",
+    "mention",
+    "need",
+    "product",
+    "products",
+    "project",
+    "projects",
+    "proper",
+    "read",
+    "recommend",
+    "search",
+    "share",
+    "show",
+    "source",
+    "study",
+    "tell",
+    "the",
+    "what",
+    "which",
+    "with",
+}
+
+_QUERY_TERM_ALIASES = {
+    "searcuity": "security",
+    "secuirty": "security",
+    "secruity": "security",
+    "secutity": "security",
+    "cyber": "cybersecurity",
+    "soc": "soc 2",
+    "soc2": "soc 2",
+}
+
+
+def _norm_field_key(value: str) -> str:
+    return " ".join(value.replace("_", " ").replace("-", " ").strip().lower().split())
+
+
+def _clean_field_value(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text or text.upper() in {"N/A", "NA", "NONE", "NULL", "-"}:
+        return ""
+    return text
+
+
+def _field_lookup(fields: Dict[str, Any], keys: Tuple[str, ...]) -> str:
+    normalized = {_norm_field_key(k): _clean_field_value(v) for k, v in fields.items()}
+    for key in keys:
+        value = normalized.get(_norm_field_key(key))
+        if value:
+            return value
+    return ""
+
+
+def _looks_like_kb_search(message: str) -> bool:
+    lower = message.lower()
+    return any(term in lower for term in _KB_SEARCH_TERMS)
+
+
+def _parse_field_line(line: str) -> Dict[str, str]:
+    fields: Dict[str, str] = {}
+    for part in line.split(";"):
+        if ":" not in part:
+            continue
+        key, value = part.split(":", 1)
+        key = key.strip()
+        value = _clean_field_value(value)
+        if key and value:
+            fields[key] = value
+    return fields
+
+
+def _project_rows_from_text(text: str) -> List[Dict[str, str]]:
+    rows: List[Dict[str, str]] = []
+    for line in (text or "").splitlines():
+        fields = _parse_field_line(line)
+        if fields:
+            rows.append(fields)
+    if rows:
+        return rows
+    fields = _parse_field_line(text or "")
+    return [fields] if fields else []
+
+
+def _query_focus_terms(query: str) -> List[str]:
+    terms: List[str] = []
+    for raw in re.findall(r"[a-zA-Z0-9]+", query.lower()):
+        token = _QUERY_TERM_ALIASES.get(raw, raw)
+        if token in _QUERY_STOPWORDS or len(token) < 4:
+            continue
+        if token not in terms:
+            terms.append(token)
+    return terms[:6]
+
+
+def _text_matches_focus(text: str, focus_terms: List[str]) -> int:
+    haystack = text.lower()
+    score = 0
+    for term in focus_terms:
+        if term == "security":
+            if any(t in haystack for t in ("security", "cybersecurity", "cyber security", "soc 2", "soc2")):
+                score += 1
+            continue
+        if term in haystack:
+            score += 1
+    return score
+
+
+def _format_project_detail(fields: Dict[str, Any], fallback: str) -> str:
+    detail_parts: List[str] = []
+    normalized = {_norm_field_key(k): _clean_field_value(v) for k, v in fields.items()}
+    for key in _PROJECT_DETAIL_KEYS:
+        value = normalized.get(_norm_field_key(key))
+        if not value or value.startswith("http"):
+            continue
+        label = key.title().replace(" / ", "/")
+        detail_parts.append(f"{label}: {value}")
+        if len(detail_parts) >= 3:
+            break
+    if detail_parts:
+        return "; ".join(detail_parts)
+
+    if fields:
+        return "No useful industry, solution, technology, or compliance detail in this KB row."
+
+    snippet = fallback.strip().replace("\n", " ")
+    if len(snippet) > 220:
+        snippet = f"{snippet[:217]}..."
+    return snippet
+
+
+def _hit_asset_title(hit: Dict[str, Any]) -> str:
+    metadata = hit.get("metadata") or {}
+    return (
+        _clean_field_value(hit.get("title"))
+        or _field_lookup(metadata, ("company", "title", "name"))
+        or _clean_field_value(metadata.get("asset_id"))
+        or _clean_field_value(hit.get("asset_id"))
+        or "Knowledge base item"
+    )
+
+
+def _source_name_for_hit(hit: Dict[str, Any]) -> str:
+    metadata = hit.get("metadata") or {}
+    return (
+        _clean_field_value(metadata.get("title"))
+        or _clean_field_value(hit.get("title"))
+        or _clean_field_value(metadata.get("source"))
+        or _clean_field_value(hit.get("asset_id"))
+        or "Knowledge base"
+    )
+
+
+def _kb_items_from_hits(
+    hits: List[Dict[str, Any]],
+    *,
+    query: str = "",
+) -> Tuple[List[Dict[str, Any]], bool]:
+    focus_terms = _query_focus_terms(query)
+    items: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for hit in hits:
+        metadata = hit.get("metadata") or {}
+        chunk_text = str(hit.get("chunk_text") or "")
+        source = _source_name_for_hit(hit)
+        rows = _project_rows_from_text(chunk_text)
+        if not rows:
+            rows = [metadata] if metadata else [{}]
+
+        for fields in rows:
+            title = _field_lookup(fields, _PROJECT_TITLE_KEYS) or _hit_asset_title(hit)
+            detail = _format_project_detail(fields, chunk_text)
+            searchable = " ".join(
+                [
+                    title,
+                    source,
+                    detail,
+                    " ".join(_clean_field_value(v) for v in fields.values()),
+                    " ".join(_clean_field_value(v) for v in metadata.values()),
+                ]
+            )
+            focus_score = _text_matches_focus(searchable, focus_terms)
+            dedupe_key = f"{title.lower()}::{source.lower()}::{detail.lower()[:120]}"
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            items.append(
+                {
+                    "title": title,
+                    "detail": detail,
+                    "source": source,
+                    "asset_id": str(hit.get("asset_id") or ""),
+                    "focus_score": focus_score,
+                    "retrieval_score": float(hit.get("score") or 0),
+                    "is_exact": not focus_terms or focus_score > 0,
+                }
+            )
+
+    items.sort(
+        key=lambda item: (
+            1 if item["is_exact"] else 0,
+            int(item["focus_score"]),
+            float(item["retrieval_score"]),
+        ),
+        reverse=True,
+    )
+    if focus_terms:
+        exact = [item for item in items if item["is_exact"]]
+        if exact:
+            return exact[:5], True
+        return items[:5], False
+    return items[:5], True
+
+
+def _md_cell(value: Any) -> str:
+    text = str(value or "").replace("\n", " ").replace("|", "/").strip()
+    return text or "—"
+
+
+def _format_kb_hits(hits: List[Dict[str, Any]], *, query: str, empty: str) -> str:
+    if not hits:
+        return empty
+
+    items, has_exact = _kb_items_from_hits(hits, query=query)
+    if not items:
+        return empty
+
+    if has_exact:
+        lines = [
+            "I found these KB-backed matches. I would use the first one if you need the closest fit:",
+            "",
+            "| Project / product | Relevant information | KB source |",
+            "|---|---|---|",
+        ]
+    else:
+        lines = [
+            "I could not find a clean KB-backed match for that exact industry/product ask.",
+            "I filtered out the nearest KB hits because they do not match the requested terms:",
+            "",
+            "| KB source | Why I filtered it out |",
+            "|---|---|---|",
+        ]
+
+    for item in items:
+        if has_exact:
+            lines.append(
+                f"| {_md_cell(item['title'])} | {_md_cell(item['detail'])} | {_md_cell(item['source'])} |"
+            )
+        else:
+            reason = f"{item['title']}: {item['detail']}"
+            lines.append(f"| {_md_cell(item['source'])} | {_md_cell(reason)} |")
+    return "\n".join(lines)
+
+
 class SalesCopilotAgent:
     """RAG + tool-use Sales Co-pilot orchestrating calls, KB, and agents."""
 
@@ -229,7 +552,12 @@ class SalesCopilotAgent:
                     use_anthropic = False
 
             if use_anthropic:
-                answer, cost = self._run_anthropic_tools(message, history, context_note=context_note)
+                answer, cost = self._run_anthropic_tools(
+                    message,
+                    history,
+                    context_note=context_note,
+                    call_id=call_id,
+                )
             else:
                 answer, cost = self._run_fallback(message, call_id=call_id)
 
@@ -298,15 +626,17 @@ class SalesCopilotAgent:
                 "trace_id": trace_id,
             }
 
-        if any(w in lower for w in ("kb", "knowledge base", "document", "case study", "battlecard")):
-            hits = _kb_search(self.ctx, message, limit=5)
+        if _looks_like_kb_search(message):
+            hits = _kb_search(self.ctx, message, limit=20)
             self._citations.extend(_hits_to_citations(hits))
             self._actions_taken.append(
                 {"tool": "search_knowledge_base", "query": message[:120], "hit_count": len(hits), "fast_path": True}
             )
-            titles = [str(h.get("title") or h.get("asset_id") or "Untitled") for h in hits[:5]]
-            answer = "Found KB matches:\n" + "\n".join(f"- {t}" for t in titles) if titles else "No KB matches found."
-            return answer, {
+            return _format_kb_hits(
+                hits,
+                query=message,
+                empty="No matching knowledge base or project entries found.",
+            ), {
                 "tokens": len(message) // 4,
                 "usd": 0.0,
                 "model": "fast-path-kb",
@@ -332,12 +662,34 @@ class SalesCopilotAgent:
             if name == "search_knowledge_base":
                 query = str(tool_input.get("query") or "")
                 limit = int(tool_input.get("limit") or 5)
-                hits = _kb_search(self.ctx, query, limit=limit)
+                hits = _kb_search(self.ctx, query, limit=max(limit * 4, 20))
+                items, has_exact = _kb_items_from_hits(hits, query=query)
                 self._citations.extend(_hits_to_citations(hits))
                 self._actions_taken.append(
-                    {"tool": name, "query": query, "hit_count": len(hits)}
+                    {
+                        "tool": name,
+                        "query": query,
+                        "hit_count": len(hits),
+                        "result_count": len(items),
+                        "exact_match": has_exact,
+                    }
                 )
-                return json.dumps(hits[:limit], default=str)
+                return json.dumps(
+                    {
+                        "query": query,
+                        "exact_match": has_exact,
+                        "results": [
+                            {
+                                "project_or_product": item["title"],
+                                "relevant_information": item["detail"],
+                                "kb_source": item["source"],
+                                "asset_id": item["asset_id"],
+                            }
+                            for item in items[:limit]
+                        ],
+                    },
+                    default=str,
+                )
 
             if name == "list_calls":
                 status = (tool_input.get("status") or "").strip().lower()
@@ -488,12 +840,13 @@ class SalesCopilotAgent:
         history: List[Dict[str, str]],
         *,
         context_note: str = "",
+        call_id: Optional[str] = None,
     ) -> Tuple[str, Dict[str, Any]]:
         import anthropic  # type: ignore
 
         settings = get_settings()
         client = anthropic.Anthropic(api_key=settings.anthropic_api_key, timeout=120.0)
-        model = "claude-sonnet-4-6"
+        model = "claude-sonnet-4-20250514"
         fallback_model = "claude-3-haiku-20240307"
 
         messages: List[Dict[str, Any]] = []
@@ -526,7 +879,7 @@ class SalesCopilotAgent:
                 if active_model != fallback_model:
                     active_model = fallback_model
                     continue
-                return self._run_fallback(message)
+                return self._run_fallback(message, call_id=call_id)
             usage = getattr(response, "usage", None)
             if usage:
                 tokens_in += getattr(usage, "input_tokens", 0) or 0
@@ -591,14 +944,14 @@ class SalesCopilotAgent:
         trace_id = str(uuid.uuid4())
         lower = message.lower()
 
-        if any(w in lower for w in ("kb", "document", "battle", "case study", "knowledge")):
-            hits = _kb_search(self.ctx, message, limit=5)
+        if _looks_like_kb_search(message):
+            hits = _kb_search(self.ctx, message, limit=20)
             self._citations.extend(_hits_to_citations(hits))
             self._actions_taken.append({"tool": "search_knowledge_base", "hit_count": len(hits)})
-            titles = [h.get("title") or h.get("asset_id") for h in hits[:5]]
-            answer = (
-                f"Found {len(hits)} knowledge base matches: {', '.join(str(t) for t in titles if t)}. "
-                "Connect Anthropic API for richer synthesis."
+            answer = _format_kb_hits(
+                hits,
+                query=message,
+                empty="No matching knowledge base or project entries found.",
             )
         elif any(w in lower for w in ("list call", "calls", "upcoming", "completed")):
             calls = self.calls.list_calls(self.ctx)[:15]
@@ -619,13 +972,21 @@ class SalesCopilotAgent:
             )
             answer = export.get("markdown") or json.dumps(export, indent=2)[:2000]
         else:
-            hits = _kb_search(self.ctx, message, limit=3)
+            hits = _kb_search(self.ctx, message, limit=20)
             self._citations.extend(_hits_to_citations(hits))
-            answer = (
-                "Sales Co-pilot (offline): I can search KB, list calls, load briefs/transcripts, "
-                "and run agents when Anthropic is configured. "
-                f"Your question: {message[:200]}"
-            )
+            if hits:
+                self._actions_taken.append({"tool": "search_knowledge_base", "hit_count": len(hits)})
+                answer = _format_kb_hits(
+                    hits,
+                    query=message,
+                    empty="No matching knowledge base or project entries found.",
+                )
+            else:
+                answer = (
+                    "Sales Co-pilot (offline): I can search KB, list calls, load briefs/transcripts, "
+                    "and run agents when Anthropic is configured. "
+                    f"Your question: {message[:200]}"
+                )
 
         return answer, {
             "tokens": len(message) // 4,

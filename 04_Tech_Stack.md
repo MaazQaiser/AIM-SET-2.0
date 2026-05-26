@@ -95,13 +95,13 @@ Every choice in this document is **opinionated, justified, and reversible only a
 | Agent / operation | Model | Why |
 |---|---|---|
 | Live Call Agent — cheap pass (keyword, sentiment) | `claude-haiku-4-5-20251001` | Fast, cheap, runs frequently |
-| Live Call Agent — proactive nudge (LLM call) | `claude-sonnet-4-6` | Balance of quality and latency |
-| Bot-chat response | `claude-sonnet-4-6` | 5s budget; needs quality |
-| Pre-DC brief generation | `claude-sonnet-4-6` | Async, batch-friendly |
-| Coaching Agent — win-loss analysis | `claude-opus-4-7` | Highest reasoning quality; runs weekly |
-| Coaching Agent — per-call scorecard | `claude-sonnet-4-6` | Sufficient quality, runs after every call |
-| Content Agent — draft asset | `claude-opus-4-7` | Quality matters; content owner reviews anyway |
-| Task Agent — email draft | `claude-sonnet-4-6` | Quality matters; AE reviews |
+| Live Call Agent — proactive nudge (LLM call) | `claude-sonnet-4-20250514` | Balance of quality and latency |
+| Bot-chat response | `claude-sonnet-4-20250514` | 5s budget; needs quality |
+| Pre-DC brief generation | `claude-sonnet-4-20250514` | Async, batch-friendly |
+| Coaching Agent — win-loss analysis | `claude-opus-4-1-20250805` | Highest reasoning quality; runs weekly |
+| Coaching Agent — per-call scorecard | `claude-sonnet-4-20250514` | Sufficient quality, runs after every call |
+| Content Agent — draft asset | `claude-opus-4-1-20250805` | Quality matters; content owner reviews anyway |
+| Task Agent — email draft | `claude-sonnet-4-20250514` | Quality matters; AE reviews |
 | KB Agent — tag inference | `claude-haiku-4-5-20251001` | Mechanical, cheap |
 
 Document this matrix in code as a `MODEL_POLICY` constant. Engineers don't pick the model per call; the policy does.
