@@ -117,7 +117,7 @@ export function BriefPreDeckPanel({ deck }: BriefPreDeckPanelProps) {
             {slides.map((slide, index) => (
               <section
                 key={slide.id}
-                className="min-h-[360px] rounded-lg border bg-card p-5 shadow-sm flex flex-col"
+                className="glass-insight-card min-h-[360px] p-5 flex flex-col"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-3">
                   <div className="min-w-0">

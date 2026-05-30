@@ -30,7 +30,7 @@ export function JiraTicketCard({ ticket, onCreate }: JiraTicketCardProps) {
   }
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div className="glass-insight-card overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b bg-muted/30 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
           <TicketCheck className="h-4 w-4 text-primary shrink-0" />

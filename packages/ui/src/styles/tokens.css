@@ -53,6 +53,11 @@
   --color-live-foreground: hsl(var(--live-foreground));
   --color-nudge: hsl(var(--nudge));
   --color-nudge-foreground: hsl(var(--nudge-foreground));
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-muted: hsl(var(--sidebar-muted));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-active: hsl(var(--sidebar-active));
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -65,8 +70,18 @@
 :root {
   --radius: 1rem;
 
-  --background: 240 5% 96%;
+  /* Page canvas — Figma #DADAE2 (node 152:1303) */
+  --background: 240 12% 87%;
   --foreground: 220 10% 20%;
+
+  /* Ambient sphere — Figma #E5DAE7 @ 100%, 600px blur (node 152:1303) */
+  --sphere: 290 21% 88%;
+
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 220 10% 20%;
+  --sidebar-muted: 240 6% 96%;
+  --sidebar-border: 240 6% 92%;
+  --sidebar-active: 240 5% 94%;
 
   --primary: 220 12% 22%;
   --primary-foreground: 0 0% 98%;
@@ -74,7 +89,7 @@
   --secondary-foreground: 220 10% 20%;
   --accent: 240 6% 94%;
   --accent-foreground: 220 10% 28%;
-  --muted: 240 5% 93%;
+  --muted: 240 10% 90%;
   --muted-foreground: 220 5% 53%;
 
   --card: 0 0% 100%;
@@ -124,6 +139,14 @@
 .dark {
   --background: 220 12% 10%;
   --foreground: 240 5% 96%;
+
+  --sphere: 290 18% 32%;
+
+  --sidebar: 220 12% 14%;
+  --sidebar-foreground: 240 5% 96%;
+  --sidebar-muted: 220 10% 18%;
+  --sidebar-border: 220 10% 22%;
+  --sidebar-active: 220 10% 20%;
 
   --primary: 240 5% 92%;
   --primary-foreground: 220 12% 12%;

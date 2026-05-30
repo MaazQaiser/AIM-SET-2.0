@@ -47,7 +47,7 @@ export function DailyBriefingCard() {
   }
 
   return (
-    <div className="rounded-2xl border border-border/50 bg-card p-5 space-y-4 shadow-card">
+    <div className="glass-insight-card p-5 space-y-4">
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-warning" />
         <span className="type-title text-foreground">Daily briefing</span>

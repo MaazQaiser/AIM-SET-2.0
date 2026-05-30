@@ -29,7 +29,7 @@ export function LiveKbAssetCard({ asset, className }: LiveKbAssetCardProps) {
   return (
     <div
       className={cn(
-        "rounded-lg border border-border bg-card/50 shadow-card overflow-hidden",
+        "glass-insight-card overflow-hidden shadow-none",
         className
       )}
     >

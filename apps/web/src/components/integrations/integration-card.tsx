@@ -49,8 +49,8 @@ export function IntegrationCard({
 
   return (
     <div className={cn(
-      "rounded-xl border bg-card p-5 space-y-4 transition-shadow",
-      isConnected && "border-primary/20 shadow-sm"
+      "glass-insight-card space-y-4 p-5 shadow-none",
+      isConnected && "border-primary/20"
     )}>
       {/* Header */}
       <div className="flex items-start gap-4">

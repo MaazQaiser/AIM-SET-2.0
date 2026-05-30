@@ -17,12 +17,20 @@ import { cn } from "../lib/cn";
 import { Button } from "./button";
 import { Input } from "./input";
 
+interface DataTableColumnMeta {
+  headerClassName?: string;
+  cellClassName?: string;
+}
+
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   searchKey?: string;
   searchPlaceholder?: string;
   pageSize?: number;
+  scrollable?: boolean;
+  stickyHeader?: boolean;
+  maxScrollHeight?: string;
 }
 
 export function DataTable<TData, TValue>({
@@ -31,6 +39,9 @@ export function DataTable<TData, TValue>({
   searchKey,
   searchPlaceholder = "Search...",
   pageSize = 10,
+  scrollable = false,
+  stickyHeader = false,
+  maxScrollHeight = "max-h-[calc(100vh-16rem)]",
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -59,15 +70,31 @@ export function DataTable<TData, TValue>({
         />
       )}
 
-      <div className="rounded-lg border border-border overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="border-b border-border bg-muted/50">
+      <div
+        className={cn(
+          "rounded-lg border border-border",
+          scrollable ? cn("overflow-auto", maxScrollHeight) : "overflow-hidden"
+        )}
+      >
+        <table className={cn("w-full text-sm", scrollable && "min-w-max")}>
+          <thead
+            className={cn(
+              "border-b border-border bg-muted/50",
+              stickyHeader && "sticky top-0 z-10 bg-muted/95 backdrop-blur-sm"
+            )}
+          >
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
+                {headerGroup.headers.map((header) => {
+                  const meta = header.column.columnDef.meta as DataTableColumnMeta | undefined;
+
+                  return (
                   <th
                     key={header.id}
-                    className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    className={cn(
+                      "px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider",
+                      meta?.headerClassName
+                    )}
                   >
                     {header.isPlaceholder ? null : (
                       <button
@@ -100,7 +127,8 @@ export function DataTable<TData, TValue>({
                       </button>
                     )}
                   </th>
-                ))}
+                  );
+                })}
               </tr>
             ))}
           </thead>
@@ -109,13 +137,23 @@ export function DataTable<TData, TValue>({
               table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors"
+                  className="group border-b border-border last:border-0 hover:bg-muted/50 transition-colors"
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 text-sm text-foreground">
+                  {row.getVisibleCells().map((cell) => {
+                    const meta = cell.column.columnDef.meta as DataTableColumnMeta | undefined;
+
+                    return (
+                    <td
+                      key={cell.id}
+                      className={cn(
+                        "px-4 py-3 text-sm text-foreground",
+                        meta?.cellClassName
+                      )}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
-                  ))}
+                    );
+                  })}
                 </tr>
               ))
             ) : (

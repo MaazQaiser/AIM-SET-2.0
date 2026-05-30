@@ -63,7 +63,7 @@ export function QuickActions() {
 
           return (
             <Link key={action.id} href={link}>
-              <Card className="h-full transition-shadow hover:shadow-md hover:border-primary/30">
+              <Card className="h-full transition-colors hover:border-white">
                 <CardContent className="p-4 flex flex-col gap-2">
                   <div
                     className={cn(

@@ -20,7 +20,7 @@ export function CoachingCard({ insight }: CoachingCardProps) {
   const priority = priorityConfig[insight.priority];
 
   return (
-    <Card className="hover:shadow-soft-sm transition-shadow">
+    <Card>
       <CardContent className="p-5 space-y-3">
         {/* Header */}
         <div className="flex items-start justify-between gap-3">

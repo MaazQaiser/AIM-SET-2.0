@@ -121,7 +121,7 @@ export function DashboardWidget({
   return (
     <div
       className={cn(
-        "relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-card",
+        "relative flex min-h-0 flex-col overflow-hidden glass-insight-card shadow-none",
         gridMode ? "h-full" : columnZone === "center" ? "min-h-0" : "max-h-[min(28rem,55vh)] shrink-0"
       )}
     >

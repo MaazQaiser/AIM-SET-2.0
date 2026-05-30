@@ -70,8 +70,8 @@ export function CallsListClient() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex min-h-0 flex-1 flex-col p-6">
+      <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Calls</h1>
           {hasImport && (
@@ -92,33 +92,35 @@ export function CallsListClient() {
           action={{ label: "Import CSV", href: "/settings" }}
         />
       ) : (
-        <Tabs defaultValue="all">
-          <TabsList>
-            <TabsTrigger value="all">
-              All leads
-              <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
-                {calls.length}
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="upcoming">
-              Upcoming
-              <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium">
-                {upcoming.length}
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="past">
-              Past
-              <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium">
-                {past.length}
-              </span>
-            </TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="all" className="mt-6 flex min-h-0 flex-1 flex-col">
+          <div className="sticky top-0 z-20 -mx-6 shrink-0 border-b border-border/60 bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+            <TabsList className="border-b-0">
+              <TabsTrigger value="all">
+                All leads
+                <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
+                  {calls.length}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="upcoming">
+                Upcoming
+                <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium">
+                  {upcoming.length}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="past">
+                Past
+                <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium">
+                  {past.length}
+                </span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          <TabsContent value="all" className="mt-4">
+          <TabsContent value="all" className="mt-4 min-h-0 flex-1 focus-visible:outline-none">
             <CallsBody calls={calls} view={view} />
           </TabsContent>
 
-          <TabsContent value="upcoming" className="mt-4">
+          <TabsContent value="upcoming" className="mt-4 min-h-0 flex-1 focus-visible:outline-none">
             {upcoming.length > 0 ? (
               <CallsBody calls={upcoming} view={view} />
             ) : (
@@ -131,7 +133,7 @@ export function CallsListClient() {
             )}
           </TabsContent>
 
-          <TabsContent value="past" className="mt-4">
+          <TabsContent value="past" className="mt-4 min-h-0 flex-1 focus-visible:outline-none">
             {past.length > 0 ? (
               <CallsBody calls={past} view={view} />
             ) : (

@@ -35,7 +35,7 @@ export default function ContentPage() {
           {gaps.map((gap) => {
             const config = statusConfig[gap.status];
             return (
-              <Card key={gap.id} className="hover:shadow-soft-sm transition-shadow">
+              <Card key={gap.id}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-2">

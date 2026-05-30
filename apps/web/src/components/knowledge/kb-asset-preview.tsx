@@ -143,7 +143,7 @@ export function KbAssetPreview({ asset, indexedText, className }: KbAssetPreview
     <div className={cn("flex min-h-[420px] flex-col gap-3 rounded-lg border bg-muted/10 p-4", className)}>
       <p className="text-sm text-muted-foreground shrink-0">Text preview from the knowledge base index.</p>
       {textPreview ? (
-        <pre className="flex-1 min-h-0 overflow-auto text-xs leading-relaxed whitespace-pre-wrap rounded-lg border bg-card p-4">
+        <pre className="glass-insight-card flex-1 min-h-0 overflow-auto whitespace-pre-wrap p-4 text-xs leading-relaxed shadow-none">
           {textPreview}
         </pre>
       ) : (

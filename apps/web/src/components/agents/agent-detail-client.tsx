@@ -34,7 +34,7 @@ function MetricCard({
   const pct = Math.min((value / (target || 1)) * 100, 120);
 
   return (
-    <div className="rounded-lg border bg-card p-4 space-y-2">
+    <div className="glass-insight-card p-4 space-y-2">
       <p className="text-xs text-muted-foreground">{label}</p>
       <div className="flex items-end gap-2">
         <span className={cn("text-2xl font-bold", passing ? "text-success" : "text-warning")}>

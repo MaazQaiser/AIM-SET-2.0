@@ -13,7 +13,7 @@ export default function SignInPage() {
   if (!isClerkConfigured()) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-background px-4">
-        <div className="max-w-md rounded-xl border border-border bg-card p-6 text-center space-y-3">
+        <div className="glass-insight-card max-w-md space-y-3 p-6 text-center shadow-none">
           <h1 className="text-lg font-semibold">Sign-in not configured</h1>
           <p className="text-sm text-muted-foreground">
             Add <code className="text-xs">NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</code> and{" "}

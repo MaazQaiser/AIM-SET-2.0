@@ -55,7 +55,7 @@ export function EmailEditor({ draft, onApprove, onRegenerate }: EmailEditorProps
   }
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div className="glass-insight-card overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
         <div className="flex items-center gap-2">

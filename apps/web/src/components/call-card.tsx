@@ -42,7 +42,7 @@ export function CallCard({ call }: CallCardProps) {
   return (
     <Card
       className={cn(
-        "group transition-all hover:shadow-md",
+        "group transition-all",
         isLive && "ring-1 ring-primary/30 border-primary/20"
       )}
     >

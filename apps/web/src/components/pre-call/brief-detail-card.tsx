@@ -66,7 +66,7 @@ export function BriefDetailCard({
   return (
     <Card
       className={cn(
-        "flex min-h-0 w-full flex-col border border-border shadow-card",
+        "flex min-h-0 w-full flex-col shadow-none",
         variant === "highlight" && "border-primary/25 bg-gradient-to-br from-primary/5 to-accent/20",
         variant === "warning" && "border-warning/35",
         className

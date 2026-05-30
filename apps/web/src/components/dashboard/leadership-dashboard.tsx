@@ -17,7 +17,7 @@ export function LeadershipDashboardExtras() {
         <h2 className="type-title">This week&apos;s coaching candidates</h2>
         <div className="grid gap-3 sm:grid-cols-3">
           {candidates?.map((c) => (
-            <Card key={c.aeId} className="hover:shadow-soft-sm transition-shadow">
+            <Card key={c.aeId}>
               <CardHeader className="pb-2">
                 <CardTitle>
                   <Link href={`/coaching/${c.aeId}`} className="hover:text-primary">
@@ -58,7 +58,7 @@ export function AeCoachingBanner() {
   return (
     <Link
       href="/coaching/ae-sarah"
-      className="block rounded-2xl border border-border/50 bg-card px-4 py-3 shadow-card hover:shadow-soft-sm transition-shadow"
+      className="glass-insight-card block px-4 py-3 transition-colors hover:border-white"
     >
       <div className="flex items-center gap-2 type-body-sm font-medium text-foreground">
         <Users className="h-4 w-4" />

@@ -33,7 +33,7 @@ export function KBAssetCard({ asset, onPreview }: KBAssetCardProps) {
   const status = asset.status ?? "ready";
 
   return (
-    <Card className="hover:shadow-soft-sm transition-shadow h-full flex flex-col">
+    <Card className="flex h-full flex-col">
       <CardContent className="p-4 flex flex-col flex-1 gap-3">
         <div className="flex items-start justify-between gap-2">
           <KbFileFormatBadge fileName={asset.fileName} mimeType={asset.mimeType} />

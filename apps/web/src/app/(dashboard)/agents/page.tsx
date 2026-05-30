@@ -66,21 +66,21 @@ export default function AgentsPage() {
       <SystemHealthBanner hasOutage={hasOutage} hasDegraded={hasDegraded} />
 
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-lg border bg-card p-4">
+        <div className="glass-insight-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
             <Activity className="h-4 w-4" />
             <span className="text-xs">Total runs today</span>
           </div>
           <p className="text-2xl font-bold">{totalRuns}</p>
         </div>
-        <div className="rounded-lg border bg-card p-4">
+        <div className="glass-insight-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
             <Zap className="h-4 w-4" />
             <span className="text-xs">Total cost today</span>
           </div>
           <p className="text-2xl font-bold">${totalCost.toFixed(2)}</p>
         </div>
-        <div className="rounded-lg border bg-card p-4">
+        <div className="glass-insight-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
             <CheckCircle2 className="h-4 w-4" />
             <span className="text-xs">Agents with runs today</span>

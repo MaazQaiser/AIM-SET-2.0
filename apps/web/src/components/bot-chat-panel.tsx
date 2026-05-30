@@ -822,7 +822,7 @@ export function BotChatPanel({
           {floatingExpanded && (
             <div
               className={cn(
-                "flex min-h-[240px] max-h-[min(420px,50vh)] flex-col overflow-hidden rounded-2xl border border-border/80",
+                "glass-insight-card flex min-h-[240px] max-h-[min(420px,50vh)] flex-col overflow-hidden shadow-none",
                 "bg-card/95 shadow-2xl backdrop-blur-md"
               )}
             >

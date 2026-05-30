@@ -200,7 +200,7 @@ function DiscoveryChecklistFullPanel({
   const bantComplete = bantPct >= 100;
 
   return (
-    <div className={cn("rounded-lg border border-border bg-card shadow-card", className)}>
+    <div className={cn("glass-insight-card shadow-none", className)}>
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
         <div className="flex items-center gap-2 min-w-0">
           <ListChecks className="h-4 w-4 shrink-0 text-primary" aria-hidden />

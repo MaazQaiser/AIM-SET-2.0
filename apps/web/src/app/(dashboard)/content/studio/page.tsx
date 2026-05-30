@@ -95,7 +95,7 @@ export default function ContentStudioPage() {
       ) : projects.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((p) => (
-            <Card key={p.id} className="hover:shadow-soft-sm transition-shadow">
+            <Card key={p.id}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{p.title}</CardTitle>
               </CardHeader>

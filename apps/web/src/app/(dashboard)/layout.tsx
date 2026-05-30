@@ -1,9 +1,11 @@
 import { AuthSetupBanner } from "@/components/layout/auth-setup-banner";
 import { Sidebar } from "@/components/layout/sidebar";
+import { SidebarProvider } from "@/components/layout/sidebar-context";
 import { TopBar } from "@/components/layout/top-bar";
 import { PersonaProvider } from "@/components/providers/persona-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { DcImportsHydrator } from "@/components/settings/dc-imports-hydrator";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 /** Avoid static prerender of dashboard pages that use Clerk client components. */
 export const dynamic = "force-dynamic";
@@ -12,15 +14,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <QueryProvider>
       <PersonaProvider>
-        <DcImportsHydrator />
-        <div className="page-hue flex h-svh overflow-hidden bg-background">
-          <Sidebar />
-          <div className="relative z-[1] flex min-w-0 flex-1 flex-col overflow-hidden">
-            <TopBar />
-            <AuthSetupBanner />
-            <main className="flex-1 overflow-y-auto">{children}</main>
-          </div>
-        </div>
+        <SidebarProvider>
+          <TooltipProvider delayDuration={200}>
+            <DcImportsHydrator />
+            <div className="page-hue relative flex h-svh">
+              <Sidebar />
+              <div className="relative z-[1] flex min-w-0 flex-1 flex-col overflow-hidden p-4 pl-[calc(var(--sidebar-rail-width,64px)+1rem)]">
+                <TopBar />
+                <AuthSetupBanner />
+                <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</main>
+              </div>
+            </div>
+          </TooltipProvider>
+        </SidebarProvider>
       </PersonaProvider>
     </QueryProvider>
   );

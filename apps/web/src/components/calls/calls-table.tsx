@@ -45,14 +45,22 @@ function primaryAction(call: Call) {
   return <span className="text-xs text-muted-foreground">—</span>;
 }
 
+const accountColumnClasses = {
+  headerClassName:
+    "min-w-[220px] w-[220px] sticky left-0 z-20 bg-muted/95 backdrop-blur-sm shadow-[1px_0_0_0_hsl(var(--border))]",
+  cellClassName:
+    "min-w-[220px] w-[220px] sticky left-0 z-10 bg-background shadow-[1px_0_0_0_hsl(var(--border))] group-hover:bg-muted/50",
+};
+
 const columns: ColumnDef<Call>[] = [
   {
     accessorKey: "accountName",
     header: "Account",
+    meta: accountColumnClasses,
     cell: ({ row }) => {
       const call = row.original;
       return (
-        <div className="min-w-[140px]">
+        <div>
           <Link
             href={`/calls/${call.id}`}
             className="font-medium text-foreground hover:text-primary hover:underline"
@@ -60,7 +68,7 @@ const columns: ColumnDef<Call>[] = [
             {call.accountName}
           </Link>
           {call.leadName && (
-            <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[220px]">
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">
               {call.leadName}
               {call.leadTitle ? ` · ${call.leadTitle}` : ""}
             </p>
@@ -164,9 +172,10 @@ export function CallsTable({ calls }: CallsTableProps) {
     <DataTable
       columns={columns}
       data={calls}
-      searchKey="accountName"
-      searchPlaceholder="Search accounts..."
       pageSize={20}
+      scrollable
+      stickyHeader
+      maxScrollHeight="max-h-[calc(100vh-18rem)]"
     />
   );
 }
