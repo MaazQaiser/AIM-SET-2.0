@@ -50,11 +50,11 @@ export function Sidebar({ defaultCollapsed = true }: SidebarProps) {
           collapsed ? "justify-center" : "px-4"
         )}
       >
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-card">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-warning text-warning-foreground shadow-soft-xs">
           <span className="text-[10px] font-bold">DC</span>
         </div>
         {!collapsed && (
-          <span className="ml-3 text-base font-semibold text-foreground">DC Copilot</span>
+          <span className="ml-3 type-title text-foreground">DC Copilot</span>
         )}
       </div>
 
@@ -75,13 +75,13 @@ export function Sidebar({ defaultCollapsed = true }: SidebarProps) {
               title={collapsed ? label : undefined}
               aria-label={label}
               className={cn(
-                "flex items-center rounded-full text-sm font-medium transition-colors",
+                "flex items-center rounded-xl type-body-sm font-medium transition-colors",
                 collapsed
-                  ? "h-8 w-8 shrink-0 justify-center p-0"
-                  : "h-8 gap-3 px-3",
+                  ? "h-9 w-9 shrink-0 justify-center p-0"
+                  : "h-9 gap-3 px-3",
                 isActive
-                  ? "bg-primary text-primary-foreground shadow-card"
-                  : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                  ? "bg-card text-foreground shadow-card"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
@@ -95,7 +95,7 @@ export function Sidebar({ defaultCollapsed = true }: SidebarProps) {
       <button
         type="button"
         onClick={() => setCollapsed((c) => !c)}
-        className="glass absolute -right-3 top-20 flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+        className="glass absolute -right-3 top-20 flex h-7 w-7 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground"
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
         {collapsed ? (

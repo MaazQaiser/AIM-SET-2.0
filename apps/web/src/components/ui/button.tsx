@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 
 const buttonVariants = cva(
   [
-    "group/btn relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium",
+    "group/btn relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl font-medium",
     "transition-[background-color,box-shadow,transform,color,border-color] duration-200 ease-out",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
     "disabled:pointer-events-none disabled:opacity-50",
@@ -17,19 +17,19 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-soft-sm hover:bg-primary/90 hover:shadow-soft",
+          "bg-primary text-primary-foreground shadow-soft-xs hover:bg-primary/90",
         dark:
-          "bg-foreground text-background shadow-soft-sm hover:bg-foreground/90 hover:shadow-soft",
+          "bg-foreground text-background shadow-soft-xs hover:bg-foreground/90",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-soft-sm hover:bg-secondary/80 hover:shadow-soft",
+          "bg-secondary text-secondary-foreground shadow-soft-xs hover:bg-secondary/90",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-soft-sm hover:bg-destructive/90 hover:shadow-soft",
+          "bg-destructive text-destructive-foreground shadow-soft-xs hover:bg-destructive/90",
         outline:
-          "border border-border/60 bg-background text-foreground shadow-soft-xs hover:bg-accent hover:text-accent-foreground hover:border-border hover:shadow-soft-sm",
+          "border border-border bg-card text-foreground shadow-soft-xs hover:bg-accent hover:text-accent-foreground",
         ghost:
-          "text-foreground hover:bg-accent hover:text-accent-foreground",
+          "text-muted-foreground hover:bg-accent hover:text-foreground",
         glass:
-          "glass text-foreground hover:bg-white/80 hover:shadow-soft dark:hover:bg-white/10",
+          "glass text-foreground hover:shadow-soft-sm",
         link:
           "text-primary underline-offset-4 hover:underline",
       },

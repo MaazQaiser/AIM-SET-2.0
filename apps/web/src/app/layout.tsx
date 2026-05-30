@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Urbanist } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ClerkGateProvider } from "@/components/providers/clerk-gate";
 import { ThemeProvider } from "@/components/providers/theme-provider";
@@ -9,10 +9,11 @@ import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
 import { getClerkPublishableKey, isClerkConfigured } from "@/lib/public-env";
 import "./globals.css";
 
-const inter = Inter({
+const urbanist = Urbanist({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-inter",
+  variable: "--font-urbanist",
+  weight: ["400", "500", "600", "700"],
 });
 
 /** Avoid static prerender when Clerk env is not set at build time (Vercel). */
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
 
 function AppDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html lang="en" className={urbanist.variable} suppressHydrationWarning>
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <TooltipProvider>

@@ -90,7 +90,7 @@ export function AgentDetailClient({ agentId }: { agentId: AgentId }) {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex items-center gap-2">
         <Link
           href="/agents"

@@ -121,7 +121,7 @@ export function DashboardWidget({
   return (
     <div
       className={cn(
-        "relative flex min-h-0 flex-col overflow-hidden rounded-xl ring-1 ring-primary/30 bg-card shadow-sm",
+        "relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-card",
         gridMode ? "h-full" : columnZone === "center" ? "min-h-0" : "max-h-[min(28rem,55vh)] shrink-0"
       )}
     >
@@ -138,9 +138,9 @@ export function DashboardWidget({
 
 function WidgetToolbar({ title, onHide }: { title: string; onHide?: () => void }) {
   return (
-    <div className="widget-drag-handle flex shrink-0 cursor-grab items-center gap-2 border-b bg-muted/40 px-3 py-2 active:cursor-grabbing">
+    <div className="widget-drag-handle flex shrink-0 cursor-grab items-center gap-2 border-b border-border/50 bg-muted/30 px-4 py-2.5 active:cursor-grabbing">
       <GripVertical className="h-4 w-4 text-muted-foreground" />
-      <span className="flex-1 truncate text-xs font-medium text-foreground">{title}</span>
+      <span className="flex-1 truncate type-label text-foreground">{title}</span>
       {onHide && (
         <Button
           type="button"

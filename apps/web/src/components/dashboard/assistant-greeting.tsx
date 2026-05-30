@@ -70,17 +70,17 @@ function AssistantGreetingBody({
 
   return (
     <header className="pt-2">
-      <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
+      <h1 className="type-headline sm:type-display text-foreground">
         {isLoaded ? (
           <>
             {salutation},{" "}
-            <span className="text-primary">{name}</span>
+            <span className="text-foreground">{name}</span>
           </>
         ) : (
-          <span className="inline-block h-12 w-64 animate-pulse rounded-md bg-muted" />
+          <span className="inline-block h-10 w-64 animate-pulse rounded-xl bg-muted" />
         )}
       </h1>
-      <p className="mt-3 text-sm text-muted-foreground">{subLine}</p>
+      <p className="mt-2 type-body-sm text-muted-foreground">{subLine}</p>
     </header>
   );
 }

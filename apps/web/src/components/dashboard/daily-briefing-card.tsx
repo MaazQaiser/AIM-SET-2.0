@@ -47,36 +47,31 @@ export function DailyBriefingCard() {
   }
 
   return (
-    <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-accent/30 p-5 space-y-4">
+    <div className="rounded-2xl border border-border/50 bg-card p-5 space-y-4 shadow-card">
       <div className="flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-primary" />
-        <span className="text-sm font-semibold text-foreground">Daily briefing</span>
+        <Sparkles className="h-4 w-4 text-warning" />
+        <span className="type-title text-foreground">Daily briefing</span>
         <AIGeneratedBadge />
       </div>
-      <p className="text-sm leading-relaxed text-foreground/90">{paragraph}</p>
-      <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-primary/10">
+      <p className="type-body-sm leading-relaxed text-foreground/90">{paragraph}</p>
+      <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/50">
         {revenue && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-background border px-2.5 py-0.5 text-xs font-semibold">
+          <span className="inline-flex items-center gap-1 rounded-full bg-muted border border-border/50 px-2.5 py-0.5 type-caption font-semibold">
             <DollarSign className="h-3 w-3 text-success" />
             Top opp: {revenue}
           </span>
         )}
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium",
-            "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
-          )}
-        >
+        <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-muted px-2.5 py-0.5 type-caption font-medium text-foreground">
           <Target className="h-3 w-3" />
           {stage}
         </span>
         {todaysCalls.length > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-background border px-2.5 py-0.5 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-muted px-2.5 py-0.5 type-caption text-muted-foreground">
             {todaysCalls.length} call{todaysCalls.length !== 1 ? "s" : ""} today
           </span>
         )}
         {highPriorityTodos > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2.5 py-0.5 text-xs font-medium text-warning">
+          <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2.5 py-0.5 type-caption font-medium text-warning">
             <AlertCircle className="h-3 w-3" />
             {highPriorityTodos} high-priority action{highPriorityTodos !== 1 ? "s" : ""}
           </span>

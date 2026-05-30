@@ -28,7 +28,7 @@ export function AgentConfigPageClient({ agentId, label }: AgentConfigPageClientP
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="p-6 space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center gap-2">
         <Link
           href="/agents"

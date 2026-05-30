@@ -22,23 +22,23 @@
 @layer utilities {
   .type-display {
     font-size: var(--text-display);
-    line-height: 1;
-    font-weight: 700;
-    letter-spacing: 0;
+    line-height: var(--text-display--line-height);
+    font-weight: var(--text-display--font-weight);
+    letter-spacing: -0.02em;
   }
 
   .type-headline {
     font-size: var(--text-headline);
-    line-height: 1.15;
-    font-weight: 700;
-    letter-spacing: 0;
+    line-height: var(--text-headline--line-height);
+    font-weight: var(--text-headline--font-weight);
+    letter-spacing: -0.015em;
   }
 
   .type-title {
     font-size: var(--text-title);
-    line-height: 1.35;
-    font-weight: 650;
-    letter-spacing: 0;
+    line-height: var(--text-title--line-height);
+    font-weight: var(--text-title--font-weight);
+    letter-spacing: -0.01em;
   }
 
   .type-subtitle {

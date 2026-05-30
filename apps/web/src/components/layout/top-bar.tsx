@@ -13,7 +13,7 @@ export function TopBar() {
   const clerkEnabled = useClerkGate();
 
   return (
-    <header className="relative z-10 flex h-16 items-center justify-between bg-transparent px-6">
+    <header className="relative z-10 flex h-14 items-center justify-between bg-transparent px-6">
       {/* Left: breadcrumb or page title slot */}
       <div id="topbar-title" className="flex items-center gap-3" />
 
@@ -22,16 +22,16 @@ export function TopBar() {
         <PersonaSwitcher />
 
         <Button
-          variant="glass"
-          size="icon-lg"
+          variant="ghost"
+          size="icon"
           aria-label="Search"
         >
           <Search className="h-4 w-4" />
         </Button>
 
         <Button
-          variant="glass"
-          size="icon-lg"
+          variant="ghost"
+          size="icon"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           aria-label="Toggle theme"
         >
@@ -40,21 +40,21 @@ export function TopBar() {
         </Button>
 
         <Button
-          variant="glass"
-          size="icon-lg"
+          variant="ghost"
+          size="icon"
           aria-label="Notifications"
           className="relative"
         >
           <Bell className="h-4 w-4" />
-          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-primary" />
+          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-warning" />
         </Button>
 
         {isLocalAuthBypassEnabled() || !clerkEnabled ? (
-          <div className="ml-1 flex h-11 items-center rounded-full glass px-3 text-xs font-medium text-muted-foreground">
+          <div className="ml-1 flex h-9 items-center rounded-xl border border-border/60 bg-card px-3 type-caption font-medium text-muted-foreground shadow-soft-xs">
             {isLocalAuthBypassEnabled() ? "Local dev" : "Auth not configured"}
           </div>
         ) : (
-          <div className="ml-1 flex h-11 w-11 items-center justify-center rounded-full glass">
+          <div className="ml-1 flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 bg-card shadow-soft-xs">
             <UserButton afterSignOutUrl="/sign-in" />
           </div>
         )}
