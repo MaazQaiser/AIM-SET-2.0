@@ -7,6 +7,8 @@ import { buildDefaultColumnOrder } from "@/lib/dashboard/column-order";
 import type { WidgetSpec } from "@/lib/dashboard/widget-registry";
 import { useDashboardLayoutStore, type LayoutKey } from "@/stores/use-dashboard-layout";
 
+const EMPTY_HIDDEN: string[] = [];
+
 interface LayoutControlsProps<P> {
   layoutKey: LayoutKey;
   widgets: WidgetSpec<P>[];
@@ -15,7 +17,7 @@ interface LayoutControlsProps<P> {
 
 export function LayoutControls<P>({ layoutKey, widgets, widgetProps }: LayoutControlsProps<P>) {
   const isEditing = useDashboardLayoutStore((s) => s.isEditing);
-  const hidden = useDashboardLayoutStore((s) => s.hidden[layoutKey] ?? []);
+  const hidden = useDashboardLayoutStore((s) => s.hidden[layoutKey] ?? EMPTY_HIDDEN);
   const showWidget = useDashboardLayoutStore((s) => s.showWidget);
   const resetColumnLayout = useDashboardLayoutStore((s) => s.resetColumnLayout);
 

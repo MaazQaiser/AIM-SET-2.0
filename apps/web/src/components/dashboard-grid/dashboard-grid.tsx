@@ -16,6 +16,7 @@ import {
 } from "@/stores/use-dashboard-layout";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
+const EMPTY_HIDDEN: string[] = [];
 
 interface DashboardGridProps<P> {
   layoutKey: LayoutKey;
@@ -25,7 +26,7 @@ interface DashboardGridProps<P> {
 
 export function DashboardGrid<P>({ layoutKey, widgets, widgetProps }: DashboardGridProps<P>) {
   const isEditing = useDashboardLayoutStore((s) => s.isEditing);
-  const hidden = useDashboardLayoutStore((s) => s.hidden[layoutKey] ?? []);
+  const hidden = useDashboardLayoutStore((s) => s.hidden[layoutKey] ?? EMPTY_HIDDEN);
   const storedLayouts = useDashboardLayoutStore((s) => s.layouts[layoutKey]);
   const setLayout = useDashboardLayoutStore((s) => s.setLayout);
   const hideWidget = useDashboardLayoutStore((s) => s.hideWidget);

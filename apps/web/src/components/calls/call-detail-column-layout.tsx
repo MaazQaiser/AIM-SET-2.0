@@ -25,6 +25,8 @@ const COLUMN_LABELS: Record<WidgetColumn, string> = {
   center: "Discuss & prep",
   right: "Coverage & completion",
 };
+const EMPTY_HIDDEN: string[] = [];
+const EMPTY_WIDGET_HEIGHTS: Record<string, number> = {};
 
 export function CallDetailColumnLayout<P>({
   layoutKey,
@@ -33,9 +35,9 @@ export function CallDetailColumnLayout<P>({
   centerHeader,
 }: CallDetailColumnLayoutProps<P>) {
   const isEditing = useDashboardLayoutStore((s) => s.isEditing);
-  const hidden = useDashboardLayoutStore((s) => s.hidden[layoutKey] ?? []);
+  const hidden = useDashboardLayoutStore((s) => s.hidden[layoutKey] ?? EMPTY_HIDDEN);
   const storedOrder = useDashboardLayoutStore((s) => s.columnOrder[layoutKey]);
-  const widgetHeights = useDashboardLayoutStore((s) => s.widgetHeights[layoutKey] ?? {});
+  const widgetHeights = useDashboardLayoutStore((s) => s.widgetHeights[layoutKey] ?? EMPTY_WIDGET_HEIGHTS);
   const hideWidget = useDashboardLayoutStore((s) => s.hideWidget);
   const setEditBaseline = useDashboardLayoutStore((s) => s.setEditBaseline);
 

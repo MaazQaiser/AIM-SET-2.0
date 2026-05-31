@@ -17,6 +17,9 @@ import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import type { PostCallCrmTask, PostCallEmailDraft, PostCallJiraTicket } from "@/lib/brief-types";
 
+const EMPTY_ACCOUNT_SNAPSHOT: AccountSnapshotRow[] = [];
+const EMPTY_CRM_TASKS: PostCallCrmTask[] = [];
+
 interface PostDcReviewScreenProps {
   callId: string;
   /** Shown after user ends call from live workspace */
@@ -30,7 +33,7 @@ export function PostDcReviewScreen({
   callId,
   justWrapped = false,
   embedded = false,
-  accountSnapshot = [],
+  accountSnapshot = EMPTY_ACCOUNT_SNAPSHOT,
 }: PostDcReviewScreenProps) {
   const { data: call, isLoading: callLoading } = useCall(callId);
   const { data: review, isLoading: reviewLoading } = usePostCallReview(callId);
@@ -38,7 +41,7 @@ export function PostDcReviewScreen({
   const isEditingLayout = useDashboardLayoutStore((s) => s.isEditing);
   const setEditingLayout = useDashboardLayoutStore((s) => s.setEditing);
   const emailDraft = useDcImportsStore((s) => s.emailDraftsByCallId[callId]);
-  const crmTasks = useDcImportsStore((s) => s.crmTasksByCallId[callId] ?? []);
+  const crmTasks = useDcImportsStore((s) => s.crmTasksByCallId[callId] ?? EMPTY_CRM_TASKS);
   const jiraTicket = useDcImportsStore((s) => s.jiraTicketsByCallId[callId]);
   const setPostCallArtifacts = useDcImportsStore((s) => s.setPostCallArtifacts);
 

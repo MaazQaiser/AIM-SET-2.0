@@ -17,6 +17,7 @@ const ROW_HEIGHT = 48;
 // Single breakpoint — editing is desktop-only so one layout is enough.
 const GRID_BREAKPOINTS = { lg: 0 };
 const GRID_COLS = { lg: 12 };
+const EMPTY_WIDGET_HEIGHTS: Record<string, number> = {};
 
 // Pixel-accurate column boundaries match the static CSS grid
 // grid-cols-[0.22fr_1fr_0.28fr] ≈ 3 / 6 / 3 columns out of 12
@@ -79,7 +80,7 @@ export function EditableColumnGrid<P>({
   widgetProps,
   columnOrder,
 }: EditableColumnGridProps<P>) {
-  const widgetHeights = useDashboardLayoutStore((s) => s.widgetHeights[layoutKey] ?? {});
+  const widgetHeights = useDashboardLayoutStore((s) => s.widgetHeights[layoutKey] ?? EMPTY_WIDGET_HEIGHTS);
   const hideWidget = useDashboardLayoutStore((s) => s.hideWidget);
   const setColumnOrder = useDashboardLayoutStore((s) => s.setColumnOrder);
   const setWidgetHeight = useDashboardLayoutStore((s) => s.setWidgetHeight);
