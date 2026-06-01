@@ -10,7 +10,6 @@ import { LiveKbAssetCard } from "@/components/live/live-kb-asset-card";
 import { LiveCallActionSummary } from "@/components/live/live-call-action-summary";
 import { LiveInsightsDock } from "@/components/live/live-insights-dock";
 import { LivePanelColumn } from "@/components/live/live-panel-column";
-import { PostDcReviewScreen } from "@/components/post-dc/post-dc-review-screen";
 import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import { RecallBotLauncher } from "@/components/live/recall-bot-launcher";
 import { NudgeAlert } from "@/components/nudge-alert";
@@ -127,7 +126,7 @@ export default function LiveCallPage({ params }: LivePageParams) {
   );
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex items-center gap-3 border-b border-border bg-card px-4 py-2 shrink-0">
         <Button asChild variant="ghost" size="icon" className="h-7 w-7">
           <Link href={`/calls/${callId}`}>
@@ -148,6 +147,7 @@ export default function LiveCallPage({ params }: LivePageParams) {
             accountName={accountName}
             hasReview={Boolean(postReview)}
             showLiveLink={false}
+            showPostDcLink={false}
             variant="compact"
           />
           <RecallBotLauncher callId={callId} meetingUrl={call?.meetingUrl} />
@@ -155,8 +155,8 @@ export default function LiveCallPage({ params }: LivePageParams) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden">
-        <div className="hidden xl:grid xl:grid-cols-[minmax(220px,0.42fr)_minmax(260px,300px)_minmax(200px,0.22fr)_minmax(180px,0.2fr)_minmax(260px,0.28fr)] h-full divide-x divide-border">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="hidden xl:grid xl:grid-cols-[minmax(220px,0.42fr)_minmax(260px,300px)_minmax(200px,0.22fr)_minmax(180px,0.2fr)_minmax(260px,0.28fr)] h-full min-h-0 divide-x divide-border">
           <LivePanelColumn
             title="Transcript"
             defaultOpen
@@ -283,7 +283,7 @@ export default function LiveCallPage({ params }: LivePageParams) {
           />
         </div>
 
-        <div className="xl:hidden h-full flex flex-col">
+        <div className="xl:hidden flex min-h-0 flex-1 flex-col">
           <FocusAreasBar
             areas={focusAreas}
             intentLabel={intentLabel}
@@ -293,7 +293,7 @@ export default function LiveCallPage({ params }: LivePageParams) {
             value={activePanel ?? "transcript"}
             onValueChange={(v: string) =>
               setActivePanel(
-                v as "transcript" | "insights" | "signals" | "kb" | "chat" | "wrap-up"
+                v as "transcript" | "insights" | "signals" | "kb" | "chat"
               )
             }
             className="flex flex-col h-full flex-1 min-h-0"
@@ -313,9 +313,6 @@ export default function LiveCallPage({ params }: LivePageParams) {
               </TabsTrigger>
               <TabsTrigger value="chat" className="text-xs">
                 Pod chat
-              </TabsTrigger>
-              <TabsTrigger value="wrap-up" className="text-xs">
-                Wrap-up
               </TabsTrigger>
             </TabsList>
 
@@ -409,9 +406,6 @@ export default function LiveCallPage({ params }: LivePageParams) {
                 transcriptLineCount={transcript.length}
                 hasObjections={objections.length > 0}
               />
-            </TabsContent>
-            <TabsContent value="wrap-up" className="flex-1 overflow-y-auto m-0 p-0">
-              <PostDcReviewScreen callId={callId} embedded />
             </TabsContent>
           </Tabs>
         </div>

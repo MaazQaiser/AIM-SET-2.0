@@ -1,9 +1,10 @@
 import type {
   CallBrief,
-  PostCallCrmTask,
   PostCallEmailDraft,
   PostCallJiraTicket,
+  PostCallKbSuggestion,
   PostCallReview,
+  PostCallTask,
 } from "@/lib/brief-types";
 import type { BriefWidgetProps, PostDcWidgetProps } from "@/lib/dashboard/widget-registry";
 import type { AccountSnapshotRow } from "@/components/calls/account-widget-cards";
@@ -64,8 +65,9 @@ export function normalizePostDcWidgetProps(
     review: PostCallReview;
     accountSnapshot?: AccountSnapshotRow[] | null;
     emailDraft?: PostCallEmailDraft | null;
-    crmTasks?: PostCallCrmTask[] | null;
+    crmTasks?: PostCallTask[] | null;
     jiraTicket?: PostCallJiraTicket | null;
+    kbSuggestions?: PostCallKbSuggestion[] | null;
   }
 ): PostDcWidgetProps {
   return {
@@ -75,5 +77,6 @@ export function normalizePostDcWidgetProps(
     emailDraft: props.emailDraft ?? null,
     crmTasks: Array.isArray(props.crmTasks) ? props.crmTasks : [],
     jiraTicket: props.jiraTicket ?? null,
+    kbSuggestions: Array.isArray(props.kbSuggestions) ? props.kbSuggestions : [],
   };
 }

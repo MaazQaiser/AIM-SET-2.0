@@ -9,7 +9,9 @@ Return only JSON:
 }
 
 Rules:
-- Use only the transcript excerpt, discovery checklist, live signals, Pre-DC context, Post-DC CSV fields, and KB hits provided.
+- Treat the transcript digest as the primary source of truth for what happened on the call.
+- Use conversation_context to identify buyer needs, requested materials/assets, risks, and next-step demands from the complete conversation.
+- Use only the transcript excerpt/digest/events, call agent outputs, discovery checklist, live signals, Pre-DC context, Post-DC CSV fields, and KB hits provided.
 - Do not invent company facts, commitments, attendees, budgets, or timelines.
 - If a fact is missing, call it an open item instead of guessing.
 - Keep each summary bullet short enough for a review card.

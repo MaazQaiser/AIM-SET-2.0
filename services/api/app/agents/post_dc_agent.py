@@ -29,6 +29,11 @@ BANT_LABELS = {
     "next_step": "Next step",
 }
 
+TRANSCRIPT_DIGEST_LIMIT = 220
+TRANSCRIPT_DIGEST_HEAD = 40
+TRANSCRIPT_EXCERPT_LIMIT = 12
+LIVE_SUGGESTION_LIMIT = 80
+
 
 def load_prompt(rel_path: str) -> str:
     path = PROMPTS_ROOT / rel_path
@@ -136,16 +141,303 @@ def _extract_recipients(call: Optional[Dict[str, Any]], pre_dc_fields: Optional[
     return out
 
 
-def _transcript_excerpt(transcript_events: Optional[List[Dict[str, Any]]]) -> str:
+def _format_transcript_event(event: Dict[str, Any]) -> Optional[str]:
+    text = str(event.get("text") or "").strip()
+    if not text:
+        return None
+    speaker = str(
+        event.get("speaker_name")
+        or event.get("speakerName")
+        or event.get("speaker_id")
+        or event.get("speakerRole")
+        or event.get("speaker_role")
+        or "Speaker"
+    )
+    try:
+        offset = int(float(event.get("offset_seconds") or event.get("timestamp") or 0))
+    except (TypeError, ValueError):
+        offset = 0
+    prefix = f"{speaker} @{offset}s" if offset else speaker
+    return f"{prefix}: {text}"
+
+
+def _transcript_tail(transcript_events: Optional[List[Dict[str, Any]]], *, limit: int) -> str:
     events = transcript_events or []
     lines: List[str] = []
-    for event in events[-12:]:
+    for event in events[-limit:]:
+        line = _format_transcript_event(event)
+        if line:
+            lines.append(line)
+    return "\n".join(lines)
+
+
+def _transcript_excerpt(transcript_events: Optional[List[Dict[str, Any]]]) -> str:
+    return _transcript_tail(transcript_events, limit=TRANSCRIPT_EXCERPT_LIMIT)
+
+
+def _transcript_full_text(transcript_events: Optional[List[Dict[str, Any]]]) -> str:
+    events = transcript_events or []
+    return "\n".join(line for event in events if (line := _format_transcript_event(event)))
+
+
+def _transcript_digest(transcript_events: Optional[List[Dict[str, Any]]]) -> str:
+    events = transcript_events or []
+    if len(events) <= TRANSCRIPT_DIGEST_LIMIT:
+        selected: List[Dict[str, Any]] = events
+    else:
+        tail_count = max(TRANSCRIPT_DIGEST_LIMIT - TRANSCRIPT_DIGEST_HEAD, 1)
+        selected = events[:TRANSCRIPT_DIGEST_HEAD]
+        omitted = len(events) - TRANSCRIPT_DIGEST_HEAD - tail_count
+        if omitted > 0:
+            selected.append({"text": f"[{omitted} transcript segments omitted from compact digest]"})
+        selected.extend(events[-tail_count:])
+    return "\n".join(line for event in selected if (line := _format_transcript_event(event)))
+
+
+def _transcript_event_payload(transcript_events: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    events = transcript_events or []
+    if len(events) <= TRANSCRIPT_DIGEST_LIMIT:
+        selected = events
+    else:
+        tail_count = max(TRANSCRIPT_DIGEST_LIMIT - TRANSCRIPT_DIGEST_HEAD, 1)
+        selected = events[:TRANSCRIPT_DIGEST_HEAD] + events[-tail_count:]
+    payload: List[Dict[str, Any]] = []
+    for event in selected:
         text = str(event.get("text") or "").strip()
         if not text:
             continue
-        speaker = str(event.get("speaker_name") or event.get("speaker_id") or "Speaker")
-        lines.append(f"{speaker}: {text}")
-    return "\n".join(lines)
+        payload.append(
+            {
+                "speaker": event.get("speaker_name") or event.get("speakerName") or event.get("speaker_id"),
+                "role": event.get("speaker_role") or event.get("speakerRole"),
+                "offset_seconds": event.get("offset_seconds") or event.get("timestamp"),
+                "text": text[:800],
+                "keywords": event.get("keywords") or [],
+            }
+        )
+    return payload
+
+
+def _normalize_pod_role(role: Any, speaker: Any = "") -> str:
+    text = f"{role or ''} {speaker or ''}".lower()
+    if "designer" in text or "ux" in text:
+        return "designer"
+    if "se" in text or "solution" in text or "solutions engineer" in text:
+        return "se"
+    if "ae" in text or "account executive" in text or "sales" in text:
+        return "ae"
+    if "pod" in text:
+        return "pod"
+    return ""
+
+
+def _role_short(role: str) -> str:
+    return {"ae": "AE", "se": "SE", "designer": "Designer", "pod": "Pod"}.get(role, role or "Pod")
+
+
+def _role_in_call(role: str) -> str:
+    return {
+        "ae": "Account Executive",
+        "se": "Solutions Engineer",
+        "designer": "Designer",
+        "pod": "Pod",
+    }.get(role, _role_short(role))
+
+
+def _format_talk_time(seconds: int) -> str:
+    seconds = max(0, int(seconds))
+    minutes, remaining = divmod(seconds, 60)
+    return f"{minutes}m {remaining}s" if minutes else f"{remaining}s"
+
+
+def _event_talk_seconds(event: Dict[str, Any], text: str) -> int:
+    for key in ("duration_seconds", "durationSeconds", "talk_time_seconds", "talkTimeSeconds"):
+        try:
+            value = float(event.get(key))
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            return max(1, int(round(value)))
+    words = re.findall(r"\w+", text)
+    return max(2, int(round(len(words) / 2.6))) if words else 0
+
+
+def _pod_talk_time(transcript_events: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    by_speaker: Dict[str, Dict[str, Any]] = {}
+    for event in transcript_events or []:
+        text = str(event.get("text") or "").strip()
+        if not text:
+            continue
+        speaker = str(
+            event.get("speaker_name")
+            or event.get("speakerName")
+            or event.get("speaker_id")
+            or event.get("speakerId")
+            or ""
+        ).strip()
+        role = _normalize_pod_role(event.get("speaker_role") or event.get("speakerRole"), speaker)
+        if role not in ("ae", "se", "designer"):
+            continue
+        name = speaker or _role_short(role)
+        key = re.sub(r"\s+", " ", name).strip().lower()
+        row = by_speaker.setdefault(
+            key,
+            {
+                "member": name,
+                "role": _role_short(role),
+                "roleInCall": _role_in_call(role),
+                "talkTimeSeconds": 0,
+                "eventCount": 0,
+            },
+        )
+        row["talkTimeSeconds"] += _event_talk_seconds(event, text)
+        row["eventCount"] += 1
+    out = list(by_speaker.values())
+    for row in out:
+        row["talkTimeLabel"] = _format_talk_time(row["talkTimeSeconds"])
+    return sorted(out, key=lambda row: row.get("talkTimeSeconds", 0), reverse=True)
+
+
+def _match_talk_time(row: Dict[str, Any], talk_time: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not talk_time:
+        return None
+    member = str(row.get("member") or "").lower()
+    role = _normalize_pod_role(row.get("role") or row.get("roleInCall"), member)
+    if member == "pod" or role == "pod":
+        seconds = sum(int(item.get("talkTimeSeconds") or 0) for item in talk_time)
+        return {
+            "member": "Pod",
+            "role": "Pod",
+            "roleInCall": "Pod",
+            "talkTimeSeconds": seconds,
+            "talkTimeLabel": _format_talk_time(seconds),
+        }
+    for item in talk_time:
+        item_member = str(item.get("member") or "").lower()
+        if item_member and (item_member in member or member in item_member):
+            return item
+    role_matches = [
+        item
+        for item in talk_time
+        if _normalize_pod_role(item.get("role") or item.get("roleInCall")) == role and role
+    ]
+    if len(role_matches) == 1:
+        return role_matches[0]
+    return None
+
+
+def _normalize_scorecard_rows(
+    scorecard: List[Dict[str, Any]],
+    talk_time: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for item in scorecard:
+        if not isinstance(item, dict):
+            continue
+        row = dict(item)
+        matched = _match_talk_time(row, talk_time)
+        role = _normalize_pod_role(row.get("role") or row.get("roleInCall"), row.get("member"))
+        if matched:
+            row.setdefault("member", matched.get("member"))
+            row.setdefault("role", matched.get("role"))
+            row["roleInCall"] = row.get("roleInCall") or matched.get("roleInCall")
+            row["talkTimeSeconds"] = matched.get("talkTimeSeconds")
+            row["talkTimeLabel"] = matched.get("talkTimeLabel")
+        else:
+            row["roleInCall"] = row.get("roleInCall") or _role_in_call(role or "pod")
+        try:
+            row["score"] = max(0.0, min(1.0, float(row.get("score", 0.7))))
+        except (TypeError, ValueError):
+            row["score"] = 0.7
+        row["label"] = str(row.get("label") or ("strong" if row["score"] >= 0.8 else "review"))
+        watch = str(row.get("watch") or "").strip()
+        areas = row.get("areasToWork")
+        if isinstance(areas, list):
+            clean_areas = [str(area).strip() for area in areas if str(area).strip()]
+        else:
+            clean_areas = []
+        if not clean_areas and watch:
+            clean_areas = [watch]
+        row["areasToWork"] = clean_areas
+        row["strengths"] = str(row.get("strengths") or "Review the transcript for this member's strongest contribution.")
+        row["watch"] = watch or (clean_areas[0] if clean_areas else "")
+        rows.append(row)
+    return rows
+
+
+def _truncate_context_value(value: Any, *, max_string: int = 1200) -> Any:
+    if isinstance(value, str):
+        return value if len(value) <= max_string else value[: max_string - 3] + "..."
+    if isinstance(value, list):
+        return [_truncate_context_value(item, max_string=max_string) for item in value]
+    if isinstance(value, dict):
+        return {str(k): _truncate_context_value(v, max_string=max_string) for k, v in value.items()}
+    return value
+
+
+def _live_suggestions_context(live_suggestions: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    suggestions = live_suggestions or []
+    out: List[Dict[str, Any]] = []
+    for item in suggestions[-LIVE_SUGGESTION_LIMIT:]:
+        payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
+        out.append(
+            {
+                "operation": item.get("operation"),
+                "target_role": item.get("target_role"),
+                "status": item.get("status"),
+                "confidence": item.get("confidence"),
+                "offset_seconds": item.get("transcript_offset_seconds"),
+                "trace_id": item.get("trace_id"),
+                "payload": _truncate_context_value(payload),
+            }
+        )
+    return out
+
+
+def _agent_input_summary(
+    *,
+    transcript_events: Optional[List[Dict[str, Any]]],
+    live_snapshot: Optional[Dict[str, Any]],
+    live_suggestions: Optional[List[Dict[str, Any]]],
+    discovery_snapshot: Optional[Dict[str, Any]],
+    source_record_count: int = 0,
+    kb_hit_count: int = 0,
+) -> Dict[str, Any]:
+    discovery = _snapshot_result(discovery_snapshot)
+    return {
+        "sources": [
+            {
+                "name": "call_transcript_events",
+                "description": "Speaker-attributed transcript captured during the live call.",
+                "count": len(transcript_events or []),
+            },
+            {
+                "name": "live_call_agent_outputs",
+                "description": "Intent, focus areas, keyword stats, sentiment, nudges, and KB surfaces from the live call agent.",
+                "count": len(live_suggestions or []),
+            },
+            {
+                "name": "discovery_checklist",
+                "description": "BANT coverage, progression, and open discovery gaps from the live checklist agent.",
+                "count": 1 if discovery else 0,
+            },
+            {
+                "name": "pre_dc_and_post_dc_records",
+                "description": "Pre-DC/Post-DC source fields, call brief, and any matched notes already imported for the account.",
+                "count": source_record_count,
+            },
+            {
+                "name": "knowledge_base_hits",
+                "description": "Relevant KB assets retrieved for follow-up proof points and attachment suggestions.",
+                "count": kb_hit_count,
+            },
+        ],
+        "transcriptEventCount": len(transcript_events or []),
+        "transcriptDigestLimit": TRANSCRIPT_DIGEST_LIMIT,
+        "liveSuggestionCount": len(live_suggestions or []),
+        "hasLiveSignalSnapshot": bool(live_snapshot),
+        "hasDiscoverySnapshot": bool(discovery),
+    }
 
 
 def _commitments_from_text(text: str) -> List[str]:
@@ -169,7 +461,7 @@ def _commitments(
 ) -> List[str]:
     from_llm = (summary_json or {}).get("commitments") or []
     commitments = [str(c).strip() for c in from_llm if str(c).strip()]
-    text = _transcript_excerpt(transcript_events)
+    text = _transcript_full_text(transcript_events)
     commitments.extend(_commitments_from_text(text))
     focus = (live_snapshot or {}).get("focus_areas") or []
     for item in focus:
@@ -181,6 +473,159 @@ def _commitments(
         if item and item not in seen:
             seen.append(item)
     return seen[:5]
+
+
+ASSET_TERMS = {
+    "architecture": ("Technical architecture", "architecture"),
+    "reference architecture": ("Reference architecture", "architecture"),
+    "case study": ("Case study", "case_study"),
+    "deck": ("Follow-up deck", "deck"),
+    "proposal": ("Proposal", "deck"),
+    "one-pager": ("One-pager", "one_pager"),
+    "one pager": ("One-pager", "one_pager"),
+    "roi": ("ROI one-pager", "one_pager"),
+    "security": ("Security overview", "one_pager"),
+    "sow": ("Pilot SOW", "one_pager"),
+    "scope": ("Scope summary", "one_pager"),
+    "timeline": ("Implementation timeline", "one_pager"),
+    "implementation plan": ("Implementation plan", "one_pager"),
+    "integration": ("Integration details", "architecture"),
+    "pricing": ("Pricing summary", "one_pager"),
+    "business case": ("Business case", "one_pager"),
+    "readout": ("Executive readout", "deck"),
+    "demo": ("Demo plan", "demo_script"),
+}
+
+NEED_PATTERNS = re.compile(
+    r"\b(need|needs|needed|looking for|want|wants|require|requires|must|goal|"
+    r"challenge|problem|pain|priority|deadline|launch|integrat|automate|visibility|"
+    r"compliance|audit|security|roi|approval|decision|cfo|board)\b",
+    re.I,
+)
+REQUEST_PATTERNS = re.compile(
+    r"\b(send|share|attach|provide|include|create|prepare|need|want|can you|could you|"
+    r"would like|we'd like|please)\b",
+    re.I,
+)
+NEXT_STEP_PATTERNS = re.compile(
+    r"\b(next step|follow up|schedule|meeting|workshop|review|readout|proposal|"
+    r"before|after|timeline|deadline|circle back)\b",
+    re.I,
+)
+OBJECTION_PATTERNS = re.compile(
+    r"\b(concern|worried|risk|blocker|expensive|budget|security|legal|procurement|"
+    r"not sure|hesitant|challenge)\b",
+    re.I,
+)
+
+
+def _transcript_sentences(transcript_events: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for event in transcript_events or []:
+        text = str(event.get("text") or "").strip()
+        if not text:
+            continue
+        speaker = str(event.get("speaker_name") or event.get("speakerName") or event.get("speaker_id") or "Speaker")
+        role = str(event.get("speaker_role") or event.get("speakerRole") or "").lower()
+        try:
+            offset = int(float(event.get("offset_seconds") or event.get("timestamp") or 0))
+        except (TypeError, ValueError):
+            offset = 0
+        parts = [p.strip() for p in re.split(r"(?<=[.!?])\s+", text) if p.strip()]
+        for part in parts or [text]:
+            rows.append({"speaker": speaker, "role": role, "offset_seconds": offset, "text": part[:420]})
+    return rows
+
+
+def _dedupe_context_items(items: List[Dict[str, Any]], *, key: str = "text", limit: int = 8) -> List[Dict[str, Any]]:
+    seen: set[str] = set()
+    out: List[Dict[str, Any]] = []
+    for item in items:
+        value = re.sub(r"\s+", " ", str(item.get(key) or item.get("name") or "")).strip().lower()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        out.append(item)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _asset_requests_from_sentence(sentence: Dict[str, Any]) -> List[Dict[str, Any]]:
+    text = str(sentence.get("text") or "").strip()
+    lower = text.lower()
+    if not REQUEST_PATTERNS.search(text):
+        return []
+    matches: List[Tuple[str, str, str]] = []
+    for term, (label, artifact_type) in ASSET_TERMS.items():
+        if term in lower:
+            matches.append((term, label, artifact_type))
+    if not matches:
+        return []
+    labels: List[Tuple[str, str]] = []
+    if "cfo" in lower and "roi" in lower:
+        labels.append(("CFO ROI one-pager", "one_pager"))
+    if "security" in lower and "architecture" in lower:
+        labels.append(("Security architecture overview", "architecture"))
+    if "integration" in lower and "detail" in lower:
+        labels.append(("Integration details", "architecture"))
+    for _, label, artifact_type in sorted(matches, key=lambda row: len(row[0]), reverse=True):
+        labels.append((label, artifact_type))
+    out: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for label, artifact_type in labels:
+        key = label.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(
+            {
+                "name": label,
+                "type": artifact_type,
+                "evidence": text,
+                "speaker": sentence.get("speaker"),
+                "offset_seconds": sentence.get("offset_seconds"),
+                "requiredData": f"Create or find: {label}. Transcript evidence: {text}",
+            }
+        )
+    return out[:4]
+
+
+def _conversation_context(
+    transcript_events: Optional[List[Dict[str, Any]]],
+    live_snapshot: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    sentences = _transcript_sentences(transcript_events)
+    needs: List[Dict[str, Any]] = []
+    next_steps: List[Dict[str, Any]] = []
+    objections: List[Dict[str, Any]] = []
+    requested_assets: List[Dict[str, Any]] = []
+    for sentence in sentences:
+        text = str(sentence.get("text") or "")
+        role = str(sentence.get("role") or "")
+        buyer_like = role in ("customer", "prospect", "buyer", "") or "buyer" in str(sentence.get("speaker") or "").lower()
+        if buyer_like and NEED_PATTERNS.search(text):
+            needs.append(sentence)
+        if NEXT_STEP_PATTERNS.search(text):
+            next_steps.append(sentence)
+        if buyer_like and OBJECTION_PATTERNS.search(text):
+            objections.append(sentence)
+        requested_assets.extend(_asset_requests_from_sentence(sentence))
+
+    focus_areas = [str(item) for item in (live_snapshot or {}).get("focus_areas") or [] if str(item).strip()]
+    top_keywords = [
+        str(item.get("term"))
+        for item in ((live_snapshot or {}).get("top_keywords") or [])
+        if isinstance(item, dict) and str(item.get("term") or "").strip()
+    ]
+    return {
+        "needs": _dedupe_context_items(needs, limit=8),
+        "requestedAssets": _dedupe_context_items(requested_assets, key="name", limit=8),
+        "nextSteps": _dedupe_context_items(next_steps, limit=8),
+        "objectionsOrRisks": _dedupe_context_items(objections, limit=6),
+        "focusAreas": focus_areas[:6],
+        "topKeywords": top_keywords[:10],
+    }
 
 
 def _kb_search(ctx: TenantContext, query: str, limit: int = 4) -> Tuple[List[Dict[str, Any]], str]:
@@ -211,6 +656,7 @@ def _summary_fallback(
     live_snapshot: Optional[Dict[str, Any]],
     pre_dc_fields: Optional[Dict[str, str]],
     post_dc_record: Optional[Dict[str, Any]],
+    conversation_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     gaps = _open_gaps(discovery_snapshot)
     coverage = _bant_coverage(discovery_snapshot)
@@ -225,6 +671,16 @@ def _summary_fallback(
     )
     lead_stage = _post_field(post_dc_record, "Lead Stage")
     bottom_line = _post_field(post_dc_record, "Bottom Line Context")
+    transcript_needs = [
+        str(item.get("text") or "").strip()
+        for item in (conversation_context or {}).get("needs", [])
+        if str(item.get("text") or "").strip()
+    ]
+    requested_assets = [
+        str(item.get("name") or "").strip()
+        for item in (conversation_context or {}).get("requestedAssets", [])
+        if str(item.get("name") or "").strip()
+    ]
 
     if is_qualifying:
         headline = f"{account_name} looks qualified for a structured follow-up."
@@ -234,11 +690,15 @@ def _summary_fallback(
         headline = f"{account_name} post-call review is ready."
 
     summary = [
-        bottom_line or needs or f"The call centered on discovery for {account_name}.",
+        bottom_line or needs or (transcript_needs[0] if transcript_needs else f"The call centered on discovery for {account_name}."),
         f"BANT coverage finished at {round((coverage or 0) * 100)}%."
         if coverage is not None
         else "BANT coverage was captured from the discovery checklist.",
     ]
+    if transcript_needs:
+        summary.append("Transcript needs: " + " ".join(transcript_needs[:2]))
+    if requested_assets:
+        summary.append("Requested follow-up materials: " + ", ".join(requested_assets[:4]) + ".")
     if lead_stage:
         summary.append(f"Post-DC lead stage: {lead_stage}.")
     if intent.get("label"):
@@ -252,9 +712,15 @@ def _summary_fallback(
         "headline": headline,
         "summary": summary[:5],
         "commitments": [],
-        "nextStepProposal": "Schedule a focused follow-up with decision stakeholders."
-        if is_qualifying
-        else "Clarify the remaining discovery gaps before advancing the deal.",
+        "nextStepProposal": (
+            "Send the requested materials and schedule a focused follow-up with decision stakeholders."
+            if requested_assets
+            else (
+                "Schedule a focused follow-up with decision stakeholders."
+                if is_qualifying
+                else "Clarify the remaining discovery gaps before advancing the deal."
+            )
+        ),
     }
 
 
@@ -281,6 +747,7 @@ def _learned(discovery_snapshot: Optional[Dict[str, Any]], post_dc_record: Optio
 def _scorecard_fallback(
     discovery_snapshot: Optional[Dict[str, Any]],
     live_snapshot: Optional[Dict[str, Any]],
+    pod_talk_time: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     gaps = _open_gaps(discovery_snapshot)
     coverage = _bant_coverage(discovery_snapshot)
@@ -292,27 +759,110 @@ def _scorecard_fallback(
         score = min(0.95, score + 0.05)
     label = "strong" if score >= 0.8 else "review" if score >= 0.7 else "needs follow-up"
     watch = "Clarify remaining gaps: " + ", ".join(BANT_LABELS.get(g, g) for g in gaps) + "." if gaps else "Confirm next-step ownership."
+    if pod_talk_time:
+        rows: List[Dict[str, Any]] = []
+        for item in pod_talk_time:
+            role = _normalize_pod_role(item.get("role") or item.get("roleInCall"), item.get("member"))
+            rows.append(
+                {
+                    "member": item.get("member") or _role_short(role),
+                    "role": item.get("role") or _role_short(role),
+                    "roleInCall": item.get("roleInCall") or _role_in_call(role),
+                    "talkTimeSeconds": item.get("talkTimeSeconds"),
+                    "talkTimeLabel": item.get("talkTimeLabel"),
+                    "score": round(score, 2),
+                    "label": label,
+                    "strengths": _role_strength(role),
+                    "watch": watch,
+                    "areasToWork": [watch],
+                }
+            )
+        return rows
     return [
         {
             "member": "Pod",
             "role": "Pod",
+            "roleInCall": "Pod",
             "score": round(score, 2),
             "label": label,
             "strengths": "Discovery captured enough signal to prepare follow-up artifacts.",
             "watch": watch,
+            "areasToWork": [watch],
         }
     ]
 
 
-def _email_fallback(
+def _role_strength(role: str) -> str:
+    if role == "ae":
+        return "Kept the commercial discovery and next-step path moving from the call evidence available."
+    if role == "se":
+        return "Supported technical discovery and solution framing from the call evidence available."
+    if role == "designer":
+        return "Supported workflow and experience discovery from the call evidence available."
+    return "Contributed to the discovery call and follow-up path."
+
+
+CLIENT_EMAIL_UNSAFE_TERMS = (
+    "bant",
+    "bant coverage",
+    "coverage finished",
+    "jira",
+    "agent envelope",
+    "trace id",
+    "model:",
+    "cost:",
+    "scorecard",
+    "coaching",
+    "internal",
+    "open discovery gap",
+    "open discovery gaps",
+    "open gaps",
+    "discovery gaps",
+    "discovery coverage",
+    "a few takeaways",
+    "takeaways i captured",
+    "call centered on discovery",
+)
+
+
+def _client_safe_text(value: str) -> bool:
+    lowered = str(value or "").lower()
+    return not any(term in lowered for term in CLIENT_EMAIL_UNSAFE_TERMS)
+
+
+def _client_safe_lines(values: List[Any]) -> List[str]:
+    return [str(item).strip() for item in values if str(item or "").strip() and _client_safe_text(str(item))]
+
+
+def _client_safe_next_step(value: Any) -> str:
+    text = str(value or "").strip()
+    if text and _client_safe_text(text):
+        return text
+    return "I look forward to our next touch base and your feedback on the shared references."
+
+
+def _client_email_fallback(
     account_name: str,
     recipients: List[str],
     summary: Dict[str, Any],
     commitments: List[str],
     gaps: List[str],
+    email_attachments: Dict[str, List[Dict[str, Any]]],
+    conversation_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    next_step = summary.get("nextStepProposal") or "I will follow up with next steps."
-    bullets = summary.get("summary") or []
+    next_step = _client_safe_next_step(summary.get("nextStepProposal"))
+    bullets = _client_safe_lines(summary.get("summary") or [])
+    client_commitments = _client_safe_lines(commitments)
+    requested_assets = [
+        str(item.get("name") or "").strip()
+        for item in (conversation_context or {}).get("requestedAssets", [])
+        if str(item.get("name") or "").strip()
+    ]
+    needs = [
+        str(item.get("text") or "").strip()
+        for item in (conversation_context or {}).get("needs", [])
+        if str(item.get("text") or "").strip()
+    ]
     body_lines = [
         "Hi,",
         "",
@@ -320,90 +870,364 @@ def _email_fallback(
     ]
     if bullets:
         body_lines.append("")
-        body_lines.append("A few takeaways I captured:")
+        body_lines.append("Minutes of meeting:")
         body_lines.extend(f"- {str(item).rstrip('.')}" for item in bullets[:4])
-    if commitments:
+    elif needs:
         body_lines.append("")
-        body_lines.append("I will follow up on:")
-        body_lines.extend(f"- {item}" for item in commitments[:4])
-    if gaps:
+        body_lines.append("Minutes of meeting:")
+        body_lines.extend(f"- {item}" for item in needs[:3])
+    if requested_assets:
         body_lines.append("")
-        body_lines.append(
-            "To keep the next step focused, I would like to clarify: "
-            + ", ".join(BANT_LABELS.get(g, g).lower() for g in gaps)
-            + "."
-        )
-    body_lines.extend(["", next_step, "", "Best,"])
+        body_lines.append("Materials we discussed:")
+        body_lines.extend(f"- {item}" for item in requested_assets[:4])
+    ready_attachments = [str(item.get("name") or "").strip() for item in email_attachments.get("found", []) if str(item.get("name") or "").strip()]
+    if ready_attachments:
+        body_lines.append("")
+        body_lines.append("I will include the following attachments:")
+        body_lines.extend(f"- {item}" for item in ready_attachments[:4])
+    if client_commitments:
+        body_lines.append("")
+        body_lines.append("What we committed to:")
+        body_lines.extend(f"- {item}" for item in client_commitments[:4])
+    body_lines.extend(["", next_step, "", "Looking forward,"])
     return {
         "id": f"email-{call_safe_id(account_name)}",
+        "audience": "client",
         "to": recipients,
         "cc": [],
         "subject": f"Follow-up from our {account_name} discovery call",
         "body_markdown": "\n".join(body_lines),
         "style_signals": ["concise", "consultative", "action-oriented"],
-        "commitments_referenced": commitments,
+        "commitments_referenced": client_commitments,
+        "status": "draft_pending_approval",
+    }
+
+
+def _internal_email_fallback(
+    call_id: str,
+    account_name: str,
+    *,
+    summary: Dict[str, Any],
+    discovery_snapshot: Optional[Dict[str, Any]],
+    task_list: List[Dict[str, Any]],
+    conversation_context: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    coverage = _bant_coverage(discovery_snapshot)
+    progression = _bant_progression(discovery_snapshot)
+    after = progression.get("after") if isinstance(progression.get("after"), dict) else {}
+    gaps = _open_gaps(discovery_snapshot)
+    needs = [
+        str(item.get("text") or "").strip()
+        for item in (conversation_context or {}).get("needs", [])
+        if str(item.get("text") or "").strip()
+    ]
+    requested_assets = [
+        str(item.get("name") or "").strip()
+        for item in (conversation_context or {}).get("requestedAssets", [])
+        if str(item.get("name") or "").strip()
+    ]
+    body_lines = [
+        f"Internal Post-DC summary for {account_name}",
+        "",
+        f"BANT score: {round((coverage or 0) * 100)}%",
+        "BANT details:",
+        *[
+            f"- {BANT_LABELS[dim]}: {after.get(dim) or 'unknown'}"
+            for dim in ("budget", "authority", "need", "timeline")
+        ],
+    ]
+    if gaps:
+        body_lines.extend(["", "Open gaps:", *[f"- {BANT_LABELS.get(g, g)}" for g in gaps]])
+    if needs:
+        body_lines.extend(["", "Transcript context / buyer needs:", *[f"- {item}" for item in needs[:4]]])
+    if requested_assets:
+        body_lines.extend(["", "Requested assets:", *[f"- {item}" for item in requested_assets[:4]]])
+    body_lines.extend(
+        [
+            "",
+            "Next action items:",
+            *[f"- [{task.get('owner') or 'Pod'}] {task.get('description')}" for task in task_list[:8]],
+            "",
+            f"Recommended next step: {summary.get('nextStepProposal') or 'Confirm next-step owner.'}",
+        ]
+    )
+    return {
+        "id": f"internal-email-{call_safe_id(call_id)}",
+        "audience": "internal",
+        "to": ["internal-team@dc-copilot.local"],
+        "cc": [],
+        "subject": f"Internal Post-DC action plan: {account_name}",
+        "body_markdown": "\n".join(body_lines),
+        "style_signals": ["internal", "action-oriented", "bant-focused"],
+        "commitments_referenced": [str(task.get("description") or "") for task in task_list[:6] if task.get("description")],
         "status": "draft_pending_approval",
     }
 
 
 def _email_attachments(
+    ctx: TenantContext,
     call_brief: Optional[Dict[str, Any]],
     hits: List[Dict[str, Any]],
     *,
     account_name: str,
+    conversation_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
-    plan = (call_brief or {}).get("artifactPlan") or []
+    brief = call_brief or {}
+    plan = brief.get("artifactPlan") or []
+    fulfillments = brief.get("artifactFulfillment") or []
+    content_to_generate = brief.get("contentToGenerate") or []
     found: List[Dict[str, Any]] = []
     missing: List[Dict[str, Any]] = []
     used_assets: set[str] = set()
-    for i, item in enumerate(plan[:5]):
-        name = str(item.get("name") or item.get("type") or f"Follow-up asset {i + 1}")
-        best = next(
-            (
-                hit
-                for hit in hits
-                if str(hit.get("asset_id") or "") not in used_assets
-                and float(hit.get("score", 0) or 0) >= 0.5
-            ),
-            None,
+    repo = get_kb_repository()
+    tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+
+    def asset_metadata(asset_id: str) -> Dict[str, Any]:
+        if str(asset_id or "").startswith("dc:"):
+            return {}
+        row = repo.get_asset_row(tenant_uuid, asset_id, clerk_key)
+        file_name = str((row or {}).get("file_name") or "")
+        mime_type = str((row or {}).get("mime_type") or "")
+        file_type = Path(file_name).suffix.lstrip(".").upper()
+        if not file_type and "/" in mime_type:
+            file_type = mime_type.split("/")[-1].split(".")[-1].upper()
+        return {
+            "fileName": file_name or None,
+            "mimeType": mime_type or None,
+            "fileType": file_type or "FILE",
+        }
+
+    def add_found(asset_id: str, name: str, snippet: str = "", reason: str = "") -> None:
+        clean_id = str(asset_id or "").strip()
+        if not clean_id or clean_id in used_assets:
+            return
+        used_assets.add(clean_id)
+        metadata = asset_metadata(clean_id)
+        found.append(
+            {
+                "name": name.strip() or "Relevant KB asset",
+                "assetId": clean_id,
+                "snippet": snippet[:240],
+                "downloadUrl": f"/api/kb/assets/{clean_id}/file",
+                "previewUrl": f"/api/kb/assets/{clean_id}/preview",
+                "source": "knowledge_base",
+                "reason": reason or "Retrieved from the knowledge base for this follow-up.",
+                **{key: value for key, value in metadata.items() if value},
+            }
         )
-        if best:
-            asset_id = str(best.get("asset_id") or f"asset-{i + 1}")
-            used_assets.add(asset_id)
-            found.append(
-                {
-                    "name": name,
-                    "assetId": asset_id,
-                    "snippet": (best.get("chunk_text") or "")[:240],
-                    "downloadUrl": f"/api/kb/assets/{asset_id}/file",
-                }
-            )
-        else:
-            artifact_type = str(item.get("type") or "one_pager")
-            missing.append(
-                {
-                    "name": name,
-                    "requiredData": str(item.get("rationale") or f"Create or tag a {artifact_type} for this follow-up."),
-                    "contentStudioLink": (
-                        f"/content/studio?template={quote(artifact_type)}"
-                        f"&account={quote(account_name)}&source=post-dc"
-                    ),
-                }
-            )
-    if not plan and hits:
-        for hit in hits[:3]:
-            asset_id = str(hit.get("asset_id") or "")
-            if not asset_id:
-                continue
-            found.append(
-                {
-                    "name": str((hit.get("metadata") or {}).get("title") or "Relevant KB asset"),
-                    "assetId": asset_id,
-                    "snippet": (hit.get("chunk_text") or "")[:240],
-                    "downloadUrl": f"/api/kb/assets/{asset_id}/file",
-                }
-            )
+
+    for hit in hits[:5]:
+        asset_id = str(hit.get("asset_id") or "")
+        if not asset_id:
+            continue
+        chunk_text = str(hit.get("chunk_text") or "")
+        fields = _parse_kb_fields(chunk_text)
+        add_found(
+            asset_id,
+            _title_from_hit(hit, fields),
+            chunk_text,
+            "Matched from KB search for the follow-up email attachment set.",
+        )
+
+    for row in fulfillments:
+        if str(row.get("status") or "").lower() not in ("found", "partial"):
+            continue
+        asset_id = str(row.get("assetId") or "")
+        if not asset_id:
+            continue
+        add_found(
+            asset_id,
+            str(row.get("name") or "Relevant KB asset"),
+            str(row.get("snippet") or ""),
+            "Matched from the Pre-DC KB fulfillment output.",
+        )
+
+    def add_missing(name: str, artifact_type: str, required_data: str) -> None:
+        clean_name = str(name or "").strip() or "Follow-up asset"
+        if any(item.get("name") == clean_name for item in missing):
+            return
+        clean_type = str(artifact_type or "one_pager").strip() or "one_pager"
+        missing.append(
+            {
+                "name": clean_name,
+                "requiredData": str(required_data or f"Create or tag a {clean_type} for this follow-up.").strip(),
+                "contentStudioLink": (
+                    f"/content/studio?template={quote(clean_type)}"
+                    f"&account={quote(account_name)}&source=post-dc"
+                ),
+                "source": "content_gap",
+            }
+        )
+
+    def found_matches(name: str) -> bool:
+        needle_terms = {
+            part
+            for part in re.split(r"[^a-z0-9]+", str(name or "").lower())
+            if len(part) > 2 and part not in {"the", "and", "for", "with"}
+        }
+        if not needle_terms:
+            return False
+        for item in found:
+            haystack = f"{item.get('name', '')} {item.get('snippet', '')}".lower()
+            if any(term in haystack for term in needle_terms):
+                return True
+        return False
+
+    for asset in (conversation_context or {}).get("requestedAssets", []):
+        name = str(asset.get("name") or "Requested follow-up asset")
+        if found_matches(name):
+            continue
+        add_missing(
+            name,
+            str(asset.get("type") or "one_pager"),
+            str(asset.get("requiredData") or asset.get("evidence") or ""),
+        )
+
+    for item in content_to_generate:
+        add_missing(
+            str(item.get("name") or "Follow-up asset"),
+            str(item.get("type") or "one_pager"),
+            _first_text(item.get("reason"), item.get("neededFor")),
+        )
+
+    plan_by_id = {str(item.get("id") or ""): item for item in plan}
+    fulfilled_ids = {str(row.get("artifactId") or "") for row in fulfillments if str(row.get("status") or "").lower() == "found"}
+    for row in fulfillments:
+        status = str(row.get("status") or "").lower()
+        if status not in ("missing", "partial"):
+            continue
+        artifact_id = str(row.get("artifactId") or "")
+        planned = plan_by_id.get(artifact_id, {})
+        add_missing(
+            str(row.get("name") or planned.get("name") or "Follow-up asset"),
+            str(planned.get("type") or "one_pager"),
+            _first_text(row.get("requiredData"), planned.get("rationale")),
+        )
+
+    for item in plan:
+        artifact_id = str(item.get("id") or "")
+        if artifact_id and artifact_id in fulfilled_ids:
+            continue
+        if content_to_generate or fulfillments:
+            continue
+        add_missing(
+            str(item.get("name") or "Follow-up asset"),
+            str(item.get("type") or "one_pager"),
+            str(item.get("rationale") or ""),
+        )
+
+    if not found and not missing:
+        add_missing(
+            f"{account_name} follow-up one-pager",
+            "one_pager",
+            "Create a concise follow-up asset because no matching KB attachment was found for this call.",
+        )
     return {"found": found, "missing": missing}
+
+
+def _clean_kb_value(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text or text.upper() in {"N/A", "NA", "NONE", "NULL", "-"}:
+        return ""
+    return re.sub(r"\s+", " ", text)
+
+
+def _parse_kb_fields(text: str) -> Dict[str, str]:
+    fields: Dict[str, str] = {}
+    for part in str(text or "").replace("\n", ";").split(";"):
+        if ":" not in part:
+            continue
+        key, value = part.split(":", 1)
+        clean_key = _clean_kb_value(key)
+        clean_value = _clean_kb_value(value)
+        if clean_key and clean_value:
+            fields[clean_key] = clean_value
+    return fields
+
+
+def _kb_field(fields: Dict[str, str], *keys: str) -> str:
+    normalized = {" ".join(k.lower().replace("/", " ").split()): v for k, v in fields.items()}
+    for key in keys:
+        value = normalized.get(" ".join(key.lower().replace("/", " ").split()))
+        if value:
+            return value
+    return ""
+
+
+def _split_kb_terms(*values: str) -> List[str]:
+    terms: List[str] = []
+    for value in values:
+        for part in re.split(r",|\||/", value or ""):
+            term = _clean_kb_value(part)
+            if term and term not in terms:
+                terms.append(term)
+    return terms[:7]
+
+
+def _title_from_hit(hit: Dict[str, Any], fields: Dict[str, str]) -> str:
+    metadata = hit.get("metadata") or {}
+    title = _first_text(
+        hit.get("title"),
+        metadata.get("title"),
+        metadata.get("name"),
+        metadata.get("company"),
+        _kb_field(fields, "Company", "Company Name", "Account", "Project"),
+    )
+    if title:
+        return title
+    asset_id = str(hit.get("asset_id") or "Knowledge base asset")
+    return asset_id.replace("dc:", "").replace("-", " ").replace("_", " ").title()
+
+
+def _kb_suggestion_from_hit(hit: Dict[str, Any], account_name: str) -> Dict[str, Any]:
+    chunk_text = str(hit.get("chunk_text") or "")
+    fields = _parse_kb_fields(chunk_text)
+    title = _title_from_hit(hit, fields)
+    industry = _kb_field(fields, "Industry", "LinkedIn Category", "LinkedIn Category / Sector")
+    service = _kb_field(fields, "Service Line", "Solution", "Offering")
+    tech_terms = _split_kb_terms(
+        _kb_field(fields, "Technology"),
+        _kb_field(fields, "Cloud Service"),
+        _kb_field(fields, "Skill"),
+        _kb_field(fields, "Platform"),
+        _kb_field(fields, "Architecture"),
+        _kb_field(fields, "Tool"),
+    )
+
+    reason_parts: List[str] = []
+    if industry:
+        reason_parts.append(industry)
+    if service:
+        reason_parts.append(service)
+
+    if reason_parts and tech_terms:
+        reason = f"Matches {', '.join(reason_parts)} with {', '.join(tech_terms)}."
+    elif reason_parts:
+        reason = f"Matches {', '.join(reason_parts)} context for this follow-up."
+    elif tech_terms:
+        reason = f"Matches the technology stack: {', '.join(tech_terms)}."
+    else:
+        snippet = re.sub(r"\s+", " ", chunk_text).strip()
+        reason = snippet[:180] if snippet else f"Relevant to the {account_name} follow-up."
+
+    suggested_use = "Use as supporting proof in the follow-up or proposal."
+    if any(term.lower() in {"aws", "azure", "gcp"} for term in tech_terms):
+        suggested_use = "Use for architecture, integration, or delivery-scope context."
+    if industry:
+        suggested_use = "Use as an industry-relevant proof point in the follow-up."
+
+    asset_id = str(hit.get("asset_id") or "")
+    suggestion = {
+        "assetId": asset_id,
+        "title": title,
+        "reason": reason,
+        "suggestedUse": suggested_use,
+        "snippet": chunk_text[:240],
+        "score": hit.get("score"),
+    }
+    if asset_id and not asset_id.startswith("dc:"):
+        suggestion["downloadUrl"] = f"/api/kb/assets/{asset_id}/file"
+    return suggestion
 
 
 def call_safe_id(value: str) -> str:
@@ -411,12 +1235,13 @@ def call_safe_id(value: str) -> str:
     return slug or "post-call"
 
 
-def _crm_tasks(
+def _task_list(
     call_id: str,
     account_name: str,
     *,
     discovery_snapshot: Optional[Dict[str, Any]],
     commitments: List[str],
+    conversation_context: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     now = datetime.now(timezone.utc)
     progression = _bant_progression(discovery_snapshot)
@@ -424,7 +1249,6 @@ def _crm_tasks(
     tasks: List[Dict[str, Any]] = [
         {
             "id": f"task-{call_id}-follow-up",
-            "crm_system": "hubspot",
             "task_type": "follow_up",
             "owner": "AE",
             "due_date": (now + timedelta(days=1)).isoformat(),
@@ -434,7 +1258,6 @@ def _crm_tasks(
         },
         {
             "id": f"task-{call_id}-debrief",
-            "crm_system": "hubspot",
             "task_type": "internal_review",
             "owner": "Pod",
             "due_date": (now + timedelta(days=2)).isoformat(),
@@ -448,7 +1271,6 @@ def _crm_tasks(
         tasks.append(
             {
                 "id": f"task-{call_id}-gap-{gap}",
-                "crm_system": "hubspot",
                 "task_type": "internal_review",
                 "owner": "AE",
                 "due_date": (now + timedelta(days=2)).isoformat(),
@@ -461,7 +1283,6 @@ def _crm_tasks(
         tasks.append(
             {
                 "id": f"task-{call_id}-commitment-{i + 1}",
-                "crm_system": "hubspot",
                 "task_type": "follow_up",
                 "owner": "AE",
                 "due_date": (now + timedelta(days=2)).isoformat(),
@@ -470,11 +1291,40 @@ def _crm_tasks(
                 "isInternalAuto": False,
             }
         )
+    for i, asset in enumerate((conversation_context or {}).get("requestedAssets", [])[:4]):
+        name = str(asset.get("name") or "Requested follow-up asset").strip()
+        if not name:
+            continue
+        tasks.append(
+            {
+                "id": f"task-{call_id}-asset-{i + 1}",
+                "task_type": "content_request",
+                "owner": "Pod",
+                "due_date": (now + timedelta(days=2)).isoformat(),
+                "description": f"Prepare or attach {name}. Evidence from transcript: {asset.get('evidence')}",
+                "status": "pending_approval",
+                "isInternalAuto": False,
+            }
+        )
+    for i, need in enumerate((conversation_context or {}).get("needs", [])[:3]):
+        text = str(need.get("text") or "").strip()
+        if not text:
+            continue
+        tasks.append(
+            {
+                "id": f"task-{call_id}-need-{i + 1}",
+                "task_type": "internal_review",
+                "owner": "Pod",
+                "due_date": (now + timedelta(days=2)).isoformat(),
+                "description": f"Address transcript need in the follow-up: {text}",
+                "status": "pending_approval",
+                "isInternalAuto": True,
+            }
+        )
     if is_qualifying:
         tasks.append(
             {
                 "id": f"task-{call_id}-next-meeting",
-                "crm_system": "hubspot",
                 "task_type": "schedule_next_meeting",
                 "owner": "AE",
                 "due_date": (now + timedelta(days=3)).isoformat(),
@@ -484,6 +1334,100 @@ def _crm_tasks(
             }
         )
     return tasks
+
+
+JIRA_FINANCIAL_RE = re.compile(
+    r"(\$|€|£|\b(?:budget|financial|finance|financing|revenue|roi|pricing|price|cost|"
+    r"investment|unit economics|cfo|economic buyer|board approval|approval path|"
+    r"annual potential|year-one|year one|bant|open discovery gap|open discovery gaps|"
+    r"discovery gaps|discovery coverage)\b)",
+    re.I,
+)
+
+JIRA_TIMELINE_RE = re.compile(
+    r"\b(?:timeline|pilot|poc|proof of concept|launch|go-live|production|readout|"
+    r"next step|follow up|schedule|meeting|workshop|proposal|by|before|after|q[1-4]|"
+    r"week|month|date|deadline)\b",
+    re.I,
+)
+
+
+def _jira_safe_line(value: Any) -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if not text or JIRA_FINANCIAL_RE.search(text):
+        return ""
+    return text
+
+
+def _jira_safe_lines(values: List[Any], *, limit: int) -> List[str]:
+    out: List[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = _jira_safe_line(value)
+        key = text.lower()
+        if not text or key in seen:
+            continue
+        seen.add(key)
+        out.append(text)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _jira_description(
+    account_name: str,
+    *,
+    summary: Dict[str, Any],
+    task_list: List[Dict[str, Any]],
+    conversation_context: Optional[Dict[str, Any]],
+) -> str:
+    summary_lines = _jira_safe_lines(
+        [summary.get("headline"), *(summary.get("summary") or [])],
+        limit=4,
+    )
+    needs = _jira_safe_lines(
+        [item.get("text") for item in (conversation_context or {}).get("needs", []) if isinstance(item, dict)],
+        limit=4,
+    )
+    requested_assets = _jira_safe_lines(
+        [item.get("name") for item in (conversation_context or {}).get("requestedAssets", []) if isinstance(item, dict)],
+        limit=4,
+    )
+    next_steps_source = [
+        item.get("text")
+        for item in (conversation_context or {}).get("nextSteps", [])
+        if isinstance(item, dict)
+    ]
+    next_steps_source.extend(task.get("description") for task in task_list)
+    timeline_lines = [
+        line
+        for line in _jira_safe_lines(next_steps_source, limit=8)
+        if JIRA_TIMELINE_RE.search(line)
+    ][:4]
+    action_items = _jira_safe_lines(
+        [task.get("description") for task in task_list],
+        limit=6,
+    )
+
+    sections = [
+        "Client summary:",
+        *(f"- {line}" for line in (summary_lines or [f"{account_name} post-discovery follow-up."])),
+        "",
+        "Client details / needs:",
+        *(f"- {line}" for line in (needs or ["Confirm the client needs captured in the discovery call."])),
+    ]
+    if timeline_lines:
+        sections.extend(["", "Timeline / POC:", *(f"- {line}" for line in timeline_lines)])
+    if requested_assets:
+        sections.extend(["", "Needed materials:", *(f"- {line}" for line in requested_assets)])
+    sections.extend(
+        [
+            "",
+            "Action items:",
+            *(f"- {line}" for line in (action_items or ["Assign owner for the next client follow-up."])),
+        ]
+    )
+    return "\n".join(sections)
 
 
 def _money_value(raw: str) -> float:
@@ -509,7 +1453,9 @@ def _jira_ticket(
     pre_dc_fields: Optional[Dict[str, str]],
     post_dc_record: Optional[Dict[str, Any]],
     summary: Dict[str, Any],
+    task_list: List[Dict[str, Any]],
     cfg: Dict[str, Any],
+    conversation_context: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     progression = _bant_progression(discovery_snapshot)
     after = progression.get("after") if isinstance(progression.get("after"), dict) else {}
@@ -517,38 +1463,29 @@ def _jira_ticket(
         dim: after.get(dim) == "confirmed"
         for dim in ("budget", "authority", "need", "timeline")
     }
-    if not all(bant_snapshot.values()):
-        return None
+    is_qualified = all(bant_snapshot.values())
     service_line = _first_text(
         _post_field(post_dc_record, "Service Line"),
         (pre_dc_fields or {}).get("Campaign Service - PreDC"),
         "services",
     )
-    annual_potential = _first_text(_post_field(post_dc_record, "Accounts Annual Potential"))
     jira_cfg = cfg.get("jira") or {}
-    try:
-        threshold = float(jira_cfg.get("high_priority_threshold_usd") or 250_000)
-    except (TypeError, ValueError):
-        threshold = 250_000
-    priority = "High" if _money_value(annual_potential) >= threshold else "Medium"
+    coverage = _bant_coverage(discovery_snapshot) or 0
+    priority = "High" if is_qualified or coverage >= 0.75 else "Medium"
     project_key = str(jira_cfg.get("project_key") or "SALES")
     icp_bucket = _first_text((pre_dc_fields or {}).get("ICP Bucket"), _post_field(post_dc_record, "Was Pre DC ICP bucket correct"))
-    labels = ["discovery-call", "bant-qualified"]
+    labels = ["discovery-call", "bant-qualified" if is_qualified else "bant-review-needed"]
     if icp_bucket:
         labels.append(re.sub(r"[^a-z0-9]+", "-", icp_bucket.lower()).strip("-")[:40])
-    description = "\n".join(
-        [
-            str(summary.get("headline") or f"{account_name} qualified after discovery."),
-            "",
-            "BANT snapshot:",
-            *[f"- {BANT_LABELS[dim]}: {'confirmed' if ok else 'not confirmed'}" for dim, ok in bant_snapshot.items()],
-            "",
-            f"Next step: {summary.get('nextStepProposal') or 'Confirm next-step owner.'}",
-        ]
+    description = _jira_description(
+        account_name,
+        summary=summary,
+        task_list=task_list,
+        conversation_context=conversation_context,
     )
     return {
         "status": "draft_pending_approval",
-        "summary": f"[DC Qualified] {account_name} — {service_line} opportunity",
+        "summary": f"[{'DC Qualified' if is_qualified else 'DC Follow-up'}] {account_name} — {service_line} opportunity",
         "description": description,
         "issueType": str(jira_cfg.get("issue_type") or "Review"),
         "priority": priority,
@@ -640,6 +1577,7 @@ def run_post_dc_pipeline(
     call_brief: Optional[Dict[str, Any]] = None,
     discovery_snapshot: Optional[Dict[str, Any]] = None,
     live_snapshot: Optional[Dict[str, Any]] = None,
+    live_suggestions: Optional[List[Dict[str, Any]]] = None,
     transcript_events: Optional[List[Dict[str, Any]]] = None,
     post_dc_record: Optional[Dict[str, Any]] = None,
 ) -> AgentEnvelope:
@@ -651,9 +1589,23 @@ def run_post_dc_pipeline(
     llm = LlmClient(api_key=settings.anthropic_api_key or None)
 
     account_name = _account_name(call, pre_dc_fields, call_id)
-    transcript = _transcript_excerpt(transcript_events)
+    transcript_excerpt = _transcript_excerpt(transcript_events)
+    transcript_digest = _transcript_digest(transcript_events)
+    pod_talk_time = _pod_talk_time(transcript_events)
+    live_suggestion_context = _live_suggestions_context(live_suggestions)
+    conversation_context = _conversation_context(transcript_events, live_snapshot)
     gaps = _open_gaps(discovery_snapshot)
     recipients = _extract_recipients(call, pre_dc_fields)
+    requested_asset_query = " ".join(
+        str(item.get("name") or "")
+        for item in conversation_context.get("requestedAssets", [])
+        if str(item.get("name") or "").strip()
+    )
+    transcript_need_query = " ".join(
+        str(item.get("text") or "")
+        for item in conversation_context.get("needs", [])[:3]
+        if str(item.get("text") or "").strip()
+    )
     kb_query = " ".join(
         part
         for part in [
@@ -661,11 +1613,21 @@ def run_post_dc_pipeline(
             (pre_dc_fields or {}).get("Industry - PreDC"),
             (pre_dc_fields or {}).get("Campaign Service - PreDC"),
             _post_field(post_dc_record, "Service Line"),
+            requested_asset_query,
+            transcript_need_query,
             "follow-up case study next steps",
         ]
         if part
     )
     hits, _ = _kb_search(ctx, kb_query, limit=4)
+    agent_inputs = _agent_input_summary(
+        transcript_events=transcript_events,
+        live_snapshot=live_snapshot,
+        live_suggestions=live_suggestions,
+        discovery_snapshot=discovery_snapshot,
+        source_record_count=sum(1 for item in (call, pre_dc_fields, call_brief, post_dc_record) if item),
+        kb_hit_count=len(hits),
+    )
 
     context = {
         "call_id": call_id,
@@ -675,8 +1637,21 @@ def run_post_dc_pipeline(
         "call_brief": call_brief or {},
         "discovery_snapshot": _snapshot_result(discovery_snapshot),
         "live_snapshot": live_snapshot or {},
+        "live_suggestions": live_suggestion_context,
         "post_dc_record": post_dc_record or {},
-        "transcript_excerpt": transcript,
+        "transcript_excerpt": transcript_excerpt,
+        "transcript_digest": transcript_digest,
+        "pod_talk_time": pod_talk_time,
+        "transcript_events": _transcript_event_payload(transcript_events),
+        "conversation_context": conversation_context,
+        "call_agent_outputs": {
+            "discovery_snapshot": _snapshot_result(discovery_snapshot),
+            "live_signal_snapshot": live_snapshot or {},
+            "live_suggestions": live_suggestion_context,
+            "transcript_event_count": len(transcript_events or []),
+            "transcript_digest": transcript_digest,
+        },
+        "agent_inputs": agent_inputs,
         "kb_hits": hits[:4],
     }
 
@@ -710,9 +1685,24 @@ def run_post_dc_pipeline(
             live_snapshot=live_snapshot,
             pre_dc_fields=pre_dc_fields,
             post_dc_record=post_dc_record,
+            conversation_context=conversation_context,
         )
 
     commitments = _commitments(transcript_events, live_snapshot, summary_json)
+    task_list = _task_list(
+        call_id,
+        account_name,
+        discovery_snapshot=discovery_snapshot,
+        commitments=commitments,
+        conversation_context=conversation_context,
+    )
+    email_attachments = _email_attachments(
+        ctx,
+        call_brief,
+        hits,
+        account_name=account_name,
+        conversation_context=conversation_context,
+    )
 
     email_json: Dict[str, Any] = {}
     if settings.anthropic_configured:
@@ -722,6 +1712,8 @@ def run_post_dc_pipeline(
             "commitments": commitments,
             "recipients": recipients,
             "open_gaps": gaps,
+            "task_list": task_list,
+            "email_attachments": email_attachments,
         }
         completion = llm.complete(
             system=email_prompt,
@@ -734,27 +1726,60 @@ def run_post_dc_pipeline(
         total_cost += completion.cost_usd
 
     if not email_json:
-        email_json = _email_fallback(account_name, recipients, summary_json, commitments, gaps)
-
-    email_attachments = _email_attachments(call_brief, hits, account_name=account_name)
+        email_json = _client_email_fallback(
+            account_name,
+            recipients,
+            summary_json,
+            commitments,
+            gaps,
+            email_attachments,
+            conversation_context=conversation_context,
+        )
+    client_fallback_email = _client_email_fallback(
+        account_name,
+        recipients,
+        summary_json,
+        commitments,
+        gaps,
+        email_attachments,
+        conversation_context=conversation_context,
+    )
+    raw_body = str(email_json.get("body_markdown") or email_json.get("body") or "")
+    if not raw_body or not _client_safe_text(raw_body):
+        raw_body = str(client_fallback_email.get("body_markdown") or "")
+    raw_subject = str(email_json.get("subject") or f"Follow-up from our {account_name} discovery call")
+    if not _client_safe_text(raw_subject):
+        raw_subject = f"Follow-up from our {account_name} discussion"
+    raw_commitments = (
+        email_json.get("commitments_referenced")
+        if isinstance(email_json.get("commitments_referenced"), list)
+        else commitments
+    )
 
     email_draft = {
         "id": str(email_json.get("id") or f"email-{call_safe_id(call_id)}"),
+        "audience": "client",
         "to": email_json.get("to") if isinstance(email_json.get("to"), list) else recipients,
         "cc": email_json.get("cc") if isinstance(email_json.get("cc"), list) else [],
-        "subject": str(email_json.get("subject") or f"Follow-up from our {account_name} discovery call"),
-        "body_markdown": str(email_json.get("body_markdown") or email_json.get("body") or ""),
+        "subject": raw_subject,
+        "body_markdown": raw_body,
         "style_signals": email_json.get("style_signals")
         if isinstance(email_json.get("style_signals"), list)
         else ["concise", "consultative"],
-        "commitments_referenced": email_json.get("commitments_referenced")
-        if isinstance(email_json.get("commitments_referenced"), list)
-        else commitments,
+        "commitments_referenced": _client_safe_lines(raw_commitments),
         "status": "draft_pending_approval",
         "attachments": email_attachments,
     }
+    internal_email_draft = _internal_email_fallback(
+        call_id,
+        account_name,
+        summary=summary_json,
+        discovery_snapshot=discovery_snapshot,
+        task_list=task_list,
+        conversation_context=conversation_context,
+    )
 
-    scorecard = _scorecard_fallback(discovery_snapshot, live_snapshot)
+    scorecard = _scorecard_fallback(discovery_snapshot, live_snapshot, pod_talk_time)
     if settings.anthropic_configured:
         coaching_context = {
             **context,
@@ -771,9 +1796,11 @@ def run_post_dc_pipeline(
         parsed = _extract_json_block(completion.text) or {}
         parsed_scorecard = parsed.get("podScorecard")
         if isinstance(parsed_scorecard, list) and parsed_scorecard:
-            scorecard = parsed_scorecard
+            scorecard = _normalize_scorecard_rows(parsed_scorecard, pod_talk_time)
         total_tokens += completion.tokens_in + completion.tokens_out
         total_cost += completion.cost_usd
+    else:
+        scorecard = _normalize_scorecard_rows(scorecard, pod_talk_time)
 
     review = {
         "headline": str(summary_json.get("headline") or f"{account_name} post-call review"),
@@ -791,14 +1818,9 @@ def run_post_dc_pipeline(
             live_snapshot=live_snapshot,
             pre_dc_fields=pre_dc_fields,
             post_dc_record=post_dc_record,
+            conversation_context=conversation_context,
         )["summary"]
 
-    crm_tasks = _crm_tasks(
-        call_id,
-        account_name,
-        discovery_snapshot=discovery_snapshot,
-        commitments=commitments,
-    )
     jira_ticket = _jira_ticket(
         call_id,
         account_name,
@@ -806,13 +1828,15 @@ def run_post_dc_pipeline(
         pre_dc_fields=pre_dc_fields,
         post_dc_record=post_dc_record,
         summary=summary_json,
+        task_list=task_list,
         cfg=cfg,
+        conversation_context=conversation_context,
     )
 
     citations = _citations(
         call_id,
         account_name,
-        transcript_excerpt=transcript,
+        transcript_excerpt=transcript_excerpt,
         pre_dc_fields=pre_dc_fields,
         hits=hits,
     )
@@ -826,7 +1850,9 @@ def run_post_dc_pipeline(
             "review": review,
             "task": {
                 "emailDraft": email_draft,
-                "crmTasks": crm_tasks,
+                "clientEmailDraft": email_draft,
+                "internalEmailDraft": internal_email_draft,
+                "taskList": task_list,
             },
             "emailAttachments": email_attachments,
             "jiraTicket": jira_ticket,
@@ -834,12 +1860,9 @@ def run_post_dc_pipeline(
                 "podScorecard": scorecard,
                 "bantProgression": _bant_progression(discovery_snapshot),
             },
+            "agentInputs": agent_inputs,
             "kbSuggestions": [
-                {
-                    "assetId": str(hit.get("asset_id", "")),
-                    "snippet": (hit.get("chunk_text") or "")[:240],
-                    "score": hit.get("score"),
-                }
+                _kb_suggestion_from_hit(hit, account_name)
                 for hit in hits[:3]
             ],
         },

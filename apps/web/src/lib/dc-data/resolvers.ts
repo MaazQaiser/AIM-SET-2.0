@@ -29,6 +29,7 @@ export function resolveCalls(): Call[] {
 }
 
 export function resolveCall(callId: string): Call | undefined {
+  if (callId === FRANCHISE_DEMO_CALL_ID) return franchiseDemoCall;
   return resolveCalls().find((c) => c.id === callId);
 }
 

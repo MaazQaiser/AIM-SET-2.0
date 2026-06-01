@@ -5,7 +5,6 @@ import { AIGeneratedBadge } from "@/components/ai-generated-badge";
 import { useAiTodos } from "@/hooks/use-ai-todos";
 import { useCalls } from "@/lib/data/hooks";
 import { isSameDay, startOfDay } from "date-fns";
-import { cn } from "@/lib/cn";
 
 export function DailyBriefingCard() {
   const { data: calls = [] } = useCalls();

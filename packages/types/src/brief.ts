@@ -201,10 +201,14 @@ export interface PostCallReview {
   podScorecard: {
     member: string;
     role: string;
+    roleInCall?: string;
+    talkTimeSeconds?: number;
+    talkTimeLabel?: string;
     score: number;
     label: string;
     strengths: string;
     watch: string;
+    areasToWork?: string[];
   }[];
   learned: { label: string; from?: number; to?: number; note: string }[];
   openDiscoveryGaps?: string[];
@@ -213,6 +217,7 @@ export interface PostCallReview {
 
 export interface PostCallEmailDraft {
   id: string;
+  audience?: "client" | "internal" | string;
   to: string[];
   cc?: string[];
   subject: string;
@@ -228,12 +233,19 @@ export interface PostCallEmailAttachmentFound {
   assetId: string;
   snippet?: string;
   downloadUrl?: string;
+  previewUrl?: string;
+  fileName?: string;
+  mimeType?: string;
+  fileType?: string;
+  source?: "knowledge_base" | string;
+  reason?: string;
 }
 
 export interface PostCallEmailAttachmentMissing {
   name: string;
   requiredData: string;
   contentStudioLink: string;
+  source?: "content_gap" | string;
 }
 
 export interface PostCallEmailAttachments {
@@ -241,15 +253,55 @@ export interface PostCallEmailAttachments {
   missing: PostCallEmailAttachmentMissing[];
 }
 
-export interface PostCallCrmTask {
+export interface PostCallKbSuggestion {
+  assetId: string;
+  title?: string;
+  reason?: string;
+  suggestedUse?: string;
+  downloadUrl?: string;
+  snippet: string;
+  score?: number | null;
+}
+
+export interface PostCallAgentCitation {
+  source_type: string;
+  source_id: string;
+  snippet: string;
+  confidence?: number | null;
+}
+
+export interface PostCallAgentEnvelope {
+  agent?: string;
+  operation?: string;
+  trace_id?: string;
+  confidence?: number | null;
+  cost?: {
+    tokens?: number;
+    usd?: number;
+    model?: string;
+  };
+  citations?: PostCallAgentCitation[];
+}
+
+export interface PostCallTask {
   id: string;
-  crm_system: "hubspot" | "salesforce";
   task_type: "follow_up" | "internal_review" | "content_request" | "schedule_next_meeting";
   owner: string;
   due_date: string;
   description: string;
   status: "pending_approval" | "approved" | "created" | "failed";
   isInternalAuto?: boolean;
+  crm_system?: "hubspot" | "salesforce";
+}
+
+export type PostCallCrmTask = PostCallTask;
+
+export interface PostCallJiraSubtask {
+  summary: string;
+  description?: string;
+  owner?: string;
+  dueDate?: string;
+  status?: "pending_approval" | "approved" | "created" | "failed" | string;
 }
 
 export interface PostCallJiraTicket {
@@ -261,6 +313,7 @@ export interface PostCallJiraTicket {
   labels: string[];
   projectKey: string;
   bantSnapshot: { budget: boolean; authority: boolean; need: boolean; timeline: boolean };
+  subtasks?: PostCallJiraSubtask[];
   externalKey?: string;
   externalUrl?: string;
   error?: string;
@@ -272,13 +325,30 @@ export interface PostCallPipelineResult {
   review?: PostCallReview;
   task?: {
     emailDraft?: PostCallEmailDraft;
-    crmTasks?: PostCallCrmTask[];
+    clientEmailDraft?: PostCallEmailDraft;
+    internalEmailDraft?: PostCallEmailDraft;
+    taskList?: PostCallTask[];
+    crmTasks?: PostCallTask[];
   };
   emailAttachments?: PostCallEmailAttachments;
   jiraTicket?: PostCallJiraTicket | null;
+  kbSuggestions?: PostCallKbSuggestion[];
+  envelope?: PostCallAgentEnvelope;
   coaching?: {
     podScorecard?: PostCallReview["podScorecard"];
     bantProgression?: Record<string, unknown>;
+  };
+  agentInputs?: {
+    sources?: {
+      name: string;
+      description: string;
+      count: number;
+    }[];
+    transcriptEventCount?: number;
+    transcriptDigestLimit?: number;
+    liveSuggestionCount?: number;
+    hasLiveSignalSnapshot?: boolean;
+    hasDiscoverySnapshot?: boolean;
   };
   discovery?: {
     result?: {

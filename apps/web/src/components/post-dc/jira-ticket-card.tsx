@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, CheckCircle2, ExternalLink, Loader2, TicketCheck } from "lucide-react";
+import { AlertCircle, ExternalLink, Loader2, TicketCheck } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import type { PostCallJiraTicket } from "@/lib/brief-types";
@@ -13,12 +13,6 @@ interface JiraTicketCardProps {
 
 export function JiraTicketCard({ ticket, onCreate }: JiraTicketCardProps) {
   const [loading, setLoading] = useState(false);
-  const bantRows = [
-    ["budget", "Budget"],
-    ["authority", "Authority"],
-    ["need", "Need"],
-    ["timeline", "Timeline"],
-  ] as const;
 
   async function handleCreate() {
     setLoading(true);
@@ -43,31 +37,9 @@ export function JiraTicketCard({ ticket, onCreate }: JiraTicketCardProps) {
       <div className="space-y-3 px-4 py-3">
         <div>
           <p className="text-xs font-medium text-foreground">{ticket.summary}</p>
-          <p className="mt-1 line-clamp-4 whitespace-pre-wrap text-xs text-muted-foreground">
+          <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">
             {ticket.description}
           </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant="outline" className="text-[10px]">
-            {ticket.projectKey}
-          </Badge>
-          <Badge variant="outline" className="text-[10px]">
-            {ticket.issueType}
-          </Badge>
-          <Badge variant="outline" className="text-[10px]">
-            {ticket.priority}
-          </Badge>
-        </div>
-        <div className="grid grid-cols-2 gap-1.5">
-          {bantRows.map(([key, label]) => (
-            <span
-              key={key}
-              className="inline-flex items-center gap-1 rounded-md border border-success/30 bg-success/5 px-2 py-1 text-[10px] font-medium text-success"
-            >
-              <CheckCircle2 className="h-3 w-3" />
-              {label} confirmed
-            </span>
-          ))}
         </div>
         {ticket.error && (
           <p className="flex items-start gap-1.5 text-xs text-destructive">
@@ -77,7 +49,9 @@ export function JiraTicketCard({ ticket, onCreate }: JiraTicketCardProps) {
         )}
       </div>
       <div className="flex items-center justify-between gap-2 border-t px-4 py-3">
-        <p className="text-xs text-muted-foreground">Created only after approval.</p>
+        <p className="text-xs text-muted-foreground">
+          Uses the configured Jira project and issue type.
+        </p>
         {ticket.status === "created" && ticket.externalUrl ? (
           <Button asChild size="sm" variant="outline" className="h-7 text-xs">
             <a href={ticket.externalUrl} target="_blank" rel="noreferrer">
@@ -88,7 +62,7 @@ export function JiraTicketCard({ ticket, onCreate }: JiraTicketCardProps) {
         ) : (
           <Button size="sm" className="h-7 text-xs" disabled={loading} onClick={handleCreate}>
             {loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <TicketCheck className="mr-1.5 h-3.5 w-3.5" />}
-            Create ticket on Jira
+            Create ticket in Jira
           </Button>
         )}
       </div>

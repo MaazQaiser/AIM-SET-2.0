@@ -3,7 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { format, isSameDay, startOfDay } from "date-fns";
 import { useClerkGate } from "@/components/providers/clerk-gate";
-import { useCalls, usePostCallCrmTasks } from "@/lib/data/hooks";
+import { useCalls, usePostCallTasks } from "@/lib/data/hooks";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
 
 function getSalutation(hour: number): string {
@@ -40,7 +40,7 @@ function AssistantGreetingBody({
   name: string;
 }) {
   const { data: calls = [] } = useCalls();
-  const { data: crmTasks = [] } = usePostCallCrmTasks();
+  const { data: taskList = [] } = usePostCallTasks();
 
   const hour = new Date().getHours();
   const salutation = getSalutation(hour);
@@ -51,7 +51,7 @@ function AssistantGreetingBody({
       (c.status === "upcoming" || c.status === "live") &&
       isSameDay(new Date(c.scheduledAt), today)
   );
-  const pendingApprovals = crmTasks.filter((t) => t.status === "pending_approval").length;
+  const pendingApprovals = taskList.filter((t) => t.status === "pending_approval").length;
 
   const dateLine = format(new Date(), "EEEE, MMMM d");
   const statParts: string[] = [];

@@ -65,7 +65,7 @@ export const AGENT_META: Record<
   },
   post_dc: {
     display_name: "Post-DC Agent",
-    description: "Post-call review pipeline for summaries, follow-up email drafts, CRM tasks, and coaching scorecards.",
+    description: "Post-call review pipeline for summaries, follow-up email drafts, task lists, Jira ticket drafts, and coaching scorecards.",
     purpose:
       "Eliminate post-call admin by turning transcript, live signals, and discovery coverage into review artifacts that stay pending AE approval.",
     operations: ["review_produced"],

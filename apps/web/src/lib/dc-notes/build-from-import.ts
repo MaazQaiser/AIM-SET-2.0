@@ -398,10 +398,12 @@ export function buildPostReviewFromPostDc(record: PostDCRecord): PostCallReview 
       {
         member: "Pod",
         role: "Pod",
+        roleInCall: "Pod",
         score: leadStage.toLowerCase() === "opportunity" ? 0.82 : 0.68,
         label: leadStage || "review",
         strengths: postDcField(record, "salesStrategy") || "See sales strategy notes.",
         watch: postDcField(record, "reasonNotFit") || "",
+        areasToWork: [postDcField(record, "reasonNotFit") || "Review the imported Post-DC notes for coaching follow-up."],
       },
     ],
     learned: [

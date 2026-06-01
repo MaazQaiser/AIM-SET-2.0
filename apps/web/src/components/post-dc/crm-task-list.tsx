@@ -1,28 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Clock, Database, AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, Clock, Loader2 } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { cn } from "@/lib/cn";
 
 type TaskStatus = "pending_approval" | "approved" | "created" | "failed";
 type TaskType = "follow_up" | "internal_review" | "content_request" | "schedule_next_meeting";
-type CrmSystem = "hubspot" | "salesforce";
 
-export interface CrmTask {
+export interface TaskItem {
   id: string;
-  crm_system: CrmSystem;
   task_type: TaskType;
   owner: string;
   due_date: string;
   description: string;
   status: TaskStatus;
   isInternalAuto?: boolean;
+  crm_system?: "hubspot" | "salesforce";
 }
 
-interface CrmTaskListProps {
-  tasks: CrmTask[];
+interface TaskListProps {
+  tasks: TaskItem[];
   onApprove?: (ids: string[]) => void;
   onReject?: (id: string) => void;
 }
@@ -37,11 +36,11 @@ const TYPE_LABELS: Record<TaskType, string> = {
 const STATUS_CONFIG: Record<TaskStatus, { label: string; className: string; icon: React.ElementType }> = {
   pending_approval: { label: "Pending",  className: "text-warning border-warning/30 bg-warning/10",     icon: Clock },
   approved:         { label: "Approved", className: "text-primary border-primary/30 bg-primary/10",      icon: Check },
-  created:          { label: "Created",  className: "text-success border-success/30 bg-success/10",      icon: Database },
+  created:          { label: "Done",     className: "text-success border-success/30 bg-success/10",      icon: CheckCircle2 },
   failed:           { label: "Failed",   className: "text-destructive border-destructive/30 bg-destructive/10", icon: AlertCircle },
 };
 
-export function CrmTaskList({ tasks, onApprove, onReject }: CrmTaskListProps) {
+export function TaskList({ tasks, onApprove, onReject }: TaskListProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
 
@@ -86,8 +85,8 @@ export function CrmTaskList({ tasks, onApprove, onReject }: CrmTaskListProps) {
           </label>
           {selected.size > 0 && (
             <Button size="sm" className="h-7 text-xs gap-1.5" onClick={handleApproveSelected} disabled={loading}>
-              {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Database className="h-3 w-3" />}
-              Create {selected.size} CRM task{selected.size > 1 ? "s" : ""}
+              {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+              Mark {selected.size} done
             </Button>
           )}
         </div>
@@ -95,7 +94,7 @@ export function CrmTaskList({ tasks, onApprove, onReject }: CrmTaskListProps) {
 
       <div className="divide-y rounded-md border">
         {tasks.length === 0 && (
-          <div className="px-4 py-6 text-center text-sm text-muted-foreground">No CRM tasks generated</div>
+          <div className="px-4 py-6 text-center text-sm text-muted-foreground">No tasks generated</div>
         )}
 
         {tasks.map((task) => {
@@ -124,9 +123,6 @@ export function CrmTaskList({ tasks, onApprove, onReject }: CrmTaskListProps) {
                       Auto · internal
                     </Badge>
                   )}
-                  <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-mono uppercase">
-                    {task.crm_system}
-                  </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>
                 <p className="text-[10px] text-muted-foreground">Due {new Date(task.due_date).toLocaleDateString()}</p>
@@ -154,3 +150,6 @@ export function CrmTaskList({ tasks, onApprove, onReject }: CrmTaskListProps) {
     </div>
   );
 }
+
+export type CrmTask = TaskItem;
+export { TaskList as CrmTaskList };

@@ -3,17 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, FileSpreadsheet, Sparkles } from "lucide-react";
+import { ExternalLink, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import { Button } from "@dc-copilot/ui/components/button";
 import { CallDetailColumnLayout } from "@/components/calls/call-detail-column-layout";
 import { LayoutControls } from "@/components/dashboard-grid/layout-controls";
-import { BRIEF_WIDGETS, POST_DC_WIDGETS } from "@/lib/dashboard/widget-registry";
-import {
-  normalizeBriefWidgetProps,
-  normalizePostDcWidgetProps,
-} from "@/lib/dashboard/normalize-widget-props";
+import { BRIEF_WIDGETS } from "@/lib/dashboard/widget-registry";
+import { normalizeBriefWidgetProps } from "@/lib/dashboard/normalize-widget-props";
 import { BotChatPanel } from "@/components/bot-chat-panel";
 import { useCallBrief, usePostCallReview } from "@/lib/data/hooks";
 import { seedChecklistFromCall } from "@/lib/discovery-checklist-seed";
@@ -26,7 +23,6 @@ import type { BANTScore, Call } from "@/types";
 
 interface CallDetailTabsProps {
   callId: string;
-  initialTab?: "brief" | "post-dc";
   discoveryQuestions: string[];
   bant: BANTScore;
   call: Call;
@@ -35,7 +31,6 @@ interface CallDetailTabsProps {
 
 export function CallDetailTabs({
   callId,
-  initialTab = "brief",
   discoveryQuestions,
   bant,
   call,
@@ -43,17 +38,18 @@ export function CallDetailTabs({
 }: CallDetailTabsProps) {
   const queryClient = useQueryClient();
   const { data: brief, isLoading: briefLoading, refetch: refetchBrief } = useCallBrief(callId);
-  const { data: review, isLoading: reviewLoading } = usePostCallReview(callId);
+  const { data: review } = usePostCallReview(callId);
   const [runningWorkflow, setRunningWorkflow] = useState(false);
   const persona = usePersona();
   const setEditing = useDashboardLayoutStore((s) => s.setEditing);
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState("brief");
 
   const leadershipPreview = persona === "leadership";
   const showJoinCall = call.status === "upcoming" || call.status === "live";
+  const postDcReady = call.status === "completed" && Boolean(review);
 
-  const handleTabChange = (value: string) => {
-    setActiveTab(value === "post-dc" ? "post-dc" : "brief");
+  const handleTabChange = () => {
+    setActiveTab("brief");
     setEditing(false);
   };
 
@@ -97,24 +93,16 @@ export function CallDetailTabs({
     <Tabs value={activeTab} onValueChange={handleTabChange}>
       <TabsList className="flex-wrap h-auto gap-1">
         <TabsTrigger value="brief">Pre-call brief</TabsTrigger>
-        <TabsTrigger value="post-dc" className="gap-1.5">
-          Post-DC review
-          {review && (
-            <span className="rounded-full bg-primary/15 px-1.5 py-0 text-[9px] font-medium text-primary">
-              Ready
-            </span>
-          )}
-        </TabsTrigger>
       </TabsList>
-      {review && activeTab === "brief" && (
+      {postDcReady && activeTab === "brief" && (
         <div className="mt-3 rounded-lg border border-border bg-muted/30 px-3 py-2 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
-            Post-DC review is available — see headline, summary, and pod scorecard after wrap-up.
+            This call has been wrapped. Post-DC review is ready.
           </p>
           <Button asChild variant="outline" size="sm" className="h-8 text-xs shrink-0">
             <Link href={`/calls/${callId}/post-dc`}>
               <ExternalLink className="h-3 w-3 mr-1" />
-              Open full screen
+              Open Post-DC
             </Link>
           </Button>
         </div>
@@ -177,39 +165,6 @@ export function CallDetailTabs({
         )}
       </TabsContent>
 
-      <TabsContent value="post-dc" className="mt-4">
-        {reviewLoading ? (
-          <PostDcTabSkeleton />
-        ) : !review ? (
-          <EmptyState
-            icon={FileSpreadsheet}
-            title="No Post-DC notes for this call"
-            description="Import post_dc_notes_data.csv in Settings. Rows link when company or lead names match Pre-DC data."
-            action={{ label: "Import CSV", href: "/settings" }}
-          />
-        ) : (
-          <>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-muted-foreground">
-                Full wrap-up view with layout controls — or open dedicated Post-DC screen.
-              </p>
-              <Button asChild variant="secondary" size="sm" className="h-8 text-xs">
-                <Link href={`/calls/${callId}/post-dc`}>Full Post-DC screen</Link>
-              </Button>
-            </div>
-            <LayoutControls
-              layoutKey="post-dc"
-              widgets={POST_DC_WIDGETS}
-              widgetProps={normalizePostDcWidgetProps({ review, call, accountSnapshot })}
-            />
-            <CallDetailColumnLayout
-              layoutKey="post-dc"
-              widgets={POST_DC_WIDGETS}
-              widgetProps={normalizePostDcWidgetProps({ review, call, accountSnapshot })}
-            />
-          </>
-        )}
-      </TabsContent>
     </Tabs>
   );
 }
@@ -228,8 +183,4 @@ function BriefTabSkeleton() {
       </div>
     </div>
   );
-}
-
-function PostDcTabSkeleton() {
-  return <BriefTabSkeleton />;
 }

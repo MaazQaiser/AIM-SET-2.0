@@ -194,7 +194,7 @@ export function CallCard({ call }: CallCardProps) {
                 </Link>
               </Button>
               <Button asChild size="sm" variant="ghost" className="ml-auto text-muted-foreground gap-1 text-xs">
-                <Link href={`/calls/${call.id}`}>Post-DC review</Link>
+                <Link href={`/calls/${call.id}/post-dc`}>Post-DC review</Link>
               </Button>
             </>
           )}

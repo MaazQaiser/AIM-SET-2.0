@@ -11,7 +11,6 @@ from app.agents.live_call.intent_detection import analyze_segment
 from app.agents.live_call_agent import bot_chat_response, build_session_summary, process_transcript_segment
 from app.domain.call_channel import get_call_channel
 from app.domain.calls_service import CallsService
-from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.live_call_repository import get_live_call_repository
 from app.orchestrator.live_broadcast import envelope_to_ws_messages, transcript_event_to_ws
 
@@ -217,10 +216,6 @@ def handle_call_end(ctx: TenantContext, call_id: str) -> Dict[str, Any]:
     from app.agents.live_call_session import clear_session
 
     clear_session(call_id)
-    _, clerk_key = resolve_kb_tenant(ctx)
-    from app.domain.live_call_session import clear_live_session
-
-    clear_live_session(clerk_key, call_id)
     from app.orchestrator.dispatcher import Orchestrator
 
     post = Orchestrator().dispatch_post_call(ctx, call_id)

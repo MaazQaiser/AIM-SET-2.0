@@ -12,9 +12,10 @@ import type {
   KBAsset,
   QuarterlyPattern,
 } from "@/types";
-import type { CallBrief, PostCallJiraTicket, PostCallPipelineResult } from "@/lib/brief-types";
+import type { CallBrief, PostCallEmailDraft, PostCallJiraTicket, PostCallPipelineResult } from "@/lib/brief-types";
 import {
   FRANCHISE_DEMO_CALL_ID,
+  franchiseDemoPostCallArtifacts,
   franchiseDemoPostReview,
   mergeFranchiseDemoCalls,
 } from "@/lib/demo/franchise-ai-platform-demo";
@@ -25,10 +26,67 @@ import {
   resolveCalls,
   resolvePostCallReview,
 } from "@/lib/dc-data/resolvers";
-import type { CrmTask } from "@/components/post-dc/crm-task-list";
+import { hasClientUnsafeEmailText, sanitizeClientEmailDraft } from "@/lib/post-dc-client-email-safety";
+import type { TaskItem } from "@/components/post-dc/crm-task-list";
 import type { ActivityEvent, AgentRun } from "@/types/agents";
 
 const REFETCH_MS = 30_000;
+
+function withEmailAttachments(
+  draft: PostCallEmailDraft | undefined,
+  attachments: PostCallPipelineResult["emailAttachments"]
+) {
+  return draft
+    ? {
+        ...draft,
+        attachments: draft.attachments ?? attachments,
+      }
+    : undefined;
+}
+
+function buildInternalEmailFallback(
+  callId: string,
+  api: PostCallPipelineResult
+): PostCallEmailDraft | undefined {
+  const taskList = api.task?.taskList ?? api.task?.crmTasks ?? [];
+  if (!api.review && taskList.length === 0) return undefined;
+  const accountName = api.accountName ?? callId;
+  const bantScore =
+    typeof api.review?.discoveryBantCoverage === "number"
+      ? `${Math.round(api.review.discoveryBantCoverage * 100)}%`
+      : "Needs review";
+  const gaps = api.review?.openDiscoveryGaps ?? [];
+  const taskLines = taskList.length
+    ? taskList.slice(0, 8).map((task) => `- [${task.owner || "Pod"}] ${task.description}`)
+    : ["- Review the post-call summary and assign next action owners."];
+  const summaryLines = (api.review?.summary ?? []).slice(0, 4).map((item) => `- ${item}`);
+
+  return {
+    id: `internal-email-${callId}`,
+    audience: "internal",
+    to: ["internal-team@dc-copilot.local"],
+    cc: [],
+    subject: `Internal Post-DC action plan: ${accountName}`,
+    body_markdown: [
+      `Internal Post-DC summary for ${accountName}`,
+      "",
+      `BANT score: ${bantScore}`,
+      gaps.length ? `Open BANT gaps: ${gaps.join(", ")}` : "BANT gaps: none currently flagged",
+      "",
+      "Call summary:",
+      ...(summaryLines.length ? summaryLines : ["- Review generated Post-DC summary before sharing externally."]),
+      "",
+      "Next action items:",
+      ...taskLines,
+    ].join("\n"),
+    style_signals: ["internal", "action-oriented", "bant-focused"],
+    commitments_referenced: taskList
+      .slice(0, 6)
+      .map((task) => task.description)
+      .filter(Boolean),
+    status: "draft_pending_approval",
+  };
+}
 
 async function fetchCallsFromApi(): Promise<Call[]> {
   const api = await bffFetch<Call[]>("/api/calls");
@@ -114,24 +172,54 @@ export function usePostCallReview(callId: string) {
   return useQuery({
     queryKey: ["post-call", callId, getImportVersion()],
     queryFn: async () => {
+      if (callId === FRANCHISE_DEMO_CALL_ID) {
+        const state = useDcImportsStore.getState();
+        if (
+          !state.emailDraftsByCallId[callId] ||
+          hasClientUnsafeEmailText(state.emailDraftsByCallId[callId]) ||
+          !state.internalEmailDraftsByCallId[callId] ||
+          !state.crmTasksByCallId[callId]?.length ||
+          !state.postRunMetaByCallId[callId]
+        ) {
+          state.setPostCallArtifacts(callId, franchiseDemoPostCallArtifacts);
+        }
+        const base = resolvePostCallReview(callId) ?? franchiseDemoPostReview;
+        const snap = state.discoverySnapshotsByCallId[callId] ?? {
+          openGaps: franchiseDemoPostReview.openDiscoveryGaps ?? [],
+          bantCoverage: franchiseDemoPostReview.discoveryBantCoverage,
+        };
+        return {
+          ...base,
+          openDiscoveryGaps: snap.openGaps?.length ? snap.openGaps : base.openDiscoveryGaps,
+          discoveryBantCoverage: snap.bantCoverage ?? base.discoveryBantCoverage,
+        };
+      }
+
       const api = await bffFetch<PostCallPipelineResult>(`/api/calls/${callId}/post-call`);
       if (api?.review) {
+        const emailDraft = withEmailAttachments(
+          api.task?.clientEmailDraft ?? api.task?.emailDraft,
+          api.emailAttachments
+        );
         useDcImportsStore.getState().setPostCallArtifacts(callId, {
           review: api.review,
-          emailDraft: api.task?.emailDraft,
-          crmTasks: api.task?.crmTasks,
+          emailDraft: sanitizeClientEmailDraft({
+            draft: emailDraft,
+            accountName: api.accountName ?? callId,
+            review: api.review,
+            attachments: api.emailAttachments,
+          }),
+          internalEmailDraft: api.task?.internalEmailDraft ?? buildInternalEmailFallback(callId, api),
+          crmTasks: api.task?.taskList ?? api.task?.crmTasks,
           jiraTicket: api.jiraTicket,
+          emailAttachments: api.emailAttachments,
+          kbSuggestions: api.kbSuggestions,
+          envelope: api.envelope,
+          coaching: api.coaching,
         });
       }
       const base = api?.review ?? resolvePostCallReview(callId);
-      const snap =
-        useDcImportsStore.getState().discoverySnapshotsByCallId[callId] ??
-        (callId === FRANCHISE_DEMO_CALL_ID
-          ? {
-              openGaps: franchiseDemoPostReview.openDiscoveryGaps ?? [],
-              bantCoverage: franchiseDemoPostReview.discoveryBantCoverage,
-            }
-          : undefined);
+      const snap = useDcImportsStore.getState().discoverySnapshotsByCallId[callId];
       if (!base && !snap) return null;
       const merged = base ?? {
         headline: "Post-call review",
@@ -164,11 +252,25 @@ export function useRunPostCallPipeline(callId: string) {
       const result = data.discovery?.result ?? data.discovery;
       const openGaps = (result as { openGaps?: string[] })?.openGaps ?? [];
       const checklist = (result as { checklist?: { bantCoverage?: number } })?.checklist;
+      const emailDraft = withEmailAttachments(
+        data.task?.clientEmailDraft ?? data.task?.emailDraft,
+        data.emailAttachments
+      );
       useDcImportsStore.getState().setPostCallArtifacts(callId, {
         review: data.review,
-        emailDraft: data.task?.emailDraft,
-        crmTasks: data.task?.crmTasks,
+        emailDraft: sanitizeClientEmailDraft({
+          draft: emailDraft,
+          accountName: data.accountName ?? callId,
+          review: data.review,
+          attachments: data.emailAttachments,
+        }),
+        internalEmailDraft: data.task?.internalEmailDraft ?? buildInternalEmailFallback(callId, data),
+        crmTasks: data.task?.taskList ?? data.task?.crmTasks,
         jiraTicket: data.jiraTicket,
+        emailAttachments: data.emailAttachments,
+        kbSuggestions: data.kbSuggestions,
+        envelope: data.envelope,
+        coaching: data.coaching,
         discoverySnapshot: {
           openGaps,
           bantCoverage: checklist?.bantCoverage ?? (result as { bantCoverage?: number })?.bantCoverage,
@@ -176,6 +278,8 @@ export function useRunPostCallPipeline(callId: string) {
       });
       void queryClient.invalidateQueries({ queryKey: ["post-call", callId] });
       void queryClient.invalidateQueries({ queryKey: ["post-call-tasks"] });
+      void queryClient.invalidateQueries({ queryKey: ["call", callId] });
+      void queryClient.invalidateQueries({ queryKey: ["calls"] });
     },
   });
 }
@@ -184,10 +288,13 @@ export function useCreateJiraTicket(callId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (ticket: PostCallJiraTicket) => {
+      const ticketPayload = Object.fromEntries(
+        Object.entries(ticket).filter(([key]) => key !== "subtasks")
+      );
       const res = await fetch("/api/integrations/jira/tickets", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(ticket),
+        body: JSON.stringify(ticketPayload),
       });
       if (!res.ok) {
         const err = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -225,14 +332,16 @@ export function useCreateJiraTicket(callId: string) {
   });
 }
 
-export function usePostCallCrmTasks() {
+export function usePostCallTasks() {
   return useQuery({
     queryKey: ["post-call-tasks", getImportVersion()],
     queryFn: async () =>
-      Object.values(useDcImportsStore.getState().crmTasksByCallId).flat() as CrmTask[],
+      Object.values(useDcImportsStore.getState().crmTasksByCallId).flat() as TaskItem[],
     staleTime: REFETCH_MS,
   });
 }
+
+export const usePostCallCrmTasks = usePostCallTasks;
 
 export function useCoachingCandidates() {
   return useQuery({

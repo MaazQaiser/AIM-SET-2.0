@@ -16,6 +16,15 @@ function nextBriefHref(calls: Call[]): string {
   return next ? `/calls/${next.id}` : "/calls";
 }
 
+function latestPostDcHref(calls: Call[]): string {
+  const latestWrapped = [...calls]
+    .filter((c) => c.status === "completed")
+    .sort(
+      (a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime()
+    )[0];
+  return latestWrapped ? `/calls/${latestWrapped.id}/post-dc` : "/calls";
+}
+
 const ACTIONS = [
   {
     id: "brief",
@@ -27,23 +36,23 @@ const ACTIONS = [
   {
     id: "approvals",
     label: "Review pending approvals",
-    description: "Emails & CRM tasks from Task Agent",
+    description: "Post-DC emails and tasks after wrap-up",
     icon: Mail,
-    href: () => "/calls/call-001?tab=post-dc",
+    href: (calls: Call[]) => latestPostDcHref(calls),
   },
   {
     id: "coaching",
     label: "Today's coaching",
     description: "Patterns and scorecards",
     icon: TrendingUp,
-    href: () => "/coaching",
+    href: (_calls: Call[]) => "/coaching",
   },
   {
     id: "agents",
     label: "Agent activity",
     description: "Monitor all 5 specialist agents",
     icon: Bot,
-    href: () => "/agents",
+    href: (_calls: Call[]) => "/agents",
   },
 ] as const;
 
@@ -58,8 +67,7 @@ export function QuickActions() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {ACTIONS.map((action) => {
           const Icon = action.icon;
-          const link =
-            action.id === "brief" ? action.href(calls) : action.href();
+          const link = action.href(calls);
 
           return (
             <Link key={action.id} href={link}>

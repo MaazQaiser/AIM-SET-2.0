@@ -19,10 +19,9 @@ import { preDcField } from "@/types/dc-notes";
 
 interface CallDetailViewProps {
   callId: string;
-  initialTab?: "brief" | "post-dc";
 }
 
-export function CallDetailView({ callId, initialTab = "brief" }: CallDetailViewProps) {
+export function CallDetailView({ callId }: CallDetailViewProps) {
   const { data: call, isLoading } = useCall(callId);
   const preRecord = useDcImportsStore((s) =>
     findPreDcRecordForCall(s.preDcRecords, callId, call?.accountName)
@@ -139,7 +138,6 @@ export function CallDetailView({ callId, initialTab = "brief" }: CallDetailViewP
 
       <CallDetailTabs
         callId={callId}
-        initialTab={initialTab}
         discoveryQuestions={discoveryQuestions}
         bant={call.bant ?? { budget: "unknown", authority: "unknown", need: "unknown", timeline: "unknown" }}
         call={call}

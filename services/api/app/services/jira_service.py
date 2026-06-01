@@ -75,15 +75,16 @@ class JiraService:
 
     def _description(self, payload: Dict[str, Any]) -> Any:
         text = str(payload.get("description") or "")
+        content = [
+            {
+                "type": "paragraph",
+                "content": [{"type": "text", "text": text or "Discovery call follow-up"}],
+            }
+        ]
         return {
             "type": "doc",
             "version": 1,
-            "content": [
-                {
-                    "type": "paragraph",
-                    "content": [{"type": "text", "text": text or "Discovery call follow-up"}],
-                }
-            ],
+            "content": content,
         }
 
 

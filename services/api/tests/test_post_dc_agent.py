@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from app.agents.post_dc_agent import run_post_dc_pipeline
 from app.config import get_settings
 from app.domain.calls_service import CallsService
+from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.memory_store import get_memory_store
 from app.main import app
 from app.orchestrator.dispatcher import Orchestrator
@@ -22,6 +23,8 @@ def _clear_memory(monkeypatch):
     store.calls.clear()
     store.call_briefs.clear()
     store.call_post_reviews.clear()
+    store.kb_assets.clear()
+    store.kb_chunks.clear()
     store.call_live_signals.clear()
     store.discovery_checklists.clear()
     store.live_sessions.clear()
@@ -92,9 +95,31 @@ def test_post_dc_agent_heuristic_result_shape(monkeypatch):
     assert env.operation == "review_produced"
     assert env.result["review"]["headline"]
     assert env.result["review"]["openDiscoveryGaps"] == ["budget", "authority"]
+    scorecard_row = env.result["review"]["podScorecard"][0]
+    assert scorecard_row["roleInCall"] == "Account Executive"
+    assert scorecard_row["talkTimeSeconds"] > 0
+    assert scorecard_row["areasToWork"]
     assert env.result["task"]["emailDraft"]["to"] == ["buyer@example.com"]
+    assert env.result["task"]["clientEmailDraft"]["audience"] == "client"
+    assert env.result["task"]["internalEmailDraft"]["audience"] == "internal"
+    client_email_body = env.result["task"]["clientEmailDraft"]["body_markdown"]
+    assert "BANT coverage" not in client_email_body
+    assert "Open discovery gaps" not in client_email_body
+    assert "A few takeaways" not in client_email_body
+    assert "call centered on discovery" not in client_email_body
     assert "attachments" in env.result["task"]["emailDraft"]
-    assert env.result["task"]["crmTasks"]
+    assert env.result["task"]["taskList"]
+    assert "crmTasks" not in env.result["task"]
+    assert all("crm_system" not in task for task in env.result["task"]["taskList"])
+    assert env.result["jiraTicket"]["status"] == "draft_pending_approval"
+    assert env.result["jiraTicket"]["bantSnapshot"]["need"] is True
+    assert env.result["jiraTicket"]["bantSnapshot"]["budget"] is False
+    jira_description = env.result["jiraTicket"]["description"]
+    assert "Client summary:" in jira_description
+    assert "Action items:" in jira_description
+    assert "BANT" not in jira_description
+    assert "Budget" not in jira_description
+    assert "$" not in jira_description
 
 
 def test_post_dc_agent_generates_jira_draft_for_qualified_call(monkeypatch):
@@ -113,6 +138,187 @@ def test_post_dc_agent_generates_jira_draft_for_qualified_call(monkeypatch):
     assert ticket is not None
     assert ticket["status"] == "draft_pending_approval"
     assert ticket["projectKey"] == "SALES"
+    assert "description" in ticket
+    assert "Client summary:" in ticket["description"]
+    assert "Action items:" in ticket["description"]
+    assert "BANT" not in ticket["description"]
+    assert "Budget" not in ticket["description"]
+    assert "subtasks" not in ticket
+
+
+def test_post_dc_agent_polishes_kb_suggestions(monkeypatch):
+    _clear_memory(monkeypatch)
+    ctx = TenantContext(tenant_id="tenant-post-dc", user_id="user-post-dc")
+    tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+    get_memory_store().kb_chunks[clerk_key] = [
+        {
+            "tenant_id": tenant_uuid,
+            "asset_id": "kb-shopify-stripe-reference",
+            "chunk_text": (
+                "Industry: Software & IT Services; "
+                "LinkedIn Category / Sector: Software & IT Services; "
+                "OS: N/A; Platform: N/A; Process: N/A; Skill: Socket; "
+                "Technology: ExpressJS, NodeJS, React, Stripe, Shopify APIs, Zoho Email; "
+                "Tool: N/A; Architecture: N/A; Cloud Service: AWS"
+            ),
+            "metadata": {"title": "Shopify and Stripe integration reference"},
+        }
+    ]
+
+    env = run_post_dc_pipeline(
+        ctx,
+        "call-post-agent",
+        call={"id": "call-post-agent", "accountName": "Post Agent Co"},
+        pre_dc_fields={
+            "Company Name-PreDC": "Post Agent Co",
+            "Industry - PreDC": "Software & IT Services",
+            "Campaign Service - PreDC": "Shopify APIs",
+        },
+        discovery_snapshot=_discovery_snapshot(),
+    )
+
+    suggestion = env.result["kbSuggestions"][0]
+    assert suggestion["title"] == "Shopify and Stripe integration reference"
+    assert suggestion["reason"] == (
+        "Matches Software & IT Services with ExpressJS, NodeJS, React, Stripe, Shopify APIs, Zoho Email, AWS."
+    )
+    assert "N/A" not in suggestion["reason"]
+    assert suggestion["suggestedUse"] == "Use as an industry-relevant proof point in the follow-up."
+
+
+def test_post_dc_agent_attachment_section_uses_kb_and_content_gaps(monkeypatch):
+    _clear_memory(monkeypatch)
+    ctx = TenantContext(tenant_id="tenant-post-dc", user_id="user-post-dc")
+    tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+    get_memory_store().kb_chunks[clerk_key] = [
+        {
+            "tenant_id": tenant_uuid,
+            "asset_id": "kb-ai-architecture",
+            "chunk_text": "Industry: Retail; Technology: React, NodeJS, AWS; Service Line: AI platform",
+            "metadata": {"title": "Retail AI reference architecture"},
+        }
+    ]
+
+    env = run_post_dc_pipeline(
+        ctx,
+        "call-post-agent",
+        call={"id": "call-post-agent", "accountName": "Attachment Co"},
+        pre_dc_fields={
+            "Company Name-PreDC": "Attachment Co",
+            "Industry - PreDC": "Retail",
+            "Campaign Service - PreDC": "AI platform",
+        },
+        call_brief={
+            "contentToGenerate": [
+                {
+                    "id": "gap-roi",
+                    "name": "CFO ROI one-pager",
+                    "type": "one_pager",
+                    "reason": "Need unit economics and year-one investment framing before it can be attached.",
+                    "neededFor": "CFO readout",
+                    "status": "missing",
+                }
+            ]
+        },
+        discovery_snapshot=_discovery_snapshot(),
+    )
+
+    attachments = env.result["emailAttachments"]
+    assert attachments["found"][0]["assetId"] == "kb-ai-architecture"
+    assert attachments["found"][0]["source"] == "knowledge_base"
+    assert attachments["found"][0]["name"] == "Retail AI reference architecture"
+    assert attachments["missing"][0]["name"] == "CFO ROI one-pager"
+    assert "unit economics" in attachments["missing"][0]["requiredData"]
+    assert attachments["missing"][0]["source"] == "content_gap"
+    assert attachments["missing"][0]["contentStudioLink"].startswith("/content/studio")
+
+
+def test_post_dc_agent_builds_email_tasks_and_assets_from_transcript_context(monkeypatch):
+    _clear_memory(monkeypatch)
+    ctx = TenantContext(tenant_id="tenant-post-dc", user_id="user-post-dc")
+
+    env = run_post_dc_pipeline(
+        ctx,
+        "call-post-agent",
+        call={"id": "call-post-agent", "accountName": "Context Co", "leadEmail": "buyer@example.com"},
+        pre_dc_fields={"Company Name-PreDC": "Context Co"},
+        discovery_snapshot=_discovery_snapshot(),
+        transcript_events=[
+            {
+                "speaker_name": "Buyer",
+                "speaker_role": "customer",
+                "text": (
+                    "We need POS integration details before the Q3 launch. "
+                    "Can you send a security architecture and CFO ROI one-pager for our review?"
+                ),
+                "offset_seconds": 35,
+            },
+            {
+                "speaker_name": "AE",
+                "speaker_role": "ae",
+                "text": "Yes, I will prepare those materials and schedule the review.",
+                "offset_seconds": 80,
+            },
+        ],
+    )
+
+    client_email = env.result["task"]["clientEmailDraft"]
+    internal_email = env.result["task"]["internalEmailDraft"]
+    email_body = client_email["body_markdown"]
+    task_descriptions = [task["description"] for task in env.result["task"]["taskList"]]
+    missing_names = {item["name"] for item in env.result["emailAttachments"]["missing"]}
+
+    assert client_email["audience"] == "client"
+    assert internal_email["audience"] == "internal"
+    assert "Minutes of meeting" in email_body
+    assert "POS integration details" in email_body
+    assert "BANT" not in email_body
+    assert "Open discovery gaps" not in email_body
+    assert "Jira" not in email_body
+    assert "What we committed to" in email_body
+    assert client_email["attachments"] == env.result["emailAttachments"]
+    assert "BANT score" in internal_email["body_markdown"]
+    assert "Next action items" in internal_email["body_markdown"]
+    assert "Security architecture overview" in missing_names
+    assert "CFO ROI one-pager" in missing_names
+    assert any("Security architecture overview" in item for item in task_descriptions)
+    assert any("POS integration details" in item for item in task_descriptions)
+
+
+def test_post_dc_agent_scans_full_transcript_for_commitments(monkeypatch):
+    _clear_memory(monkeypatch)
+    ctx = TenantContext(tenant_id="tenant-post-dc", user_id="user-post-dc")
+    transcript_events = [
+        {
+            "speaker_name": "AE",
+            "speaker_role": "ae",
+            "text": "I will send the security architecture and schedule the CFO review.",
+            "offset_seconds": 20,
+        }
+    ]
+    transcript_events.extend(
+        {
+            "speaker_name": "Buyer",
+            "speaker_role": "customer",
+            "text": f"Additional evaluation detail {idx}.",
+            "offset_seconds": 30 + idx,
+        }
+        for idx in range(20)
+    )
+
+    env = run_post_dc_pipeline(
+        ctx,
+        "call-post-agent",
+        call={"id": "call-post-agent", "accountName": "Transcript Co"},
+        pre_dc_fields={"Company Name-PreDC": "Transcript Co"},
+        discovery_snapshot=_discovery_snapshot(),
+        transcript_events=transcript_events,
+    )
+
+    commitments = env.result["task"]["emailDraft"]["commitments_referenced"]
+    assert any("security architecture" in item for item in commitments)
+    assert any("CFO review" in item for item in commitments)
+    assert env.result["agentInputs"]["transcriptEventCount"] == 21
 
 
 def test_post_call_route_persists_review(monkeypatch):
@@ -210,6 +416,54 @@ def test_live_call_inputs_flow_into_post_dc_review(monkeypatch):
     assert saved is not None
     assert saved["review"]["headline"] == post["review"]["headline"]
     assert store.call_live_signals["tenant-post-dc"][call_id]["intent"]["label"] == "commercial_discovery"
+
+
+def test_end_live_call_preserves_live_outputs_for_post_dc(monkeypatch):
+    _clear_memory(monkeypatch)
+    ctx = TenantContext(tenant_id="tenant-post-dc", user_id="user-post-dc")
+    call_id = "call-live-end-to-post"
+    store = get_memory_store()
+    store.upsert_calls(
+        "tenant-post-dc",
+        [
+            {
+                "id": call_id,
+                "accountName": "Live End Co",
+                "leadEmail": "buyer@example.com",
+                "status": "live",
+                "briefReady": False,
+                "pod": [],
+                "bant": {
+                    "budget": "unknown",
+                    "authority": "unknown",
+                    "need": "partial",
+                    "timeline": "unknown",
+                },
+            }
+        ],
+    )
+
+    orchestrator = Orchestrator()
+    orchestrator.dispatch_live_segment(
+        ctx,
+        call_id,
+        {
+            "id": "seg-1",
+            "speakerId": "buyer-1",
+            "speakerName": "Buyer",
+            "speakerRole": "customer",
+            "text": "Budget is approved and the CFO owns the decision.",
+            "timestamp": 60,
+        },
+        elapsed_seconds=60,
+    )
+
+    ended = orchestrator.dispatch_call_end(ctx, call_id)
+    post = ended["post_call"]
+
+    assert post["live_signals"]["intent"]["label"] == "commercial_discovery"
+    assert post["agentInputs"]["hasLiveSignalSnapshot"] is True
+    assert post["agentInputs"]["transcriptEventCount"] == 1
 
 
 def test_jira_route_fails_closed_when_unconfigured(monkeypatch):

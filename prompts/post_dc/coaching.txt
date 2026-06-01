@@ -6,16 +6,22 @@ Return only JSON:
     {
       "member": "Pod or person name",
       "role": "AE | SE | Designer | Pod",
+      "roleInCall": "Account Executive | Solutions Engineer | Designer | Pod",
+      "talkTimeSeconds": 0,
+      "talkTimeLabel": "0s",
       "score": 0.0,
       "label": "strong | review | needs follow-up",
       "strengths": "specific strength grounded in call evidence",
-      "watch": "specific watchout or next coaching focus"
+      "watch": "specific watchout or next coaching focus",
+      "areasToWork": ["specific skill or behavior to improve next time"]
     }
   ]
 }
 
 Rules:
-- Ground feedback in discovery checklist, transcript excerpt, and live signals.
+- Ground feedback in discovery checklist, transcript digest/events, and live call agent outputs.
+- Use `pod_talk_time` for talkTimeSeconds/talkTimeLabel. Do not invent talk time.
+- Create one row per internal pod member when speaker attribution exists. Use a single "Pod" row only when attribution is unclear.
 - Do not make personal performance claims unless role/member evidence is present.
-- If attribution is unclear, use a single "Pod" row.
+- Keep BANT movement and discovery learnings out of coaching feedback unless they directly support an area to work.
 - Keep feedback constructive and specific.

@@ -22,7 +22,19 @@ export async function POST(request: NextRequest) {
   );
 
   if (!res.ok) {
-    const detail = await res.text().catch(() => "Upstream error");
+    const raw = await res.text().catch(() => "");
+    let upstream: { detail?: string; error?: string } | null = null;
+    try {
+      upstream = raw ? (JSON.parse(raw) as { detail?: string; error?: string }) : null;
+    } catch {
+      upstream = null;
+    }
+    const detail =
+      typeof upstream?.detail === "string"
+        ? upstream.detail
+        : typeof upstream?.error === "string"
+          ? upstream.error
+          : raw || "Upstream error";
     return NextResponse.json({ error: detail }, { status: res.status });
   }
   return NextResponse.json(await res.json());

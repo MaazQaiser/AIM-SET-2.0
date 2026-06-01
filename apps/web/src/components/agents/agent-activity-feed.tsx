@@ -27,7 +27,7 @@ const EVENT_CONFIG: Record<
   asset_ingested:    { icon: Upload,      label: "Asset ingested",   variant: "bg-green-50 text-green-700 border-green-100" },
   scorecard_produced:{ icon: Star,        label: "Scorecard",        variant: "bg-yellow-50 text-yellow-700 border-yellow-100" },
   email_drafted:     { icon: Mail,        label: "Email drafted",    variant: "bg-indigo-50 text-indigo-700 border-indigo-100" },
-  crm_task_created:  { icon: Database,    label: "CRM task",         variant: "bg-green-50 text-green-700 border-green-100" },
+  crm_task_created:  { icon: Database,    label: "Task created",     variant: "bg-green-50 text-green-700 border-green-100" },
   cost_cap_warning:  { icon: AlertTriangle, label: "Cost warning",   variant: "bg-orange-50 text-orange-700 border-orange-100" },
   model_fallback:    { icon: RefreshCw,   label: "Model fallback",   variant: "bg-yellow-50 text-yellow-700 border-yellow-100" },
   run_failed:        { icon: XCircle,     label: "Run failed",       variant: "bg-red-50 text-red-700 border-red-100" },

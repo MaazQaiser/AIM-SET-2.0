@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import Link from "next/link";
 import { ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -25,17 +24,15 @@ export function SidebarSubpanel() {
   const { data: assets = [] } = useKbAssets();
   const { data: gaps = [] } = useContentGaps();
   const { data: calls = [] } = useCalls();
-  const importVersion = useDcImportsStore((state) => state.importVersion ?? 0);
+  useDcImportsStore((state) => state.importVersion ?? 0);
 
-  const contentToGenerateCount = useMemo(() => {
-    const pendingGaps = gaps.filter((gap) => gap.status !== "approved").length;
-    const fromBriefs = calls.reduce((total, call) => {
-      const brief = resolveCallBrief(call.id);
-      return total + (brief?.contentToGenerate?.length ?? 0);
-    }, 0);
+  const pendingGaps = gaps.filter((gap) => gap.status !== "approved").length;
+  const fromBriefs = calls.reduce((total, call) => {
+    const brief = resolveCallBrief(call.id);
+    return total + (brief?.contentToGenerate?.length ?? 0);
+  }, 0);
 
-    return pendingGaps + fromBriefs;
-  }, [gaps, calls, importVersion]);
+  const contentToGenerateCount = pendingGaps + fromBriefs;
 
   const assetCountLabel = formatAssetCount(assets.length);
   const generateCountLabel = formatToGenerateCount(contentToGenerateCount);

@@ -16,12 +16,12 @@ def draft_post_call_artifacts(
         result = discovery_snapshot.get("result") or discovery_snapshot
         open_gaps = list(result.get("openGaps") or [])
 
-    crm_tasks = [
+    task_list = [
         {"title": "Send follow-up email", "status": "pending_approval"},
         {"title": "Internal debrief", "status": "pending_approval"},
     ]
     for gap in open_gaps:
-        crm_tasks.append(
+        task_list.append(
             {
                 "title": f"Clarify discovery gap: {gap}",
                 "status": "pending_approval",
@@ -46,7 +46,7 @@ def draft_post_call_artifacts(
                 + email_suffix
             ),
             "openDiscoveryGaps": open_gaps,
-            "crmTasks": crm_tasks,
+            "taskList": task_list,
         },
         citations=[Citation(source_type="transcript", source_id=call_id, snippet="Call summary")],
         confidence=0.8,

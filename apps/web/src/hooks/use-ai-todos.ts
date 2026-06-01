@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { addHours, isWithinInterval } from "date-fns";
-import { useCalls, useCoachingInsights, usePostCallCrmTasks } from "@/lib/data/hooks";
+import { useCalls, useCoachingInsights, usePostCallTasks } from "@/lib/data/hooks";
 import type { AgentId } from "@/types/agents";
 
 export type AiTodoAgent = AgentId;
@@ -26,7 +26,7 @@ function parseRevenue(raw?: string): number {
 export function useAiTodos() {
   const { data: calls = [] } = useCalls();
   const { data: coachingInsights = [] } = useCoachingInsights();
-  const { data: crmTasks = [] } = usePostCallCrmTasks();
+  const { data: taskList = [] } = usePostCallTasks();
 
   const todos = useMemo(() => {
     const items: AiTodo[] = [];
@@ -34,15 +34,15 @@ export function useAiTodos() {
     const in24h = addHours(now, 24);
     const in2h = addHours(now, 2);
 
-    const pendingCrm = crmTasks.filter((t) => t.status === "pending_approval");
-    if (pendingCrm.length > 0) {
-      const hasFollowUp = pendingCrm.some((t) => t.task_type === "follow_up");
+    const pendingTasks = taskList.filter((t) => t.status === "pending_approval");
+    if (pendingTasks.length > 0) {
+      const hasFollowUp = pendingTasks.some((t) => t.task_type === "follow_up");
       items.push({
-        id: "todo-crm-batch",
+        id: "todo-task-list-batch",
         title: hasFollowUp
-          ? "Approve follow-up email & CRM tasks"
-          : `Approve ${pendingCrm.length} CRM task${pendingCrm.length > 1 ? "s" : ""}`,
-        subtitle: `${pendingCrm.length} item${pendingCrm.length > 1 ? "s" : ""} · Post-call · awaiting sign-off`,
+          ? "Approve follow-up email & tasks"
+          : `Approve ${pendingTasks.length} task${pendingTasks.length > 1 ? "s" : ""}`,
+        subtitle: `${pendingTasks.length} item${pendingTasks.length > 1 ? "s" : ""} · Post-call · awaiting sign-off`,
         agent: "post_dc",
         priority: "high",
         href: "/calls/call-001?tab=post-dc",
@@ -106,7 +106,7 @@ export function useAiTodos() {
     items.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
     return items;
-  }, [calls, coachingInsights, crmTasks]);
+  }, [calls, coachingInsights, taskList]);
 
   const counts = useMemo(
     () => ({
@@ -139,7 +139,7 @@ export function useAiTodos() {
   return {
     todos,
     counts,
-    pendingApprovalCount: crmTasks.filter((t) => t.status === "pending_approval").length,
+    pendingApprovalCount: taskList.filter((t) => t.status === "pending_approval").length,
     topOpportunityCall,
   };
 }

@@ -4,10 +4,13 @@ import { create } from "zustand";
 import type { Call } from "@/types";
 import type {
   CallBrief,
-  PostCallCrmTask,
+  PostCallAgentEnvelope,
   PostCallEmailDraft,
+  PostCallEmailAttachments,
   PostCallJiraTicket,
+  PostCallKbSuggestion,
   PostCallReview,
+  PostCallTask,
 } from "@/lib/brief-types";
 import { buildCallsFromPreDc } from "@/lib/dc-data/build-calls-from-pre-dc";
 import type { PostDCRecord, PreDCRecord } from "@/types/dc-notes";
@@ -19,16 +22,31 @@ interface DcImportsState {
   briefsByCallId: Record<string, CallBrief>;
   postReviewsByCallId: Record<string, PostCallReview>;
   emailDraftsByCallId: Record<string, PostCallEmailDraft>;
-  crmTasksByCallId: Record<string, PostCallCrmTask[]>;
+  internalEmailDraftsByCallId: Record<string, PostCallEmailDraft>;
+  crmTasksByCallId: Record<string, PostCallTask[]>;
   jiraTicketsByCallId: Record<string, PostCallJiraTicket>;
+  postRunMetaByCallId: Record<
+    string,
+    {
+      emailAttachments?: PostCallEmailAttachments;
+      kbSuggestions?: PostCallKbSuggestion[];
+      envelope?: PostCallAgentEnvelope;
+      coaching?: Record<string, unknown>;
+    }
+  >;
   discoverySnapshotsByCallId: Record<string, { openGaps: string[]; bantCoverage?: number }>;
   setPostCallArtifacts: (
     callId: string,
     artifacts: {
       review?: PostCallReview;
       emailDraft?: PostCallEmailDraft;
-      crmTasks?: PostCallCrmTask[];
+      internalEmailDraft?: PostCallEmailDraft;
+      crmTasks?: PostCallTask[];
       jiraTicket?: PostCallJiraTicket | null;
+      emailAttachments?: PostCallEmailAttachments;
+      kbSuggestions?: PostCallKbSuggestion[];
+      envelope?: PostCallAgentEnvelope;
+      coaching?: Record<string, unknown>;
       discoverySnapshot?: { openGaps: string[]; bantCoverage?: number };
     }
   ) => void;
@@ -48,8 +66,10 @@ const emptyState = {
   briefsByCallId: {} as Record<string, CallBrief>,
   postReviewsByCallId: {} as Record<string, PostCallReview>,
   emailDraftsByCallId: {} as Record<string, PostCallEmailDraft>,
-  crmTasksByCallId: {} as Record<string, PostCallCrmTask[]>,
+  internalEmailDraftsByCallId: {} as Record<string, PostCallEmailDraft>,
+  crmTasksByCallId: {} as Record<string, PostCallTask[]>,
   jiraTicketsByCallId: {} as Record<string, PostCallJiraTicket>,
+  postRunMetaByCallId: {} as DcImportsState["postRunMetaByCallId"],
   discoverySnapshotsByCallId: {} as Record<string, { openGaps: string[]; bantCoverage?: number }>,
   preDcFileName: null as string | null,
   postDcFileName: null as string | null,
@@ -83,6 +103,9 @@ export const useDcImportsStore = create<DcImportsState>()((set, get) => ({
       emailDraftsByCallId: artifacts.emailDraft
         ? { ...s.emailDraftsByCallId, [callId]: artifacts.emailDraft }
         : s.emailDraftsByCallId,
+      internalEmailDraftsByCallId: artifacts.internalEmailDraft
+        ? { ...s.internalEmailDraftsByCallId, [callId]: artifacts.internalEmailDraft }
+        : s.internalEmailDraftsByCallId,
       crmTasksByCallId: artifacts.crmTasks
         ? { ...s.crmTasksByCallId, [callId]: artifacts.crmTasks }
         : s.crmTasksByCallId,
@@ -92,6 +115,19 @@ export const useDcImportsStore = create<DcImportsState>()((set, get) => ({
           : artifacts.jiraTicket
             ? { ...s.jiraTicketsByCallId, [callId]: artifacts.jiraTicket }
             : Object.fromEntries(Object.entries(s.jiraTicketsByCallId).filter(([id]) => id !== callId)),
+      postRunMetaByCallId:
+        artifacts.emailAttachments || artifacts.kbSuggestions || artifacts.envelope || artifacts.coaching
+          ? {
+              ...s.postRunMetaByCallId,
+              [callId]: {
+                ...(s.postRunMetaByCallId[callId] ?? {}),
+                ...(artifacts.emailAttachments ? { emailAttachments: artifacts.emailAttachments } : {}),
+                ...(artifacts.kbSuggestions ? { kbSuggestions: artifacts.kbSuggestions } : {}),
+                ...(artifacts.envelope ? { envelope: artifacts.envelope } : {}),
+                ...(artifacts.coaching ? { coaching: artifacts.coaching } : {}),
+              },
+            }
+          : s.postRunMetaByCallId,
       discoverySnapshotsByCallId: artifacts.discoverySnapshot
         ? { ...s.discoverySnapshotsByCallId, [callId]: artifacts.discoverySnapshot }
         : s.discoverySnapshotsByCallId,

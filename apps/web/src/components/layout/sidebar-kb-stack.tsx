@@ -116,8 +116,10 @@ export function SidebarKbDocumentsStack({ className }: { className?: string }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
-      aria-hidden
+      role="img"
+      aria-label="Knowledge documents preview"
     >
+      <title>Knowledge documents preview</title>
       <defs>
         <SlideCardShadow />
       </defs>

@@ -139,7 +139,9 @@ class Orchestrator:
         brief = self.calls.get_brief(ctx, call_id) or {}
         pre_dc_fields = self._pre_dc_fields_for_call(ctx, call_id)
         post_dc_record = self._post_dc_record_for_call(ctx, call_id)
-        transcript_events = get_live_call_repository().list_transcript_events(ctx, call_id)
+        live_repo = get_live_call_repository()
+        transcript_events = live_repo.list_transcript_events(ctx, call_id, limit=500)
+        live_suggestions = live_repo.list_suggestions(ctx, call_id, limit=200)
         post_env = run_post_dc_pipeline(
             ctx,
             call_id,
@@ -148,6 +150,7 @@ class Orchestrator:
             call_brief=brief,
             discovery_snapshot=discovery_snapshot,
             live_snapshot=live_snapshot,
+            live_suggestions=live_suggestions,
             transcript_events=transcript_events,
             post_dc_record=post_dc_record,
         )

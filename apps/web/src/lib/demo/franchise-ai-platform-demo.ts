@@ -1,5 +1,13 @@
 import type { Call } from "@/types";
-import type { CallBrief, PostCallReview } from "@/lib/brief-types";
+import type {
+  CallBrief,
+  PostCallAgentEnvelope,
+  PostCallEmailDraft,
+  PostCallJiraTicket,
+  PostCallKbSuggestion,
+  PostCallReview,
+  PostCallTask,
+} from "@/lib/brief-types";
 import type { DemoTranscriptLine } from "@/lib/demo-live-transcript";
 
 /** Demo DC: prospect requests proposal for AI-native franchise operations platform. */
@@ -157,20 +165,28 @@ export const franchiseDemoPostReview: PostCallReview = {
     {
       member: "Sarah Mendes",
       role: "AE",
+      roleInCall: "Account Executive",
+      talkTimeSeconds: 24,
+      talkTimeLabel: "24s",
       score: 0.84,
       label: "Strong",
       strengths:
         "Anchored proposal ask early; captured budget band and board date without deflecting.",
       watch: "Book CFO / economic buyer session before proposal delivery.",
+      areasToWork: ["Book CFO / economic buyer session before proposal delivery."],
     },
     {
       member: "Tariq Hassan",
       role: "SE",
+      roleInCall: "Solutions Engineer",
+      talkTimeSeconds: 17,
+      talkTimeLabel: "17s",
       score: 0.88,
       label: "Strong",
       strengths:
         "Franchisee permission model + agent mesh resonated; reduced build-vs-buy anxiety.",
       watch: "Include integration map for POS + legacy franchise suite in proposal appendix.",
+      areasToWork: ["Include integration map for POS + legacy franchise suite in proposal appendix."],
     },
   ],
   learned: [
@@ -212,6 +228,168 @@ export const franchiseDemoPostReview: PostCallReview = {
       ],
     },
   ],
+};
+
+export const franchiseDemoEmailDraft: PostCallEmailDraft = {
+  id: "email-frontera-follow-up",
+  audience: "client",
+  to: ["marcus.chen@fronterafranchise.com"],
+  cc: ["sarah.mendes@tkxel.com", "tariq.hassan@tkxel.com"],
+  subject: "Frontera franchise ops proposal next steps",
+  body_markdown:
+    "Hi Marcus,\n\nThanks again for the direct conversation today. Here is what I captured from our discussion:\n\nWhat we discussed:\n- An AI-native execution layer for corporate and franchisee workflows across 140 locations\n- POS and legacy franchise-suite integrations with clear franchisee permission boundaries\n- A Q3 pilot path for Texas and Arizona, with production hardening by Q1 2027\n\nWhat we committed to:\n- Share a board-ready proposal package with pilot scope, integration map, CFO-level ROI framing, and reference architecture\n- Include the multi-unit retail AI reference architecture as supporting material\n- Coordinate the next proposal readout so we can walk through scope, ROI, and rollout assumptions together\n\nReferences we are sharing:\n- Multi-unit retail AI reference architecture\n- Pilot SOW outline and CFO ROI one-pager once those drafts are ready\n\nNext touch base:\n- We will follow up with proposed times for the proposal readout and align on who should join from your side.\n\nLooking forward,\nSarah",
+  style_signals: ["concise", "board-ready", "action-oriented"],
+  commitments_referenced: [
+    "Send board-ready proposal package within two weeks.",
+    "Include pilot SOW, integration map, and CFO-level ROI framing.",
+    "Schedule CFO readout before final proposal delivery.",
+  ],
+  status: "draft_pending_approval",
+  attachments: {
+    found: [
+      {
+        name: "Multi-unit retail AI reference architecture",
+        assetId: "demo-franchise-reference-architecture",
+        snippet: "Agent mesh, franchisee permission model, POS integration lanes.",
+        downloadUrl: "/knowledge/demo-franchise-reference-architecture",
+        previewUrl: "/knowledge/demo-franchise-reference-architecture",
+        fileName: "multi-unit-retail-ai-reference-architecture.pdf",
+        mimeType: "application/pdf",
+        fileType: "PDF",
+      },
+    ],
+    missing: [
+      {
+        name: "Frontera pilot SOW",
+        requiredData: "Pilot scope for 10-15 Texas and Arizona franchisees, delivery plan, and success metrics.",
+        contentStudioLink:
+          "/content/studio?template=pilot_sow&account=Frontera%20Franchise%20Group&source=post-dc",
+      },
+      {
+        name: "CFO ROI one-pager",
+        requiredData: "Unit economics, audit-time savings, compliance impact, and year-one investment case.",
+        contentStudioLink:
+          "/content/studio?template=roi_one_pager&account=Frontera%20Franchise%20Group&source=post-dc",
+      },
+    ],
+  },
+};
+
+export const franchiseDemoInternalEmailDraft: PostCallEmailDraft = {
+  id: "internal-email-frontera-follow-up",
+  audience: "internal",
+  to: ["sales-pod@tkxel.com"],
+  cc: ["sarah.mendes@tkxel.com", "tariq.hassan@tkxel.com"],
+  subject: "Internal Post-DC action plan: Frontera Franchise Group",
+  body_markdown:
+    "Internal Post-DC summary for Frontera Franchise Group\n\nBANT score: 78%\nBANT details:\n- Budget: partial, $450K-$600K envelope discussed\n- Authority: partial, COO sponsor with CFO/board approval path pending\n- Need: confirmed, franchise operations fragmentation and compliance visibility\n- Timeline: confirmed, Q3 pilot and Q1 2027 production target\n\nNext action items:\n- [AE] Review and send Marcus the follow-up email with proposal timing and next-step owners.\n- [AE] Schedule CFO readout before the board-ready proposal is finalized.\n- [Pod] Run internal proposal debrief and assign owners for pilot SOW, integration map, and ROI one-pager.\n\nRecommended next step: Deliver board-ready proposal + pilot SOW by Jun 4.",
+  style_signals: ["internal", "action-oriented", "bant-focused"],
+  commitments_referenced: [
+    "Review and send the follow-up email.",
+    "Schedule CFO readout.",
+    "Assign proposal asset owners.",
+  ],
+  status: "draft_pending_approval",
+};
+
+export const franchiseDemoCrmTasks: PostCallTask[] = [
+  {
+    id: "task-frontera-follow-up-email",
+    task_type: "follow_up",
+    owner: "AE",
+    due_date: "2026-06-02T17:00:00.000Z",
+    description: "Review and send Marcus the follow-up email with proposal timing and next-step owners.",
+    status: "pending_approval",
+  },
+  {
+    id: "task-frontera-cfo-readout",
+    task_type: "schedule_next_meeting",
+    owner: "AE",
+    due_date: "2026-06-04T17:00:00.000Z",
+    description: "Schedule CFO readout before the board-ready proposal is finalized.",
+    status: "pending_approval",
+  },
+  {
+    id: "task-frontera-proposal-debrief",
+    task_type: "internal_review",
+    owner: "Pod",
+    due_date: "2026-06-03T17:00:00.000Z",
+    description: "Internal debrief: confirm proposal scope, POS integration appendix, and reference assets.",
+    status: "pending_approval",
+    isInternalAuto: true,
+  },
+];
+
+export const franchiseDemoKbSuggestions: PostCallKbSuggestion[] = [
+  {
+    assetId: "demo-franchise-reference-architecture",
+    title: "Multi-unit retail AI reference architecture",
+    reason: "Matches the follow-up need for franchisee permissions, POS integration lanes, and a scalable AI operations layer.",
+    suggestedUse: "Attach to the proposal package as technical proof for the pilot architecture.",
+    snippet: "Reference architecture for multi-tenant franchise ops, franchisee permissions, and POS data flows.",
+    score: 0.91,
+  },
+  {
+    assetId: "demo-retail-ai-case-study",
+    title: "Retail AI compliance automation case study",
+    reason: "Matches the validated pain around compliance audits, regional visibility, and franchise operating consistency.",
+    suggestedUse: "Use as a proof point in the CFO readout or proposal narrative.",
+    snippet: "Case study showing compliance workflow automation and region-level performance visibility.",
+    score: 0.84,
+  },
+];
+
+export const franchiseDemoJiraTicket: PostCallJiraTicket = {
+  status: "draft_pending_approval",
+  summary: "[DC Follow-up] Frontera Franchise Group opportunity",
+  description:
+    "Client summary:\n- Frontera needs an AI-native execution layer for franchise operations across 140 locations.\n- The client is requesting a board-ready proposal package for a Q3 pilot and Q1 2027 production path.\n\nClient details / needs:\n- Validated needs include franchise workflow fragmentation, POS integration variance, and compliance visibility.\n- The proposal should clarify pilot scope, franchisee permission boundaries, and integration approach.\n\nTimeline / POC:\n- Q3 pilot path for Texas and Arizona franchisees.\n- Production hardening target in Q1 2027.\n- Schedule the next proposal readout before finalizing the package.\n\nNeeded materials:\n- Pilot SOW\n- Integration map\n- Multi-unit retail AI reference architecture\n\nAction items:\n- Review and send Marcus the follow-up email with proposal timing and next-step owners.\n- Schedule proposal readout before the board-ready proposal is finalized.\n- Confirm proposal scope, POS integration appendix, and reference assets.",
+  issueType: "Review",
+  priority: "High",
+  labels: ["discovery-call", "bant-review-needed", "franchise-ops"],
+  projectKey: "SALES",
+  bantSnapshot: {
+    budget: false,
+    authority: false,
+    need: true,
+    timeline: true,
+  },
+};
+
+export const franchiseDemoAgentEnvelope: PostCallAgentEnvelope = {
+  agent: "post_dc",
+  operation: "review_produced",
+  trace_id: "demo-frontera-post-dc",
+  confidence: 0.86,
+  cost: {
+    tokens: 0,
+    usd: 0,
+    model: "demo-seeded",
+  },
+  citations: [
+    {
+      source_type: "transcript",
+      source_id: FRANCHISE_DEMO_CALL_ID,
+      snippet:
+        "Please include CFO-level ROI and a clear decision process — I'll pull our CFO into a readout once we have the draft.",
+      confidence: 0.9,
+    },
+    {
+      source_type: "crm_record",
+      source_id: FRANCHISE_DEMO_CALL_ID,
+      snippet: "$450K-$600K first-year envelope; Q3 pilot / Q1 production timeline.",
+      confidence: 0.84,
+    },
+  ],
+};
+
+export const franchiseDemoPostCallArtifacts = {
+  emailDraft: franchiseDemoEmailDraft,
+  internalEmailDraft: franchiseDemoInternalEmailDraft,
+  crmTasks: franchiseDemoCrmTasks,
+  jiraTicket: franchiseDemoJiraTicket,
+  kbSuggestions: franchiseDemoKbSuggestions,
+  envelope: franchiseDemoAgentEnvelope,
 };
 
 export const FRANCHISE_DEMO_TRANSCRIPT: DemoTranscriptLine[] = [

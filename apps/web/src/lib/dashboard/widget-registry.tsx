@@ -29,20 +29,22 @@ import {
 } from "@/components/pre-call/brief-widget-cards";
 import {
   PostHeadlineCard,
+  PostKbSuggestionsCard,
   PostLearnedCard,
   PostScorecardCard,
   PostSummaryCard,
 } from "@/components/post-dc/post-dc-widget-cards";
 import { PostDiscoveryGapsCard } from "@/components/post-dc/post-discovery-gaps-card";
 import { EmailEditor } from "@/components/post-dc/email-editor";
-import { CrmTaskList } from "@/components/post-dc/crm-task-list";
+import { TaskList } from "@/components/post-dc/crm-task-list";
 import { JiraTicketCard } from "@/components/post-dc/jira-ticket-card";
 import type {
   CallBrief,
-  PostCallCrmTask,
   PostCallEmailDraft,
   PostCallJiraTicket,
+  PostCallKbSuggestion,
   PostCallReview,
+  PostCallTask,
 } from "@/lib/brief-types";
 import { arrayLen } from "@/lib/dashboard/normalize-widget-props";
 import type { BANTScore, Call } from "@/types";
@@ -76,9 +78,9 @@ export interface PostDcWidgetProps {
   call: Call;
   accountSnapshot: AccountSnapshotRow[];
   emailDraft?: PostCallEmailDraft | null;
-  crmTasks?: PostCallCrmTask[];
+  crmTasks?: PostCallTask[];
   jiraTicket?: PostCallJiraTicket | null;
-  onApproveEmail?: (draft: PostCallEmailDraft) => void;
+  kbSuggestions?: PostCallKbSuggestion[];
   onApproveCrmTasks?: (ids: string[]) => void;
   onRejectCrmTask?: (id: string) => void;
   onCreateJiraTicket?: (ticket: PostCallJiraTicket) => Promise<void> | void;
@@ -340,8 +342,7 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     column: "center",
     sortOrder: 4,
     isAvailable: ({ emailDraft }) => Boolean(emailDraft),
-    render: ({ emailDraft, onApproveEmail }) =>
-      emailDraft ? <EmailEditor draft={emailDraft} onApprove={onApproveEmail} /> : null,
+    render: ({ emailDraft }) => (emailDraft ? <EmailEditor draft={emailDraft} /> : null),
   },
   {
     id: "post.research",
@@ -364,14 +365,14 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     render: ({ review }) => <PostScorecardCard scorecard={review.podScorecard ?? []} />,
   },
   {
-    id: "post.crm_tasks",
-    title: "CRM tasks",
+    id: "post.task_list",
+    title: "Task list",
     category: "pod",
     column: "right",
     sortOrder: 2,
     isAvailable: ({ crmTasks }) => arrayLen(crmTasks) > 0,
     render: ({ crmTasks = [], onApproveCrmTasks, onRejectCrmTask }) => (
-      <CrmTaskList tasks={crmTasks} onApprove={onApproveCrmTasks} onReject={onRejectCrmTask} />
+      <TaskList tasks={crmTasks} onApprove={onApproveCrmTasks} onReject={onRejectCrmTask} />
     ),
   },
   {
@@ -383,5 +384,14 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     isAvailable: ({ jiraTicket }) => Boolean(jiraTicket),
     render: ({ jiraTicket, onCreateJiraTicket }) =>
       jiraTicket ? <JiraTicketCard ticket={jiraTicket} onCreate={onCreateJiraTicket} /> : null,
+  },
+  {
+    id: "post.kb_suggestions",
+    title: "KB suggestions",
+    category: "content",
+    column: "right",
+    sortOrder: 4,
+    isAvailable: ({ kbSuggestions }) => arrayLen(kbSuggestions) > 0,
+    render: ({ kbSuggestions = [] }) => <PostKbSuggestionsCard suggestions={kbSuggestions} />,
   },
 ];

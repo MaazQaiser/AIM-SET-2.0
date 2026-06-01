@@ -64,7 +64,7 @@ export function IntegrationsTab() {
             CRM
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Push CRM tasks and update opportunity records automatically after each call.
+            Connect external systems for account updates and approved handoffs after each call.
           </p>
         </div>
 
