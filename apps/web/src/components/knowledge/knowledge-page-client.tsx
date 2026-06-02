@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BookOpen } from "lucide-react";
 import { SearchInput } from "@dc-copilot/ui/components/search-input";
+import { PageShell } from "@/components/layout/page-shell";
 import { KBAssetCard } from "@/components/kb-asset-card";
 import { KbUploadButton } from "@/components/knowledge/kb-upload-button";
 import { KnowledgePreviewDialog } from "@/components/knowledge/knowledge-preview-dialog";
@@ -34,7 +35,7 @@ export function KnowledgePageClient() {
   });
 
   return (
-    <div className="p-6 space-y-6">
+    <PageShell size="wide">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Knowledge base</h1>
@@ -111,6 +112,6 @@ export function KnowledgePageClient() {
         open={previewAsset !== null}
         onOpenChange={(open) => !open && setPreviewAsset(null)}
       />
-    </div>
+    </PageShell>
   );
 }

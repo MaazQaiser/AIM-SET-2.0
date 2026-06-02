@@ -7,6 +7,8 @@ export function AuthSetupBanner() {
   if (isLocalAuthBypassEnabled()) return null;
 
   const status = getDeploymentAuthStatus();
+  // Local dev: localhost API_URL is expected; only warn when Clerk is missing.
+  if (process.env.NODE_ENV !== "production" && status.clerkReady) return null;
   if (status.clerkReady && status.apiUrlConfigured) return null;
 
   const hints = clerkKeyHints();
@@ -14,7 +16,7 @@ export function AuthSetupBanner() {
   return (
     <div
       role="alert"
-      className="mx-6 mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-foreground"
+      className="mx-6 mt-4 rounded-lg border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-foreground dark:border-amber-500/30 dark:bg-amber-950/40"
     >
       <p className="font-medium text-amber-900 dark:text-amber-100">
         Deployment setup incomplete

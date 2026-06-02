@@ -11,14 +11,19 @@ import type { PostDcBriefPreview } from "@/lib/brief-types";
 
 interface PostDcBriefPreviewCardProps {
   preview: PostDcBriefPreview;
+  embedded?: boolean;
 }
 
-export function PostDcBriefPreviewCard({ preview }: PostDcBriefPreviewCardProps) {
+export function PostDcBriefPreviewCard({
+  preview,
+  embedded = false,
+}: PostDcBriefPreviewCardProps) {
   return (
     <BriefDetailCard
       title="Post-DC notes (imported)"
       icon={ClipboardList}
       className="border-dashed"
+      embedded={embedded}
       sourceInfo={{
         source: "Imported Post-DC notes",
         detail:
@@ -32,6 +37,7 @@ export function PostDcBriefPreviewCard({ preview }: PostDcBriefPreviewCardProps)
         ) : null
       }
       scrollMaxHeight="14rem"
+      hideEmbeddedTitle={embedded}
     >
       <div className="space-y-2">
         {preview.bottomLineContext && (

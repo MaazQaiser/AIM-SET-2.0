@@ -1,13 +1,10 @@
 "use client";
 
-import { ArrowLeft, Pencil } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@dc-copilot/ui/components/button";
-import { Badge } from "@dc-copilot/ui/components/badge";
-import { AIGeneratedBadge } from "@/components/ai-generated-badge";
+import { CallDetailStickyHeader } from "@/components/calls/call-detail-sticky-header";
 import { CallDetailTabs } from "@/components/calls/call-detail-tabs";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { Skeleton } from "@dc-copilot/ui/components/skeleton";
+import { useMainScrollCompact } from "@/hooks/use-main-scroll-compact";
 import { useCall } from "@/lib/data/hooks";
 import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
@@ -22,6 +19,7 @@ interface CallDetailViewProps {
 }
 
 export function CallDetailView({ callId }: CallDetailViewProps) {
+  const compact = useMainScrollCompact(32);
   const { data: call, isLoading } = useCall(callId);
   const preRecord = useDcImportsStore((s) =>
     findPreDcRecordForCall(s.preDcRecords, callId, call?.accountName)
@@ -31,9 +29,9 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6 max-w-[1400px] mx-auto w-full">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-96 w-full" />
+      <div className="px-4 pt-2 pb-4 max-w-[1600px] mx-auto w-full">
+        <Skeleton className="h-16 w-full rounded-lg mb-4" />
+        <Skeleton className="h-96 w-full rounded-xl" />
       </div>
     );
   }
@@ -72,77 +70,53 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
         { label: "Deal stage", value: call.dealStage ?? "Discovery" },
       ];
 
-  return (
-    <div className="p-6 space-y-6 max-w-[1400px] mx-auto w-full">
-      <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="icon">
-          <Link href="/calls" aria-label="Back to calls">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-xl font-semibold text-foreground">{call.accountName}</h1>
-            {call.leadName && (
-              <span className="text-sm text-muted-foreground">
-                · {call.leadName}
-                {call.leadTitle ? ` (${call.leadTitle})` : ""}
-              </span>
-            )}
-            <Badge variant="secondary">Pre-DC Brief</Badge>
-            {call.annualRevenue && (
-              <Badge variant="outline" className="text-[10px] font-mono">
-                {call.annualRevenue} revenue
-              </Badge>
-            )}
-            <AIGeneratedBadge />
-          </div>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {call.discoveryCallDatePkt && call.discoveryCallTimePkt ? (
-              <>
-                Discovery call: {call.discoveryCallDatePkt} at {call.discoveryCallTimePkt} (PKT)
-              </>
-            ) : (
-              new Date(call.scheduledAt).toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              })
-            )}
-          </p>
-        </div>
-        {isEditingLayout ? (
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            onClick={() => setEditingLayout(false)}
-          >
-            Done
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => setEditingLayout(true)}
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            Customize layout
-          </Button>
-        )}
-      </div>
+  const scheduleText =
+    call.discoveryCallDatePkt && call.discoveryCallTimePkt
+      ? `${call.discoveryCallDatePkt} · ${call.discoveryCallTimePkt} PKT`
+      : new Date(call.scheduledAt).toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        });
 
+  const showJoinCall = call.status === "upcoming" || call.status === "live";
+
+  return (
+    <div className="call-detail-page w-full pt-0 pb-8 min-h-0 text-[0.9375rem] leading-relaxed">
+      <CallDetailStickyHeader
+        call={call}
+        scheduleText={scheduleText}
+        bant={
+          call.bant ?? {
+            budget: "unknown",
+            authority: "unknown",
+            need: "unknown",
+            timeline: "unknown",
+          }
+        }
+        compact={compact}
+        showJoinCall={showJoinCall}
+        isEditingLayout={isEditingLayout}
+        onToggleLayout={() => setEditingLayout(!isEditingLayout)}
+      />
+      <div className="px-16 md:px-24 lg:px-32 max-w-[1480px] mx-auto w-full">
       <CallDetailTabs
         callId={callId}
         discoveryQuestions={discoveryQuestions}
-        bant={call.bant ?? { budget: "unknown", authority: "unknown", need: "unknown", timeline: "unknown" }}
+        bant={
+          call.bant ?? {
+            budget: "unknown",
+            authority: "unknown",
+            need: "unknown",
+            timeline: "unknown",
+          }
+        }
         call={call}
         accountSnapshot={accountSnapshot}
       />
+      </div>
     </div>
   );
 }

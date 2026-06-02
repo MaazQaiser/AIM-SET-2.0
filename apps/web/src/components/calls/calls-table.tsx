@@ -47,9 +47,9 @@ function primaryAction(call: Call) {
 
 const accountColumnClasses = {
   headerClassName:
-    "min-w-[220px] w-[220px] sticky left-0 z-20 bg-muted/95 backdrop-blur-sm shadow-[1px_0_0_0_hsl(var(--border))]",
+    "min-w-[220px] w-[220px] sticky left-0 z-20 bg-card shadow-[inset_-1px_0_0_0_hsl(var(--border))]",
   cellClassName:
-    "min-w-[220px] w-[220px] sticky left-0 z-10 bg-background shadow-[1px_0_0_0_hsl(var(--border))] group-hover:bg-muted/50",
+    "min-w-[220px] w-[220px] sticky left-0 z-10 bg-card group-hover:bg-muted/20 shadow-[inset_-1px_0_0_0_hsl(var(--border))]",
 };
 
 const columns: ColumnDef<Call>[] = [

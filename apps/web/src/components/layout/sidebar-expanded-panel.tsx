@@ -5,6 +5,10 @@ import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import {
+  appNavLinkActiveClass,
+  appNavLinkClass,
+} from "@dc-copilot/ui/surfaces";
+import {
   mainNavItems,
   footerNavItems,
   getSidebarPageTitle,
@@ -83,7 +87,11 @@ export function SidebarExpandedPanel() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={cn(styles.navLink, isActive && styles.navLinkActive)}
+                className={cn(
+                  appNavLinkClass,
+                  styles.navLink,
+                  isActive && appNavLinkActiveClass
+                )}
                 aria-current={isActive ? "page" : undefined}
                 onClick={() => setExpanded(false)}
               >

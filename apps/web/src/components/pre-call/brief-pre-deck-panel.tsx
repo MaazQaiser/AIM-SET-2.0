@@ -11,7 +11,15 @@ import {
 } from "@dc-copilot/ui/components/dialog";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
-import { BriefDetailCard, BriefDetailRow } from "@/components/pre-call/brief-detail-card";
+import {
+  BriefDetailCard,
+  BriefDetailRow,
+  briefDetailDialogClass,
+  briefMainBody,
+  briefMainLead,
+  briefMainMuted,
+  briefMainUnderline,
+} from "@/components/pre-call/brief-detail-card";
 import type { PreDeck, PreDeckSlide } from "@/lib/brief-types";
 import { cn } from "@/lib/cn";
 
@@ -49,6 +57,7 @@ export function BriefPreDeckPanel({ deck }: BriefPreDeckPanelProps) {
   return (
     <>
       <BriefDetailCard
+        tone="main"
         title="Pre-call deck"
         icon={Presentation}
         sourceInfo={{
@@ -71,7 +80,7 @@ export function BriefPreDeckPanel({ deck }: BriefPreDeckPanelProps) {
         }
       >
         <div className="space-y-3">
-          <p className="text-sm text-foreground/85 leading-relaxed">{deck.summary}</p>
+          <p className={cn(briefMainBody, "font-medium")}>{deck.summary}</p>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <Layers3 className="h-3.5 w-3.5" />
@@ -91,12 +100,12 @@ export function BriefPreDeckPanel({ deck }: BriefPreDeckPanelProps) {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-medium truncate">{slide.title}</p>
+                      <p className={cn(briefMainLead, index === 0 && briefMainUnderline, "truncate")}>
+                        {slide.title}
+                      </p>
                       <SlideSourceBadge slide={slide} />
                     </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                      {slide.narrative}
-                    </p>
+                    <p className={cn(briefMainMuted, "line-clamp-2 mt-1")}>{slide.narrative}</p>
                   </div>
                 </BriefDetailRow>
               </li>
@@ -106,7 +115,9 @@ export function BriefPreDeckPanel({ deck }: BriefPreDeckPanelProps) {
       </BriefDetailCard>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-5xl w-[96vw] h-[90vh] flex flex-col">
+        <DialogContent
+          className={cn(briefDetailDialogClass, "max-w-5xl w-[96vw] h-[90vh] flex flex-col")}
+        >
           <DialogHeader className="shrink-0">
             <DialogTitle className="pr-8 truncate">{deck.title}</DialogTitle>
             <DialogDescription>

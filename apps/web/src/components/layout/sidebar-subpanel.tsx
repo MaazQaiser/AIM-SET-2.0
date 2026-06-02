@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import {
+  appCardClass,
+  appSidebarWidgetClass,
+} from "@dc-copilot/ui/surfaces";
 import { resolveCallBrief } from "@/lib/dc-data/resolvers";
 import { useKbAssets, useContentGaps, useCalls } from "@/lib/data/hooks";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
@@ -50,7 +54,7 @@ export function SidebarSubpanel() {
         </button>
 
         <div className={styles.aiInsightWrap}>
-          <article className={styles.aiInsightCard}>
+          <article className={cn(appCardClass, styles.aiInsightCard)}>
             <header className={styles.aiInsightHeader}>
               <h2 className={styles.aiInsightTitle}>AI Insight</h2>
               <ChevronRight className={styles.widgetCardIcon} strokeWidth={1.5} aria-hidden />
@@ -71,7 +75,7 @@ export function SidebarSubpanel() {
 
         <Link
           href="/knowledge"
-          className={cn(styles.widgetCard, styles.kbWidgetCard)}
+          className={cn(appSidebarWidgetClass, styles.widgetCard, styles.kbWidgetCard)}
           onClick={() => setExpanded(false)}
         >
           <span className={styles.widgetCardText}>
@@ -97,7 +101,7 @@ export function SidebarSubpanel() {
           <Link
             key={card.href + card.title}
             href={card.href}
-            className={styles.widgetCard}
+            className={cn(appSidebarWidgetClass, styles.widgetCard)}
             onClick={() => setExpanded(false)}
           >
             <span className={styles.widgetCardText}>

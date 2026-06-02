@@ -4,7 +4,9 @@ import { useMemo } from "react";
 import { CheckCircle2, AlertTriangle, XCircle, Activity, Zap } from "lucide-react";
 import { AgentStatusCard } from "@/components/agents/agent-status-card";
 import { AgentActivityFeed } from "@/components/agents/agent-activity-feed";
+import { PageShell } from "@/components/layout/page-shell";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
+import { StatCard } from "@dc-copilot/ui/components/stat-card";
 import { useAgentAudit, useAgentRuns } from "@/lib/data/hooks";
 import { buildAgentStatuses } from "@/lib/agents/catalog";
 
@@ -55,7 +57,7 @@ export default function AgentsPage() {
   const healthyCount = statuses.filter((a) => a.health === "healthy").length;
 
   return (
-    <div className="p-6 space-y-6">
+    <PageShell size="wide" className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Agent Control Panel</h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -65,31 +67,14 @@ export default function AgentsPage() {
 
       <SystemHealthBanner hasOutage={hasOutage} hasDegraded={hasDegraded} />
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="glass-insight-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <Activity className="h-4 w-4" />
-            <span className="text-xs">Total runs today</span>
-          </div>
-          <p className="text-2xl font-bold">{totalRuns}</p>
-        </div>
-        <div className="glass-insight-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <Zap className="h-4 w-4" />
-            <span className="text-xs">Total cost today</span>
-          </div>
-          <p className="text-2xl font-bold">${totalCost.toFixed(2)}</p>
-        </div>
-        <div className="glass-insight-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <CheckCircle2 className="h-4 w-4" />
-            <span className="text-xs">Agents with runs today</span>
-          </div>
-          <p className="text-2xl font-bold">
-            {healthyCount}
-            <span className="text-sm font-normal text-muted-foreground">/{statuses.length}</span>
-          </p>
-        </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard title="Total runs today" value={totalRuns} icon={Activity} />
+        <StatCard title="Total cost today" value={`$${totalCost.toFixed(2)}`} icon={Zap} />
+        <StatCard
+          title="Agents with runs today"
+          value={`${healthyCount}/${statuses.length}`}
+          icon={CheckCircle2}
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -113,6 +98,6 @@ export default function AgentsPage() {
           />
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Linkedin, Clock, MessageCircle, ExternalLink } from "lucide-react";
-import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
+import { BriefDetailCard, briefDetailDialogClass } from "@/components/pre-call/brief-detail-card";
 import { Button } from "@dc-copilot/ui/components/button";
 import {
   Dialog,
@@ -16,6 +16,7 @@ import type { ClientAttendee, InfluenceLevel } from "@/lib/brief-types";
 
 interface ClientAttendeesCardProps {
   attendees: ClientAttendee[];
+  embedded?: boolean;
 }
 
 const INFLUENCE_CONFIG: Record<InfluenceLevel, { label: string; className: string }> = {
@@ -57,7 +58,9 @@ function ClientAttendeeDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[min(90vh,640px)] overflow-y-auto">
+      <DialogContent
+        className={cn(briefDetailDialogClass, "max-w-lg max-h-[min(90vh,640px)] overflow-y-auto")}
+      >
         <DialogHeader className="pr-8">
           <div className="flex items-start gap-3">
             <div className="h-12 w-12 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
@@ -136,7 +139,10 @@ function ClientAttendeeDetailDialog({
   );
 }
 
-export function ClientAttendeesCard({ attendees }: ClientAttendeesCardProps) {
+export function ClientAttendeesCard({
+  attendees,
+  embedded = false,
+}: ClientAttendeesCardProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = attendees.find((a) => a.id === selectedId) ?? null;
 
@@ -152,6 +158,7 @@ export function ClientAttendeesCard({ attendees }: ClientAttendeesCardProps) {
     <>
       <BriefDetailCard
         title="Client attendees"
+        embedded={embedded}
         sourceInfo={{
           source: "Imported lead/contact data",
           detail:

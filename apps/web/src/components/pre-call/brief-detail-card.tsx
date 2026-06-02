@@ -9,6 +9,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useThemePreview } from "@/hooks/use-theme-preview";
+import {
+  appBodyClass,
+  appCardClass,
+  appDialogClass,
+  appLeadClass,
+  appMutedClass,
+  appScrollClass,
+  appScrollSidebarClass,
+} from "@dc-copilot/ui/surfaces";
 import { cn } from "@/lib/cn";
 
 export interface BriefSourceInfo {
@@ -16,10 +26,49 @@ export interface BriefSourceInfo {
   detail: string;
 }
 
+/** Typography for Pre-DC main column cards (center + merged focus rail). */
+export const briefMainBody = cn(appBodyClass, "[&_li]:text-base [&_p]:text-base");
+export const briefMainLead = appLeadClass;
+export const briefMainUnderline =
+  "font-semibold underline decoration-foreground/40 underline-offset-[3px]";
+export const briefMainMuted = appMutedClass;
+
+/** Scrollable card regions: slim thumb, inset via scrollbar track margin. */
+export const briefCardScrollClass = appScrollClass;
+
+/** Left sidebar scroll areas — thinner thumb than main column. */
+export const briefSidebarScrollClass = appScrollSidebarClass;
+
+/** Shared shell: cool border, clipped corners (overrides glass-insight-card). */
+export const briefCardShellClass = cn(appCardClass, "gap-0");
+
+/** Detail modals on Pre-DC — same border, radius, and shadow as brief cards. */
+export const briefDetailDialogClass = appDialogClass;
+
+/** Left sidebar outer cards (Customer & account, Discovery checklist). */
+export const BRIEF_SIDEBAR_CARD_SCROLL_MAX = "min(32rem,calc(100vh-8rem))";
+
+/** Main column brief cards — same sticky header + inner scroll pattern as sidebar. */
+export const BRIEF_MAIN_CARD_SCROLL_MAX = "min(40rem,calc(100vh-10rem))";
+
+/** Relevant content — half the main column cap, scroll inside. */
+export const BRIEF_RELEVANT_CONTENT_SCROLL_MAX = "min(20rem,calc((100vh - 10rem) / 2))";
+
+const mainCardPadding = {
+  header: "px-9 pt-8 pb-5 sm:px-10",
+  body: "px-9 pb-9 pt-0 sm:px-10",
+};
+const defaultCardPadding = {
+  header: "px-7 pt-7 pb-4",
+  body: "px-7 pb-7 pt-0",
+};
+
 export interface BriefDetailCardProps {
   title: string;
   icon?: LucideIcon;
   children: ReactNode;
+  /** default = sidebar/context; main = larger body in focus column */
+  tone?: "default" | "main";
   /** default = standard card; highlight = AI summary; warning = signals */
   variant?: "default" | "highlight" | "warning";
   /** Scrollable body with optional max height (e.g. "10rem" for ~3 peek rows) */
@@ -27,6 +76,63 @@ export interface BriefDetailCardProps {
   headerExtra?: ReactNode;
   sourceInfo?: BriefSourceInfo;
   className?: string;
+  /** Render body only (e.g. inside a parent accordion on Pre-DC sidebar) */
+  embedded?: boolean;
+  /** When embedded + scroll, omit inner title if parent accordion already shows it */
+  hideEmbeddedTitle?: boolean;
+  /** Main column: set false to let the card grow without inner scroll */
+  enableMainScroll?: boolean;
+}
+
+const stickyHeaderSurface = () => "bg-card";
+
+function BriefDetailCardTitleRow({
+  title,
+  icon: Icon,
+  headerExtra,
+  sourceInfo,
+  tone = "default",
+  variant = "default",
+  className,
+}: {
+  title: string;
+  icon?: LucideIcon;
+  headerExtra?: ReactNode;
+  sourceInfo?: BriefSourceInfo;
+  tone?: "default" | "main";
+  variant?: "default" | "highlight" | "warning";
+  className?: string;
+}) {
+  const { isIntercom } = useThemePreview();
+
+  return (
+    <div className={cn("flex items-start justify-between gap-2 min-w-0", className)}>
+      <CardTitle
+        className={cn(
+          "font-semibold flex items-center gap-2 min-w-0",
+          tone === "main" ? "text-base" : "text-sm"
+        )}
+      >
+        {Icon && (
+          <Icon
+            className={cn(
+              "h-4 w-4 shrink-0",
+              !isIntercom && variant === "highlight" && "text-primary",
+              !isIntercom && variant === "warning" && "text-warning",
+              isIntercom && variant === "highlight" && "text-[#ff5600]",
+              isIntercom && variant === "warning" && "text-[#ff2067]"
+            )}
+          />
+        )}
+        <span className="truncate">{title}</span>
+        {sourceInfo ? <SourceInfoIcon info={sourceInfo} /> : null}
+        {isIntercom && variant === "warning" && (
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#ff2067]" aria-hidden />
+        )}
+      </CardTitle>
+      {headerExtra}
+    </div>
+  );
 }
 
 function SourceInfoIcon({ info }: { info: BriefSourceInfo }) {
@@ -57,45 +163,92 @@ export function BriefDetailCard({
   title,
   icon: Icon,
   children,
+  tone = "default",
   variant = "default",
   scrollMaxHeight,
   headerExtra,
   sourceInfo,
   className,
+  embedded = false,
+  hideEmbeddedTitle = false,
+  enableMainScroll = true,
 }: BriefDetailCardProps) {
+  const { isIntercom } = useThemePreview();
+
+  const resolvedScrollMaxHeight =
+    scrollMaxHeight ??
+    (tone === "main" && enableMainScroll ? BRIEF_MAIN_CARD_SCROLL_MAX : undefined);
+  const scrollableBody = Boolean(resolvedScrollMaxHeight);
+
+  if (embedded) {
+    if (resolvedScrollMaxHeight) {
+      return (
+        <div
+          className={cn("flex min-h-0 min-w-0 flex-col", className)}
+          style={{ maxHeight: resolvedScrollMaxHeight }}
+        >
+          {!hideEmbeddedTitle && (
+            <div className={cn("sticky top-0 z-10 shrink-0 pb-2", stickyHeaderSurface())}>
+              <BriefDetailCardTitleRow
+                title={title}
+                icon={Icon}
+                headerExtra={headerExtra}
+                sourceInfo={sourceInfo}
+                tone={tone}
+                variant={variant}
+              />
+            </div>
+          )}
+          <div
+            className={cn(
+              briefCardScrollClass,
+              "min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-2"
+            )}
+          >
+            {children}
+          </div>
+        </div>
+      );
+    }
+
+    return <div className={cn("min-w-0", className)}>{children}</div>;
+  }
+
   return (
     <Card
       className={cn(
-        "flex min-h-0 w-full flex-col shadow-none",
-        variant === "highlight" && "border-primary/25 bg-gradient-to-br from-primary/5 to-accent/20",
+        briefCardShellClass,
+        "flex min-h-0 w-full flex-col",
+        scrollableBody && "overflow-hidden",
         variant === "warning" && "border-warning/35",
+        isIntercom && variant === "highlight" && "border-l-[3px] border-l-[#ff5600]",
         className
       )}
+      style={resolvedScrollMaxHeight ? { maxHeight: resolvedScrollMaxHeight } : undefined}
     >
-      <CardHeader className="shrink-0 space-y-0 pb-3">
-        <div className="flex items-start justify-between gap-2 min-w-0">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2 min-w-0">
-            {Icon && (
-              <Icon
-                className={cn(
-                  "h-4 w-4 shrink-0",
-                  variant === "highlight" && "text-primary",
-                  variant === "warning" && "text-warning"
-                )}
-              />
-            )}
-            <span className="truncate">{title}</span>
-            {sourceInfo ? <SourceInfoIcon info={sourceInfo} /> : null}
-          </CardTitle>
-          {headerExtra}
-        </div>
+      <CardHeader
+        className={cn(
+          "shrink-0 space-y-0",
+          tone === "main" ? mainCardPadding.header : defaultCardPadding.header,
+          scrollableBody && cn("sticky top-0 z-10", stickyHeaderSurface())
+        )}
+      >
+        <BriefDetailCardTitleRow
+          title={title}
+          icon={Icon}
+          headerExtra={headerExtra}
+          sourceInfo={sourceInfo}
+          tone={tone}
+          variant={variant}
+        />
       </CardHeader>
       <CardContent
         className={cn(
-          "min-h-0 pt-0",
-          scrollMaxHeight && "overflow-y-auto overflow-x-hidden"
+          "min-h-0",
+          tone === "main" ? mainCardPadding.body : defaultCardPadding.body,
+          tone === "main" ? briefMainBody : "text-[0.9375rem] leading-relaxed",
+          scrollableBody && cn(briefCardScrollClass, "flex-1 overflow-y-auto overflow-x-hidden pt-1")
         )}
-        style={scrollMaxHeight ? { maxHeight: scrollMaxHeight } : undefined}
       >
         {children}
       </CardContent>
@@ -103,7 +256,7 @@ export function BriefDetailCard({
   );
 }
 
-/** Row inside brief cards — use `plain` for label/value facts (no inner box). */
+/** Row inside brief cards — flat dividers only, no inner boxes. */
 export function BriefDetailRow({
   children,
   className,
@@ -111,13 +264,14 @@ export function BriefDetailRow({
 }: {
   children: ReactNode;
   className?: string;
+  /** Slightly tighter padding for label/value facts */
   plain?: boolean;
 }) {
   return (
     <div
       className={cn(
-        "min-w-0",
-        plain ? "py-1" : "rounded-lg border border-border bg-muted/20 px-3 py-2.5",
+        "min-w-0 border-b border-border/40 last:border-b-0",
+        plain ? "py-2" : "py-2.5",
         className
       )}
     >
@@ -134,14 +288,24 @@ export function BriefDetailFields({
   rows: { label: string; value: string }[];
   className?: string;
 }) {
+  const { isIntercom } = useThemePreview();
+
   return (
-    <dl className={cn("space-y-3", className)}>
+    <dl className={cn("space-y-4", className)}>
       {rows.map((row) => (
         <div key={row.label}>
-          <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <dt
+            className={cn(
+              isIntercom
+                ? "text-xs text-[#7b7b78]"
+                : "text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+            )}
+          >
             {row.label}
           </dt>
-          <dd className="text-sm font-medium leading-snug break-words mt-0.5">{row.value}</dd>
+          <dd className="text-[0.9375rem] font-medium text-foreground leading-relaxed break-words mt-0.5">
+            {row.value}
+          </dd>
         </div>
       ))}
     </dl>
@@ -153,27 +317,43 @@ export function BriefDetailAccordion({
   summary,
   children,
   defaultOpen = false,
+  loud = false,
+  main = false,
 }: {
   title: string;
   summary?: string;
   children: ReactNode;
   defaultOpen?: boolean;
+  /** Sidebar section titles — extra bold */
+  loud?: boolean;
+  /** Main column: larger title with underline */
+  main?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="rounded-lg border border-border overflow-hidden min-w-0">
+    <div className="min-w-0 border-b border-border/30 last:border-b-0">
       <button
         type="button"
-        className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm hover:bg-muted/40 min-w-0"
+        className={cn(
+          "sticky top-0 z-[9] flex w-full items-center justify-between gap-2 py-2.5 text-left text-sm min-w-0",
+          stickyHeaderSurface(),
+          "hover:opacity-80"
+        )}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
         <span className="min-w-0 flex-1">
-          <span className="font-medium text-foreground">{title}</span>
-          {summary && !open && (
-            <span className="block text-xs text-muted-foreground truncate mt-0.5">{summary}</span>
-          )}
+          <span
+            className={cn(
+              "text-foreground",
+              main && "text-base font-bold underline decoration-foreground/40 underline-offset-[3px]",
+              !main && loud && "text-sm font-extrabold tracking-tight",
+              !main && !loud && "text-sm font-bold"
+            )}
+          >
+            {title}
+          </span>
         </span>
         <ChevronDown
           className={cn(
@@ -182,7 +362,9 @@ export function BriefDetailAccordion({
           )}
         />
       </button>
-      {open && <div className="border-t border-border px-3 py-2.5 bg-muted/15">{children}</div>}
+      {open && (
+        <div className={cn("pb-3 pt-1", main && briefMainBody)}>{children}</div>
+      )}
     </div>
   );
 }

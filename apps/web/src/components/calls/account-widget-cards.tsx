@@ -8,20 +8,37 @@ export interface AccountSnapshotRow {
   value: string;
 }
 
-export function AccountSnapshotCard({ rows }: { rows: AccountSnapshotRow[] }) {
+export function AccountSnapshotCard({
+  rows,
+  embedded = false,
+}: {
+  rows: AccountSnapshotRow[];
+  embedded?: boolean;
+}) {
   if (rows.length === 0) return null;
   return (
-    <BriefDetailCard title="Account snapshot" scrollMaxHeight="14rem">
+    <BriefDetailCard
+      title="Account snapshot"
+      scrollMaxHeight="14rem"
+      embedded={embedded}
+      hideEmbeddedTitle={embedded}
+    >
       <BriefDetailFields rows={rows} />
     </BriefDetailCard>
   );
 }
 
-export function CompanyMetricsCard({ call }: { call: Call }) {
+export function CompanyMetricsCard({
+  call,
+  embedded = false,
+}: {
+  call: Call;
+  embedded?: boolean;
+}) {
   const hasAny = Boolean(call.annualRevenue || call.employeeCount || call.icpBucket);
   if (!hasAny) return null;
   return (
-    <BriefDetailCard title="Company metrics">
+    <BriefDetailCard title="Company metrics" embedded={embedded}>
       <BriefDetailFields
         rows={[
           ...(call.annualRevenue

@@ -27,7 +27,7 @@ const bantLabels = {
   timeline: "Timeline",
 };
 
-type BANTLayout = "inline" | "stack" | "grid" | "row";
+type BANTLayout = "inline" | "stack" | "grid" | "row" | "strip";
 
 interface BANTScorecardProps {
   bant: BANTScore;
@@ -38,6 +38,10 @@ interface BANTScorecardProps {
   layout?: BANTLayout;
   /** No per-dimension boxes — use inside an outer brief card */
   plain?: boolean;
+  /** Tighter gaps for header strip row layout */
+  dense?: boolean;
+  /** Slightly larger strip for header / nav bars */
+  stripScale?: "sm" | "md";
 }
 
 export function BANTScorecard({
@@ -46,9 +50,58 @@ export function BANTScorecard({
   compact = false,
   layout,
   plain = false,
+  dense = false,
+  stripScale = "sm",
 }: BANTScorecardProps) {
   const resolvedLayout: BANTLayout = layout ?? (compact ? "inline" : "grid");
   const keys = ["budget", "authority", "need", "timeline"] as const;
+
+  if (resolvedLayout === "strip") {
+    const md = stripScale === "md";
+    return (
+      <div
+        className={cn(
+          "grid grid-cols-4 text-left",
+          md ? "gap-x-3 sm:gap-x-4" : "gap-x-3 sm:gap-x-4"
+        )}
+      >
+        {keys.map((key) => {
+          const status = bant[key] ?? "unknown";
+          const config = statusConfig[status] ?? statusConfig.unknown;
+          const Icon = config.icon;
+          return (
+            <div
+              key={key}
+              className={cn("flex items-center min-w-0 text-left", md ? "gap-2.5" : "gap-2")}
+            >
+              <Icon
+                className={cn("shrink-0", md ? "h-4 w-4" : "h-3.5 w-3.5", config.color)}
+              />
+              <div className="min-w-0 leading-none text-left">
+                <p
+                  className={cn(
+                    "text-left font-semibold uppercase tracking-wide text-muted-foreground",
+                    md ? "text-[10px]" : "text-[9px]"
+                  )}
+                >
+                  {bantLabels[key]}
+                </p>
+                <p
+                  className={cn(
+                    "text-left font-bold",
+                    md ? "text-xs" : "text-[11px]",
+                    config.color
+                  )}
+                >
+                  {config.label}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   if (resolvedLayout === "inline") {
     return (
@@ -76,7 +129,7 @@ export function BANTScorecard({
     resolvedLayout === "stack"
       ? "grid grid-cols-1 gap-2"
       : resolvedLayout === "row"
-        ? "grid grid-cols-4 gap-2"
+        ? cn("grid grid-cols-4", dense ? "gap-1" : "gap-2")
         : "grid grid-cols-2 gap-3";
 
   return (
@@ -89,16 +142,18 @@ export function BANTScorecard({
           <div
             key={key}
             className={cn(
-              "flex items-center gap-3 min-w-0",
-              plain ? "py-1.5" : "rounded-lg border border-border bg-muted/40 p-3"
+              "flex items-center gap-2 min-w-0",
+              plain ? "py-1" : "rounded-lg border border-border bg-muted/40 p-2.5"
             )}
           >
             <Icon className={cn("h-5 w-5 shrink-0", config.color)} />
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide truncate">
+            <div className="min-w-0 text-left">
+              <p className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide truncate">
                 {bantLabels[key]}
               </p>
-              <p className={cn("text-sm font-semibold truncate", config.color)}>{config.label}</p>
+              <p className={cn("text-left text-xs font-semibold truncate", config.color)}>
+                {config.label}
+              </p>
               {evidenceByDimension?.[key] && (
                 <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
                   &ldquo;{evidenceByDimension[key]}&rdquo;

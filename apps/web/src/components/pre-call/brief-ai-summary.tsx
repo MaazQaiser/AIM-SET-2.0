@@ -3,9 +3,10 @@
 import { Sparkles, TrendingUp, Calendar, DollarSign, Target, Users } from "lucide-react";
 import { WorkflowAgentBadge } from "@/components/pre-call/workflow-agent-badge";
 import { useWidgetSize } from "@/components/dashboard-grid/dashboard-widget";
-import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
+import { BriefDetailCard, briefMainBody } from "@/components/pre-call/brief-detail-card";
 import { parseSummaryHighlights, type SummaryHighlightRule } from "@/lib/brief-summary-highlights";
 import { useAgentConfig } from "@/lib/data/agent-config-hooks";
+import { useThemePreview } from "@/hooks/use-theme-preview";
 import type { CallBrief } from "@/lib/brief-types";
 import { cn } from "@/lib/cn";
 
@@ -47,10 +48,12 @@ function HighlightedSummary({
   text,
   clamp,
   rules,
+  intercomMarks,
 }: {
   text: string;
   clamp?: boolean;
   rules?: SummaryHighlightRule[];
+  intercomMarks?: boolean;
 }) {
   const parts = parseSummaryHighlights(text, rules);
   let offset = 0;
@@ -63,13 +66,23 @@ function HighlightedSummary({
   return (
     <p
       className={cn(
-        "text-sm leading-relaxed text-foreground/90 break-words",
+        briefMainBody,
+        "break-words",
+        intercomMarks ? "text-[#111111]" : "text-foreground/90",
         clamp && "line-clamp-6"
       )}
     >
       {keyedParts.map((part) =>
         part.type === "highlight" ? (
-          <mark key={part.key} className={cn(part.className, "font-medium")}>
+          <mark
+            key={part.key}
+            className={cn(
+              intercomMarks
+                ? "rounded px-0.5 bg-[#ebe7e1] text-[#111111] font-bold underline decoration-[#111111]/30 underline-offset-2"
+                : part.className,
+              !intercomMarks && "font-bold underline decoration-foreground/35 underline-offset-2"
+            )}
+          >
             {part.value}
           </mark>
         ) : (
@@ -81,18 +94,23 @@ function HighlightedSummary({
 }
 
 export function BriefAISummary({ brief }: BriefAISummaryProps) {
+  const { isIntercom } = useThemePreview();
   const { data: workflowConfig } = useAgentConfig("workflow");
   const highlightRules = workflowConfig?.summary_highlight_rules;
 
   const { compact, columnZone } = useWidgetSize();
   const isCenter = columnZone === "center";
-  const stageClass = STAGE_COLOR[brief.dealStage] ?? "bg-muted/60 text-muted-foreground border-border";
+  const stageClass = isIntercom
+    ? "bg-card border-border text-muted-foreground"
+    : STAGE_COLOR[brief.dealStage] ?? "bg-muted/60 text-muted-foreground border-border";
   const contactUrgency = brief.daysSinceLastContact > 14 ? "text-warning" : "text-muted-foreground";
   const icpPct = Math.round(brief.icpMatch * 100);
   const icpSegments = brief.icpNote?.split("·").map((s) => s.trim()).filter(Boolean) ?? [];
+  const chipClass = isIntercom ? "bg-card border-border text-muted-foreground" : undefined;
 
   return (
     <BriefDetailCard
+      tone="main"
       title="PRE-DC Workflow summary"
       icon={Sparkles}
       variant="highlight"
@@ -108,8 +126,15 @@ export function BriefAISummary({ brief }: BriefAISummaryProps) {
         <div className="flex flex-wrap items-center gap-1.5">
           {brief.opportunityValue && (
             <MetaChip
-              className="bg-amber-50/90 border-amber-200/70 text-amber-950"
-              icon={<DollarSign className="h-3 w-3 shrink-0 text-amber-700" />}
+              className={cn(
+                chipClass,
+                !isIntercom && "bg-amber-50/90 border-amber-200/70 text-amber-950"
+              )}
+              icon={
+                <DollarSign
+                  className={cn("h-3 w-3 shrink-0", isIntercom ? "text-[#626260]" : "text-amber-700")}
+                />
+              }
             >
               {brief.opportunityValue}
             </MetaChip>
@@ -118,16 +143,30 @@ export function BriefAISummary({ brief }: BriefAISummaryProps) {
             {brief.dealStage}
           </MetaChip>
           <MetaChip
-            className="bg-violet-50/90 border-violet-200/70 text-violet-950"
-            icon={<TrendingUp className="h-3 w-3 shrink-0 text-violet-700" />}
+            className={cn(
+              chipClass,
+              !isIntercom && "bg-violet-50/90 border-violet-200/70 text-violet-950"
+            )}
+            icon={
+              <TrendingUp
+                className={cn("h-3 w-3 shrink-0", isIntercom ? "text-[#626260]" : "text-violet-700")}
+              />
+            }
           >
             ICP {icpPct}%
           </MetaChip>
           {icpSegments.map((segment) => (
             <MetaChip
               key={segment}
-              className="bg-slate-100/90 border-slate-200/70 text-slate-800"
-              icon={<Users className="h-3 w-3 shrink-0 text-slate-600" />}
+              className={cn(
+                chipClass,
+                !isIntercom && "bg-slate-100/90 border-slate-200/70 text-slate-800"
+              )}
+              icon={
+                <Users
+                  className={cn("h-3 w-3 shrink-0", isIntercom ? "text-[#626260]" : "text-slate-600")}
+                />
+              }
             >
               {segment}
             </MetaChip>
@@ -135,8 +174,10 @@ export function BriefAISummary({ brief }: BriefAISummaryProps) {
           {(!compact || isCenter) && (
             <MetaChip
               className={cn(
-                "bg-background/80 border-border",
-                contactUrgency === "text-warning" && "bg-warning/10 border-warning/30 text-warning"
+                chipClass ?? "bg-background/80 border-border",
+                !isIntercom &&
+                  contactUrgency === "text-warning" &&
+                  "bg-warning/10 border-warning/30 text-warning"
               )}
               icon={<Calendar className="h-3 w-3 shrink-0" />}
             >
@@ -149,6 +190,7 @@ export function BriefAISummary({ brief }: BriefAISummaryProps) {
           text={brief.aiSummary ?? ""}
           clamp={!isCenter && compact}
           rules={highlightRules}
+          intercomMarks={isIntercom}
         />
       </div>
     </BriefDetailCard>

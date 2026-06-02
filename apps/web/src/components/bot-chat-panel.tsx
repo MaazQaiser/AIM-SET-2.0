@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowUp,
   Bot,
   ChevronDown,
   Download,
@@ -17,6 +18,7 @@ import remarkGfm from "remark-gfm";
 import { BotChatSuggestedActions } from "@/components/bot-chat/bot-chat-suggested-actions";
 import { AIGeneratedBadge } from "@/components/ai-generated-badge";
 import { CitationMarker } from "@/components/citation-marker";
+import { useThemePreview } from "@/hooks/use-theme-preview";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Input } from "@dc-copilot/ui/components/input";
@@ -191,6 +193,7 @@ export function BotChatPanel({
   transcriptLineCount = 0,
   hasObjections = false,
 }: BotChatPanelProps) {
+  const { isIntercom } = useThemePreview();
   const persona = usePersona();
   const viewerRole: PodRole | "leadership" =
     persona === "leadership" || persona === "content-owner" ? "leadership" : persona;
@@ -224,6 +227,7 @@ export function BotChatPanel({
   const isLoading = isCopilotMode ? copilotLoading : localLoading;
   const [error, setError] = useState<string | null>(null);
   const [floatingExpanded, setFloatingExpanded] = useState(false);
+  const [inputWide, setInputWide] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const userScrolledRef = useRef(false);
@@ -237,15 +241,12 @@ export function BotChatPanel({
     const onPointerDown = (e: MouseEvent) => {
       if (dockRef.current && !dockRef.current.contains(e.target as Node)) {
         setFloatingExpanded(false);
+        setInputWide(false);
       }
     };
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, [isFloating, floatingExpanded]);
-
-  useEffect(() => {
-    if (isFloating && messages.length > 0) setFloatingExpanded(true);
-  }, [isFloating, messages.length]);
 
   useEffect(() => {
     if (mode === "group") seedGroupWelcome(callId, accountName);
@@ -510,73 +511,88 @@ export function BotChatPanel({
       </div>
     ) : null;
 
-  const chatInput = (
+  const floatingInputRow = (
+    <>
+      {isCopilotMode && (
+        <>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) setPendingFile(f);
+              e.target.value = "";
+            }}
+          />
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 shrink-0 rounded-full text-[#111111] hover:bg-white/40"
+            aria-label="Attach file to knowledge base"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
+        </>
+      )}
+      <input
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onFocus={() => {
+          setInputWide(true);
+          setFloatingExpanded(true);
+        }}
+        placeholder={inputPlaceholder}
+        disabled={isLoading}
+        className="call-detail-copilot-search-input flex-1 min-w-0 bg-transparent text-sm text-[#111111] outline-none border-0 pl-1"
+        aria-label={
+          isCopilotMode
+            ? "Sales Co-pilot message"
+            : mode === "group"
+              ? "Pod group message"
+              : "Direct message to Copilot"
+        }
+      />
+      <Button
+        type="submit"
+        size="icon"
+        disabled={isLoading || (!input.trim() && !pendingFile)}
+        aria-label="Send"
+        className="h-9 w-9 shrink-0 rounded-full bg-[#111111] text-white hover:bg-[#111111]/90 disabled:bg-[#111111]/40"
+      >
+        <ArrowUp className="h-4 w-4" strokeWidth={2.25} />
+      </Button>
+    </>
+  );
+
+  const floatingInputForm = (
     <form
       onSubmit={handleSubmit}
       className={cn(
-        "flex flex-col gap-2 shrink-0",
-        isFloating ? "p-0" : "border-t border-border p-3"
+        "call-detail-copilot-input-bar flex flex-col gap-2 shrink-0",
+        floatingExpanded && "border-t call-detail-copilot-divider"
       )}
     >
       {attachmentChip}
-      {isFloating ? (
-        <div className="w-full rounded-full p-[3px] bg-gradient-to-r from-primary via-primary/70 to-primary/35 shadow-lg shadow-primary/20">
-          <div className="flex items-center gap-2 rounded-full bg-background pl-3 pr-1.5 py-1.5">
-            {isCopilotMode && (
-              <>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) setPendingFile(f);
-                    e.target.value = "";
-                  }}
-                />
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 shrink-0 rounded-full"
-                  aria-label="Attach file to knowledge base"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Paperclip className="h-4 w-4" />
-                </Button>
-              </>
-            )}
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onFocus={() => setFloatingExpanded(true)}
-              placeholder={inputPlaceholder}
-              disabled={isLoading}
-              className="flex-1 min-w-0 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none border-0 pl-2"
-              aria-label={
-                isCopilotMode
-                  ? "Sales Co-pilot message"
-                  : mode === "group"
-                    ? "Pod group message"
-                    : "Direct message to Copilot"
-              }
-            />
-            <Button
-              type="submit"
-              size="icon"
-              variant="ghost"
-              disabled={isLoading || (!input.trim() && !pendingFile)}
-              aria-label="Send"
-              className="relative h-9 w-9 shrink-0 rounded-full hover:bg-primary/10"
-            >
-              <Send className="h-4 w-4 text-foreground" />
-              <Sparkles className="absolute -top-0.5 -right-0.5 h-3 w-3 text-primary" aria-hidden />
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex gap-2 w-full">
+      <div
+        className="flex min-h-[3.25rem] items-center gap-2 pl-4 pr-3 py-2"
+        onClick={() => setInputWide(true)}
+      >
+        {floatingInputRow}
+      </div>
+    </form>
+  );
+
+  const chatInput = (
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-2 shrink-0 border-t border-border p-3"
+    >
+      {attachmentChip}
+      <div className="flex gap-2 w-full">
           {isCopilotMode && (
             <>
               <input
@@ -621,18 +637,29 @@ export function BotChatPanel({
             disabled={isLoading || (!input.trim() && !pendingFile)}
             aria-label="Send"
           >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+          <Send className="h-4 w-4" />
+        </Button>
+      </div>
     </form>
   );
 
   const panelBody = (
     <>
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2 shrink-0">
-        <Bot className="h-4 w-4 text-primary shrink-0" aria-hidden />
-        <span className="text-sm font-medium truncate">
+      <div
+        className={cn(
+          "flex items-center gap-2 border-b px-3 py-2 shrink-0",
+          isFloating
+            ? "call-detail-copilot-divider px-4 py-2.5"
+            : isIntercom
+              ? "border-[#ebe7e1]"
+              : "border-border"
+        )}
+      >
+        <Bot
+          className={cn("h-4 w-4 shrink-0", isIntercom ? "text-[#ff5600]" : "text-primary")}
+          aria-hidden
+        />
+        <span className={cn("text-sm font-medium truncate text-[#111111]")}>
           {isCopilotMode ? "Sales Co-pilot" : "DC Copilot Pod"}
         </span>
         <div className="ml-auto flex items-center gap-1 shrink-0">
@@ -641,15 +668,23 @@ export function BotChatPanel({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-7 w-7 shrink-0"
+              className="h-7 w-7 shrink-0 text-[#111111] hover:bg-white/40"
               aria-label="Minimize copilot"
-              onClick={() => setFloatingExpanded(false)}
+              onClick={() => {
+                setFloatingExpanded(false);
+                setInputWide(false);
+              }}
             >
               <ChevronDown className="h-4 w-4" />
             </Button>
           )}
           <div
-            className="inline-flex rounded-md border border-border p-0.5 bg-muted/30"
+            className={cn(
+              "inline-flex rounded-md border p-0.5",
+              isFloating
+                ? "call-detail-copilot-tab-rail rounded-full"
+                : "border-border bg-muted/30"
+            )}
             role="tablist"
             aria-label="Chat mode"
           >
@@ -660,8 +695,12 @@ export function BotChatPanel({
               className={cn(
                 "inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-colors",
                 mode === "group"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? isFloating
+                    ? "call-detail-copilot-tab-active rounded-full"
+                    : "bg-background text-foreground shadow-sm"
+                  : isFloating
+                    ? "call-detail-copilot-tab-inactive rounded-full"
+                    : "text-muted-foreground hover:text-foreground"
               )}
               onClick={() => setMode(callId, "group")}
             >
@@ -675,8 +714,12 @@ export function BotChatPanel({
               className={cn(
                 "inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-colors",
                 mode === "direct"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? isFloating
+                    ? "call-detail-copilot-tab-active rounded-full"
+                    : "bg-background text-foreground shadow-sm"
+                  : isFloating
+                    ? "call-detail-copilot-tab-inactive rounded-full"
+                    : "text-muted-foreground hover:text-foreground"
               )}
               onClick={() => setMode(callId, "direct")}
             >
@@ -690,8 +733,12 @@ export function BotChatPanel({
               className={cn(
                 "inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-colors",
                 mode === "copilot"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? isFloating
+                    ? "call-detail-copilot-tab-active rounded-full"
+                    : "bg-background text-foreground shadow-sm"
+                  : isFloating
+                    ? "call-detail-copilot-tab-inactive rounded-full"
+                    : "text-muted-foreground hover:text-foreground"
               )}
               onClick={() => setMode(callId, "copilot")}
             >
@@ -704,15 +751,36 @@ export function BotChatPanel({
       </div>
 
       {isCopilotMode ? (
-        <p className="text-[10px] text-muted-foreground px-3 py-1.5 border-b border-border/60 shrink-0">
+        <p
+          className={cn(
+            "text-[10px] px-3 py-1.5 border-b shrink-0",
+            isFloating
+              ? "call-detail-copilot-muted call-detail-copilot-divider px-4"
+              : "text-muted-foreground border-border/60"
+          )}
+        >
           Global assistant — search KB (vector store), inspect any call, run agents, or upload files.
         </p>
       ) : mode === "group" ? (
-        <p className="text-[10px] text-muted-foreground px-3 py-1.5 border-b border-border/60 shrink-0">
+        <p
+          className={cn(
+            "text-[10px] px-3 py-1.5 border-b shrink-0",
+            isFloating
+              ? "call-detail-copilot-muted call-detail-copilot-divider px-4"
+              : "text-muted-foreground border-border/60"
+          )}
+        >
           Shared with everyone on this call. Copilot replies appear for the whole pod.
         </p>
       ) : (
-        <p className="text-[10px] text-muted-foreground px-3 py-1.5 border-b border-border/60 shrink-0">
+        <p
+          className={cn(
+            "text-[10px] px-3 py-1.5 border-b shrink-0",
+            isFloating
+              ? "call-detail-copilot-muted call-detail-copilot-divider px-4"
+              : "text-muted-foreground border-border/60"
+          )}
+        >
           Private to you — teammates do not see direct messages or replies.
         </p>
       )}
@@ -721,11 +789,16 @@ export function BotChatPanel({
         actions={suggestedActions}
         onSelect={handleSuggestedAction}
         disabled={isLoading}
+        className={cn(isFloating && "call-detail-copilot-divider border-b px-4")}
+        buttonClassName={isFloating ? "call-detail-copilot-suggested-btn" : undefined}
       />
 
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto px-3 py-3 space-y-3 min-h-0"
+        className={cn(
+          "flex-1 overflow-y-auto px-3 py-3 space-y-3 min-h-0",
+          isFloating && "call-detail-copilot-messages px-4"
+        )}
         onScroll={() => {
           const el = listRef.current;
           if (!el) return;
@@ -734,7 +807,12 @@ export function BotChatPanel({
         }}
       >
         {messages.length === 0 && !error && mode === "direct" && (
-          <p className="text-sm text-muted-foreground text-center py-6 px-2">
+          <p
+            className={cn(
+              "text-sm text-center py-6 px-2",
+              isFloating ? "call-detail-copilot-muted" : "text-muted-foreground"
+            )}
+          >
             Ask DC Copilot privately about this call — prep questions, talk tracks, or live coaching.
           </p>
         )}
@@ -758,15 +836,28 @@ export function BotChatPanel({
               <div
                 className={cn(
                   "max-w-[92%] rounded-lg px-3 py-2 text-sm min-w-0",
-                  msg.role === "user" && "bg-primary text-primary-foreground",
-                  msg.role === "assistant" && "bg-muted text-foreground border border-border/60",
+                  msg.role === "user" &&
+                    (isFloating
+                      ? "call-detail-copilot-message-user"
+                      : "bg-primary text-primary-foreground"),
+                  msg.role === "assistant" &&
+                    (isFloating
+                      ? "call-detail-copilot-message-assistant border"
+                      : "bg-muted text-foreground border border-border/60"),
                   msg.role === "system" &&
-                    "bg-muted/40 text-muted-foreground text-xs text-center border border-dashed border-border max-w-full"
+                    (isFloating
+                      ? "call-detail-copilot-muted text-xs text-center border border-dashed call-detail-copilot-divider max-w-full bg-white/20"
+                      : "bg-muted/40 text-muted-foreground text-xs text-center border border-dashed border-border max-w-full")
                 )}
               >
                 {authorBadge(msg, isCopilotMode)}
                 {msg.role === "assistant" ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <div
+                    className={cn(
+                      "prose prose-sm dark:prose-invert max-w-none",
+                      isFloating && "call-detail-copilot-prose"
+                    )}
+                  >
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                     {msg.citations && msg.citations.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
@@ -809,27 +900,35 @@ export function BotChatPanel({
   );
 
   if (isFloating) {
+    const dockExpanded = inputWide || floatingExpanded;
+
     return (
       <div
         ref={dockRef}
         className={cn(
-          "fixed bottom-6 left-1/2 z-50 flex w-[min(100%,42rem)] -translate-x-1/2 flex-col px-4 pointer-events-none",
+          "call-detail-roboto fixed bottom-10 left-1/2 z-50 flex -translate-x-1/2 flex-col pointer-events-none",
+          "transition-[width] duration-300 ease-out",
+          dockExpanded
+            ? "w-[min(calc(100%-2.5rem),42rem)]"
+            : "w-[min(calc(100%-5rem),19rem)]",
           className
         )}
         aria-label="DC Copilot floating chat"
       >
-        <div className="pointer-events-auto flex flex-col gap-3">
+        <div
+          className={cn(
+            "call-detail-liquid-glass call-detail-liquid-glass--dock pointer-events-auto w-full overflow-hidden transition-[border-radius] duration-300 ease-out",
+            dockExpanded ? "rounded-2xl" : "rounded-full",
+            floatingExpanded && "call-detail-liquid-glass--expanded"
+          )}
+          onClick={!floatingExpanded ? () => setInputWide(true) : undefined}
+        >
           {floatingExpanded && (
-            <div
-              className={cn(
-                "glass-insight-card flex min-h-[240px] max-h-[min(420px,50vh)] flex-col overflow-hidden shadow-none",
-                "bg-card/95 shadow-2xl backdrop-blur-md"
-              )}
-            >
+            <div className="call-detail-copilot-panel-body flex min-h-[240px] max-h-[min(420px,50vh)] flex-col overflow-hidden">
               <div className="flex min-h-0 flex-1 flex-col">{panelBody}</div>
             </div>
           )}
-          {chatInput}
+          {floatingInputForm}
         </div>
       </div>
     );

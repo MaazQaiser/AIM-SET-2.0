@@ -1,6 +1,7 @@
 "use client";
 
 import { TrendingUp, Phone, Users, BarChart3 } from "lucide-react";
+import { PageShell } from "@/components/layout/page-shell";
 import { StatCard } from "@dc-copilot/ui/components/stat-card";
 import { CoachingCard } from "@/components/coaching-card";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
@@ -33,7 +34,7 @@ export default function CoachingPage() {
   const teamRows: TeamRow[] = [];
 
   return (
-    <div className="p-6 space-y-8">
+    <PageShell className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Coaching</h1>
         <p className="text-sm text-muted-foreground mt-1">Team performance</p>
@@ -86,6 +87,6 @@ export default function CoachingPage() {
           />
         )}
       </section>
-    </div>
+    </PageShell>
   );
 }

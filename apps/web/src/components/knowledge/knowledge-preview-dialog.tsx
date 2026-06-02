@@ -7,9 +7,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@dc-copilot/ui/components/dialog";
+import { briefDetailDialogClass } from "@/components/pre-call/brief-detail-card";
 import { KbAssetPreview } from "@/components/knowledge/kb-asset-preview";
 import { KbFileFormatBadge } from "@/components/knowledge/kb-file-format-badge";
 import type { KBAsset } from "@/types";
+import { cn } from "@/lib/cn";
 
 interface KnowledgePreviewDialogProps {
   asset: KBAsset | null;
@@ -22,7 +24,12 @@ export function KnowledgePreviewDialog({ asset, open, onOpenChange }: KnowledgeP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-[96vw] h-[90vh] flex flex-col p-0 gap-0">
+      <DialogContent
+        className={cn(
+          briefDetailDialogClass,
+          "max-w-5xl w-[96vw] h-[90vh] flex flex-col p-0 gap-0"
+        )}
+      >
         <DialogHeader className="px-4 pt-4 pb-2 shrink-0">
           <DialogTitle className="pr-8 truncate">{asset.title}</DialogTitle>
           <DialogDescription className="flex flex-wrap items-center gap-2">

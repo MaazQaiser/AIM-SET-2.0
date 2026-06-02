@@ -6,6 +6,7 @@ import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
+import { PageShell } from "@/components/layout/page-shell";
 import { AIGeneratedBadge } from "@/components/ai-generated-badge";
 import { useContentGaps } from "@/lib/data/hooks";
 
@@ -19,7 +20,7 @@ export default function ContentPage() {
   const { data: gaps = [] } = useContentGaps();
 
   return (
-    <div className="p-6 space-y-6">
+    <PageShell>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Content</h1>
@@ -71,6 +72,6 @@ export default function ContentPage() {
       ) : (
         <EmptyState icon={Lightbulb} title="No content gaps detected" description="Missing assets will appear here." />
       )}
-    </div>
+    </PageShell>
   );
 }

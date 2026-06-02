@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { FolderKanban, Loader2 } from "lucide-react";
-import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
+import {
+  BriefDetailCard,
+  BRIEF_RELEVANT_CONTENT_SCROLL_MAX,
+  briefMainLead,
+  briefMainMuted,
+  briefMainUnderline,
+} from "@/components/pre-call/brief-detail-card";
 import { KbDocumentViewerDialog } from "@/components/pre-call/kb-document-viewer-dialog";
 import { RelevantProjectDetailDialog } from "@/components/pre-call/relevant-project-detail-dialog";
 import { KbFileFormatBadge } from "@/components/knowledge/kb-file-format-badge";
@@ -14,14 +20,33 @@ interface BriefRelevantContentProps {
   className?: string;
 }
 
+function relevanceBarFillClass(pct: number): string {
+  if (pct >= 90) return "bg-emerald-500";
+  if (pct >= 70) return "bg-primary";
+  if (pct >= 50) return "bg-amber-400";
+  return "bg-destructive/70";
+}
+
+function relevanceBarTextClass(pct: number): string {
+  if (pct >= 90) return "text-emerald-700 dark:text-emerald-400";
+  if (pct >= 70) return "text-primary";
+  if (pct >= 50) return "text-amber-700 dark:text-amber-400";
+  return "text-destructive";
+}
+
 function RelevanceBar({ score }: { score: number }) {
   const pct = Math.round(score * 100);
   return (
     <div className="flex items-center gap-2 min-w-[88px]">
       <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-        <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, pct)}%` }} />
+        <div
+          className={cn("h-full rounded-full transition-colors", relevanceBarFillClass(pct))}
+          style={{ width: `${Math.min(100, pct)}%` }}
+        />
       </div>
-      <span className="text-[10px] tabular-nums text-muted-foreground w-8 text-right">{pct}%</span>
+      <span className={cn("text-[10px] tabular-nums w-8 text-right", relevanceBarTextClass(pct))}>
+        {pct}%
+      </span>
     </div>
   );
 }
@@ -39,16 +64,18 @@ export function BriefRelevantContent({ brief, className }: BriefRelevantContentP
   return (
     <>
       <BriefDetailCard
+        tone="main"
         title="Relevant content"
         icon={FolderKanban}
         className={className}
+        scrollMaxHeight={BRIEF_RELEVANT_CONTENT_SCROLL_MAX}
         sourceInfo={{
           source: "Knowledge base search",
           detail:
             "The system searches KB documents and project notes using the account name, needs, industry, service area, and company description, then ranks the closest matches.",
         }}
       >
-        <p className="text-xs text-muted-foreground -mt-2 mb-3">
+        <p className={cn(briefMainMuted, "-mt-2 mb-3")}>
           From your knowledge base — click to preview in the app.
         </p>
         <div className="space-y-5 min-w-0">
@@ -62,19 +89,27 @@ export function BriefRelevantContent({ brief, className }: BriefRelevantContentP
                       type="button"
                       onClick={() => setActiveDoc(doc)}
                       className={cn(
-                        "w-full text-left rounded-lg border border-border/80 bg-muted/20 p-3",
-                        "hover:border-primary/40 hover:bg-primary/5 transition-colors"
+                        "w-full text-left border-b border-border/40 py-3 last:border-b-0",
+                        "hover:opacity-80 transition-opacity"
                       )}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
                           <KbFileFormatBadge fileName={doc.fileName} mimeType={doc.mimeType} />
-                          <p className="text-sm font-medium truncate w-full sm:w-auto">{doc.title}</p>
+                          <p
+                            className={cn(
+                              briefMainLead,
+                              doc.relevanceScore >= 0.7 && briefMainUnderline,
+                              "truncate w-full sm:w-auto"
+                            )}
+                          >
+                            {doc.title}
+                          </p>
                         </div>
                         <RelevanceBar score={doc.relevanceScore} />
                       </div>
                       {doc.snippet ? (
-                        <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{doc.snippet}</p>
+                        <p className={cn(briefMainMuted, "mt-2 line-clamp-2")}>{doc.snippet}</p>
                       ) : null}
                     </button>
                   </li>
@@ -86,20 +121,28 @@ export function BriefRelevantContent({ brief, className }: BriefRelevantContentP
           {projects.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Relevant projects</p>
-              <ul className="divide-y divide-border/60 rounded-lg border border-border/80 overflow-hidden">
+              <ul className="divide-y divide-border/40">
                 {projects.map((project) => (
                   <li key={project.id}>
                     <button
                       type="button"
                       onClick={() => setActiveProject(project)}
-                      className="w-full text-left px-3 py-2.5 hover:bg-muted/40 transition-colors"
+                      className="w-full text-left py-2.5 hover:opacity-80 transition-opacity"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-sm font-medium truncate flex-1 min-w-0">{project.title}</span>
+                        <span
+                          className={cn(
+                            briefMainLead,
+                            project.relevanceScore >= 0.7 && briefMainUnderline,
+                            "truncate flex-1 min-w-0"
+                          )}
+                        >
+                          {project.title}
+                        </span>
                         <RelevanceBar score={project.relevanceScore} />
                       </div>
                       {project.summary ? (
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{project.summary}</p>
+                        <p className={cn(briefMainMuted, "mt-1 line-clamp-1")}>{project.summary}</p>
                       ) : null}
                     </button>
                   </li>

@@ -21,6 +21,7 @@ import type { ClientInteraction, SentimentTrend } from "@/lib/brief-types";
 
 interface ClientHistoryCardProps {
   interactions: ClientInteraction[];
+  embedded?: boolean;
 }
 
 const TYPE_CONFIG: Record<
@@ -163,12 +164,16 @@ function InteractionRow({
   );
 }
 
-export function ClientHistoryCard({ interactions }: ClientHistoryCardProps) {
+export function ClientHistoryCard({
+  interactions,
+  embedded = false,
+}: ClientHistoryCardProps) {
   const { compact } = useWidgetSize();
   if (interactions.length === 0) {
     return (
       <BriefDetailCard
         title="Client interaction history"
+        embedded={embedded}
         sourceInfo={{
           source: "Imported history",
           detail:
@@ -188,6 +193,8 @@ export function ClientHistoryCard({ interactions }: ClientHistoryCardProps) {
     <BriefDetailCard
       title="Client interaction history"
       scrollMaxHeight="14rem"
+      embedded={embedded}
+      hideEmbeddedTitle={embedded}
       sourceInfo={{
         source: "Imported history",
         detail:

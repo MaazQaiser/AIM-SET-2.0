@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, Settings, Activity } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Badge } from "@dc-copilot/ui/components/badge";
+import { Card, CardContent } from "@dc-copilot/ui/components/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import { AgentActivityFeed } from "@/components/agents/agent-activity-feed";
 import { AgentRunTable } from "@/components/agents/agent-run-table";
@@ -34,7 +35,8 @@ function MetricCard({
   const pct = Math.min((value / (target || 1)) * 100, 120);
 
   return (
-    <div className="glass-insight-card p-4 space-y-2">
+    <Card>
+      <CardContent className="space-y-2 p-4 pt-4">
       <p className="text-xs text-muted-foreground">{label}</p>
       <div className="flex items-end gap-2">
         <span className={cn("text-2xl font-bold", passing ? "text-success" : "text-warning")}>
@@ -56,7 +58,8 @@ function MetricCard({
           />
         </div>
       )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -22,4 +22,5 @@ export * from "./components/textarea";
 export * from "./components/tooltip";
 export * from "./components/typography";
 export * from "./lib/cn";
+export * from "./surfaces";
 export * from "./tokens";

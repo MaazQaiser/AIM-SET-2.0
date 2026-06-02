@@ -12,7 +12,12 @@ import {
   BriefDetailCard,
   BriefDetailFields,
   BriefDetailRow,
+  briefMainBody,
+  briefMainLead,
+  briefMainMuted,
+  briefMainUnderline,
 } from "@/components/pre-call/brief-detail-card";
+import { cn } from "@/lib/cn";
 import type {
   AnticipatedObjection,
   CallBrief,
@@ -72,7 +77,7 @@ function buildBantProvenance(brief?: CallBrief, call?: Call): { label: string; v
 
 const VISIBLE_QUESTION_ROWS = 3;
 /** ~3 single-line question rows + dividers */
-const QUESTIONS_PEEK_HEIGHT = "11.25rem";
+const QUESTIONS_PEEK_HEIGHT = "14rem";
 
 function isPresentationDocument(doc: RelevantDocument): boolean {
   const format = doc.format?.toLowerCase();
@@ -92,25 +97,20 @@ export function BriefBANTCard({
   bant,
   brief,
   call,
+  embedded = false,
 }: {
   bant: BANTScore;
   brief?: CallBrief;
   call?: Call;
+  embedded?: boolean;
 }) {
   const provenance = buildBantProvenance(brief, call);
   const openDimensions = (Object.keys(BANT_LABELS) as (keyof BANTScore)[]).filter(
     (k) => bant[k] !== "confirmed"
   );
 
-  return (
-    <BriefDetailCard
-      title="BANT scorecard"
-      sourceInfo={{
-        source: "Imported data + simple rules",
-        detail:
-          "This reads BANT clues from the Pre-DC/Post-DC fields and marks anything not clearly confirmed as something to verify on the call.",
-      }}
-    >
+  const bantBody = (
+    <>
       <BANTScorecard bant={bant} layout="stack" plain />
       {provenance.length > 0 && (
         <div className="mt-4 pt-3 border-t border-border">
@@ -121,11 +121,33 @@ export function BriefBANTCard({
         </div>
       )}
       {openDimensions.length > 0 && (
-        <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
+        <p className="text-xs font-medium text-muted-foreground mt-3 leading-relaxed">
           Still to confirm on the call:{" "}
           {openDimensions.map((k) => BANT_LABELS[k].toLowerCase()).join(", ")}.
         </p>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="min-w-0">
+        <p className="text-sm font-extrabold tracking-tight text-foreground mb-2">BANT scorecard</p>
+        {bantBody}
+      </div>
+    );
+  }
+
+  return (
+    <BriefDetailCard
+      title="BANT scorecard"
+      sourceInfo={{
+        source: "Imported data + simple rules",
+        detail:
+          "This reads BANT clues from the Pre-DC/Post-DC fields and marks anything not clearly confirmed as something to verify on the call.",
+      }}
+    >
+      {bantBody}
     </BriefDetailCard>
   );
 }
@@ -133,6 +155,7 @@ export function BriefBANTCard({
 export function BriefSignalsCard({ signals }: { signals: string[] }) {
   return (
     <BriefDetailCard
+      tone="main"
       title="New signals"
       icon={AlertCircle}
       variant="warning"
@@ -151,12 +174,19 @@ export function BriefSignalsCard({ signals }: { signals: string[] }) {
       <ul className="space-y-2">
         {signals.map((signal, i) => (
           <li key={signal}>
-            <BriefDetailRow className="bg-warning/5 border-warning/30">
+            <BriefDetailRow>
               <div className="flex items-start gap-2 min-w-0">
                 <span className="shrink-0 rounded-md bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-warning">
                   Signal {i + 1}
                 </span>
-                <p className="text-sm text-foreground/90 leading-snug break-words min-w-0 flex-1">
+                <p
+                  className={cn(
+                    briefMainBody,
+                    briefMainLead,
+                    briefMainUnderline,
+                    "break-words min-w-0 flex-1"
+                  )}
+                >
                   {signal}
                 </p>
               </div>
@@ -172,6 +202,7 @@ export function BriefPainsCard({ pains }: { pains: HypothesizedPain[] }) {
   const safePains = pains ?? [];
   return (
     <BriefDetailCard
+      tone="main"
       title="Hypothesized pain points"
       sourceInfo={{
         source: "AI from lead research",
@@ -191,7 +222,15 @@ export function BriefPainsCard({ pains }: { pains: HypothesizedPain[] }) {
                   <span className="shrink-0 font-mono text-[10px] font-bold text-primary mt-0.5">
                     {String(i + 1).padStart(2, "0")}
                   </span>
-                  <p className="text-sm text-foreground leading-snug break-words min-w-0">
+                  <p
+                    className={cn(
+                      briefMainBody,
+                      "italic font-normal",
+                      pain.confidence >= 0.7 &&
+                        "underline decoration-foreground/40 underline-offset-[3px]",
+                      "break-words min-w-0"
+                    )}
+                  >
                     {pain.text}
                   </p>
                 </div>
@@ -215,6 +254,7 @@ export function BriefDiscoveryQuestionsCard({ questions }: { questions: string[]
 
   return (
     <BriefDetailCard
+      tone="main"
       title="Suggested discovery questions"
       icon={HelpCircle}
       scrollMaxHeight={questions.length > VISIBLE_QUESTION_ROWS ? QUESTIONS_PEEK_HEIGHT : undefined}
@@ -233,12 +273,12 @@ export function BriefDiscoveryQuestionsCard({ questions }: { questions: string[]
         {questions.map((q, i) => (
           <li
             key={q}
-            className="flex gap-3 py-2.5 text-sm min-w-0 first:pt-0 last:pb-0"
+            className="flex gap-3 py-3 min-w-0 first:pt-0 last:pb-0"
           >
-            <span className="shrink-0 font-mono text-xs text-primary font-bold w-6">
+            <span className="shrink-0 font-mono text-sm text-primary font-bold w-7 pt-0.5">
               Q{i + 1}
             </span>
-            <p className="text-foreground/90 break-words min-w-0 leading-snug flex-1">
+            <p className={cn(briefMainBody, "font-normal break-words min-w-0 flex-1")}>
               {q}
             </p>
           </li>
@@ -251,6 +291,7 @@ export function BriefDiscoveryQuestionsCard({ questions }: { questions: string[]
 export function BriefObjectionsCard({ objections }: { objections: AnticipatedObjection[] }) {
   return (
     <BriefDetailCard
+      tone="main"
       title="Anticipated objections"
       sourceInfo={{
         source: "AI from lead context",
@@ -259,22 +300,34 @@ export function BriefObjectionsCard({ objections }: { objections: AnticipatedObj
       }}
     >
       <div className="space-y-2">
-        {objections.map((o) => (
-          <BriefDetailAccordion
-            key={o.objection}
-            title={o.objection}
-            summary={`Response · ${(o.confidence * 100).toFixed(0)}% confidence`}
-          >
-            <div className="space-y-2">
-              <div className="flex justify-end">
-                <ConfidenceTag score={o.confidence} />
+        {objections.map((o) => {
+          const [handlerLead, ...handlerRest] = o.handler.split(/(?<=\.)\s+/);
+          const handlerTail = handlerRest.join(" ").trim();
+          return (
+            <BriefDetailAccordion
+              key={o.objection}
+              title={o.objection}
+              main
+              summary={`Response · ${(o.confidence * 100).toFixed(0)}% confidence`}
+            >
+              <div className="space-y-2">
+                <div className="flex justify-end">
+                  <ConfidenceTag score={o.confidence} />
+                </div>
+                <p
+                  className={cn(
+                    briefMainBody,
+                    briefMainMuted,
+                    "break-words border-l-2 border-primary/30 pl-3"
+                  )}
+                >
+                  <span className={cn(briefMainLead, "text-foreground")}>{handlerLead}</span>
+                  {handlerTail ? ` ${handlerTail}` : null}
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground leading-relaxed break-words border-l-2 border-primary/30 pl-3">
-                {o.handler}
-              </p>
-            </div>
-          </BriefDetailAccordion>
-        ))}
+            </BriefDetailAccordion>
+          );
+        })}
       </div>
     </BriefDetailCard>
   );
@@ -317,6 +370,7 @@ export function BriefDeckCard({
   if (loadingDeck) {
     return (
       <BriefDetailCard
+        tone="main"
         title="Recommended deck"
         icon={Presentation}
         sourceInfo={{
@@ -325,7 +379,7 @@ export function BriefDeckCard({
             "This section searches the KB for one presentation file only: a PPT or PPTX that best matches the account and call context.",
         }}
       >
-        <p className="text-xs text-muted-foreground">Checking the knowledge base for one PPT/PPTX deck…</p>
+        <p className={briefMainMuted}>Checking the knowledge base for one PPT/PPTX deck…</p>
       </BriefDetailCard>
     );
   }
@@ -333,6 +387,7 @@ export function BriefDeckCard({
   if (!deck) {
     return (
       <BriefDetailCard
+        tone="main"
         title="Recommended deck"
         icon={Presentation}
         sourceInfo={{
@@ -341,9 +396,7 @@ export function BriefDeckCard({
             "The system looked for a PPT/PPTX deck in the KB for this call. If none appears, upload or tag a relevant deck and rerun the workflow.",
         }}
       >
-        <p className="text-xs text-muted-foreground">
-          No PPT/PPTX deck found in the knowledge base for this call.
-        </p>
+        <p className={briefMainMuted}>No PPT/PPTX deck found in the knowledge base for this call.</p>
       </BriefDetailCard>
     );
   }
@@ -351,6 +404,7 @@ export function BriefDeckCard({
   return (
     <>
       <BriefDetailCard
+        tone="main"
         title="Recommended deck"
         icon={Presentation}
         sourceInfo={{
@@ -363,11 +417,9 @@ export function BriefDeckCard({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-2">
               <KbFileFormatBadge fileName={deck.fileName} mimeType={deck.mimeType} />
-              <p className="text-sm font-medium leading-snug break-words">{deck.title}</p>
+              <p className={cn(briefMainLead, briefMainUnderline, "break-words")}>{deck.title}</p>
               {deck.snippet ? (
-                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
-                  {deck.snippet}
-                </p>
+                <p className={cn(briefMainMuted, "line-clamp-2")}>{deck.snippet}</p>
               ) : null}
             </div>
             <Button type="button" variant="outline" size="sm" onClick={() => setActiveDoc(deck)}>
@@ -393,6 +445,7 @@ export function BriefDeckCard({
 export function BriefPodNotesCard({ notes }: { notes: CallBrief["podNotes"] }) {
   return (
     <BriefDetailCard
+      tone="main"
       title="Pod-specific notes"
       icon={Users}
       scrollMaxHeight="14rem"
@@ -405,7 +458,13 @@ export function BriefPodNotesCard({ notes }: { notes: CallBrief["podNotes"] }) {
       <ul className="space-y-4">
         {notes.map((note) => (
           <li key={note.memberName}>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground truncate">
+            <p
+              className={cn(
+                briefMainLead,
+                briefMainUnderline,
+                "text-sm uppercase tracking-wide truncate"
+              )}
+            >
               {note.memberName} · {note.role}
             </p>
             {note.reviewedAt && (
@@ -417,9 +476,7 @@ export function BriefPodNotesCard({ notes }: { notes: CallBrief["podNotes"] }) {
                 })}
               </p>
             )}
-            <p className="text-sm text-foreground/80 leading-relaxed break-words mt-1.5">
-              {note.note}
-            </p>
+            <p className={cn(briefMainBody, "font-medium break-words mt-1.5")}>{note.note}</p>
           </li>
         ))}
       </ul>

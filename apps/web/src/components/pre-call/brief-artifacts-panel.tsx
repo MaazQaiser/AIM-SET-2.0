@@ -2,7 +2,13 @@
 
 import { FileCheck, FileQuestion, FileSearch, Package } from "lucide-react";
 import { WorkflowAgentBadge } from "@/components/pre-call/workflow-agent-badge";
-import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
+import {
+  BriefDetailCard,
+  briefMainBody,
+  briefMainLead,
+  briefMainMuted,
+  briefMainUnderline,
+} from "@/components/pre-call/brief-detail-card";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import type { CallBrief } from "@/lib/brief-types";
 import { cn } from "@/lib/cn";
@@ -35,6 +41,7 @@ export function BriefArtifactsPanel({ brief }: BriefArtifactsPanelProps) {
 
   return (
     <BriefDetailCard
+      tone="main"
       title="PRE-DC Workflow artifacts"
       icon={Package}
       sourceInfo={{
@@ -62,11 +69,11 @@ export function BriefArtifactsPanel({ brief }: BriefArtifactsPanelProps) {
                 .slice()
                 .sort((a, b) => a.priority - b.priority)
                 .map((item) => (
-                  <li key={item.id} className="text-sm">
-                    <span className="font-medium">{item.name}</span>
-                    <span className="text-muted-foreground text-xs ml-1">({item.type})</span>
+                  <li key={item.id} className={briefMainBody}>
+                    <span className={cn(briefMainLead, briefMainUnderline)}>{item.name}</span>
+                    <span className={cn(briefMainMuted, "ml-1")}>({item.type})</span>
                     {item.rationale ? (
-                      <p className="text-xs text-muted-foreground mt-0.5 ml-5">{item.rationale}</p>
+                      <p className={cn(briefMainMuted, "mt-1 ml-5")}>{item.rationale}</p>
                     ) : null}
                   </li>
                 ))}
@@ -88,11 +95,11 @@ export function BriefArtifactsPanel({ brief }: BriefArtifactsPanelProps) {
                 return (
                   <li
                     key={row.artifactId}
-                    className="rounded-lg border border-border/80 bg-muted/20 p-3 space-y-2"
+                    className="space-y-2 border-b border-border/40 pb-3 last:border-b-0 last:pb-0"
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusIcon status={row.status} />
-                      <span className="text-sm font-medium">{label}</span>
+                      <span className={cn(briefMainLead, "break-words")}>{label}</span>
                       <Badge
                         variant="outline"
                         className={cn("text-[10px] capitalize", STATUS_STYLE[row.status])}
@@ -101,7 +108,13 @@ export function BriefArtifactsPanel({ brief }: BriefArtifactsPanelProps) {
                       </Badge>
                     </div>
                     {row.snippet ? (
-                      <p className="text-xs text-muted-foreground leading-relaxed border-l-2 border-primary/30 pl-2">
+                      <p
+                        className={cn(
+                          briefMainBody,
+                          briefMainMuted,
+                          "border-l-2 border-primary/30 pl-2"
+                        )}
+                      >
                         {row.snippet}
                       </p>
                     ) : null}

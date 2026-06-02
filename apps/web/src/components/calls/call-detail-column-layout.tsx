@@ -7,7 +7,15 @@ import {
   mergeColumnOrder,
   orderWidgetsByColumn,
 } from "@/lib/dashboard/column-order";
-import type { WidgetColumn, WidgetSpec } from "@/lib/dashboard/widget-registry";
+import {
+  isBriefTaskWidget,
+  type BriefWidgetProps,
+  type WidgetColumn,
+  type WidgetSpec,
+} from "@/lib/dashboard/widget-registry";
+import { PreDcCustomerInfoPanel } from "@/components/pre-call/pre-dc-customer-info-panel";
+import { PreDcPrepTasksPanel } from "@/components/pre-call/pre-dc-prep-tasks-panel";
+import { useThemePreview } from "@/hooks/use-theme-preview";
 import { cn } from "@/lib/cn";
 import { useDashboardLayoutStore, type LayoutKey } from "@/stores/use-dashboard-layout";
 import { EditableColumnGrid } from "@/components/calls/editable-column-grid";
@@ -87,7 +95,53 @@ export function CallDetailColumnLayout<P>({
     );
   }
 
-  // Static 3-column view.
+  // Pre-DC brief: 2-column layout (info + checklist | main content).
+  if (layoutKey === "brief") {
+    const briefProps = widgetProps as BriefWidgetProps;
+    const grouped = orderWidgetsByColumn(visibleWidgets, columnOrder);
+    const infoWidgets = grouped.left;
+    const focusWidgets = [
+      ...grouped.center,
+      ...grouped.right.filter((w) => !isBriefTaskWidget(w.id)),
+    ];
+
+    return (
+      <div className="space-y-4 min-w-0">
+        <div
+          className={cn(
+            "grid gap-8",
+            "grid-cols-1",
+            "lg:grid-cols-[minmax(300px,0.34fr)_minmax(0,1fr)]",
+            "lg:items-start"
+          )}
+        >
+          <aside
+            className={cn(
+              "flex min-w-0 flex-col gap-5",
+              "lg:sticky lg:top-2 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto"
+            )}
+            aria-label="Account context and checklist"
+          >
+            <PreDcCustomerInfoPanel
+              widgets={infoWidgets as WidgetSpec<BriefWidgetProps>[]}
+              widgetProps={briefProps}
+            />
+            <PreDcPrepTasksPanel widgetProps={briefProps} />
+          </aside>
+          <ColumnRail
+            zone="center"
+            label=""
+            widgets={focusWidgets}
+            widgetProps={widgetProps}
+            onHide={(id) => hideWidget(layoutKey, id)}
+            isPrimary
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Post-DC and other layouts: 3-column view.
   const grouped = orderWidgetsByColumn(visibleWidgets, columnOrder);
 
   return (
@@ -126,6 +180,17 @@ export function CallDetailColumnLayout<P>({
   );
 }
 
+function ColumnSectionLabel({ label }: { label: string }) {
+  const { isIntercom } = useThemePreview();
+  if (!isIntercom || !label.trim()) return null;
+
+  return (
+    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground pb-1 border-b border-border mb-1">
+      {label}
+    </p>
+  );
+}
+
 function ColumnRail<P>({
   zone,
   label,
@@ -143,20 +208,23 @@ function ColumnRail<P>({
   header?: React.ReactNode;
   isPrimary?: boolean;
 }) {
+  const { isIntercom } = useThemePreview();
   if (widgets.length === 0 && !header) return null;
 
   return (
     <section
       className={cn(
-        "flex min-w-0 flex-col gap-3",
+        "flex min-w-0 flex-col",
+        isIntercom ? "gap-4" : "gap-3",
         zone === "center"
           ? "min-h-0"
           : "lg:sticky lg:top-4 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto"
       )}
       aria-label={label}
     >
+      <ColumnSectionLabel label={label} />
       {header}
-      <div className={cn("flex flex-col gap-3 min-w-0", isPrimary && "gap-4")}>
+      <div className={cn("flex flex-col min-w-0", isIntercom ? "gap-4" : "gap-3", isPrimary && !isIntercom && "gap-5")}>
         {widgets.map((spec) => (
           <DashboardWidget
             key={spec.id}

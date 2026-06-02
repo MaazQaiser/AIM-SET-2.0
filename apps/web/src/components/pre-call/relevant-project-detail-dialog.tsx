@@ -9,7 +9,9 @@ import {
   DialogTitle,
 } from "@dc-copilot/ui/components/dialog";
 import { Badge } from "@dc-copilot/ui/components/badge";
+import { briefDetailDialogClass } from "@/components/pre-call/brief-detail-card";
 import type { RelevantProject, RelevantProjectSource } from "@/lib/brief-types";
+import { cn } from "@/lib/cn";
 
 const SOURCE_LABEL: Record<RelevantProjectSource, string> = {
   knowledge_base: "Knowledge base",
@@ -36,7 +38,7 @@ export function RelevantProjectDetailDialog({
 }: RelevantProjectDetailDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+      <DialogContent className={cn(briefDetailDialogClass, "max-w-lg max-h-[80vh] flex flex-col")}>
         <DialogHeader>
           <DialogTitle className="pr-6">{project?.title ?? "Project"}</DialogTitle>
           <DialogDescription className="flex flex-wrap items-center gap-2">

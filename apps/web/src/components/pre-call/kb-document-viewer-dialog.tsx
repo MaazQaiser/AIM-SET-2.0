@@ -9,7 +9,9 @@ import {
 } from "@dc-copilot/ui/components/dialog";
 import { KbAssetPreview } from "@/components/knowledge/kb-asset-preview";
 import { KbFileFormatBadge } from "@/components/knowledge/kb-file-format-badge";
+import { briefDetailDialogClass } from "@/components/pre-call/brief-detail-card";
 import type { RelevantDocument } from "@/lib/brief-types";
+import { cn } from "@/lib/cn";
 
 interface KbDocumentViewerDialogProps {
   document: RelevantDocument | null;
@@ -34,7 +36,12 @@ export function KbDocumentViewerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-[96vw] h-[90vh] flex flex-col p-0 gap-0">
+      <DialogContent
+        className={cn(
+          briefDetailDialogClass,
+          "max-w-5xl w-[96vw] h-[90vh] flex flex-col p-0 gap-0"
+        )}
+      >
         <DialogHeader className="px-4 pt-4 pb-2 shrink-0">
           <DialogTitle className="pr-8 truncate">{doc.title}</DialogTitle>
           <DialogDescription className="flex flex-wrap items-center gap-2">

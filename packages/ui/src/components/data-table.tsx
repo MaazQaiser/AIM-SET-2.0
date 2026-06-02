@@ -72,15 +72,15 @@ export function DataTable<TData, TValue>({
 
       <div
         className={cn(
-          "rounded-lg border border-border",
+          "overflow-hidden rounded-xl border border-border bg-card",
           scrollable ? cn("overflow-auto", maxScrollHeight) : "overflow-hidden"
         )}
       >
-        <table className={cn("w-full text-sm", scrollable && "min-w-max")}>
+        <table className={cn("w-full border-collapse bg-card text-sm", scrollable && "min-w-max")}>
           <thead
             className={cn(
-              "border-b border-border bg-muted/50",
-              stickyHeader && "sticky top-0 z-10 bg-muted/95 backdrop-blur-sm"
+              "border-b border-border bg-card",
+              stickyHeader && "sticky top-0 z-10 bg-card"
             )}
           >
             {table.getHeaderGroups().map((headerGroup) => (
@@ -89,76 +89,76 @@ export function DataTable<TData, TValue>({
                   const meta = header.column.columnDef.meta as DataTableColumnMeta | undefined;
 
                   return (
-                  <th
-                    key={header.id}
-                    className={cn(
-                      "px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider",
-                      meta?.headerClassName
-                    )}
-                  >
-                    {header.isPlaceholder ? null : (
-                      <button
-                        type="button"
-                        className={cn(
-                          "flex items-center gap-1",
-                          header.column.getCanSort() && "cursor-pointer hover:text-foreground"
-                        )}
-                        onClick={header.column.getToggleSortingHandler()}
-                        aria-sort={
-                          header.column.getIsSorted() === "asc"
-                            ? "ascending"
-                            : header.column.getIsSorted() === "desc"
-                            ? "descending"
-                            : "none"
-                        }
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {header.column.getCanSort() && (
-                          <span>
-                            {header.column.getIsSorted() === "asc" ? (
-                              <ChevronUp className="h-3 w-3" />
-                            ) : header.column.getIsSorted() === "desc" ? (
-                              <ChevronDown className="h-3 w-3" />
-                            ) : (
-                              <ChevronsUpDown className="h-3 w-3 opacity-40" />
-                            )}
-                          </span>
-                        )}
-                      </button>
-                    )}
-                  </th>
+                    <th
+                      key={header.id}
+                      className={cn(
+                        "h-10 whitespace-nowrap px-4 text-left align-middle text-xs font-semibold text-muted-foreground",
+                        meta?.headerClassName
+                      )}
+                    >
+                      {header.isPlaceholder ? null : (
+                        <button
+                          type="button"
+                          className={cn(
+                            "inline-flex items-center gap-1.5",
+                            header.column.getCanSort() && "cursor-pointer hover:text-foreground"
+                          )}
+                          onClick={header.column.getToggleSortingHandler()}
+                          aria-sort={
+                            header.column.getIsSorted() === "asc"
+                              ? "ascending"
+                              : header.column.getIsSorted() === "desc"
+                              ? "descending"
+                              : "none"
+                          }
+                        >
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          {header.column.getCanSort() && (
+                            <span className="text-muted-foreground/70">
+                              {header.column.getIsSorted() === "asc" ? (
+                                <ChevronUp className="h-3.5 w-3.5" />
+                              ) : header.column.getIsSorted() === "desc" ? (
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              ) : (
+                                <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
+                              )}
+                            </span>
+                          )}
+                        </button>
+                      )}
+                    </th>
                   );
                 })}
               </tr>
             ))}
           </thead>
-          <tbody>
+          <tbody className="bg-card">
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className="group border-b border-border last:border-0 hover:bg-muted/50 transition-colors"
+                  className="group border-b border-border/70 bg-card last:border-0 transition-colors hover:bg-muted/20"
                 >
                   {row.getVisibleCells().map((cell) => {
                     const meta = cell.column.columnDef.meta as DataTableColumnMeta | undefined;
 
                     return (
-                    <td
-                      key={cell.id}
-                      className={cn(
-                        "px-4 py-3 text-sm text-foreground",
-                        meta?.cellClassName
-                      )}
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
+                      <td
+                        key={cell.id}
+                        className={cn(
+                          "px-4 py-2.5 align-middle text-sm text-foreground",
+                          meta?.cellClassName
+                        )}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
                     );
                   })}
                 </tr>
               ))
             ) : (
-              <tr>
-                <td colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+              <tr className="bg-card">
+                <td colSpan={columns.length} className="h-24 bg-card text-center text-muted-foreground">
                   No results.
                 </td>
               </tr>
@@ -167,7 +167,6 @@ export function DataTable<TData, TValue>({
         </table>
       </div>
 
-      {/* Pagination */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}

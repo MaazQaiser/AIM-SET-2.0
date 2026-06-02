@@ -9,12 +9,14 @@ interface PreDcResearchCardProps {
   sections: BriefResearchSection[];
   className?: string;
   title?: string;
+  embedded?: boolean;
 }
 
 export function PreDcResearchCard({
   sections,
   className,
   title = "Lead research",
+  embedded = false,
 }: PreDcResearchCardProps) {
   if (sections.length === 0) return null;
 
@@ -24,6 +26,8 @@ export function PreDcResearchCard({
       icon={Building2}
       className={cn("border-primary/20", className)}
       scrollMaxHeight="14rem"
+      embedded={embedded}
+      hideEmbeddedTitle={embedded}
       sourceInfo={{
         source: title.startsWith("Post-DC") ? "Imported Post-DC notes" : "Imported Pre-DC notes",
         detail: title.startsWith("Post-DC")

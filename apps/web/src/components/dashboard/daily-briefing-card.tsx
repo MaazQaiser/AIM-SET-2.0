@@ -1,6 +1,7 @@
 "use client";
 
 import { Sparkles, DollarSign, Target, AlertCircle } from "lucide-react";
+import { Card, CardContent } from "@dc-copilot/ui/components/card";
 import { AIGeneratedBadge } from "@/components/ai-generated-badge";
 import { useAiTodos } from "@/hooks/use-ai-todos";
 import { useCalls } from "@/lib/data/hooks";
@@ -46,7 +47,8 @@ export function DailyBriefingCard() {
   }
 
   return (
-    <div className="glass-insight-card p-5 space-y-4">
+    <Card>
+      <CardContent className="space-y-4 p-5 pt-5">
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-warning" />
         <span className="type-title text-foreground">Daily briefing</span>
@@ -76,6 +78,7 @@ export function DailyBriefingCard() {
           </span>
         )}
       </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

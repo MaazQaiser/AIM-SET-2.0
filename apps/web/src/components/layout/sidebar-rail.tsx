@@ -5,6 +5,15 @@ import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import { PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/cn";
+import {
+  appNavItemActiveClass,
+  appNavItemClass,
+  appNavLinkActiveClass,
+  appNavLinkClass,
+  appSidebarPanelClass,
+  appSidebarWidgetClass,
+  appCardClass,
+} from "@dc-copilot/ui/surfaces";
 import { mainNavItems, footerNavItems } from "./sidebar-nav-config";
 import { useSidebar } from "./sidebar-context";
 import {
@@ -62,7 +71,7 @@ export function SidebarRail() {
       <RailTooltip label="Open sidebar">
         <button
           type="button"
-          className={styles.railIconButton}
+          className={cn(appNavItemClass, styles.railIconButton)}
           aria-label="Open sidebar"
           onClick={() => setExpanded(true)}
         >
@@ -83,8 +92,9 @@ export function SidebarRail() {
                 <Link
                   href={item.href}
                   className={cn(
+                    appNavItemClass,
                     styles.railIconButton,
-                    isActive && styles.railIconButtonActive
+                    isActive && appNavItemActiveClass
                   )}
                   aria-label={item.label}
                   aria-current={isActive ? "page" : undefined}
@@ -103,8 +113,9 @@ export function SidebarRail() {
             item.kind === "link" && pathname.startsWith(item.href);
 
           const buttonClass = cn(
+            appNavItemClass,
             styles.railIconButton,
-            isActive && styles.railIconButtonActive
+            isActive && appNavItemActiveClass
           );
 
           if (item.kind === "button") {

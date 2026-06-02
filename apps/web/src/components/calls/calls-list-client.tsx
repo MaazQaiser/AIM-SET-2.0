@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Phone, Search } from "lucide-react";
+import { PageShell } from "@/components/layout/page-shell";
 import { CallCard } from "@/components/call-card";
 import { CallsTable } from "@/components/calls/calls-table";
 import { CallsViewToggle, type CallsViewMode } from "@/components/calls/calls-view-toggle";
@@ -32,10 +33,10 @@ function CallsBody({ calls, view }: { calls: Call[]; view: CallsViewMode }) {
 function ListLoadingSkeleton({ view }: { view: CallsViewMode }) {
   if (view === "list") {
     return (
-      <div className="space-y-2 rounded-lg border border-border overflow-hidden">
-        <Skeleton className="h-10 w-full rounded-none" />
+      <div className="space-y-2 overflow-hidden rounded-xl border border-border bg-card">
+        <Skeleton className="h-10 w-full rounded-none bg-muted/40" />
         {[1, 2, 3, 4, 5].map((i) => (
-          <Skeleton key={i} className="h-14 w-full rounded-none" />
+          <Skeleton key={i} className="h-14 w-full rounded-none bg-card" />
         ))}
       </div>
     );
@@ -43,7 +44,7 @@ function ListLoadingSkeleton({ view }: { view: CallsViewMode }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {[1, 2, 3].map((i) => (
-        <Skeleton key={i} className="h-48 w-full rounded-2xl" />
+        <Skeleton key={i} className="h-48 w-full rounded-xl" />
       ))}
     </div>
   );
@@ -59,18 +60,18 @@ export function CallsListClient() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4">
+      <PageShell size="wide" className="space-y-4">
         <div className="flex items-center justify-between gap-4">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-8 w-24" />
         </div>
         <ListLoadingSkeleton view={view} />
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col p-6">
+    <PageShell size="wide" className="flex min-h-0 flex-1 flex-col space-y-0 p-6 sm:p-8">
       <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Calls</h1>
@@ -93,7 +94,7 @@ export function CallsListClient() {
         />
       ) : (
         <Tabs defaultValue="all" className="mt-6 flex min-h-0 flex-1 flex-col">
-          <div className="sticky top-0 z-20 -mx-6 shrink-0 border-b border-border/60 bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="sticky top-0 z-20 -mx-6 shrink-0 border-b border-border/60 bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:-mx-8 sm:px-8">
             <TabsList className="border-b-0">
               <TabsTrigger value="all">
                 All leads
@@ -146,6 +147,6 @@ export function CallsListClient() {
           </TabsContent>
         </Tabs>
       )}
-    </div>
+    </PageShell>
   );
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Urbanist } from "next/font/google";
+import { Inter, Roboto, Urbanist } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ClerkGateProvider } from "@/components/providers/clerk-gate";
 import { ThemeProvider } from "@/components/providers/theme-provider";
@@ -16,6 +16,20 @@ const urbanist = Urbanist({
   weight: ["400", "500", "600", "700"],
 });
 
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+  weight: ["400", "500", "600"],
+});
+
+const roboto = Roboto({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-roboto",
+  weight: ["400", "500", "700"],
+});
+
 /** Avoid static prerender when Clerk env is not set at build time (Vercel). */
 export const dynamic = "force-dynamic";
 
@@ -29,8 +43,12 @@ export const metadata: Metadata = {
 
 function AppDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={urbanist.variable} suppressHydrationWarning>
-      <body>
+    <html
+      lang="en"
+      className={`${urbanist.variable} ${inter.variable} ${roboto.variable}`}
+      suppressHydrationWarning
+    >
+      <body className="font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <TooltipProvider>
             {children}

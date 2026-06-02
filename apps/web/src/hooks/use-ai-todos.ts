@@ -45,7 +45,7 @@ export function useAiTodos() {
         subtitle: `${pendingTasks.length} item${pendingTasks.length > 1 ? "s" : ""} · Post-call · awaiting sign-off`,
         agent: "post_dc",
         priority: "high",
-        href: "/calls/call-001?tab=post-dc",
+        href: "/calls/call-001/post-dc",
       });
     }
 

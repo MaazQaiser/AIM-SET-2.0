@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Activity, Settings, ChevronRight, CheckCircle2, AlertTriangle, XCircle, Clock } from "lucide-react";
+import { Card, CardContent, CardFooter } from "@dc-copilot/ui/components/card";
 import { ModelPolicyBadge } from "./model-policy-badge";
 import { CostGaugeBar } from "./cost-gauge-bar";
 import type { AgentStatus } from "@/types/agents";
@@ -30,66 +31,68 @@ export function AgentStatusCard({ status }: AgentStatusCardProps) {
   const HealthIcon = health.icon;
 
   return (
-    <article className="glass-insight-card px-[18px] py-4">
-      <header className="flex items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-            <h2 className="glass-insight-title truncate">{status.display_name}</h2>
+    <Card className="flex flex-col">
+      <CardContent className="space-y-4 p-5 pt-5">
+        <header className="flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+              <h2 className="truncate text-sm font-semibold text-foreground">{status.display_name}</h2>
+            </div>
+            <p className="line-clamp-2 text-sm text-muted-foreground">{status.description}</p>
           </div>
-          <p className="glass-insight-body line-clamp-2">{status.description}</p>
-        </div>
-        <div className={cn("flex shrink-0 items-center gap-1 text-xs font-medium", health.className)}>
-          <HealthIcon className="h-3.5 w-3.5" />
-          <span>{health.label}</span>
-        </div>
-      </header>
+          <div className={cn("flex shrink-0 items-center gap-1 text-xs font-medium", health.className)}>
+            <HealthIcon className="h-3.5 w-3.5" />
+            <span>{health.label}</span>
+          </div>
+        </header>
 
-      <div className="space-y-4">
-        <div>
-          <p className="glass-insight-body mb-1 text-xs">Model</p>
-          <ModelPolicyBadge policy={status.model_policy} />
-        </div>
+        <div className="space-y-4">
+          <div>
+            <p className="mb-1 text-xs text-muted-foreground">Model</p>
+            <ModelPolicyBadge policy={status.model_policy} />
+          </div>
 
-        <div>
-          <p className="glass-insight-body mb-1 text-xs">Spend today</p>
-          <CostGaugeBar
-            spentUsd={status.cost_today_usd}
-            capUsd={status.cost_cap_usd}
-            capLabel={status.project_cap_usd ? "project cap" : "per-run cap"}
-          />
-          {status.per_run_cap_usd != null && (
-            <p className="glass-insight-body mt-1 text-[10px]">
-              Per-run ceiling ${status.per_run_cap_usd.toFixed(2)}
-              {status.project_cap_usd != null
-                ? ` · Project ceiling $${status.project_cap_usd.toFixed(2)}`
-                : ""}
-            </p>
-          )}
-        </div>
+          <div>
+            <p className="mb-1 text-xs text-muted-foreground">Spend today</p>
+            <CostGaugeBar
+              spentUsd={status.cost_today_usd}
+              capUsd={status.cost_cap_usd}
+              capLabel={status.project_cap_usd ? "project cap" : "per-run cap"}
+            />
+            {status.per_run_cap_usd != null && (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Per-run ceiling ${status.per_run_cap_usd.toFixed(2)}
+                {status.project_cap_usd != null
+                  ? ` · Project ceiling $${status.project_cap_usd.toFixed(2)}`
+                  : ""}
+              </p>
+            )}
+          </div>
 
-        <div className="glass-insight-body flex items-center justify-between text-xs">
-          <span>{status.runs_today} runs today</span>
-          {status.last_run_at && <span>Last: {formatRelative(status.last_run_at)}</span>}
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{status.runs_today} runs today</span>
+            {status.last_run_at && <span>Last: {formatRelative(status.last_run_at)}</span>}
+          </div>
         </div>
-      </div>
+      </CardContent>
 
-      <footer className="flex gap-2 border-t border-white/70 pt-3 dark:border-white/10">
+      <CardFooter className="flex gap-2 border-t border-border px-5 pb-5 pt-0">
         <Link
           href={`/agents/${status.agent_id}`}
-          className="glass-insight-body flex flex-1 items-center justify-center gap-1 py-1 text-xs transition-colors hover:text-[#2e404c] dark:hover:text-[#f2f2f4]"
+          className="flex flex-1 items-center justify-center gap-1 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           <span>View detail</span>
           <ChevronRight className="h-3 w-3" />
         </Link>
         <Link
           href={`/agents/${status.agent_id}/config`}
-          className="glass-insight-body flex items-center gap-1 px-2 py-1 text-xs transition-colors hover:text-[#2e404c] dark:hover:text-[#f2f2f4]"
+          className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           <Settings className="h-3.5 w-3.5" />
           <span>Config</span>
         </Link>
-      </footer>
-    </article>
+      </CardFooter>
+    </Card>
   );
 }

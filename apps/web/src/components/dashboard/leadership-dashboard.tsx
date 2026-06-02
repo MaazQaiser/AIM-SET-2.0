@@ -58,7 +58,7 @@ export function AeCoachingBanner() {
   return (
     <Link
       href="/coaching/ae-sarah"
-      className="glass-insight-card block px-4 py-3 transition-colors hover:border-white"
+      className="app-card block px-4 py-3 transition-colors hover:bg-muted/30"
     >
       <div className="flex items-center gap-2 type-body-sm font-medium text-foreground">
         <Users className="h-4 w-4" />

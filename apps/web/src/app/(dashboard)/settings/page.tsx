@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@dc-c
 import { Button } from "@dc-copilot/ui/components/button";
 import { DataTable } from "@dc-copilot/ui/components/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
+import { PageShell } from "@/components/layout/page-shell";
 import { AeNotificationPrefs } from "@/components/settings/ae-notification-prefs";
 import { DcNotesCsvImport } from "@/components/settings/dc-notes-csv-import";
 import { IntegrationsTab } from "@/components/integrations/integrations-tab";
@@ -34,7 +35,7 @@ const memberColumns: ColumnDef<MemberRow>[] = [
 
 export default function SettingsPage() {
   return (
-    <div className="p-6 space-y-6">
+    <PageShell>
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -91,6 +92,6 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </PageShell>
   );
 }

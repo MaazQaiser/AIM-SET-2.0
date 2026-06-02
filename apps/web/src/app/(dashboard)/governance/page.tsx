@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@dc-copilot/ui/components/card";
 import { Badge } from "@dc-copilot/ui/components/badge";
+import { PageShell } from "@/components/layout/page-shell";
 import { GovernanceAuditTable } from "@/components/governance/governance-audit-table";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 
@@ -18,7 +19,7 @@ const rolloutStages = [
 
 export default function GovernancePage() {
   return (
-    <div className="p-6 space-y-6">
+    <PageShell>
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Governance</h1>
         <p className="text-sm text-muted-foreground mt-1">Audit, compliance, and AI cost policy</p>
@@ -141,6 +142,6 @@ export default function GovernancePage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </PageShell>
   );
 }

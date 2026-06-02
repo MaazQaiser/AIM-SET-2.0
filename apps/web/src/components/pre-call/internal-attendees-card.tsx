@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Users, Sparkles } from "lucide-react";
-import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
+import { BriefDetailCard, briefDetailDialogClass } from "@/components/pre-call/brief-detail-card";
 import { Button } from "@dc-copilot/ui/components/button";
 import {
   Dialog,
@@ -17,6 +17,7 @@ import type { InternalAttendee } from "@/lib/brief-types";
 
 interface InternalAttendeesCardProps {
   attendees: InternalAttendee[];
+  embedded?: boolean;
 }
 
 const ROLE_STYLES: Record<
@@ -46,7 +47,9 @@ function InternalAttendeeDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[min(90vh,560px)] overflow-y-auto">
+      <DialogContent
+        className={cn(briefDetailDialogClass, "max-w-lg max-h-[min(90vh,560px)] overflow-y-auto")}
+      >
         <DialogHeader className="pr-8">
           <div className="flex items-start gap-3">
             <Avatar className="h-12 w-12 shrink-0">
@@ -88,7 +91,10 @@ function InternalAttendeeDetailDialog({
   );
 }
 
-export function InternalAttendeesCard({ attendees }: InternalAttendeesCardProps) {
+export function InternalAttendeesCard({
+  attendees,
+  embedded = false,
+}: InternalAttendeesCardProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = attendees.find((a) => a.id === selectedId) ?? null;
 
@@ -99,6 +105,7 @@ export function InternalAttendeesCard({ attendees }: InternalAttendeesCardProps)
       <BriefDetailCard
         title="Internal attendees"
         icon={Users}
+        embedded={embedded}
         sourceInfo={{
           source: "Rules from lead context",
           detail:

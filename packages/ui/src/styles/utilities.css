@@ -175,83 +175,65 @@
   }
 
   .sidebar-panel {
-    background-color: hsl(var(--sidebar));
+    background-color: hsl(var(--card));
     color: hsl(var(--sidebar-foreground));
-    border: 1px solid hsl(var(--sidebar-border) / 0.65);
-    border-radius: var(--radius-2xl);
-    box-shadow: var(--shadow-soft-md);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-xl);
+    box-shadow: none;
   }
 
   .glass {
-    background-color: hsl(var(--card) / 0.85);
-    backdrop-filter: blur(10px) saturate(120%);
-    -webkit-backdrop-filter: blur(10px) saturate(120%);
-    border: 1px solid hsl(var(--border) / 0.6);
-    box-shadow: var(--shadow-soft-xs);
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .dark .glass {
-    background-color: hsl(var(--card) / 0.75);
-    border-color: hsl(var(--border) / 0.5);
+    background-color: hsl(var(--card));
+    border-color: hsl(var(--border));
   }
 
-  /** Matches sidebar `.shell` glass panel (Figma AI-Un) */
+  /** @deprecated use .app-sidebar-panel — kept for legacy markup */
   .glass-shell {
-    border-radius: 24px;
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.6) 0%,
-      rgba(255, 255, 255, 0.3) 100%
-    );
+    border-radius: var(--radius-xl);
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
     box-shadow: none;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .dark .glass-shell {
-    background: linear-gradient(
-      180deg,
-      rgba(28, 28, 33, 0.85) 0%,
-      rgba(28, 28, 33, 0.55) 100%
-    );
+    background: hsl(var(--card));
+    border-color: hsl(var(--border));
   }
 
-  /** Matches sidebar `.aiInsightCard` */
+  /** Platform card surface — aliases .app-card for legacy class names */
   .glass-insight-card {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 0;
     overflow: hidden;
-    border: 1px solid #ffffff;
-    border-radius: 24px;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg);
     box-shadow: none;
-    background: linear-gradient(
-      180deg,
-      #ffffff 0%,
-      rgba(255, 255, 255, 0.3) 100%
-    );
+    background: hsl(var(--card));
   }
 
   .dark .glass-insight-card {
-    border-color: rgba(255, 255, 255, 0.12);
-    background: linear-gradient(
-      180deg,
-      rgba(38, 38, 44, 0.95) 0%,
-      rgba(38, 38, 44, 0.6) 100%
-    );
+    border-color: hsl(var(--border));
+    background: hsl(var(--card));
   }
 
   .glass-insight-title {
     margin: 0;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 22px;
-    color: #2e404c;
-  }
-
-  .dark .glass-insight-title {
-    color: #f2f2f4;
+    color: hsl(var(--foreground));
   }
 
   .glass-insight-body {
@@ -259,37 +241,21 @@
     font-size: 14px;
     font-weight: 400;
     line-height: 22px;
-    color: #777777;
-  }
-
-  .dark .glass-insight-body {
-    color: #9ca3af;
+    color: hsl(var(--muted-foreground));
   }
 
   /**
-   * Figma AI-Un background (node 152:1303)
-   * Background #DADAE2 · Sphere #E5DAE7 · 100% opacity · 600px uniform blur
+   * Page canvas — warm cream base (matches call-detail / Intercom editorial)
    */
   .page-hue {
     position: relative;
     isolation: isolate;
     overflow: hidden;
-    background-color: #dadae2;
+    background-color: hsl(var(--background));
   }
 
   .page-hue::before {
-    content: "";
-    position: absolute;
-    z-index: 0;
-    pointer-events: none;
-    width: min(560px, 52vw);
-    height: min(560px, 52vw);
-    bottom: max(-38%, -320px);
-    left: 28%;
-    border-radius: 50%;
-    background-color: #e5dae7;
-    opacity: 1;
-    filter: blur(600px);
+    content: none;
   }
 
   .page-hue::after {

@@ -8,12 +8,13 @@ import { DailyBriefingCard } from "./daily-briefing-card";
 import { AiTodoList } from "./ai-todo-list";
 import { UnifiedAgenda } from "./unified-agenda";
 import { QuickActions } from "./quick-actions";
+import { PageShell } from "@/components/layout/page-shell";
 
 export function DashboardHome() {
   const hasImport = useDcImportsStore((s) => s.preDcRecords.length > 0);
 
   return (
-    <div className="p-6 sm:p-8 space-y-8 max-w-6xl mx-auto">
+    <PageShell className="space-y-8">
       <AssistantGreeting />
 
       {!hasImport ? (
@@ -35,6 +36,6 @@ export function DashboardHome() {
           <QuickActions />
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

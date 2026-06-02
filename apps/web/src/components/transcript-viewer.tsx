@@ -83,7 +83,8 @@ export function TranscriptViewer({
               <button
                 type="button"
                 className={cn(
-                  "group w-full text-left px-4 py-3 border-l-2 hover:bg-muted/50 transition-colors",
+                  "group w-full text-left py-3 border-l-2 hover:bg-muted/50 transition-colors",
+                  isLive ? "px-6" : "px-4",
                   event.sentiment ? sentimentColor[event.sentiment] : "border-l-border",
                   onEventClick && "cursor-pointer"
                 )}

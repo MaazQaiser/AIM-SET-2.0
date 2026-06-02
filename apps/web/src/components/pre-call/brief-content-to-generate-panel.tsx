@@ -2,7 +2,14 @@
 
 import { AlertTriangle, FilePlus2 } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
-import { BriefDetailCard, BriefDetailRow } from "@/components/pre-call/brief-detail-card";
+import {
+  BriefDetailCard,
+  BriefDetailRow,
+  briefMainBody,
+  briefMainLead,
+  briefMainMuted,
+  briefMainUnderline,
+} from "@/components/pre-call/brief-detail-card";
 import type { ContentToGenerate } from "@/lib/brief-types";
 import { cn } from "@/lib/cn";
 
@@ -21,6 +28,7 @@ export function BriefContentToGeneratePanel({ items }: BriefContentToGeneratePan
 
   return (
     <BriefDetailCard
+      tone="main"
       title="Content to generate"
       icon={FilePlus2}
       variant="warning"
@@ -36,7 +44,7 @@ export function BriefContentToGeneratePanel({ items }: BriefContentToGeneratePan
       }
     >
       <div className="space-y-3">
-        <p className="text-xs text-muted-foreground leading-relaxed">
+        <p className={briefMainMuted}>
           These assets are not strong enough in the knowledge base yet. Creating them would make the
           call prep sharper.
         </p>
@@ -51,7 +59,9 @@ export function BriefContentToGeneratePanel({ items }: BriefContentToGeneratePan
                       item.status === "missing" ? "text-rose-700" : "text-amber-700"
                     )}
                   />
-                  <p className="min-w-0 flex-1 text-sm font-medium break-words">{item.name}</p>
+                  <p className={cn(briefMainLead, briefMainUnderline, "min-w-0 flex-1 break-words")}>
+                    {item.name}
+                  </p>
                   <Badge
                     variant="outline"
                     className={cn(
@@ -64,12 +74,12 @@ export function BriefContentToGeneratePanel({ items }: BriefContentToGeneratePan
                     {STATUS_LABEL[item.status]}
                   </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  <span className="font-medium text-foreground/80">Why generate it: </span>
+                <p className={briefMainBody}>
+                  <span className={briefMainLead}>Why generate it: </span>
                   {item.reason}
                 </p>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  <span className="font-medium text-foreground/80">Needed for: </span>
+                <p className={cn(briefMainBody, briefMainMuted)}>
+                  <span className="font-semibold text-foreground/90">Needed for: </span>
                   {item.neededFor}
                 </p>
               </BriefDetailRow>

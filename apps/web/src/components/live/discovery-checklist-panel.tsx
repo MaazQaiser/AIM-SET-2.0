@@ -36,14 +36,27 @@ interface DiscoveryChecklistPanelProps {
   className?: string;
   /** full = live call sidebar; brief = minimal call detail with accordions */
   variant?: "full" | "brief";
+  /** Body only — used inside Pre-DC prep sidebar card */
+  embedded?: boolean;
+  /** When BANT scorecard is shown above, omit duplicate BANT breakdown/items */
+  suppressBantSections?: boolean;
 }
 
 export function DiscoveryChecklistPanel({
   state,
   className,
   variant = "full",
+  embedded = false,
+  suppressBantSections = false,
 }: DiscoveryChecklistPanelProps) {
   if (!state) {
+    if (embedded) {
+      return (
+        <p className={cn("text-sm text-muted-foreground", className)}>
+          Discovery checklist will populate when the call stream connects.
+        </p>
+      );
+    }
     return (
       <BriefDetailCard title="Discovery coverage" icon={ListChecks} className={className}>
         <p className="text-sm text-muted-foreground">
@@ -54,7 +67,14 @@ export function DiscoveryChecklistPanel({
   }
 
   if (variant === "brief") {
-    return <DiscoveryChecklistBriefCard state={state} className={className} />;
+    return (
+      <DiscoveryChecklistBriefCard
+        state={state}
+        className={className}
+        embedded={embedded}
+        suppressBantSections={suppressBantSections}
+      />
+    );
   }
 
   return <DiscoveryChecklistFullPanel state={state} className={className} />;
@@ -63,9 +83,13 @@ export function DiscoveryChecklistPanel({
 function DiscoveryChecklistBriefCard({
   state,
   className,
+  embedded = false,
+  suppressBantSections = false,
 }: {
   state: DiscoveryChecklistState;
   className?: string;
+  embedded?: boolean;
+  suppressBantSections?: boolean;
 }) {
   const bantPct = Math.round(state.bantCoverage * 100);
   const allPct = Math.round(state.coverage * 100);
@@ -74,50 +98,55 @@ function DiscoveryChecklistBriefCard({
   const bantComplete = bantPct >= 100;
   const openGapCount = state.openGaps.length;
 
-  return (
-    <BriefDetailCard
-      title="Discovery coverage"
-      icon={ListChecks}
-      className={className}
-      headerExtra={
-        <div className="flex items-center gap-2 shrink-0">
-          <CoverageRing percent={bantPct} label="BANT" />
-          <Badge variant={bantComplete ? "success" : "secondary"} className="text-[10px]">
-            {bantPct}% BANT
-          </Badge>
-        </div>
-      }
-    >
-      <BriefDetailRow className="bg-primary/5 border-primary/20">
-        <p className="text-sm text-foreground">
-          <span className="font-semibold">{bantPct}%</span> BANT ·{" "}
-          <span className="font-semibold">{allPct}%</span> overall
-          {openGapCount > 0 && (
-            <span className="text-muted-foreground">
-              {" "}
-              · {openGapCount} open gap{openGapCount === 1 ? "" : "s"}
-            </span>
-          )}
-        </p>
-      </BriefDetailRow>
+  const headerExtra = (
+    <div className="flex items-center gap-2 shrink-0">
+      <CoverageRing percent={bantPct} label="BANT" />
+      <Badge variant={bantComplete ? "success" : "secondary"} className="text-[10px]">
+        {bantPct}% BANT
+      </Badge>
+    </div>
+  );
 
-      <div className="mt-3 space-y-2">
-        <BriefDetailAccordion
-          title="BANT breakdown"
-          summary={`Budget, authority, need, timeline — ${bantPct}% covered`}
-        >
-          <BANTScorecard
-            bant={state.bant}
-            evidenceByDimension={bantEvidenceFromChecklist(state)}
-            compact
-            layout="stack"
-          />
-        </BriefDetailAccordion>
+  const body = (
+    <>
+      {suppressBantSections ? (
+        <ChecklistCoverageProgress percent={allPct} openGapCount={openGapCount} />
+      ) : (
+        <BriefDetailRow className="bg-primary/5 border-primary/20">
+          <p className="text-sm font-medium text-foreground">
+            <span className="font-extrabold">{bantPct}%</span> BANT ·{" "}
+            <span className="font-extrabold">{allPct}%</span> overall
+            {openGapCount > 0 && (
+              <span className="text-muted-foreground font-medium">
+                {" "}
+                · {openGapCount} open gap{openGapCount === 1 ? "" : "s"}
+              </span>
+            )}
+          </p>
+        </BriefDetailRow>
+      )}
 
-        {bantItems.length > 0 && (
+      <div className={cn(suppressBantSections ? "mt-4" : "mt-3", "space-y-2")}>
+        {!suppressBantSections && (
+          <BriefDetailAccordion
+            title="BANT breakdown"
+            summary={`Budget, authority, need, timeline — ${bantPct}% covered`}
+            loud
+          >
+            <BANTScorecard
+              bant={state.bant}
+              evidenceByDimension={bantEvidenceFromChecklist(state)}
+              compact
+              layout="stack"
+            />
+          </BriefDetailAccordion>
+        )}
+
+        {!suppressBantSections && bantItems.length > 0 && (
           <BriefDetailAccordion
             title="BANT checklist items"
             summary={`${bantItems.filter((i) => i.status === "confirmed").length}/${bantItems.length} confirmed`}
+            loud
           >
             <ChecklistItemList items={bantItems} />
           </BriefDetailAccordion>
@@ -127,6 +156,7 @@ function DiscoveryChecklistBriefCard({
           <BriefDetailAccordion
             title="Open gaps"
             summary={state.openGaps.map((g) => g.replace(/_/g, " ")).join(", ")}
+            loud
           >
             <ul className="space-y-1.5">
               {state.openGaps.map((gap) => (
@@ -142,23 +172,37 @@ function DiscoveryChecklistBriefCard({
           <BriefDetailAccordion
             title="Secondary qualification"
             summary={`${secondary.filter((i) => i.status === "confirmed").length}/${secondary.length} complete`}
+            loud
           >
             <ChecklistItemList items={secondary} />
           </BriefDetailAccordion>
         )}
 
-        <BriefDetailAccordion title="Overall qualification" summary={`${allPct}% coverage`}>
-          <p className="text-sm text-muted-foreground">
-            Combined BANT and secondary discovery items for this call preview.
-          </p>
-          <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
-            <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${allPct}%` }}
-            />
-          </div>
-        </BriefDetailAccordion>
+        {!embedded && (
+          <BriefDetailAccordion
+            title="Overall qualification"
+            summary={`${allPct}% coverage`}
+            loud
+          >
+            <ChecklistCoverageProgress percent={allPct} openGapCount={openGapCount} />
+          </BriefDetailAccordion>
+        )}
       </div>
+    </>
+  );
+
+  if (embedded) {
+    return <div className={cn("min-w-0", className)}>{body}</div>;
+  }
+
+  return (
+    <BriefDetailCard
+      title="Discovery coverage"
+      icon={ListChecks}
+      className={className}
+      headerExtra={headerExtra}
+    >
+      {body}
     </BriefDetailCard>
   );
 }
@@ -252,6 +296,41 @@ function DiscoveryChecklistFullPanel({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ChecklistCoverageProgress({
+  percent,
+  openGapCount,
+}: {
+  percent: number;
+  openGapCount: number;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-muted-foreground">Discovery coverage</span>
+        <span className="text-sm font-extrabold tabular-nums text-foreground">{percent}%</span>
+      </div>
+      <div
+        className="h-2.5 w-full overflow-hidden rounded-full bg-muted"
+        role="progressbar"
+        aria-valuenow={percent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`Discovery coverage ${percent} percent`}
+      >
+        <div
+          className="h-full rounded-full bg-primary transition-[width] duration-300"
+          style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
+        />
+      </div>
+      {openGapCount > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          {openGapCount} open gap{openGapCount === 1 ? "" : "s"} to confirm on the call
+        </p>
+      ) : null}
     </div>
   );
 }

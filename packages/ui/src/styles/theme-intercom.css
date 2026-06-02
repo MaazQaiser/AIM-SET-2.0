@@ -1,0 +1,153 @@
+/**
+ * Intercom editorial theme — scoped under .theme-intercom
+ * Tokens from https://www.shadcn.io/design/intercom
+ */
+
+.theme-intercom {
+  --font-sans: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
+
+  /* Canvas & surfaces — subtle warm yellow page floor */
+  --background: 48 56% 97%; /* ~#fdfbf0 */
+  --foreground: 0 0% 7%; /* #111111 */
+
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 7%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 7%;
+
+  --muted: 36 18% 90%; /* #ebe7e1 */
+  --muted-foreground: 60 1% 38%; /* #626260 */
+
+  --accent: 36 18% 90%;
+  --accent-foreground: 0 0% 7%;
+
+  --secondary: 36 18% 90%;
+  --secondary-foreground: 60 1% 38%;
+
+  --primary: 0 0% 7%; /* charcoal CTAs */
+  --primary-foreground: 0 0% 100%;
+
+  --border: 36 14% 80%; /* #d3cec6 hairline */
+  --input: 36 14% 80%;
+  --ring: 0 0% 7%;
+
+  --destructive: 0 75% 44%; /* #c41c1c */
+  --destructive-foreground: 0 0% 100%;
+
+  --success: 142 88% 46%; /* #0bdf50 */
+  --success-foreground: 0 0% 7%;
+
+  --warning: 43 85% 52%;
+  --warning-foreground: 43 90% 12%;
+
+  --fin-orange: 22 100% 50%; /* #ff5600 — AI-only accent */
+  --ink-subtle: 60 2% 48%; /* #7b7b78 */
+  --report-pink: 345 100% 56%; /* #ff2067 */
+
+  --radius: 0.75rem; /* 12px cards */
+
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 0 0% 7%;
+  --sidebar-muted: 36 18% 90%;
+  --sidebar-border: 36 14% 80%;
+  --sidebar-active: 36 18% 90%;
+
+  --shadow-card: none;
+  --shadow-soft-xs: none;
+  --shadow-soft-sm: none;
+  --shadow-soft: none;
+  --shadow-soft-md: none;
+  --shadow-soft-lg: none;
+}
+
+.theme-intercom .page-hue {
+  background-color: #fdfbf0;
+}
+
+.theme-intercom .page-hue::before,
+.theme-intercom .page-hue::after {
+  content: none;
+}
+
+.theme-intercom .glass-insight-card {
+  gap: 0;
+  overflow: visible;
+  border: 1px solid #d3cec6;
+  border-radius: 12px;
+  box-shadow: none;
+  background: #ffffff;
+}
+
+.theme-intercom .glass-insight-title {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  color: #111111;
+}
+
+.theme-intercom .glass-insight-body {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  color: #626260;
+}
+
+/* Intercom underline tabs — charcoal active indicator */
+.theme-intercom [data-slot="tabs-list"],
+.theme-intercom .inline-flex.items-center.text-muted-foreground.h-10.gap-6 {
+  border-bottom-color: #d3cec6;
+}
+
+.theme-intercom [data-state="active"].border-b-2,
+.theme-intercom button[data-state="active"][class*="border-b-2"] {
+  border-bottom-color: #111111 !important;
+  color: #111111;
+}
+
+/* Fin-orange utility classes */
+.theme-intercom .text-fin-orange {
+  color: hsl(var(--fin-orange));
+}
+
+.theme-intercom .bg-fin-orange {
+  background-color: hsl(var(--fin-orange));
+}
+
+.theme-intercom .border-fin-orange {
+  border-color: hsl(var(--fin-orange));
+}
+
+.theme-intercom .bg-fin-orange\/10 {
+  background-color: hsl(var(--fin-orange) / 0.1);
+}
+
+.theme-intercom .border-fin-orange\/20 {
+  border-color: hsl(var(--fin-orange) / 0.2);
+}
+
+.theme-intercom .text-ink-subtle {
+  color: hsl(var(--ink-subtle));
+}
+
+.theme-intercom .border-hairline {
+  border-color: #d3cec6;
+}
+
+.theme-intercom .app-card,
+.theme-intercom .app-sidebar-panel,
+.theme-intercom .app-sidebar-widget,
+.theme-intercom .app-dialog {
+  border-color: #d3cec6;
+  box-shadow: none;
+}
+
+.theme-intercom .app-nav-item-active,
+.theme-intercom .app-nav-link-active {
+  background: #ebe7e1;
+  border-color: #d3cec6;
+}
+
+.theme-intercom .bg-surface-2 {
+  background-color: #ebe7e1;
+}

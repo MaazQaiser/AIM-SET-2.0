@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { cn } from "@/lib/cn";
+import { appSidebarPanelClass } from "@dc-copilot/ui/surfaces";
 import { useSidebar } from "./sidebar-context";
 import { SidebarRail } from "./sidebar-rail";
 import { SidebarExpandedPanel } from "./sidebar-expanded-panel";
@@ -36,7 +37,11 @@ export function Sidebar() {
         />
 
         <aside
-          className={cn(styles.panelShell, expanded && styles.panelShellExpanded)}
+          className={cn(
+            appSidebarPanelClass,
+            styles.panelShell,
+            expanded && styles.panelShellExpanded
+          )}
           aria-label="Main navigation"
           aria-hidden={!expanded}
           inert={!expanded ? true : undefined}

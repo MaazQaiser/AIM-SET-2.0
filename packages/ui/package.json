@@ -12,7 +12,8 @@
     "./typography.css": "./src/styles/typography.css",
     "./components/*": "./src/components/*.tsx",
     "./lib/*": "./src/lib/*.ts",
-    "./tokens": "./src/tokens.ts"
+    "./tokens": "./src/tokens.ts",
+    "./surfaces": "./src/surfaces.ts"
   },
   "scripts": {
     "lint": "biome lint ./src",

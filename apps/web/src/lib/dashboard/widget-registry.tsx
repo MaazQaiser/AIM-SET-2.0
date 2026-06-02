@@ -53,6 +53,10 @@ type DefaultLayout = Pick<LayoutItem, "x" | "y" | "w" | "h" | "minW" | "minH">;
 
 export type WidgetColumn = "left" | "center" | "right";
 
+export interface WidgetRenderOptions {
+  embedded?: boolean;
+}
+
 export interface WidgetSpec<P = unknown> {
   id: string;
   title: string;
@@ -60,8 +64,37 @@ export interface WidgetSpec<P = unknown> {
   column: WidgetColumn;
   sortOrder: number;
   defaultLayout?: DefaultLayout;
-  render: (props: P) => ReactNode;
+  render: (props: P, options?: WidgetRenderOptions) => ReactNode;
   isAvailable?: (props: P) => boolean;
+}
+
+/** Pre-DC sidebar: account & research context */
+export const BRIEF_INFO_WIDGET_IDS = [
+  "account.snapshot",
+  "account.metrics",
+  "brief.research",
+  "brief.internal-attendees",
+  "brief.attendees",
+  "brief.history",
+  "brief.post-preview",
+] as const;
+
+export const BRIEF_TASK_WIDGET_IDS = ["brief.bant"] as const;
+
+export function isBriefInfoWidget(id: string): boolean {
+  return (BRIEF_INFO_WIDGET_IDS as readonly string[]).includes(id);
+}
+
+export function isBriefTaskWidget(id: string): boolean {
+  return (BRIEF_TASK_WIDGET_IDS as readonly string[]).includes(id);
+}
+
+/** Main column: center widgets + right column except BANT (moved to prep tasks sidebar). */
+export function isBriefFocusWidget<P extends { id: string; column: WidgetColumn }>(
+  widget: P
+): boolean {
+  if (isBriefInfoWidget(widget.id) || isBriefTaskWidget(widget.id)) return false;
+  return widget.column === "center" || widget.column === "right";
 }
 
 export interface BriefWidgetProps {
@@ -195,7 +228,9 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     column: "left",
     sortOrder: 0,
     isAvailable: ({ accountSnapshot }) => arrayLen(accountSnapshot) > 0,
-    render: ({ accountSnapshot }) => <AccountSnapshotCard rows={accountSnapshot ?? []} />,
+    render: ({ accountSnapshot }, opts) => (
+      <AccountSnapshotCard rows={accountSnapshot ?? []} embedded={opts?.embedded} />
+    ),
   },
   {
     id: "account.metrics",
@@ -204,7 +239,7 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     column: "left",
     sortOrder: 1,
     isAvailable: ({ call }) => Boolean(call.annualRevenue || call.employeeCount || call.icpBucket),
-    render: ({ call }) => <CompanyMetricsCard call={call} />,
+    render: ({ call }, opts) => <CompanyMetricsCard call={call} embedded={opts?.embedded} />,
   },
   {
     id: "brief.research",
@@ -213,7 +248,9 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     column: "left",
     sortOrder: 2,
     isAvailable: ({ brief }) => arrayLen(brief.researchSections) > 0,
-    render: ({ brief }) => <PreDcResearchCard sections={brief.researchSections ?? []} />,
+    render: ({ brief }, opts) => (
+      <PreDcResearchCard sections={brief.researchSections ?? []} embedded={opts?.embedded} />
+    ),
   },
   {
     id: "brief.internal-attendees",
@@ -221,9 +258,10 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "pod",
     column: "left",
     sortOrder: 3,
-    render: ({ brief, call }) => (
+    render: ({ brief, call }, opts) => (
       <InternalAttendeesCard
         attendees={resolveInternalAttendees(brief.internalAttendees, call)}
+        embedded={opts?.embedded}
       />
     ),
   },
@@ -234,7 +272,9 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     column: "left",
     sortOrder: 4,
     isAvailable: ({ brief }) => arrayLen(brief.clientAttendees) > 0,
-    render: ({ brief }) => <ClientAttendeesCard attendees={brief.clientAttendees ?? []} />,
+    render: ({ brief }, opts) => (
+      <ClientAttendeesCard attendees={brief.clientAttendees ?? []} embedded={opts?.embedded} />
+    ),
   },
   {
     id: "brief.history",
@@ -243,7 +283,9 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     column: "left",
     sortOrder: 5,
     isAvailable: ({ brief }) => arrayLen(brief.interactionHistory) > 0,
-    render: ({ brief }) => <ClientHistoryCard interactions={brief.interactionHistory ?? []} />,
+    render: ({ brief }, opts) => (
+      <ClientHistoryCard interactions={brief.interactionHistory ?? []} embedded={opts?.embedded} />
+    ),
   },
   {
     id: "brief.post-preview",
@@ -252,8 +294,10 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     column: "left",
     sortOrder: 6,
     isAvailable: ({ brief }) => Boolean(brief.postDcPreview),
-    render: ({ brief }) =>
-      brief.postDcPreview ? <PostDcBriefPreviewCard preview={brief.postDcPreview} /> : null,
+    render: ({ brief }, opts) =>
+      brief.postDcPreview ? (
+        <PostDcBriefPreviewCard preview={brief.postDcPreview} embedded={opts?.embedded} />
+      ) : null,
   },
   {
     id: "brief.bant",
@@ -262,8 +306,10 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     column: "right",
     sortOrder: 0,
     isAvailable: ({ bant }) => Boolean(bant),
-    render: ({ bant, brief, call }) =>
-      bant ? <BriefBANTCard bant={bant} brief={brief} call={call} /> : null,
+    render: ({ bant, brief, call }, opts) =>
+      bant ? (
+        <BriefBANTCard bant={bant} brief={brief} call={call} embedded={opts?.embedded} />
+      ) : null,
   },
   {
     id: "brief.pod-notes",

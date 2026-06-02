@@ -1,9 +1,13 @@
 "use client";
 
 import { Button } from "@dc-copilot/ui/components/button";
+import {
+  applyApiDemoResult,
+  applyClientDemoSegment,
+  transcriptEventFromDemoLine,
+} from "@/lib/demo/client-live-call-demo";
 import { getDemoTranscriptForCall } from "@/lib/demo-live-transcript";
 import { useLiveCall } from "@/stores/use-live-call";
-import type { TranscriptEvent } from "@/types";
 import { Play, Square } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -12,69 +16,108 @@ interface DemoTranscriptPlayerProps {
   isConnected?: boolean;
 }
 
-export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlayerProps) {
+type DemoMode = "api" | "client";
+
+export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
   const [playing, setPlaying] = useState(false);
   const [lineIndex, setLineIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<DemoMode | null>(null);
   const stopRef = useRef(false);
+  const modeRef = useRef<DemoMode>("api");
   const lines = getDemoTranscriptForCall(callId);
   const appendTranscriptEvent = useLiveCall((s) => s.appendTranscriptEvent);
+  const setConnected = useLiveCall((s) => s.setConnected);
+
+  async function postDemoSegment(lineIndex: number) {
+    const line = lines[lineIndex];
+    const res = await fetch(`/api/calls/${callId}/demo-segment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: line.text,
+        speaker_id: line.speakerId,
+        speaker_role: line.speakerRole,
+        offset_seconds: line.offsetSeconds,
+        provider_event_id: `demo-${callId}-${lineIndex}`,
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & {
+      error?: string;
+      transcript_event?: {
+        id?: string;
+        speaker_id?: string;
+        speaker_role?: string;
+        text?: string;
+        offset_seconds?: number;
+      };
+    };
+    if (!res.ok) {
+      throw new Error(
+        (typeof data.error === "string" ? data.error : undefined) ??
+          `Segment ${lineIndex + 1} failed (${res.status})`
+      );
+    }
+    const ev = data.transcript_event;
+    if (ev?.text) {
+      appendTranscriptEvent(transcriptEventFromDemoLine(callId, line, lineIndex));
+    }
+    applyApiDemoResult(data);
+  }
+
+  async function resolveDemoMode(): Promise<DemoMode> {
+    if (process.env.NEXT_PUBLIC_DEMO_CLIENT_ONLY === "true") {
+      return "client";
+    }
+    try {
+      await postDemoSegment(0);
+      return "api";
+    } catch {
+      return "client";
+    }
+  }
 
   async function playDemo() {
-    if (playing) return;
+    if (playing || lines.length === 0) return;
     stopRef.current = false;
     setPlaying(true);
     setLineIndex(0);
     setError(null);
 
-    for (let i = 0; i < lines.length; i++) {
+    const resolved = await resolveDemoMode();
+    modeRef.current = resolved;
+    setMode(resolved);
+
+    if (resolved === "client") {
+      setConnected(true);
+      useLiveCall.getState().reset();
+      useLiveCall.getState().setCallId(callId);
+      useLiveCall.getState().setConnected(true);
+    }
+
+    const startIndex = resolved === "api" ? 1 : 0;
+
+    for (let i = startIndex; i < lines.length; i++) {
       if (stopRef.current) break;
       const line = lines[i];
       setLineIndex(i + 1);
 
       try {
-        const res = await fetch(`/api/calls/${callId}/demo-segment`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: line.text,
-            speaker_id: line.speakerId,
-            speaker_role: line.speakerRole,
-            offset_seconds: line.offsetSeconds,
-            provider_event_id: `demo-${callId}-${i}`,
-          }),
-        });
-        const data = (await res.json().catch(() => ({}))) as {
-          error?: string;
-          transcript_event?: {
-            id?: string;
-            speaker_id?: string;
-            speaker_role?: string;
-            text?: string;
-            offset_seconds?: number;
-          };
-        };
-        if (!res.ok) {
-          throw new Error(data.error ?? `Segment ${i + 1} failed (${res.status})`);
-        }
-        // Push transcript event directly into the store as a fallback
-        // in case the WebSocket broadcast didn't arrive.
-        const ev = data.transcript_event;
-        if (ev?.text) {
-          const mapped: TranscriptEvent = {
-            id: ev.id ?? `demo-${callId}-${i}`,
-            speakerId: ev.speaker_id ?? line.speakerId,
-            speakerName: ev.speaker_id ?? line.speakerId,
-            speakerRole: (ev.speaker_role as TranscriptEvent["speakerRole"]) ?? "customer",
-            text: ev.text,
-            timestamp: ev.offset_seconds ?? line.offsetSeconds,
-            keywords: [],
-          };
-          appendTranscriptEvent(mapped);
+        if (modeRef.current === "client") {
+          applyClientDemoSegment(callId, i, line);
+        } else {
+          await postDemoSegment(i);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Demo playback failed");
-        break;
+        modeRef.current = "client";
+        setMode("client");
+        setConnected(true);
+        try {
+          applyClientDemoSegment(callId, i, line);
+        } catch {
+          setError(err instanceof Error ? err.message : "Demo playback failed");
+          break;
+        }
       }
 
       await new Promise((r) => setTimeout(r, line.pauseAfterMs ?? 2000));
@@ -107,14 +150,16 @@ export function DemoTranscriptPlayer({ callId, isConnected }: DemoTranscriptPlay
           {error}
         </span>
       )}
+      {mode === "client" && playing && (
+        <span className="text-[10px] text-muted-foreground hidden sm:inline">Offline demo</span>
+      )}
       {!playing ? (
         <Button
           type="button"
           variant="outline"
           size="sm"
           className="h-7 text-xs"
-          disabled={false}
-          title="Replay scripted discovery call segments through the live-call agent"
+          title="Replay scripted discovery call — uses API when available, otherwise local simulation"
           onClick={() => void playDemo()}
         >
           <Play className="h-3 w-3 mr-1" />
