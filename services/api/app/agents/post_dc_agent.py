@@ -997,24 +997,34 @@ def _email_attachments(
             "fileType": file_type or "FILE",
         }
 
-    def add_found(asset_id: str, name: str, snippet: str = "", reason: str = "") -> None:
+    def add_found(
+        asset_id: str,
+        name: str,
+        snippet: str = "",
+        reason: str = "",
+        score: Any = None,
+    ) -> None:
         clean_id = str(asset_id or "").strip()
         if not clean_id or clean_id in used_assets:
             return
         used_assets.add(clean_id)
         metadata = asset_metadata(clean_id)
-        found.append(
-            {
-                "name": name.strip() or "Relevant KB asset",
-                "assetId": clean_id,
-                "snippet": snippet[:240],
-                "downloadUrl": f"/api/kb/assets/{clean_id}/file",
-                "previewUrl": f"/api/kb/assets/{clean_id}/preview",
-                "source": "knowledge_base",
-                "reason": reason or "Retrieved from the knowledge base for this follow-up.",
-                **{key: value for key, value in metadata.items() if value},
-            }
-        )
+        entry: Dict[str, Any] = {
+            "name": name.strip() or "Relevant KB asset",
+            "assetId": clean_id,
+            "snippet": snippet[:240],
+            "downloadUrl": f"/api/kb/assets/{clean_id}/file",
+            "previewUrl": f"/api/kb/assets/{clean_id}/preview",
+            "source": "knowledge_base",
+            "reason": reason or "Retrieved from the knowledge base for this follow-up.",
+            **{key: value for key, value in metadata.items() if value},
+        }
+        if score is not None:
+            try:
+                entry["matchScore"] = max(0.0, min(1.0, float(score)))
+            except (TypeError, ValueError):
+                pass
+        found.append(entry)
 
     for hit in hits[:5]:
         asset_id = str(hit.get("asset_id") or "")
@@ -1027,6 +1037,7 @@ def _email_attachments(
             _title_from_hit(hit, fields),
             chunk_text,
             "Matched from KB search for the follow-up email attachment set.",
+            score=hit.get("score"),
         )
 
     for row in fulfillments:

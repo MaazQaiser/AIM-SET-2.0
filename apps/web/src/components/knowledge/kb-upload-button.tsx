@@ -85,7 +85,11 @@ function combinedProgress(phase: UploadPhase, uploadPct: number, ingestPct: numb
   return 0;
 }
 
-export function KbUploadButton() {
+interface KbUploadButtonProps {
+  onAssetReady?: (asset: { id: string; title: string }) => void;
+}
+
+export function KbUploadButton({ onAssetReady }: KbUploadButtonProps = {}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<UploadPhase>("idle");
   const [uploadPct, setUploadPct] = useState(0);
@@ -167,6 +171,7 @@ export function KbUploadButton() {
       setPhase("done");
       setStageLabel("Ready");
       toast.success(`${data.asset.title} is ready in the knowledge base`);
+      onAssetReady?.({ id: data.asset.id, title: data.asset.title });
       setDialogOpen(false);
       resetForm();
     } catch (err) {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Eye, Loader2, Send } from "lucide-react";
+import { ArrowLeft, Loader2, Send } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Input } from "@dc-copilot/ui/components/input";
 import {
@@ -14,6 +14,8 @@ import {
   DialogTitle,
 } from "@dc-copilot/ui/components/dialog";
 import { ClpPublicView } from "@/components/landing-page/clp-public-view";
+import { ClpKbAssetsPanel } from "@/components/landing-page/clp-kb-assets-panel";
+import { ClpSectionEditor } from "@/components/landing-page/clp-section-editor";
 import { PostDcProposalWidget } from "@/components/post-dc/post-dc-proposal-widget";
 import {
   useClpProposal,
@@ -23,8 +25,9 @@ import {
   useUpdateLandingPage,
 } from "@/lib/data/clp-hooks";
 import { useCall } from "@/lib/data/hooks";
+import { syncAssetSections } from "@/lib/landing-page/clp-editor-utils";
 import { toast } from "sonner";
-import type { ClpSection, CustomerLandingPage } from "@dc-copilot/types";
+import type { CustomerLandingPage } from "@dc-copilot/types";
 
 interface ClpEditorScreenProps {
   callId: string;
@@ -42,37 +45,30 @@ export function ClpEditorScreen({ callId }: ClpEditorScreenProps) {
   const [password, setPassword] = useState("");
 
   useEffect(() => {
-    if (page) setDraft(page);
+    if (page) setDraft(syncAssetSections(page));
   }, [page]);
 
   useEffect(() => {
     if (!isLoading && !page && !generate.isPending) {
       generate.mutate(undefined, {
-        onSuccess: (p) => setDraft(p),
+        onSuccess: (p) => setDraft(syncAssetSections(p)),
         onError: () => toast.error("Could not generate landing page draft"),
       });
     }
   }, [isLoading, page, generate.isPending]);
 
   function saveDraft(next: CustomerLandingPage) {
-    setDraft(next);
+    const synced = syncAssetSections(next);
+    setDraft(synced);
     update.mutate(
       {
-        sections: next.sections,
-        selectedAssets: next.selectedAssets,
-        branding: next.branding,
-        settings: next.settings,
+        sections: synced.sections,
+        selectedAssets: synced.selectedAssets,
+        branding: synced.branding,
+        settings: synced.settings,
       },
       { onError: () => toast.error("Save failed") }
     );
-  }
-
-  function toggleSection(id: string) {
-    if (!draft) return;
-    const sections = draft.sections.map((s) =>
-      s.id === id ? { ...s, visible: !s.visible } : s
-    );
-    saveDraft({ ...draft, sections });
   }
 
   if (!draft && (isLoading || generate.isPending)) {
@@ -109,7 +105,18 @@ export function ClpEditorScreen({ callId }: ClpEditorScreenProps) {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => generate.mutate()}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              generate.mutate(undefined, {
+                onSuccess: (p) => {
+                  setDraft(syncAssetSections(p));
+                  toast.success("AI draft refreshed");
+                },
+              })
+            }
+          >
             Refresh AI draft
           </Button>
           <Button size="sm" onClick={() => setPublishOpen(true)}>
@@ -120,54 +127,10 @@ export function ClpEditorScreen({ callId }: ClpEditorScreenProps) {
       </div>
 
       <div className="flex-1 grid lg:grid-cols-2 min-h-0">
-        <div className="border-r p-6 space-y-4 overflow-y-auto">
+        <div className="border-r p-6 space-y-5 overflow-y-auto">
           <PostDcProposalWidget callId={callId} />
-          <div>
-            <h2 className="text-sm font-semibold mb-2 flex items-center gap-2">
-              <Eye className="h-4 w-4" />
-              Sections
-            </h2>
-            <ul className="space-y-2">
-              {draft.sections.map((s) => (
-                <SectionRow key={s.id} section={s} onToggle={() => toggleSection(s.id)} />
-              ))}
-            </ul>
-          </div>
-          {draft.aiSuggestions.length > 0 && (
-            <div>
-              <h2 className="text-sm font-semibold mb-2">Suggested assets</h2>
-              <ul className="space-y-2">
-                {draft.aiSuggestions.map((a) => {
-                  const selected = draft.selectedAssets.some((s) => s.assetId === a.assetId);
-                  return (
-                    <li key={a.assetId} className="flex items-center justify-between gap-2 text-xs">
-                      <span className="text-muted-foreground truncate">{a.title}</span>
-                      <Button
-                        variant={selected ? "secondary" : "outline"}
-                        size="sm"
-                        className="h-7 shrink-0"
-                        onClick={() => {
-                          const selectedAssets = selected
-                            ? draft.selectedAssets.filter((s) => s.assetId !== a.assetId)
-                            : [
-                                ...draft.selectedAssets,
-                                {
-                                  assetId: a.assetId,
-                                  title: a.title,
-                                  displayMode: "embed" as const,
-                                },
-                              ];
-                          saveDraft({ ...draft, selectedAssets });
-                        }}
-                      >
-                        {selected ? "Remove" : "Add"}
-                      </Button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
+          <ClpSectionEditor draft={draft} onChange={saveDraft} />
+          <ClpKbAssetsPanel draft={draft} onChange={saveDraft} />
           {proposal && (
             <div className="rounded-md border px-3 py-2 text-xs">
               <p className="font-medium">Proposal attached</p>
@@ -205,7 +168,7 @@ export function ClpEditorScreen({ callId }: ClpEditorScreenProps) {
               onClick={() => {
                 publish.mutate(password, {
                   onSuccess: (p) => {
-                    setDraft(p);
+                    setDraft(syncAssetSections(p));
                     setPublishOpen(false);
                     toast.success("Landing page published");
                   },
@@ -219,16 +182,5 @@ export function ClpEditorScreen({ callId }: ClpEditorScreenProps) {
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-function SectionRow({ section, onToggle }: { section: ClpSection; onToggle: () => void }) {
-  return (
-    <li className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-      <span>{section.title ?? section.type}</span>
-      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onToggle}>
-        {section.visible !== false ? "Hide" : "Show"}
-      </Button>
-    </li>
   );
 }

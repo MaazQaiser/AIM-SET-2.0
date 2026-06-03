@@ -6,6 +6,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import { DataTable } from "@dc-copilot/ui/components/data-table";
+import { callDetailsHref } from "@/lib/dashboard/call-links";
 import type { Call, CallStatus } from "@/types";
 
 const STATUS_CONFIG: Record<
@@ -18,33 +19,6 @@ const STATUS_CONFIG: Record<
   "no-show": { label: "No show", variant: "destructive" },
 };
 
-function primaryAction(call: Call) {
-  if (call.status === "live") {
-    return (
-      <Button asChild size="sm" variant="default" className="h-8">
-        <Link href={`/calls/${call.id}/live`}>Join live</Link>
-      </Button>
-    );
-  }
-  if (call.status === "upcoming") {
-    return call.briefReady ? (
-      <Button asChild size="sm" variant="default" className="h-8">
-        <Link href={`/calls/${call.id}`}>Open brief</Link>
-      </Button>
-    ) : (
-      <span className="text-xs text-muted-foreground">Generating…</span>
-    );
-  }
-  if (call.status === "completed") {
-    return (
-      <Button asChild size="sm" variant="outline" className="h-8">
-        <Link href={`/calls/${call.id}/post-dc?wrapped=1`}>Summary</Link>
-      </Button>
-    );
-  }
-  return <span className="text-xs text-muted-foreground">—</span>;
-}
-
 const columns: ColumnDef<Call>[] = [
   {
     accessorKey: "accountName",
@@ -54,7 +28,7 @@ const columns: ColumnDef<Call>[] = [
       return (
         <div>
           <Link
-            href={`/calls/${call.id}`}
+            href={callDetailsHref(call)}
             className="font-medium text-foreground hover:text-primary hover:underline"
           >
             {call.accountName}
@@ -144,14 +118,17 @@ const columns: ColumnDef<Call>[] = [
     id: "actions",
     header: "",
     enableSorting: false,
-    cell: ({ row }) => (
-      <div className="flex items-center justify-end gap-2">
-        {primaryAction(row.original)}
-        <Button asChild size="sm" variant="ghost" className="h-8 text-muted-foreground">
-          <Link href={`/calls/${row.original.id}`}>Details</Link>
+    cell: ({ row }) => {
+      const call = row.original;
+      if (call.status === "no-show") {
+        return <span className="text-xs text-muted-foreground">—</span>;
+      }
+      return (
+        <Button asChild size="sm" variant="outline" className="h-8">
+          <Link href={callDetailsHref(call)}>View details</Link>
         </Button>
-      </div>
-    ),
+      );
+    },
   },
 ];
 

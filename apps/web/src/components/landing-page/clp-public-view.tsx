@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { ClpComment, ClpProposal, ClpSection, CustomerLandingPage } from "@dc-copilot/types";
+import { Download, FileText } from "lucide-react";
+import type { ClpAssetRef, ClpComment, ClpProposal, ClpSection, CustomerLandingPage } from "@dc-copilot/types";
 import { cn } from "@/lib/cn";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Input } from "@dc-copilot/ui/components/input";
 import { Textarea } from "@dc-copilot/ui/components/textarea";
+import { KbFileTypeIcon } from "@/components/knowledge/kb-file-type-icon";
 
 interface ClpPublicViewProps {
   page: CustomerLandingPage;
@@ -63,20 +65,22 @@ export function ClpPublicView({
       <main className="max-w-3xl mx-auto px-6 py-8 space-y-10">
         {sections.map((section) => (
           <section key={section.id} id={section.id} className="scroll-mt-20">
-            <div className="flex items-start justify-between gap-2">
-              <h2 className="text-lg font-semibold">{sectionTitle(section)}</h2>
-              {!preview && page.settings?.allowComments !== false && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs h-7"
-                  onClick={() => setCommentSection(commentSection === section.id ? null : section.id)}
-                >
-                  Comment
-                </Button>
-              )}
-            </div>
-            {renderSection(section, onDocumentOpen)}
+            {section.type !== "hero" && (
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="text-lg font-semibold">{sectionTitle(section)}</h2>
+                {!preview && page.settings?.allowComments !== false && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-7"
+                    onClick={() => setCommentSection(commentSection === section.id ? null : section.id)}
+                  >
+                    Comment
+                  </Button>
+                )}
+              </div>
+            )}
+            {renderSection(section, page, onDocumentOpen)}
             {commentSection === section.id && (
               <div className="mt-3 space-y-2">
                 <Textarea
@@ -119,7 +123,7 @@ export function ClpPublicView({
           </section>
         )}
 
-        {branding.aeName && (
+        {branding.aeName && !sections.some((s) => s.type === "ae_contact") && (
           <section className="rounded-lg border bg-muted/20 p-4 text-sm">
             <p className="font-medium">Your account team</p>
             <p>{branding.aeName}</p>
@@ -182,10 +186,48 @@ export function ClpPublicView({
 }
 
 function sectionTitle(s: ClpSection): string {
-  return s.title ?? s.headline ?? s.type.replace(/_/g, " ");
+  if (s.type === "hero") return s.headline ?? "Overview";
+  return s.title ?? s.type.replace(/_/g, " ");
 }
 
-function renderSection(section: ClpSection, onDocumentOpen?: (assetId: string) => void) {
+function assetRefsForSection(section: ClpSection, page: CustomerLandingPage): ClpAssetRef[] {
+  const ids = section.assetIds?.length
+    ? section.assetIds
+    : section.assetId
+      ? [section.assetId]
+      : [];
+  return ids.map((id) => {
+    const fromSelected = page.selectedAssets.find((a) => a.assetId === id);
+    return fromSelected ?? { assetId: id, title: "Document", displayMode: "embed" as const };
+  });
+}
+
+function renderSection(
+  section: ClpSection,
+  page: CustomerLandingPage,
+  onDocumentOpen?: (assetId: string) => void
+) {
+  if (section.type === "hero") {
+    return (
+      <div className="mt-2 space-y-2">
+        {section.headline && (
+          <p className="text-xl font-semibold text-foreground leading-snug">{section.headline}</p>
+        )}
+        {section.subhead && <p className="text-sm text-muted-foreground">{section.subhead}</p>}
+      </div>
+    );
+  }
+
+  if (section.type === "ae_contact") {
+    const { branding } = page;
+    return (
+      <div className="mt-3 rounded-lg border bg-muted/20 p-4 text-sm">
+        {branding.aeName && <p className="font-medium">{branding.aeName}</p>}
+        {branding.aeEmail && <p className="text-muted-foreground">{branding.aeEmail}</p>}
+      </div>
+    );
+  }
+
   if (section.bullets?.length) {
     return (
       <ul className="mt-3 list-disc pl-5 text-sm text-muted-foreground space-y-1">
@@ -195,17 +237,50 @@ function renderSection(section: ClpSection, onDocumentOpen?: (assetId: string) =
       </ul>
     );
   }
-  if (section.assetId) {
+
+  const assetRefs = assetRefsForSection(section, page);
+  if (assetRefs.length > 0) {
     return (
-      <button
-        type="button"
-        className="mt-3 text-sm text-primary underline"
-        onClick={() => onDocumentOpen?.(section.assetId!)}
-      >
-        Open document
-      </button>
+      <div className="mt-3 space-y-2">
+        {section.caption && (
+          <p className="text-sm text-muted-foreground">{section.caption}</p>
+        )}
+        <ul className="space-y-2">
+          {assetRefs.map((ref) => (
+            <li
+              key={ref.assetId}
+              className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5"
+            >
+              <KbFileTypeIcon fileName={ref.title} size="sm" />
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">{ref.title}</span>
+              <div className="flex shrink-0 gap-0.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="h-8 w-8"
+                  aria-label={`Preview ${ref.title}`}
+                  onClick={() => onDocumentOpen?.(ref.assetId)}
+                >
+                  <FileText className="h-4 w-4" />
+                </Button>
+                <Button asChild variant="ghost" size="icon-sm" className="h-8 w-8">
+                  <a
+                    href={`/api/kb/assets/${ref.assetId}/file`}
+                    download
+                    aria-label={`Download ${ref.title}`}
+                  >
+                    <Download className="h-4 w-4" />
+                  </a>
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
     );
   }
+
   if (section.links?.length) {
     return (
       <ul className="mt-3 space-y-1">
@@ -219,8 +294,10 @@ function renderSection(section: ClpSection, onDocumentOpen?: (assetId: string) =
       </ul>
     );
   }
+
   if (section.subhead) {
     return <p className="mt-2 text-sm text-muted-foreground">{section.subhead}</p>;
   }
+
   return null;
 }

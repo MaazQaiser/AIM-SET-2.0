@@ -239,6 +239,8 @@ export interface PostCallEmailAttachmentFound {
   fileType?: string;
   source?: "knowledge_base" | string;
   reason?: string;
+  /** KB retrieval relevance score (0–1). */
+  matchScore?: number;
 }
 
 export interface PostCallEmailAttachmentMissing {

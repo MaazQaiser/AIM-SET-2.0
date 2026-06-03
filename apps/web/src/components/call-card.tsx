@@ -1,4 +1,4 @@
-import { Calendar, Clock, Users, FileText, Radio, Building2, Briefcase, ChevronRight, DollarSign } from "lucide-react";
+import { Calendar, Clock, Users, Building2, Briefcase, ChevronRight, DollarSign } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { cn } from "@/lib/cn";
@@ -7,6 +7,7 @@ import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent } from "@dc-copilot/ui/components/card";
 import { PodMemberBadge } from "./pod-member-badge";
 import { BANTScorecard } from "./bant-scorecard";
+import { callDetailsHref } from "@/lib/dashboard/call-links";
 import type { Call } from "@/types";
 
 interface CallCardProps {
@@ -36,8 +37,6 @@ export function CallCard({ call }: CallCardProps) {
   const cfg = STATUS_CONFIG[call.status];
   const scheduledDate = new Date(call.scheduledAt);
   const isLive = call.status === "live";
-  const isUpcoming = call.status === "upcoming";
-  const isCompleted = call.status === "completed";
 
   return (
     <Card
@@ -144,63 +143,15 @@ export function CallCard({ call }: CallCardProps) {
 
         {/* ── Actions ──────────────────────────────────────────────────── */}
         <div className="flex items-center gap-2 border-t pt-3">
-          {isUpcoming && (
-            <>
-              {call.briefReady ? (
-                <Button asChild size="sm" className="gap-1.5">
-                  <Link href={`/calls/${call.id}`}>
-                    <FileText className="h-3.5 w-3.5" />
-                    Open brief
-                  </Link>
-                </Button>
-              ) : (
-                <Button size="sm" variant="outline" disabled className="gap-1.5 text-muted-foreground">
-                  <span className="h-2 w-2 rounded-full bg-warning animate-pulse" />
-                  Generating brief…
-                </Button>
-              )}
-              <Button asChild size="sm" variant="ghost" className="ml-auto text-muted-foreground gap-1">
-                <Link href={`/calls/${call.id}`}>
-                  Details
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Link>
-              </Button>
-            </>
-          )}
-
-          {isLive && (
-            <>
-              <Button asChild size="sm" className="gap-1.5 bg-success hover:bg-success/90 text-white">
-                <Link href={`/calls/${call.id}/live`}>
-                  <Radio className="h-3.5 w-3.5" />
-                  Join live
-                </Link>
-              </Button>
-              <Button asChild size="sm" variant="outline" className="gap-1.5">
-                <Link href={`/calls/${call.id}`}>
-                  <FileText className="h-3.5 w-3.5" />
-                  Brief
-                </Link>
-              </Button>
-            </>
-          )}
-
-          {isCompleted && (
-            <>
-              <Button asChild size="sm" variant="outline" className="gap-1.5">
-                <Link href={`/calls/${call.id}/post-dc?wrapped=1`}>
-                  View summary
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Link>
-              </Button>
-              <Button asChild size="sm" variant="ghost" className="ml-auto text-muted-foreground gap-1 text-xs">
-                <Link href={`/calls/${call.id}/post-dc?wrapped=1`}>Post-DC review</Link>
-              </Button>
-            </>
-          )}
-
-          {call.status === "no-show" && (
+          {call.status === "no-show" ? (
             <span className="text-xs text-muted-foreground italic">No action required</span>
+          ) : (
+            <Button asChild size="sm" variant="outline" className="gap-1.5">
+              <Link href={callDetailsHref(call)}>
+                View details
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
           )}
         </div>
 

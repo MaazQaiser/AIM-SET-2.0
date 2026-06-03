@@ -11,7 +11,14 @@ import {
   DialogTitle,
 } from "@dc-copilot/ui/components/dialog";
 import { KbAssetPreview } from "@/components/knowledge/kb-asset-preview";
-import { KbFileFormatBadge } from "@/components/knowledge/kb-file-format-badge";
+import { KbFileTypeIcon } from "@/components/knowledge/kb-file-type-icon";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { resolveKbFileFormat } from "@/lib/kb/file-format";
+import { cn } from "@/lib/cn";
 import type { PostCallEmailAttachmentFound } from "@/lib/brief-types";
 
 interface KbAttachmentCardProps {
@@ -24,9 +31,17 @@ function attachmentFileName(asset: PostCallEmailAttachmentFound) {
   return `${asset.name}${suffix}`;
 }
 
+function formatMatchScore(score?: number): string | null {
+  if (typeof score !== "number" || Number.isNaN(score)) return null;
+  const pct = score <= 1 ? Math.round(score * 100) : Math.round(score);
+  return `${pct}% match`;
+}
+
 export function KbAttachmentCard({ asset }: KbAttachmentCardProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const fileName = attachmentFileName(asset);
+  const formatMeta = resolveKbFileFormat(fileName, asset.mimeType);
+  const matchLabel = formatMatchScore(asset.matchScore);
   const downloadHref = asset.downloadUrl ?? `/api/kb/assets/${asset.assetId}/file`;
   const previewAsset = useMemo(
     () => ({
@@ -42,45 +57,68 @@ export function KbAttachmentCard({ asset }: KbAttachmentCardProps) {
 
   return (
     <>
-      <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium text-foreground">{asset.name}</span>
-              <KbFileFormatBadge fileName={fileName} mimeType={asset.mimeType} />
-            </div>
-            <p className="break-all text-[10px] text-muted-foreground">{fileName}</p>
-            {asset.reason ? (
-              <p className="text-muted-foreground">{asset.reason}</p>
-            ) : null}
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-1.5">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1.5 px-2 text-xs"
-              onClick={() => setPreviewOpen(true)}
-            >
-              <Eye className="h-3.5 w-3.5" />
-              Preview
-            </Button>
-            <Button asChild variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs">
-              <a href={downloadHref} download={fileName}>
-                <Download className="h-3.5 w-3.5" />
-                Download
-              </a>
-            </Button>
-          </div>
+      <div
+        className={cn(
+          "flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5",
+          "shadow-sm transition-colors hover:border-border/80 hover:bg-muted/20"
+        )}
+      >
+        <KbFileTypeIcon fileName={fileName} mimeType={asset.mimeType} size="md" />
+
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <p className="truncate text-sm font-medium text-foreground">{asset.name}</p>
+          <p className="truncate text-[11px] text-muted-foreground">{fileName}</p>
+          {matchLabel ? (
+            <p className="text-[11px] font-medium tabular-nums text-foreground">{matchLabel}</p>
+          ) : null}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={() => setPreviewOpen(true)}
+                aria-label={`Preview ${asset.name}`}
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Preview</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                asChild
+                variant="ghost"
+                size="icon-sm"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              >
+                <a href={downloadHref} download={fileName} aria-label={`Download ${fileName}`}>
+                  <Download className="h-4 w-4" />
+                </a>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Download</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="flex h-[90vh] w-[96vw] max-w-5xl flex-col gap-0 p-0">
           <DialogHeader className="shrink-0 px-4 pb-2 pt-4">
-            <DialogTitle className="pr-8">{asset.name}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 pr-8">
+              <KbFileTypeIcon fileName={fileName} mimeType={asset.mimeType} size="sm" />
+              <span className="truncate">{asset.name}</span>
+            </DialogTitle>
             <DialogDescription className="flex flex-wrap items-center gap-2">
-              <KbFileFormatBadge fileName={fileName} mimeType={asset.mimeType} />
+              <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {formatMeta.label}
+              </span>
               <span className="break-all">{fileName}</span>
             </DialogDescription>
           </DialogHeader>

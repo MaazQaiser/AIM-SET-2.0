@@ -20,7 +20,7 @@ export function CallsViewToggle({ view, onChange, className }: CallsViewTogglePr
     >
       <Button
         type="button"
-        variant={view === "list" ? "secondary" : "ghost"}
+        variant={view === "list" ? "dark" : "ghost"}
         size="sm"
         className="h-8 gap-1.5 px-2.5"
         onClick={() => onChange("list")}
@@ -31,7 +31,7 @@ export function CallsViewToggle({ view, onChange, className }: CallsViewTogglePr
       </Button>
       <Button
         type="button"
-        variant={view === "cards" ? "secondary" : "ghost"}
+        variant={view === "cards" ? "dark" : "ghost"}
         size="sm"
         className="h-8 gap-1.5 px-2.5"
         onClick={() => onChange("cards")}

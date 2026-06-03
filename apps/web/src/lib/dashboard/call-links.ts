@@ -1,5 +1,16 @@
 import type { Call } from "@/types";
 
+/** Primary call detail route: pre-DC brief, live workspace, or post-DC review. */
+export function callDetailsHref(call: Call): string {
+  if (call.status === "completed") {
+    return `/calls/${call.id}/post-dc?wrapped=1`;
+  }
+  if (call.status === "live") {
+    return `/calls/${call.id}/live`;
+  }
+  return `/calls/${call.id}`;
+}
+
 /** Latest completed call for post-DC review / approvals. */
 export function latestPostDcHref(calls: Call[]): string {
   const latest = [...calls]
