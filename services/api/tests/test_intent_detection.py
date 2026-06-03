@@ -15,6 +15,15 @@ def test_sentiment_positive():
     assert r["score"] > 0
 
 
+def test_sentiment_positive_franchise_demo_recovery_line():
+    r = analyze_sentiment(
+        "That's the first answer that doesn't sound like vaporware. "
+        "Multi-tenant agent mesh is exactly what our architecture review kept asking for."
+    )
+    assert r["label"] == "positive"
+    assert r["score"] > 0
+
+
 def test_sentiment_uncertainty_phrase_is_negative():
     r = analyze_sentiment("I'm not sure how you can help us")
     assert r["label"] == "negative"
@@ -77,6 +86,55 @@ def test_analyze_segment_prioritizes_pain_point_nudge():
     assert out["nudge"]["message"].startswith("Customer raised:")
     assert "bottleneck" in out["nudge"]["message"]
     assert out["intent_update"]["pains"]
+
+
+def test_analyze_segment_detects_positive_customer_recovery_shift():
+    ctx = TenantContext(tenant_id="test-tenant-positive-shift", user_id="u1")
+    call_id = "call-test-positive-shift"
+
+    analyze_segment(
+        ctx,
+        call_id,
+        {
+            "id": "positive-shift-1",
+            "text": "Manual compliance audits are a nightmare and a bottleneck.",
+            "speakerId": "cust-1",
+            "speakerName": "Alex",
+            "speakerRole": "customer",
+            "timestamp": 10,
+        },
+    )
+    analyze_segment(
+        ctx,
+        call_id,
+        {
+            "id": "positive-shift-2",
+            "text": "We can review the pilot scope and architecture together.",
+            "speakerId": "cust-1",
+            "speakerName": "Alex",
+            "speakerRole": "customer",
+            "timestamp": 20,
+        },
+    )
+    out = analyze_segment(
+        ctx,
+        call_id,
+        {
+            "id": "positive-shift-3",
+            "text": (
+                "That's the first answer that doesn't sound like vaporware. "
+                "Multi-tenant agent mesh is exactly what our architecture review kept asking for."
+            ),
+            "speakerId": "cust-1",
+            "speakerName": "Alex",
+            "speakerRole": "customer",
+            "timestamp": 30,
+        },
+    )
+
+    assert out["transcript"]["sentiment"] == "positive"
+    assert out["sentiment"]["customer"] > 0
+    assert out["sentiment"]["shift"]["direction"] == "positive"
 
 
 def test_analyze_segment_survives_tenant_resolution_failure(monkeypatch):

@@ -22,6 +22,8 @@ _POSITIVE = frozenset(
         "valuable",
         "progress",
         "success",
+        "appreciate",
+        "exactly",
     }
 )
 _NEGATIVE = frozenset(
@@ -71,6 +73,17 @@ _NEGATIVE_PHRASES = tuple(
     )
 )
 
+_POSITIVE_PHRASES = tuple(
+    re.compile(pattern)
+    for pattern in (
+        r"\bfirst\s+answer\b",
+        r"\bexactly\s+what\b",
+        r"\bkept\s+asking\s+for\b",
+        r"\bmove\s+forward\b",
+        r"\bdoesn'?t\s+sound\s+like\s+vaporware\b",
+    )
+)
+
 
 class SentimentResult(TypedDict):
     label: SentimentLabel
@@ -84,6 +97,7 @@ def analyze_sentiment(text: str, speaker_role: str | None = None) -> SentimentRe
     tokens = set(re.findall(r"[a-z']+", lowered))
     pos = len(tokens & _POSITIVE)
     neg = len(tokens & _NEGATIVE)
+    pos += sum(1 for pattern in _POSITIVE_PHRASES if pattern.search(lowered))
     neg += sum(1 for pattern in _NEGATIVE_PHRASES if pattern.search(lowered))
     if pos > neg and pos >= 1:
         score = min(1.0, 0.35 + 0.15 * pos)

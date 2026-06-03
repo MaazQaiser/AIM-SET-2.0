@@ -11,6 +11,12 @@ import { cn } from "@/lib/cn";
 const BANT_KEYS = ["budget", "authority", "need", "timeline"] as const;
 
 type BantKey = (typeof BANT_KEYS)[number];
+type SentimentTone = "positive" | "neutral" | "negative";
+type SentimentBar = {
+  id: string;
+  tone: SentimentTone;
+  current?: boolean;
+};
 
 const bantLabels: Record<BantKey, string> = {
   budget: "Budget",
@@ -120,21 +126,30 @@ function SentimentBars({
   transcript: TranscriptEvent[];
   customerScore: number;
 }) {
-  const bars = useMemo(() => {
+  const bars = useMemo<SentimentBar[]>(() => {
+    const currentTone = scoreToTone(customerScore);
     const withSentiment = transcript
       .filter((e) => e.speakerRole === "customer" && e.sentiment)
       .slice(-12);
-    if (withSentiment.length >= 3) {
-      return withSentiment.map((e, index) => ({
+    if (withSentiment.length > 0) {
+      const transcriptBars: SentimentBar[] = withSentiment.slice(-7).map((e, index) => ({
         id: e.id || `${e.timestamp}-${index}`,
-        tone: e.sentiment as "positive" | "neutral" | "negative",
+        tone: e.sentiment as SentimentTone,
       }));
+      return [
+        ...transcriptBars,
+        {
+          id: `current-${currentTone}-${Math.round(customerScore * 100)}`,
+          tone: currentTone,
+          current: true,
+        },
+      ];
     }
-    const tone = scoreToTone(customerScore);
-    const fill = tone === "positive" ? 0.85 : tone === "negative" ? 0.35 : 0.55;
-    return Array.from({ length: 8 }, (_, i) => ({
+    const fill = currentTone === "positive" ? 0.85 : currentTone === "negative" ? 0.35 : 0.55;
+    return Array.from({ length: 8 }, (_, i): SentimentBar => ({
       id: `fallback-${i}`,
-      tone: i / 7 <= fill ? tone : ("neutral" as const),
+      tone: i / 7 <= fill ? currentTone : ("neutral" as const),
+      current: i === 7,
     }));
   }, [transcript, customerScore]);
 
@@ -147,9 +162,12 @@ function SentimentBars({
             "flex-1 rounded-sm min-w-[4px]",
             bar.tone === "positive" && "bg-success",
             bar.tone === "negative" && "bg-destructive/70",
-            bar.tone === "neutral" && "bg-muted-foreground/25"
+            bar.tone === "neutral" && "bg-muted-foreground/25",
+            bar.current && "ring-1 ring-foreground/20"
           )}
           style={{ height: `${40 + (i / Math.max(bars.length - 1, 1)) * 60}%` }}
+          data-sentiment-tone={bar.tone}
+          data-current-sentiment={bar.current ? "true" : undefined}
           aria-hidden
         />
       ))}
@@ -164,6 +182,13 @@ function scoreTextClass(score: number): string {
   return "text-muted-foreground";
 }
 
+function scoreTileClass(score: number): string {
+  const tone = scoreToTone(score);
+  if (tone === "positive") return "border-success/35 bg-success/5";
+  if (tone === "negative") return "border-destructive/35 bg-destructive/5";
+  return "border-border bg-muted/20";
+}
+
 function SentimentScoreRow({
   label,
   score,
@@ -171,8 +196,13 @@ function SentimentScoreRow({
   label: string;
   score: number;
 }) {
+  const tone = scoreToTone(score);
   return (
-    <div className="min-w-0 rounded-md border border-border bg-muted/20 px-2 py-1.5">
+    <div
+      className={cn("min-w-0 rounded-md border px-2 py-1.5", scoreTileClass(score))}
+      data-sentiment-label={label.toLowerCase()}
+      data-sentiment-tone={tone}
+    >
       <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>

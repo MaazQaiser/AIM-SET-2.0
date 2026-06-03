@@ -235,6 +235,16 @@ def _detect_sentiment_shift(
                 }
                 session.sentiment_shift = shift
                 return shift
+            if recent[-1] - recent[0] >= 0.25:
+                shift = {
+                    "direction": "positive",
+                    "from_score": recent[0],
+                    "to_score": recent[-1],
+                    "timestamp": timestamp,
+                    "message": "Customer sentiment is warming after the latest response.",
+                }
+                session.sentiment_shift = shift
+                return shift
     return session.sentiment_shift if session.segment_count % 1 == 0 else None
 
 

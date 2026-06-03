@@ -131,4 +131,44 @@ test.describe("Live call cockpit — DOM + API", () => {
     expect(out.checklist?.bant?.budget).toBeTruthy();
     expect((out.checklist?.bantCoverage ?? 0) > 0).toBeTruthy();
   });
+
+  test("API sentiment payloads switch the rail between red and green", async ({
+    page,
+    request,
+  }) => {
+    await page.goto(`/calls/${CALL_ID}/live`, { waitUntil: "domcontentloaded" });
+    await expect(page.getByText("Connecting stream…")).toBeHidden({ timeout: 25_000 });
+
+    const sentimentSection = page.locator("section", { hasText: "Sentiment" }).first();
+    const customerTile = sentimentSection.locator('[data-sentiment-label="customer"]');
+    const currentBar = sentimentSection.locator('[data-current-sentiment="true"]').last();
+
+    await postDemoSegment(request, {
+      text: "Manual audits are a nightmare and a bottleneck, and we are concerned about delays.",
+      speaker_role: "customer",
+      offset_seconds: 210,
+    });
+
+    await expect
+      .poll(async () => customerTile.getAttribute("data-sentiment-tone"), { timeout: 25_000 })
+      .toBe("negative");
+    await expect
+      .poll(async () => currentBar.getAttribute("data-sentiment-tone"), { timeout: 25_000 })
+      .toBe("negative");
+    await expect(sentimentSection).toContainText(/Customer\s*-\d+%\s+concern/i);
+
+    await postDemoSegment(request, {
+      text: "That's a great first answer and exactly what we needed. We are excited to move forward.",
+      speaker_role: "customer",
+      offset_seconds: 220,
+    });
+
+    await expect
+      .poll(async () => customerTile.getAttribute("data-sentiment-tone"), { timeout: 25_000 })
+      .toBe("positive");
+    await expect
+      .poll(async () => currentBar.getAttribute("data-sentiment-tone"), { timeout: 25_000 })
+      .toBe("positive");
+    await expect(sentimentSection).toContainText(/Customer\s*\+\d+%\s+upbeat/i);
+  });
 });
