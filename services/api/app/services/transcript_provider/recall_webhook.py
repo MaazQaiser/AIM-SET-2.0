@@ -35,7 +35,11 @@ def parse_recall_payload(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Map Recall-style webhook bodies to internal TranscriptSegment fields."""
     import logging as _log
 
-    _log.getLogger("recall.webhook").info("Raw payload: %s", body)
+    _log.getLogger("recall.webhook").debug(
+        "Recall webhook payload event=%s keys=%s",
+        body.get("event") or body.get("type"),
+        sorted(body.keys()),
+    )
 
     # --- Recall realtime_endpoints sends: {"data": {"data": {...}, "is_final": bool}} ---
     # Skip interim (non-final) transcripts to avoid duplicates.
@@ -66,21 +70,8 @@ def parse_recall_payload(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             text = " ".join(w.get("text", w) if isinstance(w, dict) else str(w) for w in words).strip()
 
     participant = _dict_or_empty(data.get("participant"))
-    speaker = (
-        participant.get("name")
-        or data.get("speaker")
-        or data.get("speaker_name")
-        or data.get("participant_name")
-        or "unknown"
-    )
-    # Use numeric participant id when available; fall back to name for display
-    speaker_id = str(
-        participant.get("id")
-        or data.get("speaker_id")
-        or data.get("participant_id")
-        or participant.get("name")
-        or speaker
-    )
+    speaker_name = _speaker_display_name(data, participant)
+    speaker_id = _speaker_identity(data, participant, speaker_name)
     role_raw = (data.get("speaker_role") or data.get("role") or "").lower()
     if role_raw in ("agent", "host", "rep", "ae", "sales"):
         speaker_role = "ae"
@@ -151,6 +142,7 @@ def parse_recall_payload(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "kind": "segment",
         "text": text,
         "speaker_id": speaker_id,
+        "speaker_name": speaker_name,
         "speaker_role": speaker_role,
         "offset_seconds": offset,
         "provider_event_id": str(provider_event_id),
@@ -182,15 +174,17 @@ def resolve_call_id(
 
 
 def segment_to_event_dict(parsed: Dict[str, Any], call_id: str) -> Dict[str, Any]:
+    provider_event_id = parsed.get("provider_event_id")
     return {
-        "id": str(uuid.uuid4()),
+        "id": str(provider_event_id or uuid.uuid4()),
         "call_id": call_id,
         "speaker_id": parsed.get("speaker_id", "unknown"),
+        "speaker_name": parsed.get("speaker_name") or parsed.get("speaker_id", "unknown"),
         "speaker_role": parsed.get("speaker_role"),
         "text": parsed.get("text", ""),
         "offset_seconds": parsed.get("offset_seconds", 0),
         "provider": "recall",
-        "provider_event_id": parsed.get("provider_event_id"),
+        "provider_event_id": provider_event_id,
     }
 
 
@@ -240,6 +234,47 @@ def _webhook_secret_bytes(secret: str) -> bytes:
 
 def _dict_or_empty(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
+
+
+def _clean_string(value: Any) -> Optional[str]:
+    if value is None or isinstance(value, (dict, list, tuple, set)):
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _speaker_display_name(data: Dict[str, Any], participant: Dict[str, Any]) -> str:
+    speaker = data.get("speaker")
+    speaker_obj = _dict_or_empty(speaker)
+    name = (
+        _clean_string(participant.get("name"))
+        or _clean_string(participant.get("display_name"))
+        or _clean_string(participant.get("displayName"))
+        or _clean_string(data.get("speaker_name"))
+        or _clean_string(data.get("participant_name"))
+        or _clean_string(data.get("participantName"))
+        or _clean_string(speaker_obj.get("name"))
+        or _clean_string(speaker_obj.get("display_name"))
+        or _clean_string(speaker_obj.get("displayName"))
+        or _clean_string(participant.get("email"))
+        or _clean_string(speaker)
+    )
+    return name or "unknown"
+
+
+def _speaker_identity(data: Dict[str, Any], participant: Dict[str, Any], fallback: str) -> str:
+    speaker = data.get("speaker")
+    speaker_obj = _dict_or_empty(speaker)
+    speaker_id = (
+        _clean_string(participant.get("id"))
+        or _clean_string(data.get("speaker_id"))
+        or _clean_string(data.get("participant_id"))
+        or _clean_string(data.get("participantId"))
+        or _clean_string(speaker_obj.get("id"))
+        or _clean_string(speaker)
+        or fallback
+    )
+    return speaker_id or "unknown"
 
 
 def _relative_timestamp(value: Any) -> Optional[float]:

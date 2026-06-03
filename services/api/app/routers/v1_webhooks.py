@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import uuid
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
@@ -33,6 +34,17 @@ def _ctx_from_query(tenant_id: Optional[str], user_id: Optional[str]) -> TenantC
         user_id=user_id or "recall-webhook",
         clerk_org_id=tenant_id,
     )
+
+
+async def _resolve_segment_call_id(
+    ctx: TenantContext,
+    parsed: Dict[str, Any],
+    explicit_call_id: Optional[str],
+) -> Optional[str]:
+    cid = explicit_call_id or parsed.get("call_id")
+    if cid:
+        return cid
+    return await asyncio.to_thread(resolve_call_id, ctx, parsed, explicit_call_id=None)
 
 
 @router.post("/recall/transcript")
@@ -70,7 +82,7 @@ async def recall_transcript_webhook(
             return _orch.dispatch_call_end(ctx, cid)
         return {"ok": True, "warning": "no call_id for session end"}
 
-    cid = resolve_call_id(ctx, parsed, explicit_call_id=call_id)
+    cid = await _resolve_segment_call_id(ctx, parsed, call_id)
     if not cid:
         raise HTTPException(
             status_code=422,
@@ -78,25 +90,31 @@ async def recall_transcript_webhook(
         )
 
     event = segment_to_event_dict(parsed, cid)
+    if not event.get("id"):
+        event["id"] = str(uuid.uuid4())
+
     channel = get_call_channel()
 
-    # Broadcast transcript IMMEDIATELY so the user sees it in <1 second
+    # Broadcast before persistence or analysis so the user sees it in <1 second.
     transcript_ws = transcript_event_to_ws(event)
     await channel.broadcast(cid, transcript_ws)
 
-    # Run the heavy analysis pipeline in the background
-    async def _analyze_and_broadcast():
+    async def _persist_analyze_and_broadcast():
         try:
+            from app.domain.live_call_repository import get_live_call_repository
+
+            stored = await asyncio.to_thread(
+                get_live_call_repository().append_transcript_event, ctx, cid, event
+            )
+            if stored.get("_deduped"):
+                return
             result = await asyncio.to_thread(_orch.dispatch_live_segment, ctx, cid, event)
             for msg in result.get("ws_messages") or []:
-                # Skip the transcript message — already sent above
-                if msg.get("type") == "transcript":
-                    continue
                 await channel.broadcast(cid, msg)
         except Exception:
             _logger.exception("background analysis failed call_id=%s", cid)
 
-    asyncio.create_task(_analyze_and_broadcast())
+    asyncio.create_task(_persist_analyze_and_broadcast())
 
     return {"ok": True, "call_id": cid}
 
@@ -121,6 +139,8 @@ async def demo_segment(
         "provider": "demo",
         "provider_event_id": body.get("provider_event_id"),
     }
+    if not event.get("id"):
+        event["id"] = str(uuid.uuid4())
     channel = get_call_channel()
 
     # Broadcast transcript IMMEDIATELY
@@ -130,8 +150,6 @@ async def demo_segment(
     try:
         result = await asyncio.to_thread(_orch.dispatch_live_segment, ctx, call_id, event)
         for msg in result.get("ws_messages") or []:
-            if msg.get("type") == "transcript":
-                continue
             await channel.broadcast(call_id, msg)
     except Exception as exc:
         _logger.exception("demo analysis failed call_id=%s", call_id)

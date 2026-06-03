@@ -159,7 +159,6 @@ export function CallDetailStickyHeader({
         "flex min-h-[3.75rem] items-center"
       )}
       data-visible={compact ? "true" : "false"}
-      role="banner"
       aria-hidden={!compact}
     >
       <CompactHeaderBar

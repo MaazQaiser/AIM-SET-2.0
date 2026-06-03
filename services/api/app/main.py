@@ -16,7 +16,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_REPO_ROOT / "python-packages"))
 
 if os.environ.get("DC_COPILOT_IGNORE_DOTENV") != "true":
-    load_dotenv()
+    load_dotenv(override=True)
 
 from app.routers import (  # noqa: E402
     dc_notes,

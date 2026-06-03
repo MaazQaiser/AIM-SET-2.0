@@ -68,25 +68,44 @@ test.describe("Live call cockpit — DOM + API", () => {
     await expect(playDemo).toBeEnabled({ timeout: 10_000 });
     await playDemo.click();
 
+    await expect(
+      page.getByText(/Manual brand-standard audits|bottleneck before/i).first()
+    ).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(
+      page.getByText(/Customer raised:|align next questions to this pain/i).first()
+    ).toBeVisible({
+      timeout: 45_000,
+    });
+
+    const sentimentSection = page.locator("section", { hasText: "Sentiment" }).first();
+    await expect(sentimentSection).toContainText("Customer");
+    await expect
+      .poll(async () => sentimentSection.innerText(), { timeout: 45_000 })
+      .toMatch(/Customer\s+-\d+%\s+concern/i);
+
     await expect(page.getByText(/budget|four hundred|six hundred|carved/i).first()).toBeVisible({
       timeout: 90_000,
     });
 
-    await expect(page.getByText(/Discovery coverage/i).first()).toBeVisible();
+    await expect(page.getByText(/BANT live/i).first()).toBeVisible();
     await expect
       .poll(
         async () => {
           const text = await page.locator("body").innerText();
-          const match = text.match(/(\d+)%\s*BANT/i);
-          return match ? Number(match[1]) : 0;
+          const match = text.match(/BANT coverage at\s*(\d+)%|(\d+)%\s*BANT/i);
+          return match ? Number(match[1] ?? match[2]) : 0;
         },
         { timeout: 90_000 }
       )
       .toBeGreaterThan(0);
 
-    await expect(page.getByText(/Next actions/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Running summary/i).first()).toBeVisible({
+      timeout: 15_000,
+    });
 
-    await expect(page.getByText(/Call intent/i).first()).toBeVisible();
+    await expect(page.getByText(/Primary intent|Latest pain signal/i).first()).toBeVisible();
     await expect(
       page.getByText(/commercial|timeline|budget|discovery|focus/i).first()
     ).toBeVisible();

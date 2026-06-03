@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import uuid
+import logging
 from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional
 
@@ -46,9 +47,33 @@ _INTENT_DISPLAY: Dict[str, str] = {
 _PAIN_EMERGENT_PATTERNS = [
     r"\b(struggle|struggling|pain|problem|challenge|frustrat|difficult|blocked|bottleneck)\b",
     r"\b(can't|cannot|unable to|hard to|too slow|too expensive)\b",
+    r"\b(manual|spreadsheet|spreadsheets|workaround|rework|visibility gap|requirements?|not sure|unclear)\b",
 ]
 
 _TOPIC_SPIKE_THRESHOLD = 3
+_logger = logging.getLogger(__name__)
+
+
+def _fallback_tenant_key(ctx: TenantContext) -> str:
+    return ctx.clerk_org_id or ctx.tenant_id or ctx.user_id or "local-dev"
+
+
+def _resolve_live_session(ctx: TenantContext, call_id: str) -> LiveCallSession:
+    try:
+        _, clerk_key = resolve_kb_tenant(ctx)
+    except Exception:
+        clerk_key = _fallback_tenant_key(ctx)
+        _logger.exception(
+            "tenant resolution failed for live analysis; using fallback tenant key call_id=%s tenant_key=%s",
+            call_id,
+            clerk_key,
+        )
+    session = get_live_session(clerk_key, call_id)
+    try:
+        _load_brief_context(ctx, call_id, session)
+    except Exception:
+        _logger.exception("brief context load failed for live analysis call_id=%s", call_id)
+    return session
 
 
 def _load_brief_context(ctx: TenantContext, call_id: str, session: LiveCallSession) -> None:
@@ -215,21 +240,29 @@ def _detect_sentiment_shift(
 
 def _retrieve_kb_hits(ctx: TenantContext, query: str, limit: int = 3) -> List[Dict[str, Any]]:
     settings = get_settings()
-    tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+    try:
+        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+    except Exception:
+        _logger.exception("tenant resolution failed for live KB retrieval")
+        return []
     repo = get_kb_repository()
 
     def vector_search(tid: str, embedding: List[float], lim: int) -> List[Dict[str, Any]]:
         return repo.match_chunks(tenant_uuid, embedding, limit=lim, clerk_key=clerk_key)
 
     embed_fn = default_embed_fn if settings.openai_configured or settings.openai_api_key else None
-    return retrieve_kb(
-        tenant_uuid,
-        query,
-        limit=limit,
-        chunks=get_memory_store().kb_chunks.get(clerk_key, []),
-        embed_fn=embed_fn,
-        vector_search_fn=vector_search if embed_fn else None,
-    )
+    try:
+        return retrieve_kb(
+            tenant_uuid,
+            query,
+            limit=limit,
+            chunks=get_memory_store().kb_chunks.get(clerk_key, []),
+            embed_fn=embed_fn,
+            vector_search_fn=vector_search if embed_fn else None,
+        )
+    except Exception:
+        _logger.exception("live KB retrieval failed")
+        return []
 
 
 def analyze_segment(
@@ -240,9 +273,7 @@ def analyze_segment(
     """
     Cheap pass on every transcript segment. Returns WS payloads and optional nudge/suggestion.
     """
-    _, clerk_key = resolve_kb_tenant(ctx)
-    session = get_live_session(clerk_key, call_id)
-    _load_brief_context(ctx, call_id, session)
+    session = _resolve_live_session(ctx, call_id)
 
     text = (segment.get("text") or "").strip()
     if not text:
@@ -304,7 +335,29 @@ def analyze_segment(
     ]
 
     # Routing-based proactive nudge
-    if kw_result.get("signal_type") and kw_result.get("routing_confidence", 0) >= 0.65:
+    if new_pains:
+        pain = new_pains[0]
+        focus_suggestion = {
+            "message": (
+                f"Customer raised: \"{pain['text'][:80]}\" — "
+                f"align next questions to this pain and related capabilities."
+            ),
+            "pain_id": pain["id"],
+        }
+        nudge = {
+            "id": str(uuid.uuid4()),
+            "message": focus_suggestion["message"],
+            "role": "ae",
+            "timestamp": timestamp,
+            "citation": {
+                "id": str(uuid.uuid4()),
+                "title": "Pain point detected",
+                "type": "transcript",
+                "excerpt": pain.get("evidence", text[:200]),
+            },
+        }
+
+    if not nudge and kw_result.get("signal_type") and kw_result.get("routing_confidence", 0) >= 0.65:
         target = "ae"
         for rule in routing:
             if rule.get("id") == kw_result.get("matched_rule_id"):
@@ -344,29 +397,6 @@ def analyze_segment(
                 "title": "Sentiment shift",
                 "type": "transcript",
                 "excerpt": text[:200],
-            },
-        }
-
-    # Pain detected focus suggestion
-    if new_pains and not nudge:
-        pain = new_pains[0]
-        focus_suggestion = {
-            "message": (
-                f"Customer raised: \"{pain['text'][:80]}\" — "
-                f"align next questions to this pain and related capabilities."
-            ),
-            "pain_id": pain["id"],
-        }
-        nudge = {
-            "id": str(uuid.uuid4()),
-            "message": focus_suggestion["message"],
-            "role": "ae",
-            "timestamp": timestamp,
-            "citation": {
-                "id": str(uuid.uuid4()),
-                "title": "Pain point detected",
-                "type": "transcript",
-                "excerpt": pain.get("evidence", text[:200]),
             },
         }
 

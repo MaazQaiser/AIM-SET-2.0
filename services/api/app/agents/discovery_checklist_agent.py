@@ -41,6 +41,9 @@ def handle_segment(
     *,
     elapsed_seconds: int = 0,
     seed_bant: Optional[Dict[str, str]] = None,
+    sentiment: Optional[str] = None,
+    speaker_role: Optional[str] = None,
+    signal_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Process one transcript segment; returns WS payloads + envelope."""
     if state is None:
@@ -50,16 +53,34 @@ def handle_segment(
         state,
         text,
         elapsed_seconds=elapsed_seconds,
+        sentiment=sentiment,
+        speaker_role=speaker_role,
+        signal_type=signal_type,
     )
 
     bant_signals: List[Dict[str, Any]] = []
+    latest_evidence = {
+        item.id: item.evidence[-1]
+        for item in updated.items
+        if item.id in BANT_DIMENSION_LABELS and item.evidence
+    }
     for dim in new_dims:
+        evidence = latest_evidence.get(dim)
+        value = (evidence.value if evidence else "") or ""
+        signal_label = BANT_DIMENSION_LABELS.get(dim, f"{dim} signal")
+        if value:
+            signal_label = f"{signal_label}: {value}"
+        if evidence and evidence.sentiment == "negative":
+            signal_label = f"{signal_label} · customer concern"
         bant_signals.append(
             {
                 "id": str(uuid.uuid4()),
-                "label": BANT_DIMENSION_LABELS.get(dim, f"{dim} signal"),
+                "label": signal_label,
                 "timestamp": elapsed_seconds,
                 "dimension": dim,
+                "value": value,
+                "sentiment": evidence.sentiment if evidence else sentiment,
+                "snippet": evidence.snippet if evidence else text[:200],
             }
         )
 

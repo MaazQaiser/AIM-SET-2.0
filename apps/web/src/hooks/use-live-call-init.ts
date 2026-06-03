@@ -4,6 +4,16 @@ import { useEffect, useRef } from "react";
 import { useLiveCall } from "@/stores/use-live-call";
 import type { SuggestionLogEntry, TranscriptEvent } from "@/types";
 
+function sentimentLabel(value: unknown): TranscriptEvent["sentiment"] | undefined {
+  return value === "positive" || value === "negative" || value === "neutral" ? value : undefined;
+}
+
+function sentimentScore(value: TranscriptEvent["sentiment"]): number {
+  if (value === "positive") return 0.55;
+  if (value === "negative") return -0.65;
+  return 0;
+}
+
 function mapStoredEvent(row: Record<string, unknown>): TranscriptEvent {
   const offset = Number(row.offset_seconds ?? 0);
   return {
@@ -14,18 +24,27 @@ function mapStoredEvent(row: Record<string, unknown>): TranscriptEvent {
     text: String(row.text ?? ""),
     timestamp: offset,
     keywords: Array.isArray(row.keywords) ? (row.keywords as string[]) : [],
+    sentiment: sentimentLabel(row.sentiment),
+    signalType:
+      typeof row.signal_type === "string"
+        ? row.signal_type
+        : typeof row.signalType === "string"
+          ? row.signalType
+          : undefined,
   };
 }
 
 function mapSuggestionLog(row: Record<string, unknown>): SuggestionLogEntry | null {
   const id = row.id;
   if (!id) return null;
+  const operation = String(row.operation ?? "unknown");
+  if (operation === "intent_snapshot" || operation === "intent_update") return null;
   const payload = (row.payload as Record<string, unknown>) ?? {};
   const shownAt = row.shown_at as string | undefined;
   const ts = shownAt ? Date.parse(shownAt) : Date.now();
   return {
     id: String(id),
-    operation: String(row.operation ?? "unknown"),
+    operation,
     timestamp: Number.isFinite(ts) ? ts : Date.now(),
     shownAt,
     confidence: Number(row.confidence ?? 0),
@@ -48,6 +67,7 @@ export function useLiveCallInit(callId: string) {
   const reset = useLiveCall((s) => s.reset);
   const appendTranscriptEvent = useLiveCall((s) => s.appendTranscriptEvent);
   const appendSuggestionLog = useLiveCall((s) => s.appendSuggestionLog);
+  const updateSentiment = useLiveCall((s) => s.updateSentiment);
   const transcript = useLiveCall((s) => s.transcript);
 
   useEffect(() => {
@@ -69,7 +89,21 @@ export function useLiveCallInit(callId: string) {
           suggestions?: Record<string, unknown>[];
         };
         for (const row of data.events ?? []) {
-          appendTranscriptEvent(mapStoredEvent(row));
+          const event = mapStoredEvent(row);
+          appendTranscriptEvent(event);
+          if (event.sentiment) {
+            const score = sentimentScore(event.sentiment);
+            const current = useLiveCall.getState();
+            if (
+              event.speakerRole === "ae" ||
+              event.speakerRole === "se" ||
+              event.speakerRole === "designer"
+            ) {
+              updateSentiment(score, current.sentimentCustomer);
+            } else {
+              updateSentiment(current.sentimentAE, score);
+            }
+          }
         }
         for (const row of data.suggestions ?? []) {
           const entry = mapSuggestionLog(row);
@@ -85,7 +119,7 @@ export function useLiveCallInit(callId: string) {
       reset();
       initialized.current = false;
     };
-  }, [callId, reset, setCallId, appendTranscriptEvent, appendSuggestionLog]);
+  }, [callId, reset, setCallId, appendTranscriptEvent, appendSuggestionLog, updateSentiment]);
 
   return { transcript };
 }

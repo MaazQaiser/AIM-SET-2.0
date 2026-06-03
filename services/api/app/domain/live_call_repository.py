@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -11,14 +12,29 @@ from app.deps import get_supabase
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.memory_store import get_memory_store
 
+_logger = logging.getLogger(__name__)
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _mem_key(ctx: TenantContext, call_id: str) -> str:
-    _, clerk_key = resolve_kb_tenant(ctx)
-    return f"{clerk_key}:{call_id}"
+def _fallback_tenant_key(ctx: TenantContext) -> str:
+    return ctx.clerk_org_id or ctx.tenant_id or ctx.user_id or "local-dev"
+
+
+def _resolve_live_tenant(ctx: TenantContext) -> tuple[str, str, bool]:
+    try:
+        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+        return tenant_uuid, clerk_key, True
+    except Exception as exc:
+        fallback = _fallback_tenant_key(ctx)
+        _logger.warning(
+            "tenant resolution failed for live call repository; using memory fallback tenant_key=%s error=%s",
+            fallback,
+            exc,
+        )
+        return fallback, fallback, False
 
 
 class LiveCallRepository:
@@ -44,8 +60,8 @@ class LiveCallRepository:
             "ended_at": None,
             "summary": {},
         }
-        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
-        if get_settings().supabase_configured:
+        tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
+        if tenant_resolved and get_settings().supabase_configured:
             try:
                 get_supabase().table("call_live_sessions").upsert(
                     {
@@ -64,8 +80,8 @@ class LiveCallRepository:
         return row
 
     def get_session(self, ctx: TenantContext, call_id: str) -> Optional[Dict[str, Any]]:
-        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
-        if get_settings().supabase_configured:
+        tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
+        if tenant_resolved and get_settings().supabase_configured:
             try:
                 res = (
                     get_supabase()
@@ -86,8 +102,8 @@ class LiveCallRepository:
     def resolve_call_by_provider_meeting(
         self, ctx: TenantContext, provider_meeting_id: str
     ) -> Optional[str]:
-        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
-        if get_settings().supabase_configured:
+        tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
+        if tenant_resolved and get_settings().supabase_configured:
             try:
                 res = (
                     get_supabase()
@@ -127,27 +143,36 @@ class LiveCallRepository:
         *,
         provider: str = "recall",
     ) -> Dict[str, Any]:
-        sess = self.get_or_create_session(ctx, call_id, provider=provider, provider_meeting_id=provider_meeting_id)
-        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
-        if get_settings().supabase_configured:
+        sess = self.get_session(ctx, call_id) or {
+            "call_id": call_id,
+            "status": "live",
+            "provider": provider,
+            "provider_meeting_id": None,
+            "started_at": _now_iso(),
+            "ended_at": None,
+            "summary": {},
+        }
+        tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
+        linked = {
+            **sess,
+            "provider_meeting_id": provider_meeting_id,
+            "provider": provider,
+        }
+        if tenant_resolved and get_settings().supabase_configured:
             try:
                 get_supabase().table("call_live_sessions").upsert(
                     {
                         "tenant_id": tenant_uuid,
                         "call_id": call_id,
-                        "status": sess.get("status", "live"),
+                        "status": linked.get("status", "live"),
                         "provider": provider,
                         "provider_meeting_id": provider_meeting_id,
-                        "summary": sess.get("summary") or {},
+                        "summary": linked.get("summary") or {},
                     }
                 ).execute()
             except Exception:
                 pass
-        get_memory_store().live_sessions.setdefault(clerk_key, {})[call_id] = {
-            **sess,
-            "provider_meeting_id": provider_meeting_id,
-            "provider": provider,
-        }
+        get_memory_store().live_sessions.setdefault(clerk_key, {})[call_id] = linked
         return get_memory_store().live_sessions[clerk_key][call_id]
 
     def append_transcript_event(
@@ -156,16 +181,19 @@ class LiveCallRepository:
         call_id: str,
         event: Dict[str, Any],
     ) -> Dict[str, Any]:
-        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+        tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
         event_id = event.get("id") or str(uuid.uuid4())
         row = {
             "id": event_id,
             "call_id": call_id,
             "speaker_id": event.get("speaker_id", "unknown"),
+            "speaker_name": event.get("speaker_name") or event.get("speaker_id", "unknown"),
             "speaker_role": event.get("speaker_role"),
             "text": event.get("text", ""),
             "offset_seconds": float(event.get("offset_seconds") or 0),
             "keywords": event.get("keywords") or [],
+            "sentiment": event.get("sentiment"),
+            "signal_type": event.get("signal_type") or event.get("signalType"),
             "provider": event.get("provider", "recall"),
             "provider_event_id": event.get("provider_event_id"),
             "created_at": event.get("created_at") or _now_iso(),
@@ -179,7 +207,7 @@ class LiveCallRepository:
                 row["_deduped"] = True
                 return row
             # Check Supabase
-            if get_settings().supabase_configured:
+            if tenant_resolved and get_settings().supabase_configured:
                 try:
                     existing = (
                         get_supabase()
@@ -196,35 +224,109 @@ class LiveCallRepository:
                         return row
                 except Exception:
                     pass
-        if get_settings().supabase_configured:
+        if tenant_resolved and get_settings().supabase_configured:
+            transcript_payload = {
+                "id": event_id,
+                "tenant_id": tenant_uuid,
+                "call_id": call_id,
+                "speaker_id": row["speaker_id"],
+                "speaker_name": row["speaker_name"],
+                "speaker_role": row["speaker_role"],
+                "text": row["text"],
+                "offset_seconds": row["offset_seconds"],
+                "keywords": row["keywords"],
+                "sentiment": row["sentiment"],
+                "signal_type": row["signal_type"],
+                "provider": row["provider"],
+                "provider_event_id": row["provider_event_id"],
+            }
             try:
-                get_supabase().table("call_transcript_events").insert(
-                    {
-                        "id": event_id,
-                        "tenant_id": tenant_uuid,
-                        "call_id": call_id,
-                        "speaker_id": row["speaker_id"],
-                        "speaker_role": row["speaker_role"],
-                        "text": row["text"],
-                        "offset_seconds": row["offset_seconds"],
-                        "keywords": row["keywords"],
-                        "provider": row["provider"],
-                        "provider_event_id": row["provider_event_id"],
-                    }
-                ).execute()
+                get_supabase().table("call_transcript_events").insert(transcript_payload).execute()
             except Exception:
-                pass
+                try:
+                    legacy_payload = dict(transcript_payload)
+                    legacy_payload.pop("sentiment", None)
+                    legacy_payload.pop("signal_type", None)
+                    get_supabase().table("call_transcript_events").insert(legacy_payload).execute()
+                except Exception:
+                    try:
+                        legacy_payload = dict(transcript_payload)
+                        legacy_payload.pop("sentiment", None)
+                        legacy_payload.pop("signal_type", None)
+                        legacy_payload.pop("speaker_name", None)
+                        get_supabase().table("call_transcript_events").insert(legacy_payload).execute()
+                    except Exception:
+                        pass
         store = get_memory_store()
         store.transcript_events.setdefault(clerk_key, {}).setdefault(call_id, []).append(row)
         if len(store.transcript_events[clerk_key][call_id]) > 500:
             store.transcript_events[clerk_key][call_id] = store.transcript_events[clerk_key][call_id][-500:]
         return row
 
+    def update_transcript_event_analysis(
+        self,
+        ctx: TenantContext,
+        call_id: str,
+        event_id: str,
+        *,
+        keywords: Optional[List[str]] = None,
+        sentiment: Optional[str] = None,
+        signal_type: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        payload: Dict[str, Any] = {}
+        if keywords is not None:
+            payload["keywords"] = keywords
+        if sentiment is not None:
+            payload["sentiment"] = sentiment
+        if signal_type is not None:
+            payload["signal_type"] = signal_type
+        if not payload:
+            return None
+
+        tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
+        if tenant_resolved and get_settings().supabase_configured:
+            try:
+                (
+                    get_supabase()
+                    .table("call_transcript_events")
+                    .update(payload)
+                    .eq("tenant_id", tenant_uuid)
+                    .eq("call_id", call_id)
+                    .eq("id", event_id)
+                    .execute()
+                )
+            except Exception:
+                legacy_payload = {
+                    key: value
+                    for key, value in payload.items()
+                    if key not in ("sentiment", "signal_type")
+                }
+                if legacy_payload:
+                    try:
+                        (
+                            get_supabase()
+                            .table("call_transcript_events")
+                            .update(legacy_payload)
+                            .eq("tenant_id", tenant_uuid)
+                            .eq("call_id", call_id)
+                            .eq("id", event_id)
+                            .execute()
+                        )
+                    except Exception:
+                        pass
+
+        events = get_memory_store().transcript_events.get(clerk_key, {}).get(call_id, [])
+        for item in events:
+            if item.get("id") == event_id:
+                item.update(payload)
+                return item
+        return None
+
     def list_transcript_events(
         self, ctx: TenantContext, call_id: str, *, limit: int = 200
     ) -> List[Dict[str, Any]]:
-        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
-        if get_settings().supabase_configured:
+        tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
+        if tenant_resolved and get_settings().supabase_configured:
             try:
                 res = (
                     get_supabase()
@@ -254,7 +356,7 @@ class LiveCallRepository:
         trace_id: Optional[str] = None,
         suggestion_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+        tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
         sid = suggestion_id or str(uuid.uuid4())
         shown_at = _now_iso()
         row = {
@@ -270,7 +372,7 @@ class LiveCallRepository:
             "acted_at": None,
             "trace_id": trace_id,
         }
-        if get_settings().supabase_configured:
+        if tenant_resolved and get_settings().supabase_configured:
             try:
                 get_supabase().table("live_call_suggestions").insert(
                     {
@@ -300,9 +402,9 @@ class LiveCallRepository:
         suggestion_id: str,
         status: str,
     ) -> Optional[Dict[str, Any]]:
-        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+        tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
         acted_at = _now_iso()
-        if get_settings().supabase_configured:
+        if tenant_resolved and get_settings().supabase_configured:
             try:
                 get_supabase().table("live_call_suggestions").update(
                     {"status": status, "acted_at": acted_at}
@@ -319,8 +421,8 @@ class LiveCallRepository:
     def list_suggestions(
         self, ctx: TenantContext, call_id: str, *, limit: int = 100
     ) -> List[Dict[str, Any]]:
-        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
-        if get_settings().supabase_configured:
+        tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
+        if tenant_resolved and get_settings().supabase_configured:
             try:
                 res = (
                     get_supabase()
@@ -338,9 +440,9 @@ class LiveCallRepository:
         return list(get_memory_store().live_suggestions.get(clerk_key, {}).get(call_id, []))[-limit:]
 
     def end_session(self, ctx: TenantContext, call_id: str, summary: Dict[str, Any]) -> Dict[str, Any]:
-        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+        tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
         ended_at = _now_iso()
-        if get_settings().supabase_configured:
+        if tenant_resolved and get_settings().supabase_configured:
             try:
                 get_supabase().table("call_live_sessions").update(
                     {"status": "ended", "ended_at": ended_at, "summary": summary}
@@ -370,10 +472,13 @@ def _event_from_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "id": row.get("id"),
         "call_id": row.get("call_id"),
         "speaker_id": row.get("speaker_id"),
+        "speaker_name": row.get("speaker_name") or row.get("speaker_id"),
         "speaker_role": row.get("speaker_role"),
         "text": row.get("text"),
         "offset_seconds": float(row.get("offset_seconds") or 0),
         "keywords": row.get("keywords") or [],
+        "sentiment": row.get("sentiment"),
+        "signal_type": row.get("signal_type"),
         "provider": row.get("provider"),
         "provider_event_id": row.get("provider_event_id"),
         "created_at": row.get("created_at"),

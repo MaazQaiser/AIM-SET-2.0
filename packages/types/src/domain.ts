@@ -48,6 +48,9 @@ export interface BantSignal {
   label: string;
   timestamp: number;
   dimension: "budget" | "authority" | "need" | "timeline";
+  value?: string;
+  sentiment?: "positive" | "neutral" | "negative" | string;
+  snippet?: string;
 }
 
 export interface KeywordDefinition {

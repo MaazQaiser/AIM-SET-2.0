@@ -42,9 +42,8 @@ export function PreDcBantStrip({
     >
       {bant && <BANTScorecard bant={bant} layout="strip" stripScale="md" />}
       {showJoinCall && bant && (
-        <div
-          role="separator"
-          aria-orientation="vertical"
+        <span
+          aria-hidden
           className={cn(
             compact ? "mx-3 h-8" : "mx-2.5 h-8",
             "w-px shrink-0 self-center",

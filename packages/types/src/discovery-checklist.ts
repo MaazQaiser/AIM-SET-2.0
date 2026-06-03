@@ -22,6 +22,10 @@ export interface ChecklistEvidence {
   snippet: string;
   transcriptOffsetSeconds?: number;
   confidence: number;
+  value?: string;
+  sentiment?: "positive" | "neutral" | "negative" | string;
+  speakerRole?: string;
+  signalType?: string;
 }
 
 export interface ChecklistItem {

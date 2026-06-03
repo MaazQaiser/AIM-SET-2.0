@@ -2,9 +2,9 @@
 
 import { useMemo } from "react";
 import { filterKeywordCounts } from "@/lib/live/keyword-filter";
-import { scoreToTone } from "@/lib/live/sentiment-display";
+import { formatSentimentScore, scoreToTone } from "@/lib/live/sentiment-display";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
-import type { KeywordStats, TranscriptEvent } from "@/types";
+import type { KeywordStats, SentimentShift, TranscriptEvent } from "@/types";
 import { LiveSubsectionHeader } from "@/components/live/live-column-header";
 import { cn } from "@/lib/cn";
 
@@ -40,7 +40,9 @@ interface LiveMetricsRailProps {
   keywordStats: KeywordStats | null;
   keywords: string[];
   transcript: TranscriptEvent[];
+  sentimentAE: number;
   sentimentCustomer: number;
+  sentimentShift: SentimentShift | null;
   openGaps: string[];
   className?: string;
 }
@@ -57,8 +59,17 @@ function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistState | nul
   const evidenceById = Object.fromEntries(
     checklist.items
       .filter((i) => i.tier === "bant")
-      .map((i) => [i.id, i.evidence?.[0]?.snippet ?? ""])
-  );
+      .map((i) => {
+        const evidence = i.evidence?.[i.evidence.length - 1];
+        return [
+          i.id,
+          {
+            text: evidence?.value || evidence?.snippet || "",
+            sentiment: evidence?.sentiment,
+          },
+        ];
+      })
+  ) as Record<string, { text: string; sentiment?: string }>;
 
   return (
     <div className="grid grid-cols-2 gap-2">
@@ -89,9 +100,10 @@ function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistState | nul
             >
               {bantStatusLabel(status, key)}
             </p>
-            {evidence && (
+            {evidence?.text && (
               <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2 leading-snug">
-                {evidence}
+                {evidence.sentiment === "negative" ? "Concern: " : ""}
+                {evidence.text}
               </p>
             )}
           </div>
@@ -113,14 +125,15 @@ function SentimentBars({
       .filter((e) => e.speakerRole === "customer" && e.sentiment)
       .slice(-12);
     if (withSentiment.length >= 3) {
-      return withSentiment.map((e) => ({
+      return withSentiment.map((e, index) => ({
+        id: e.id || `${e.timestamp}-${index}`,
         tone: e.sentiment as "positive" | "neutral" | "negative",
       }));
     }
     const tone = scoreToTone(customerScore);
-    const fill =
-      tone === "positive" ? 0.85 : tone === "negative" ? 0.35 : 0.55;
+    const fill = tone === "positive" ? 0.85 : tone === "negative" ? 0.35 : 0.55;
     return Array.from({ length: 8 }, (_, i) => ({
+      id: `fallback-${i}`,
       tone: i / 7 <= fill ? tone : ("neutral" as const),
     }));
   }, [transcript, customerScore]);
@@ -129,7 +142,7 @@ function SentimentBars({
     <div className="flex items-end gap-1 h-8">
       {bars.map((bar, i) => (
         <div
-          key={i}
+          key={bar.id}
           className={cn(
             "flex-1 rounded-sm min-w-[4px]",
             bar.tone === "positive" && "bg-success",
@@ -144,12 +157,40 @@ function SentimentBars({
   );
 }
 
+function scoreTextClass(score: number): string {
+  const tone = scoreToTone(score);
+  if (tone === "positive") return "text-success";
+  if (tone === "negative") return "text-destructive";
+  return "text-muted-foreground";
+}
+
+function SentimentScoreRow({
+  label,
+  score,
+}: {
+  label: string;
+  score: number;
+}) {
+  return (
+    <div className="min-w-0 rounded-md border border-border bg-muted/20 px-2 py-1.5">
+      <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className={cn("truncate text-[11px] font-semibold", scoreTextClass(score))}>
+        {formatSentimentScore(score)}
+      </p>
+    </div>
+  );
+}
+
 export function LiveMetricsRail({
   checklist,
   keywordStats,
   keywords,
   transcript,
+  sentimentAE,
   sentimentCustomer,
+  sentimentShift,
   openGaps,
   className,
 }: LiveMetricsRailProps) {
@@ -194,6 +235,21 @@ export function LiveMetricsRail({
 
       <section>
         <LiveSubsectionHeader title="Sentiment" />
+        <div className="mb-2 grid grid-cols-2 gap-2">
+          <SentimentScoreRow label="Customer" score={sentimentCustomer} />
+          <SentimentScoreRow label="AE" score={sentimentAE} />
+        </div>
+        {sentimentShift && (
+          <p className="mb-2 text-[11px] leading-snug text-muted-foreground">
+            Shift:{" "}
+            <span className={scoreTextClass(sentimentShift.to_score)}>
+              {sentimentShift.message ||
+                (sentimentShift.direction === "negative"
+                  ? "Customer concern rising"
+                  : "Customer confidence improving")}
+            </span>
+          </p>
+        )}
         <SentimentBars transcript={transcript} customerScore={sentimentCustomer} />
       </section>
 

@@ -54,14 +54,14 @@ DEFAULT_PLAYBOOK: Dict[str, str] = {
 
 # keyword groups -> item id, minimum match tier (partial vs confirmed)
 SIGNAL_RULES: List[Tuple[str, List[str], ChecklistItemStatus]] = [
-    ("budget", ["budget", "pricing", "cost", "spend", "investment", "approved budget", "dollar", "price", "afford", "expensive", "cheap", "limited budget", "money", "funding", "financial", "carved", "envelope", "year one", "year-one", "four hundred", "six hundred", "million", "thousand"], "partial"),
+    ("budget", ["budget", "pricing", "cost", "spend", "investment", "approved budget", "dollar", "price", "afford", "expensive", "cheap", "limited budget", "money", "funding", "financial", "carved", "envelope", "year one", "year-one", "four hundred", "six hundred", "million", "thousand", "budget owner", "budget range"], "partial"),
     ("budget", ["budget approved", "allocated", "signed off", "funding approved", "set aside", "earmarked", "board still has to bless", "board has to bless"], "confirmed"),
-    ("authority", ["decision maker", "economic buyer", "sign off", "cio", "cto", "vp ", "director", "board", "manager", "head of", "lead", "chief", "executive", "owner"], "partial"),
-    ("authority", ["reports to", "final say", "signatory", "approves", "i decide", "my call", "i approve"], "confirmed"),
+    ("authority", ["decision maker", "economic buyer", "sign off", "cio", "cto", "cfo", "ceo", "coo", "cpo", "vp ", "director", "board", "manager", "head of", "lead", "chief", "executive", "owner", "budget owner", "procurement", "finance", "legal", "approval committee", "steering committee"], "partial"),
+    ("authority", ["reports to", "final say", "signatory", "approves", "approve it", "need to approve", "must approve", "has to approve", "board approval", "approval path", "i decide", "my call", "i approve"], "confirmed"),
     ("need", ["pain", "problem", "challenge", "struggling", "need to", "priority", "impact", "pain point", "overcome", "solution", "looking for", "looking forward", "require", "want to", "wish we", "gap", "issue", "bottleneck", "friction", "limitation", "automat"], "partial"),
     ("need", ["must have", "critical", "urgent need", "business case", "top priority", "deal breaker", "non-negotiable"], "confirmed"),
-    ("timeline", ["timeline", "deadline", "go-live", "go live", "launch", "q1", "q2", "q3", "q4", "by end of", "this quarter", "next quarter", "this year", "next month", "asap", "soon", "urgent", "immediately", "production-grade", "pilot", "next year"], "partial"),
-    ("timeline", ["board meeting", "decision by", "kick off", "start date", "go live date", "target date", "production-grade by"], "confirmed"),
+    ("timeline", ["timeline", "deadline", "go-live", "go live", "launch", "q1", "q2", "q3", "q4", "by end of", "this quarter", "next quarter", "this year", "next month", "asap", "soon", "urgent", "immediately", "production-grade", "pilot", "next year", "kickoff", "rollout"], "partial"),
+    ("timeline", ["board meeting", "decision by", "kick off", "kickoff", "pilot kickoff", "start date", "go live date", "go-live by", "production go-live", "target date", "production-grade by"], "confirmed"),
     ("success_criteria", ["success looks like", "success criteria", "kpi", "outcome", "measure", "metric"], "partial"),
     ("stakeholders", ["stakeholder", "who else", "involved", "team members", "evaluating", "colleague"], "partial"),
     ("decision_process", ["procurement", "rfp", "evaluation process", "steps to", "approval process"], "partial"),
@@ -95,6 +95,10 @@ class ChecklistEvidence:
     snippet: str
     transcript_offset_seconds: Optional[float] = None
     confidence: float = 0.7
+    value: str = ""
+    sentiment: Optional[str] = None
+    speaker_role: Optional[str] = None
+    signal_type: Optional[str] = None
 
 
 @dataclass
@@ -136,6 +140,10 @@ class DiscoveryChecklistState:
                             "snippet": e.snippet,
                             "transcriptOffsetSeconds": e.transcript_offset_seconds,
                             "confidence": e.confidence,
+                            "value": e.value,
+                            "sentiment": e.sentiment,
+                            "speakerRole": e.speaker_role,
+                            "signalType": e.signal_type,
                         }
                         for e in it.evidence
                     ],
@@ -267,10 +275,151 @@ def initial_checklist_state(
     return state
 
 
-def _apply_signals(text: str, items: List[ChecklistItemState], snippet: str) -> List[str]:
+def _unique_join(values: List[str], *, limit: int = 4) -> str:
+    seen: set[str] = set()
+    out: List[str] = []
+    for value in values:
+        cleaned = re.sub(r"\s+", " ", value).strip(" ,.;:-")
+        if not cleaned:
+            continue
+        key = cleaned.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(cleaned)
+        if len(out) >= limit:
+            break
+    return " | ".join(out)
+
+
+_MONEY_RE = re.compile(
+    r"(?:[$€£]\s?\d[\d,.]*(?:\s?(?:k|m|b|thousand|million|billion))?"
+    r"|\b\d+(?:\.\d+)?\s*(?:k|m|b|thousand|million|billion)\b)",
+    re.I,
+)
+_MONEY_RANGE_RE = re.compile(
+    rf"{_MONEY_RE.pattern}\s*(?:-|–|—|to|through|and)\s*{_MONEY_RE.pattern}",
+    re.I,
+)
+_WORD_MONEY_RE = re.compile(
+    r"\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|"
+    r"hundred|thousand|million|billion|k)\b(?:[\s-]+(?:one|two|three|four|five|six|"
+    r"seven|eight|nine|ten|eleven|twelve|hundred|thousand|million|billion|k)\b){1,8}",
+    re.I,
+)
+_AUTHORITY_RE = re.compile(
+    r"\b(?:decision maker|economic buyer|budget owner|final approver|signatory|"
+    r"cfo|ceo|cto|cio|coo|cpo|vp(?:\s+of\s+\w+)?|director(?:\s+of\s+\w+)?|"
+    r"head of\s+\w+|board|procurement|finance|legal|security|steering committee|"
+    r"approval committee|manager|owner)\b",
+    re.I,
+)
+_MONTH_PATTERN = (
+    r"Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|"
+    r"Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December"
+)
+_TIMELINE_RE = re.compile(
+    r"\b(?:Q[1-4](?:\s+(?:pilot|kickoff|go-live|production|launch|rollout|readout|approval)){0,3}"
+    r"|(?:pilot|production|go-live|go live|launch|rollout|kickoff|readout)\s+"
+    rf"(?:by|in|before|after)\s+(?:the\s+)?(?:Q[1-4]|{_MONTH_PATTERN}|next quarter|this quarter|next month|this month)"
+    rf"|(?:by|before|after)\s+(?:the\s+)?(?:Q[1-4]|{_MONTH_PATTERN}|next quarter|this quarter|next month|this month)"
+    r"|(?:this|next)\s+(?:week|month|quarter|year)"
+    rf"|(?:\d{{1,2}}\s+)?(?:{_MONTH_PATTERN})\b)",
+    re.I,
+)
+_TIMELINE_MILESTONE_RE = re.compile(
+    r"\bQ[1-4](?:\s+(?:pilot|kickoff|go-live|production|launch|rollout|readout|approval)){1,3}\b",
+    re.I,
+)
+_NEED_RE = re.compile(
+    r"\b(?:pain|problem|challenge|struggling|bottleneck|friction|gap|manual|broken|"
+    r"nightmare|limitation|need to|need a|need an|must have|critical|priority)\b",
+    re.I,
+)
+_APPROVAL_NEED_RE = re.compile(r"\bneed(?:s)?\s+to\s+approv(?:e|al)\b", re.I)
+_PAIN_NEED_RE = re.compile(
+    r"\b(?:pain|problem|challenge|struggling|bottleneck|friction|gap|manual|broken|"
+    r"nightmare|limitation|must have|critical|priority|business case)\b",
+    re.I,
+)
+
+
+def _extract_bant_value(item_id: str, text: str, snippet: str) -> str:
+    if item_id == "budget":
+        ranges = [m.group(0) for m in _MONEY_RANGE_RE.finditer(text)]
+        amounts = [m.group(0) for m in _MONEY_RE.finditer(text)]
+        word_amounts = [
+            m.group(0)
+            for m in _WORD_MONEY_RE.finditer(text)
+            if re.search(r"\b(?:hundred|thousand|million|billion|k)\b", m.group(0), re.I)
+        ]
+        value = _unique_join([*(ranges or amounts), *word_amounts], limit=3)
+        if value:
+            return value
+    elif item_id == "authority":
+        value = _unique_join([m.group(0) for m in _AUTHORITY_RE.finditer(text)], limit=4)
+        if value:
+            return value
+    elif item_id == "timeline":
+        milestones = [m.group(0) for m in _TIMELINE_MILESTONE_RE.finditer(text)]
+        milestone_quarters = {
+            quarter.upper()
+            for value in milestones
+            for quarter in re.findall(r"\bQ[1-4]\b", value, re.I)
+        }
+        generic = []
+        for match in _TIMELINE_RE.finditer(text):
+            value = match.group(0)
+            quarters = {q.upper() for q in re.findall(r"\bQ[1-4]\b", value, re.I)}
+            if quarters and quarters.issubset(milestone_quarters) and value not in milestones:
+                continue
+            generic.append(value)
+        value = _unique_join(
+            [*milestones, *generic],
+            limit=4,
+        )
+        if value:
+            return value
+    elif item_id == "need":
+        if _NEED_RE.search(text):
+            return snippet
+    return snippet
+
+
+def _signal_type_to_item(signal_type: Optional[str]) -> Optional[str]:
+    mapping = {
+        "budget_signal": "budget",
+        "authority_signal": "authority",
+        "decision_maker_signal": "authority",
+        "timeline_signal": "timeline",
+        "need_signal": "need",
+        "pain_signal": "need",
+    }
+    return mapping.get((signal_type or "").strip())
+
+
+def _confidence_for_evidence(item_id: str, value: str, sentiment: Optional[str]) -> float:
+    if item_id in ("budget", "authority", "timeline") and value:
+        return 0.86
+    if item_id == "need" and sentiment == "negative":
+        return 0.84
+    return 0.75
+
+
+def _apply_signals(
+    text: str,
+    items: List[ChecklistItemState],
+    snippet: str,
+    *,
+    transcript_offset_seconds: Optional[float] = None,
+    sentiment: Optional[str] = None,
+    speaker_role: Optional[str] = None,
+    signal_type: Optional[str] = None,
+) -> List[str]:
     """Returns list of item ids touched by this segment (status or new evidence)."""
     lower = text.lower()
     changed: List[str] = []
+    matched_statuses: Dict[str, ChecklistItemStatus] = {}
 
     money_hit = bool(
         re.search(
@@ -278,12 +427,24 @@ def _apply_signals(text: str, items: List[ChecklistItemState], snippet: str) -> 
             lower,
         )
     )
+    signal_item_id = _signal_type_to_item(signal_type)
     for item_id, keywords, tier_status in SIGNAL_RULES:
         matched = any(kw in lower for kw in keywords)
         if item_id == "budget" and money_hit:
             matched = True
+        if item_id == "need" and sentiment == "negative" and _NEED_RE.search(text):
+            matched = True
+        if item_id == "need" and _APPROVAL_NEED_RE.search(text) and not _PAIN_NEED_RE.search(text):
+            matched = False
         if not matched:
             continue
+        current = matched_statuses.get(item_id, "pending")
+        matched_statuses[item_id] = _merge_status(current, tier_status)
+
+    if signal_item_id and signal_item_id not in matched_statuses:
+        matched_statuses[signal_item_id] = "partial"
+
+    for item_id, tier_status in matched_statuses.items():
         for it in items:
             if it.id != item_id:
                 continue
@@ -291,7 +452,18 @@ def _apply_signals(text: str, items: List[ChecklistItemState], snippet: str) -> 
             status_changed = new_status != it.status
             if status_changed:
                 it.status = new_status
-            it.evidence.append(ChecklistEvidence(snippet=snippet[:200], confidence=0.75))
+            value = _extract_bant_value(item_id, text, snippet)
+            it.evidence.append(
+                ChecklistEvidence(
+                    snippet=snippet[:200],
+                    transcript_offset_seconds=transcript_offset_seconds,
+                    confidence=_confidence_for_evidence(item_id, value, sentiment),
+                    value=value[:120],
+                    sentiment=sentiment,
+                    speaker_role=speaker_role,
+                    signal_type=signal_type,
+                )
+            )
             if len(it.evidence) > 5:
                 it.evidence = it.evidence[-5:]
             if item_id not in changed:
@@ -369,6 +541,9 @@ def update_checklist_from_segment(
     *,
     elapsed_seconds: Optional[int] = None,
     transcript_offset_seconds: Optional[float] = None,
+    sentiment: Optional[str] = None,
+    speaker_role: Optional[str] = None,
+    signal_type: Optional[str] = None,
 ) -> Tuple[DiscoveryChecklistState, List[str], List[BANTDimension]]:
     """Update checklist from a transcript segment. Returns (state, changed_ids, new_bant_dimensions)."""
     state = deepcopy(state)
@@ -379,7 +554,19 @@ def update_checklist_from_segment(
     if not snippet:
         return state, [], []
 
-    changed = _apply_signals(text, state.items, snippet)
+    changed = _apply_signals(
+        text,
+        state.items,
+        snippet,
+        transcript_offset_seconds=(
+            transcript_offset_seconds
+            if transcript_offset_seconds is not None
+            else float(elapsed_seconds) if elapsed_seconds is not None else None
+        ),
+        sentiment=sentiment,
+        speaker_role=speaker_role,
+        signal_type=signal_type,
+    )
     state.bant = _checklist_to_bant(state.items)
     state.coverage, state.bant_coverage = _compute_coverage(state.items)
     state.open_gaps = _open_gaps(state.items)
@@ -503,6 +690,10 @@ def checklist_from_dict(data: Dict[str, Any]) -> DiscoveryChecklistState:
                 snippet=e.get("snippet", ""),
                 transcript_offset_seconds=e.get("transcriptOffsetSeconds"),
                 confidence=float(e.get("confidence", 0.7)),
+                value=e.get("value", ""),
+                sentiment=e.get("sentiment"),
+                speaker_role=e.get("speakerRole"),
+                signal_type=e.get("signalType"),
             )
             for e in raw.get("evidence") or []
         ]

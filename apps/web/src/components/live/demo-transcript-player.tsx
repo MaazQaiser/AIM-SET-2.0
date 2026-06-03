@@ -58,8 +58,13 @@ export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
           `Segment ${lineIndex + 1} failed (${res.status})`
       );
     }
+    const hasTranscriptMessage =
+      Array.isArray(data.ws_messages) &&
+      data.ws_messages.some(
+        (msg) => msg && typeof msg === "object" && (msg as { type?: string }).type === "transcript"
+      );
     const ev = data.transcript_event;
-    if (ev?.text) {
+    if (!hasTranscriptMessage && ev?.text) {
       appendTranscriptEvent(transcriptEventFromDemoLine(callId, line, lineIndex));
     }
     applyApiDemoResult(data);
