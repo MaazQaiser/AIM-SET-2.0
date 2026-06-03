@@ -29,6 +29,7 @@ import type {
   NudgePayload,
   ObjectionPayload,
   PodRole,
+  SentimentSignal,
   SentimentShift,
   SuggestionLogEntry,
   TranscriptEvent,
@@ -158,6 +159,7 @@ export interface LiveCallWorkspaceProps {
   sentimentAE: number;
   sentimentCustomer: number;
   sentimentShift: SentimentShift | null;
+  sentimentSignals: SentimentSignal[];
   elapsedSeconds: number;
   isConnected: boolean;
   viewerRole: PodRole | null;
@@ -188,6 +190,7 @@ export function LiveCallWorkspace({
   sentimentAE,
   sentimentCustomer,
   sentimentShift,
+  sentimentSignals,
   elapsedSeconds,
   isConnected,
   viewerRole,
@@ -319,6 +322,7 @@ export function LiveCallWorkspace({
           sentimentAE={sentimentAE}
           sentimentCustomer={sentimentCustomer}
           sentimentShift={sentimentShift}
+          sentimentSignals={sentimentSignals}
           openGaps={openGaps}
           bantSignals={bantSignals}
           suggestionLog={suggestionLog}

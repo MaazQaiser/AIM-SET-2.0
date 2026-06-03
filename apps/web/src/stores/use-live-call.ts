@@ -6,6 +6,7 @@ import type {
   IntentSnapshot,
   KeywordStats,
   ObjectionPayload,
+  SentimentSignal,
   SentimentShift,
   SurfacedKbAsset,
   SuggestionLogEntry,
@@ -19,6 +20,7 @@ interface LiveCallState {
   transcript: TranscriptEvent[];
   pendingNudges: NudgePayload[];
   bantSignals: BantSignal[];
+  sentimentSignals: SentimentSignal[];
   elapsedSeconds: number;
   sentimentAE: number;
   sentimentCustomer: number;
@@ -37,6 +39,7 @@ interface LiveCallState {
   appendTranscriptEvent: (event: TranscriptEvent) => void;
   addNudge: (nudge: NudgePayload) => void;
   addBantSignal: (signal: BantSignal) => void;
+  addSentimentSignal: (signal: SentimentSignal) => void;
   dismissNudge: (id: string) => void;
   acceptNudge: (id: string) => void;
   updateSentiment: (ae: number, customer: number, shift?: SentimentShift | null) => void;
@@ -57,6 +60,7 @@ const initialState = {
   transcript: [],
   pendingNudges: [],
   bantSignals: [],
+  sentimentSignals: [],
   elapsedSeconds: 0,
   sentimentAE: 0,
   sentimentCustomer: 0,
@@ -151,6 +155,11 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
   addBantSignal: (signal) =>
     set((s) => ({
       bantSignals: upsertCapped(s.bantSignals, signal, (item) => item.id, 20),
+    })),
+
+  addSentimentSignal: (signal) =>
+    set((s) => ({
+      sentimentSignals: upsertCapped(s.sentimentSignals, signal, (item) => item.id, 20),
     })),
 
   dismissNudge: (id) =>

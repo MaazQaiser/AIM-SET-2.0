@@ -116,10 +116,22 @@ export interface SentimentShift {
   message: string;
 }
 
+export interface SentimentSignal {
+  id: string;
+  label: string;
+  timestamp: number;
+  speakerRole: "customer" | PodRole;
+  speakerName?: string;
+  tone: "positive" | "negative" | "neutral";
+  score: number;
+  snippet?: string;
+}
+
 export interface LiveSentimentPayload {
   ae: number;
   customer: number;
   shift?: SentimentShift | null;
+  signal?: SentimentSignal | null;
 }
 
 export interface SurfacedKbAsset {

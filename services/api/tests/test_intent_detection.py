@@ -102,6 +102,46 @@ def test_analyze_segment_prioritizes_pain_point_nudge():
     assert out["intent_update"]["pains"]
 
 
+def test_analyze_segment_emits_sentiment_signal_and_ignores_neutral_filler():
+    ctx = TenantContext(tenant_id="test-tenant-sentiment-signal", user_id="u1")
+    call_id = "call-test-sentiment-signal"
+
+    concern = analyze_segment(
+        ctx,
+        call_id,
+        {
+            "id": "sentiment-signal-1",
+            "text": "I'm not sure that you will be able to help us overcome this challenge.",
+            "speakerId": "cust-1",
+            "speakerName": "Alex",
+            "speakerRole": "customer",
+            "timestamp": 19,
+        },
+    )
+
+    assert concern["transcript"]["sentiment"] == "negative"
+    assert concern["sentiment"]["customer"] < 0
+    assert concern["sentiment"]["signal"]["tone"] == "negative"
+    assert concern["sentiment"]["signal"]["snippet"].startswith("I'm not sure")
+
+    filler = analyze_segment(
+        ctx,
+        call_id,
+        {
+            "id": "sentiment-signal-2",
+            "text": "now",
+            "speakerId": "cust-1",
+            "speakerName": "Alex",
+            "speakerRole": "customer",
+            "timestamp": 54,
+        },
+    )
+
+    assert filler["transcript"]["sentiment"] == "neutral"
+    assert filler["sentiment"]["signal"] is None
+    assert filler["sentiment"]["customer"] < 0
+
+
 def test_analyze_segment_detects_positive_customer_recovery_shift():
     ctx = TenantContext(tenant_id="test-tenant-positive-shift", user_id="u1")
     call_id = "call-test-positive-shift"

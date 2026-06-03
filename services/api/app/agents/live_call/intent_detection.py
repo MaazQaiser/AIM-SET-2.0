@@ -248,6 +248,46 @@ def _detect_sentiment_shift(
     return session.sentiment_shift if session.segment_count % 1 == 0 else None
 
 
+def _latest_meaningful_sentiment_score(
+    session: LiveCallSession,
+    series_key: str,
+    fallback: float,
+) -> float:
+    scores = (
+        float(point.get("valence", 0.0))
+        for point in reversed(session.sentiment_series.get(series_key, [])[-8:])
+    )
+    for score in scores:
+        if abs(score) >= 0.2:
+            return round(score, 3)
+    return fallback
+
+
+def _sentiment_signal(
+    transcript_payload: Dict[str, Any],
+    sentiment: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    label = sentiment.get("label")
+    if label not in ("positive", "negative"):
+        return None
+
+    speaker_role = transcript_payload.get("speakerRole") or "customer"
+    speaker_name = transcript_payload.get("speakerName") or "Speaker"
+    role_label = "Customer" if speaker_role == "customer" else "AE"
+    tone_label = "concern" if label == "negative" else "upbeat"
+    score = float(sentiment.get("score") or 0.0)
+    return {
+        "id": f"sentiment-{transcript_payload.get('id') or uuid.uuid4()}",
+        "label": f"{role_label} sentiment: {tone_label}",
+        "timestamp": float(transcript_payload.get("timestamp") or 0),
+        "speakerRole": speaker_role,
+        "speakerName": speaker_name,
+        "tone": label,
+        "score": score,
+        "snippet": (transcript_payload.get("text") or "")[:200],
+    }
+
+
 def _retrieve_kb_hits(ctx: TenantContext, query: str, limit: int = 3) -> List[Dict[str, Any]]:
     settings = get_settings()
     try:
@@ -314,9 +354,17 @@ def analyze_segment(
     session.sentiment_series[series_key] = session.sentiment_series[series_key][-120:]
 
     if series_key == "ae":
-        session.last_ae_score = sentiment["score"]
+        session.last_ae_score = _latest_meaningful_sentiment_score(
+            session,
+            series_key,
+            session.last_ae_score,
+        )
     else:
-        session.last_customer_score = sentiment["score"]
+        session.last_customer_score = _latest_meaningful_sentiment_score(
+            session,
+            series_key,
+            session.last_customer_score,
+        )
 
     new_pains = _detect_pains(text, session, call_id, timestamp)
     shift = _detect_sentiment_shift(session, speaker_role, sentiment["score"], timestamp)
@@ -332,6 +380,7 @@ def analyze_segment(
         "sentiment": sentiment["label"],
         "signalType": kw_result.get("signal_type"),
     }
+    sentiment_signal = _sentiment_signal(transcript_payload, sentiment)
 
     nudge: Optional[Dict[str, Any]] = None
     focus_suggestion: Optional[Dict[str, Any]] = None
@@ -465,6 +514,7 @@ def analyze_segment(
             "ae": session.last_ae_score,
             "customer": session.last_customer_score,
             "shift": shift,
+            "signal": sentiment_signal,
         },
         "nudge": nudge,
         "citations": citations,

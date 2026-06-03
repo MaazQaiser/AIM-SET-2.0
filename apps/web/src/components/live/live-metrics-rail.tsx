@@ -4,7 +4,13 @@ import { useMemo } from "react";
 import { filterKeywordCounts } from "@/lib/live/keyword-filter";
 import { formatSentimentScore, scoreToTone } from "@/lib/live/sentiment-display";
 import type { BantSignal, DiscoveryChecklistState } from "@dc-copilot/types";
-import type { KeywordStats, SentimentShift, SuggestionLogEntry, TranscriptEvent } from "@/types";
+import type {
+  KeywordStats,
+  SentimentSignal,
+  SentimentShift,
+  SuggestionLogEntry,
+  TranscriptEvent,
+} from "@/types";
 import { LiveSubsectionHeader } from "@/components/live/live-column-header";
 import { SignalLog } from "@/components/live/signal-log";
 import { SuggestionLog } from "@/components/live/suggestion-log";
@@ -52,6 +58,7 @@ interface LiveMetricsRailProps {
   sentimentAE: number;
   sentimentCustomer: number;
   sentimentShift: SentimentShift | null;
+  sentimentSignals: SentimentSignal[];
   openGaps: string[];
   bantSignals: BantSignal[];
   suggestionLog: SuggestionLogEntry[];
@@ -220,6 +227,56 @@ function SentimentScoreRow({
   );
 }
 
+function sentimentSignalClass(tone: SentimentSignal["tone"]): string {
+  if (tone === "positive") return "border-success/40 bg-success/5";
+  if (tone === "negative") return "border-destructive/40 bg-destructive/5";
+  return "border-border bg-muted/20";
+}
+
+function sentimentSignalTextClass(tone: SentimentSignal["tone"]): string {
+  if (tone === "positive") return "text-success";
+  if (tone === "negative") return "text-destructive";
+  return "text-muted-foreground";
+}
+
+function SentimentSignalLog({ signals }: { signals: SentimentSignal[] }) {
+  if (signals.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Sentiment signals will appear when customer concern or confidence changes.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="space-y-1.5">
+      {[...signals].reverse().slice(0, 6).map((signal) => (
+        <li
+          key={signal.id}
+          className={cn("rounded-lg border px-2.5 py-2", sentimentSignalClass(signal.tone))}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-xs font-semibold text-foreground">{signal.label}</p>
+            <span
+              className={cn(
+                "shrink-0 text-[10px] font-semibold",
+                sentimentSignalTextClass(signal.tone)
+              )}
+            >
+              {formatSentimentScore(signal.score)}
+            </span>
+          </div>
+          {signal.snippet && (
+            <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+              {signal.snippet}
+            </p>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function LiveMetricsRail({
   checklist,
   keywordStats,
@@ -228,6 +285,7 @@ export function LiveMetricsRail({
   sentimentAE,
   sentimentCustomer,
   sentimentShift,
+  sentimentSignals,
   openGaps,
   bantSignals,
   suggestionLog,
@@ -254,6 +312,11 @@ export function LiveMetricsRail({
         <BantLiveTiles checklist={checklist} />
       </section>
 
+      <section data-testid="sentiment-signals-section">
+        <LiveSubsectionHeader title="Sentiment signals" />
+        <SentimentSignalLog signals={sentimentSignals} />
+      </section>
+
       <section>
         <LiveSubsectionHeader title="BANT signals" />
         <SignalLog signals={bantSignals} />
@@ -277,7 +340,7 @@ export function LiveMetricsRail({
         )}
       </section>
 
-      <section>
+      <section data-testid="sentiment-section">
         <LiveSubsectionHeader title="Sentiment" />
         <div className="mb-2 grid grid-cols-2 gap-2">
           <SentimentScoreRow label="Customer" score={sentimentCustomer} />

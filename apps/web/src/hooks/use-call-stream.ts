@@ -12,6 +12,7 @@ import type {
   LiveSentimentPayload,
   ObjectionPayload,
   PodRole,
+  SentimentSignal,
   SurfacedKbAsset,
   SuggestionLogEntry,
   UnansweredQuestionPayload,
@@ -23,6 +24,7 @@ type StreamMessage =
   | { type: "transcript"; payload: TranscriptEvent }
   | { type: "nudge"; payload: NudgePayload }
   | { type: "sentiment"; payload: LiveSentimentPayload }
+  | { type: "sentiment_signal"; payload: SentimentSignal }
   | { type: "intent_update"; payload: IntentSnapshot }
   | { type: "keyword_stats"; payload: KeywordStats }
   | { type: "bant_signal"; payload: BantSignal }
@@ -125,6 +127,12 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
                   msg.payload.customer,
                   msg.payload.shift ?? null
                 );
+                if (msg.payload.signal) {
+                  store.addSentimentSignal(msg.payload.signal);
+                }
+                break;
+              case "sentiment_signal":
+                store.addSentimentSignal(msg.payload);
                 break;
               case "intent_update":
                 store.applyIntentUpdate(msg.payload);

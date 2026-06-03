@@ -37,6 +37,7 @@ export default function LiveCallPage({ params }: LivePageParams) {
   const sentimentAE = useLiveCall((s) => s.sentimentAE);
   const sentimentCustomer = useLiveCall((s) => s.sentimentCustomer);
   const sentimentShift = useLiveCall((s) => s.sentimentShift);
+  const sentimentSignals = useLiveCall((s) => s.sentimentSignals);
   const isConnected = useLiveCall((s) => s.isConnected);
   const objections = useLiveCall((s) => s.objections);
   const unansweredQuestions = useLiveCall((s) => s.unansweredQuestions);
@@ -111,6 +112,7 @@ export default function LiveCallPage({ params }: LivePageParams) {
       sentimentAE={sentimentAE}
       sentimentCustomer={sentimentCustomer}
       sentimentShift={sentimentShift}
+      sentimentSignals={sentimentSignals}
       elapsedSeconds={elapsedSeconds}
       isConnected={isConnected}
       viewerRole={viewerRole}

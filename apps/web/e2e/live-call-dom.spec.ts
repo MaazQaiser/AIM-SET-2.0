@@ -84,7 +84,7 @@ test.describe("Live call cockpit — DOM + API", () => {
       timeout: 45_000,
     });
 
-    const sentimentSection = page.locator("section", { hasText: "Sentiment" }).first();
+    const sentimentSection = page.getByTestId("sentiment-section");
     await expect(sentimentSection).toContainText("Customer");
     await expect
       .poll(async () => sentimentSection.innerText(), { timeout: 45_000 })
@@ -166,7 +166,8 @@ test.describe("Live call cockpit — DOM + API", () => {
     await page.goto(`/calls/${CALL_ID}/live`, { waitUntil: "domcontentloaded" });
     await expect(page.getByText("Connecting stream…")).toBeHidden({ timeout: 25_000 });
 
-    const sentimentSection = page.locator("section", { hasText: "Sentiment" }).first();
+    const sentimentSection = page.getByTestId("sentiment-section");
+    const sentimentSignalsSection = page.getByTestId("sentiment-signals-section");
     const customerTile = sentimentSection.locator('[data-sentiment-label="customer"]');
     const currentBar = sentimentSection.locator('[data-current-sentiment="true"]').last();
 
@@ -183,6 +184,10 @@ test.describe("Live call cockpit — DOM + API", () => {
       .poll(async () => currentBar.getAttribute("data-sentiment-tone"), { timeout: 25_000 })
       .toBe("negative");
     await expect(sentimentSection).toContainText(/Customer\s*-\d+%\s+concern/i);
+    await expect(sentimentSignalsSection).toContainText(/Customer sentiment:\s*concern/i, {
+      timeout: 25_000,
+    });
+    await expect(sentimentSignalsSection).toContainText(/nightmare and a bottleneck/i);
 
     await postDemoSegment(request, {
       text: "That's a great first answer and exactly what we needed. We are excited to move forward.",
@@ -197,5 +202,6 @@ test.describe("Live call cockpit — DOM + API", () => {
       .poll(async () => currentBar.getAttribute("data-sentiment-tone"), { timeout: 25_000 })
       .toBe("positive");
     await expect(sentimentSection).toContainText(/Customer\s*\+\d+%\s+upbeat/i);
+    await expect(sentimentSignalsSection).toContainText(/Customer sentiment:\s*upbeat/i);
   });
 });

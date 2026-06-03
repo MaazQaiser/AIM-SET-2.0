@@ -82,6 +82,50 @@ describe("useLiveCall live page state regressions", () => {
     expect(useLiveCall.getState().sentimentAE).toBe(0.1);
   });
 
+  it("keeps sentiment signals from API demo fallback websocket messages", () => {
+    applyApiDemoResult({
+      ws_messages: [
+        {
+          type: "sentiment",
+          payload: {
+            ae: 0,
+            customer: -0.5,
+            shift: null,
+            signal: {
+              id: "sentiment-segment-1",
+              label: "Customer sentiment: concern",
+              timestamp: 19,
+              speakerRole: "customer",
+              speakerName: "Alex",
+              tone: "negative",
+              score: -0.5,
+              snippet: "I'm not sure that you will be able to help us.",
+            },
+          },
+        },
+        {
+          type: "sentiment_signal",
+          payload: {
+            id: "sentiment-segment-2",
+            label: "Customer sentiment: upbeat",
+            timestamp: 30,
+            speakerRole: "customer",
+            speakerName: "Alex",
+            tone: "positive",
+            score: 0.5,
+            snippet: "This is exactly what we need.",
+          },
+        },
+      ],
+    });
+
+    const state = useLiveCall.getState();
+    expect(state.sentimentSignals).toHaveLength(2);
+    expect(state.sentimentSignals[0].tone).toBe("negative");
+    expect(state.sentimentSignals[0].snippet).toContain("not sure");
+    expect(state.sentimentSignals[1].tone).toBe("positive");
+  });
+
   it("applies enriched transcript and sentiment from API demo fallback messages", () => {
     applyApiDemoResult({
       ws_messages: [
