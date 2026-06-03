@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -18,6 +18,7 @@ from app.services.transcript_provider.recall_client import (
 router = APIRouter(prefix="/api/v1/calls", tags=["calls"])
 _calls = CallsService()
 _orch = Orchestrator()
+_poll_emitted_event_ids: Dict[str, Set[str]] = {}
 
 
 @router.get("")
@@ -162,6 +163,8 @@ async def poll_transcript(
     channel = get_call_channel()
     new_count = 0
     new_events: List[Dict[str, Any]] = []
+    seen_key = f"{ctx.tenant_id}:{call_id}"
+    seen_ids = _poll_emitted_event_ids.setdefault(seen_key, set())
     for seg in raw_segments:
         words = seg.get("words") or []
         text = " ".join(w.get("text", "") if isinstance(w, dict) else str(w) for w in words).strip()
@@ -170,12 +173,40 @@ async def poll_transcript(
         if not text:
             continue
 
-        speaker = seg.get("speaker") or "unknown"
-        speaker_name = speaker
-        if isinstance(seg.get("participant"), dict):
-            speaker_name = seg["participant"].get("name") or speaker
+        participant = seg.get("participant") if isinstance(seg.get("participant"), dict) else {}
+        speaker_raw = seg.get("speaker")
+        speaker_obj = speaker_raw if isinstance(speaker_raw, dict) else {}
+        speaker = (
+            speaker_obj.get("id")
+            or speaker_obj.get("speaker_id")
+            or speaker_obj.get("name")
+            or speaker_obj.get("display_name")
+            or speaker_obj.get("displayName")
+            or speaker_raw
+            or seg.get("speaker_id")
+            or "unknown"
+        )
+        speaker_name = (
+            participant.get("name")
+            or participant.get("display_name")
+            or participant.get("displayName")
+            or seg.get("speaker_name")
+            or seg.get("participant_name")
+            or seg.get("participantName")
+            or speaker_obj.get("name")
+            or speaker_obj.get("display_name")
+            or speaker_obj.get("displayName")
+            or speaker
+        )
+        speaker_id = (
+            participant.get("id")
+            or seg.get("speaker_id")
+            or seg.get("participant_id")
+            or seg.get("participantId")
+            or speaker
+        )
 
-        peid = hashlib.sha256(f"{bot_id}:{speaker}:{text[:50]}".encode()).hexdigest()[:32]
+        peid = hashlib.sha256(f"{bot_id}:{speaker_id}:{text[:50]}".encode()).hexdigest()[:32]
 
         offset = 0.0
         if words and isinstance(words[0], dict):
@@ -190,36 +221,40 @@ async def poll_transcript(
 
         event = {
             "id": peid,
-            "speaker_id": speaker_name,
+            "speaker_id": str(speaker_id),
+            "speaker_name": str(speaker_name),
             "speaker_role": "customer",
             "text": text,
             "offset_seconds": offset,
             "provider": "recall",
             "provider_event_id": peid,
         }
-        stored = repo.append_transcript_event(ctx, call_id, event)
-        if not stored.get("_deduped"):
-            new_count += 1
-            new_events.append(stored)
-            await channel.broadcast(call_id, transcript_event_to_ws(event))
+        if peid in seen_ids:
+            continue
 
-            async def _analyze_and_broadcast(ev: Dict[str, Any] = event) -> None:
-                try:
-                    result = await asyncio.to_thread(
-                        _orch.dispatch_live_segment,
-                        ctx,
-                        call_id,
-                        ev,
-                        elapsed_seconds=int(ev.get("offset_seconds", 0)),
-                    )
-                    for msg in result.get("ws_messages") or []:
-                        if msg.get("type") == "transcript":
-                            continue
-                        await channel.broadcast(call_id, msg)
-                except Exception:
-                    pass
+        seen_ids.add(peid)
+        new_count += 1
+        new_events.append(event)
+        await channel.broadcast(call_id, transcript_event_to_ws(event))
 
-            asyncio.create_task(_analyze_and_broadcast())
+        async def _persist_analyze_and_broadcast(ev: Dict[str, Any] = event) -> None:
+            try:
+                stored = await asyncio.to_thread(repo.append_transcript_event, ctx, call_id, ev)
+                if stored.get("_deduped"):
+                    return
+                result = await asyncio.to_thread(
+                    _orch.dispatch_live_segment,
+                    ctx,
+                    call_id,
+                    ev,
+                    elapsed_seconds=int(ev.get("offset_seconds", 0)),
+                )
+                for msg in result.get("ws_messages") or []:
+                    await channel.broadcast(call_id, msg)
+            except Exception:
+                pass
+
+        asyncio.create_task(_persist_analyze_and_broadcast())
 
     return {
         "ok": True,

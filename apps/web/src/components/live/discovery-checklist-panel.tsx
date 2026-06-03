@@ -13,12 +13,16 @@ import { cn } from "@/lib/cn";
 import type { BANTScore } from "@/types";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
 
-function bantEvidenceFromChecklist(state: DiscoveryChecklistState): Partial<Record<keyof BANTScore, string>> {
+function bantEvidenceFromChecklist(
+  state: DiscoveryChecklistState
+): Partial<Record<keyof BANTScore, string>> {
   const out: Partial<Record<keyof BANTScore, string>> = {};
   for (const item of state.items.filter((i) => i.tier === "bant")) {
-    const snippet = item.evidence?.[0]?.snippet;
-    if (snippet) {
-      out[item.id as keyof BANTScore] = snippet;
+    const evidence = item.evidence?.[item.evidence.length - 1];
+    const text = evidence?.value || evidence?.snippet;
+    if (text) {
+      out[item.id as keyof BANTScore] =
+        evidence?.sentiment === "negative" ? `Customer concern: ${text}` : text;
     }
   }
   return out;
@@ -179,11 +183,7 @@ function DiscoveryChecklistBriefCard({
         )}
 
         {!embedded && (
-          <BriefDetailAccordion
-            title="Overall qualification"
-            summary={`${allPct}% coverage`}
-            loud
-          >
+          <BriefDetailAccordion title="Overall qualification" summary={`${allPct}% coverage`} loud>
             <ChecklistCoverageProgress percent={allPct} openGapCount={openGapCount} />
           </BriefDetailAccordion>
         )}
@@ -316,6 +316,7 @@ function ChecklistCoverageProgress({
       <div
         className="h-2.5 w-full overflow-hidden rounded-full bg-muted"
         role="progressbar"
+        tabIndex={0}
         aria-valuenow={percent}
         aria-valuemin={0}
         aria-valuemax={100}

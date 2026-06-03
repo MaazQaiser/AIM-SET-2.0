@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -13,6 +14,8 @@ from app.domain.call_channel import get_call_channel
 from app.domain.calls_service import CallsService
 from app.domain.live_call_repository import get_live_call_repository
 from app.orchestrator.live_broadcast import envelope_to_ws_messages, transcript_event_to_ws
+
+_logger = logging.getLogger(__name__)
 
 
 def _now_iso() -> str:
@@ -73,7 +76,7 @@ def _persist_and_collect_messages(
         elif envelope.operation == "objection_detected":
             target_role = envelope.result.get("target_role") or "ae"
 
-        if envelope.operation not in ("signal_annotation", "intent_snapshot"):
+        if envelope.operation not in ("signal_annotation", "intent_snapshot", "intent_update"):
             repo.append_suggestion(
                 ctx,
                 call_id,
@@ -117,6 +120,13 @@ def handle_transcript_segment(
     normalized = {
         "id": segment.get("id") or str(uuid.uuid4()),
         "speaker_id": segment.get("speakerId") or segment.get("speaker_id") or "unknown",
+        "speaker_name": (
+            segment.get("speakerName")
+            or segment.get("speaker_name")
+            or segment.get("speakerId")
+            or segment.get("speaker_id")
+            or "Speaker"
+        ),
         "speaker_role": segment.get("speakerRole") or segment.get("speaker_role") or "customer",
         "text": segment.get("text") or "",
         "offset_seconds": float(
@@ -128,8 +138,11 @@ def handle_transcript_segment(
         "provider_event_id": segment.get("provider_event_id"),
     }
     stored = repo.append_transcript_event(ctx, call_id, normalized)
-    stored["speaker_name"] = segment.get("speakerName") or segment.get("speaker_name") or stored.get(
-        "speaker_id"
+    stored["speaker_name"] = (
+        segment.get("speakerName")
+        or segment.get("speaker_name")
+        or stored.get("speaker_name")
+        or stored.get("speaker_id")
     )
 
     analysis = analyze_segment(
@@ -139,25 +152,52 @@ def handle_transcript_segment(
             "id": stored["id"],
             "text": stored["text"],
             "speakerId": stored["speaker_id"],
-            "speakerName": segment.get("speakerName") or stored["speaker_id"],
+            "speakerName": stored.get("speaker_name") or stored["speaker_id"],
             "speakerRole": stored["speaker_role"],
             "timestamp": stored["offset_seconds"],
         },
     )
+    transcript_update = analysis.get("transcript") or {}
+    has_transcript_analysis = False
+    if transcript_update:
+        keywords = transcript_update.get("keywords")
+        if keywords is not None:
+            stored["keywords"] = keywords
+            has_transcript_analysis = True
+        if transcript_update.get("sentiment") is not None:
+            stored["sentiment"] = transcript_update.get("sentiment")
+            has_transcript_analysis = True
+        signal_type = transcript_update.get("signalType") or transcript_update.get("signal_type")
+        if signal_type is not None:
+            stored["signal_type"] = signal_type
+            has_transcript_analysis = True
+    if has_transcript_analysis:
+        repo.update_transcript_event_analysis(
+            ctx,
+            call_id,
+            str(stored["id"]),
+            keywords=stored.get("keywords"),
+            sentiment=stored.get("sentiment"),
+            signal_type=stored.get("signal_type"),
+        )
 
-    brief = CallsService().get_brief(ctx, call_id)
-    advanced = process_transcript_segment(
-        ctx,
-        call_id,
-        {
-            "text": stored["text"],
-            "speaker_id": stored["speaker_id"],
-            "speaker_role": stored["speaker_role"],
-            "offset_seconds": stored["offset_seconds"],
-            "keywords": (analysis.get("transcript") or {}).get("keywords"),
-        },
-        brief=brief,
-    )
+    advanced: List[AgentEnvelope] = []
+    try:
+        brief = CallsService().get_brief(ctx, call_id)
+        advanced = process_transcript_segment(
+            ctx,
+            call_id,
+            {
+                "text": stored["text"],
+                "speaker_id": stored["speaker_id"],
+                "speaker_role": stored["speaker_role"],
+                "offset_seconds": stored["offset_seconds"],
+                "keywords": (analysis.get("transcript") or {}).get("keywords"),
+            },
+            brief=brief,
+        )
+    except Exception:
+        _logger.exception("advanced live-call analysis failed call_id=%s", call_id)
 
     envelopes: List[AgentEnvelope] = [_analysis_to_envelope(call_id, analysis)]
     channel = get_call_channel()
@@ -169,6 +209,8 @@ def handle_transcript_segment(
                 channel.broadcast_sync(call_id, bant_ws)
             if envelopes[0].operation != "proactive_nudge":
                 continue
+        if env.operation == "proactive_nudge" and envelopes[0].operation == "proactive_nudge":
+            continue
         if env.operation in (
             "proactive_nudge",
             "objection_detected",

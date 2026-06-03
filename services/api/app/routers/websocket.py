@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -42,6 +43,8 @@ async def _process_live_segment(
     """Broadcast transcript instantly, then run analysis in background."""
     lock = _dispatch_locks.setdefault(call_id, asyncio.Lock())
     channel = get_call_channel()
+    if not segment.get("id"):
+        segment["id"] = str(uuid.uuid4())
 
     # Broadcast transcript IMMEDIATELY (<1s)
     transcript_ws = transcript_event_to_ws(segment)
@@ -56,10 +59,8 @@ async def _process_live_segment(
                 call_id,
                 segment,
                 elapsed_seconds=elapsed_seconds,
-            )
+        )
         for msg in out.get("ws_messages") or []:
-            if msg.get("type") == "transcript":
-                continue  # already sent above
             await channel.broadcast(call_id, msg)
     except Exception:
         _logger.exception("live segment dispatch failed call_id=%s", call_id)

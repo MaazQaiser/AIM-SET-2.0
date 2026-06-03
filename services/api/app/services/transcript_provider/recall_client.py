@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, Optional
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import httpx
 
@@ -38,7 +38,8 @@ def create_recall_live_bot(
         )
 
     base_url = _recall_base_url(settings.recall_region)
-    webhook_url = _webhook_url(settings.public_api_base_url, ctx, call_id)
+    public_base_url = _validate_public_webhook_base_url(settings.public_api_base_url)
+    webhook_url = _webhook_url(public_base_url, ctx, call_id)
     payload = _create_bot_payload(settings.recall_bot_name, meeting_url, webhook_url, ctx, call_id)
 
     try:
@@ -87,10 +88,11 @@ def create_recall_live_bot(
 
 
 def poll_recall_transcript(bot_id: str) -> list[Dict[str, Any]]:
-    """Fetch transcript from Recall bot object (polling fallback when webhooks fail).
+    """Fetch completed transcript segments from Recall.
 
-    During a live call, the bot object's `transcript` field accumulates
-    completed sentences. We read that field directly.
+    Real-time transcript is delivered through Recall realtime endpoints while
+    the meeting is live. Once the recording transcript artifact is done, Recall
+    exposes the final transcript via `recordings[].media_shortcuts.transcript`.
     """
     settings = get_settings()
     if not settings.recall_api_key:
@@ -113,10 +115,14 @@ def poll_recall_transcript(bot_id: str) -> list[Dict[str, Any]]:
         data = response.json()
     except ValueError:
         return []
-    # The bot object has a `transcript` list with completed utterances
+
+    # Kept for compatibility with older Recall response shapes.
     transcript = data.get("transcript")
     if isinstance(transcript, list):
         return transcript
+    downloaded = _download_recording_transcript(data, settings.recall_api_key)
+    if downloaded:
+        return downloaded
     return []
 
 
@@ -131,6 +137,38 @@ def _recall_base_url(region: str) -> str:
     return f"https://{region}.recall.ai"
 
 
+def _normalize_public_webhook_base_url(public_api_base_url: str) -> str:
+    raw = str(public_api_base_url or "").strip()
+    parsed = urlparse(raw)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise RecallConfigurationError(
+            "PUBLIC_API_BASE_URL must be a public HTTPS URL with a host "
+            "(for example, https://your-tunnel.ngrok-free.app). "
+            "This is the API webhook tunnel URL, not the meeting link."
+        )
+    path = parsed.path.rstrip("/")
+    return f"https://{parsed.netloc}{path}".rstrip("/")
+
+
+def _validate_public_webhook_base_url(public_api_base_url: str) -> str:
+    base = _normalize_public_webhook_base_url(public_api_base_url)
+
+    health_url = f"{base}/health"
+    try:
+        response = httpx.get(health_url, timeout=5, follow_redirects=True)
+    except httpx.HTTPError as exc:
+        raise RecallConfigurationError(
+            f"PUBLIC_API_BASE_URL is not reachable at {health_url}. "
+            "Start or update the API tunnel before launching a Recall bot."
+        ) from exc
+    if response.status_code >= 400:
+        raise RecallConfigurationError(
+            f"PUBLIC_API_BASE_URL is not reachable at {health_url} "
+            f"(returned {response.status_code}). Start or update the API tunnel before launching a Recall bot."
+        )
+    return base
+
+
 def _authorization_header(api_key: str) -> str:
     api_key = api_key.strip()
     if api_key.lower().startswith("token "):
@@ -138,8 +176,62 @@ def _authorization_header(api_key: str) -> str:
     return f"Token {api_key}"
 
 
+def _download_recording_transcript(bot: Dict[str, Any], api_key: str) -> list[Dict[str, Any]]:
+    for recording in bot.get("recordings") or []:
+        if not isinstance(recording, dict):
+            continue
+        shortcut = _dict_or_empty(recording.get("media_shortcuts")).get("transcript")
+        transcript = _dict_or_empty(shortcut)
+        data = _dict_or_empty(transcript.get("data"))
+        download_url = data.get("download_url")
+        if not download_url:
+            continue
+        segments = _fetch_transcript_download(str(download_url), api_key)
+        if segments:
+            return segments
+    return []
+
+
+def _fetch_transcript_download(download_url: str, api_key: str) -> list[Dict[str, Any]]:
+    headers = {"accept": "application/json"}
+    try:
+        response = httpx.get(download_url, headers=headers, timeout=20, follow_redirects=True)
+        if response.status_code in (401, 403) and "recall.ai" in urlparse(download_url).netloc:
+            response = httpx.get(
+                download_url,
+                headers={**headers, "Authorization": _authorization_header(api_key)},
+                timeout=20,
+                follow_redirects=True,
+            )
+    except httpx.HTTPError:
+        return []
+    if response.status_code >= 400:
+        return []
+    try:
+        payload = response.json()
+    except ValueError:
+        return []
+    return _transcript_segments_from_download(payload)
+
+
+def _transcript_segments_from_download(payload: Any) -> list[Dict[str, Any]]:
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+    if not isinstance(payload, dict):
+        return []
+    for key in ("segments", "transcript", "utterances", "data"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+    return []
+
+
+def _dict_or_empty(value: Any) -> Dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
 def _webhook_url(public_api_base_url: str, ctx: TenantContext, call_id: str) -> str:
-    base = public_api_base_url.strip().rstrip("/")
+    base = _normalize_public_webhook_base_url(public_api_base_url)
     query = urlencode(
         {
             "call_id": call_id,

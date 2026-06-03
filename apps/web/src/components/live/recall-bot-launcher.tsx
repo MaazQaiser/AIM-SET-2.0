@@ -13,6 +13,16 @@ interface RecallBotLauncherProps {
   meetingUrl?: string;
 }
 
+function displayLaunchError(message: string): string {
+  if (message.startsWith("PUBLIC_API_BASE_URL is not reachable")) {
+    return "API tunnel is not reachable. Update PUBLIC_API_BASE_URL in services/api/.env and restart the API.";
+  }
+  if (message.startsWith("PUBLIC_API_BASE_URL must be")) {
+    return "API tunnel URL is invalid. Set PUBLIC_API_BASE_URL to a public HTTPS API URL, not the meeting link.";
+  }
+  return message;
+}
+
 export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps) {
   const [value, setValue] = useState(meetingUrl ?? "");
   const [loading, setLoading] = useState(false);
@@ -48,9 +58,7 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
         botId?: string;
       };
       if (!res.ok) {
-        throw new Error(
-          body.error ?? body.detail ?? `Recall bot launch failed (${res.status})`
-        );
+        throw new Error(body.error ?? body.detail ?? `Recall bot launch failed (${res.status})`);
       }
       launchedUrlRef.current = meetingUrlValue;
       setStatus("ready");
@@ -59,7 +67,9 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
       startPolling();
     } catch (err) {
       setStatus("error");
-      setMessage(err instanceof Error ? err.message : "Recall bot launch failed");
+      setMessage(
+        displayLaunchError(err instanceof Error ? err.message : "Recall bot launch failed")
+      );
     } finally {
       setLoading(false);
     }
@@ -81,7 +91,7 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
 
   function startPolling() {
     if (pollRef.current) return;
-    pollRef.current = setInterval(() => {
+    const pollOnce = () => {
       void (async () => {
         try {
           const res = await fetch(`/api/calls/${encodeURIComponent(callId)}/poll-transcript`, {
@@ -92,6 +102,7 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
             events?: Array<{
               id?: string;
               speaker_id?: string;
+              speaker_name?: string;
               speaker_role?: string;
               text?: string;
               offset_seconds?: number;
@@ -103,7 +114,7 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
             const mapped: TranscriptEvent = {
               id: ev.id ?? crypto.randomUUID(),
               speakerId: ev.speaker_id ?? "unknown",
-              speakerName: ev.speaker_id ?? "Speaker",
+              speakerName: ev.speaker_name ?? ev.speaker_id ?? "Speaker",
               speakerRole: (ev.speaker_role as TranscriptEvent["speakerRole"]) ?? "customer",
               text: ev.text ?? "",
               timestamp: ev.offset_seconds ?? 0,
@@ -115,7 +126,9 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
           // ignore poll errors
         }
       })();
-    }, 5000);
+    };
+    pollOnce();
+    pollRef.current = setInterval(pollOnce, 2000);
   }
 
   useEffect(() => {

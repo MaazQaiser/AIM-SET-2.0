@@ -99,6 +99,27 @@ function uniqueBy<T>(items: T[], getKey: (item: T) => unknown): T[] {
   });
 }
 
+function mergeTranscriptEvent(
+  existing: TranscriptEvent,
+  incoming: TranscriptEvent
+): TranscriptEvent {
+  return {
+    ...existing,
+    ...incoming,
+    id: incoming.id || existing.id,
+    speakerId: incoming.speakerId || existing.speakerId,
+    speakerName: incoming.speakerName || existing.speakerName,
+    speakerRole: incoming.speakerRole ?? existing.speakerRole,
+    text: incoming.text || existing.text,
+    timestamp: Number.isFinite(incoming.timestamp)
+      ? incoming.timestamp
+      : existing.timestamp,
+    keywords: incoming.keywords?.length ? incoming.keywords : existing.keywords,
+    sentiment: incoming.sentiment ?? existing.sentiment,
+    signalType: incoming.signalType ?? existing.signalType,
+  };
+}
+
 export const useLiveCall = create<LiveCallState>((set, get) => ({
   ...initialState,
 
@@ -108,6 +129,13 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
   appendTranscriptEvent: (event) => {
     const eventId = stableKey(event.id);
     if (eventId && get().transcript.some((existing) => stableKey(existing.id) === eventId)) {
+      set((s) => ({
+        transcript: s.transcript.map((existing) =>
+          stableKey(existing.id) === eventId
+            ? mergeTranscriptEvent(existing, event)
+            : existing
+        ),
+      }));
       return;
     }
     set((s) => ({
@@ -182,10 +210,14 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
       ),
     })),
 
-  appendSuggestionLog: (entry) =>
+  appendSuggestionLog: (entry) => {
+    if (entry.operation === "intent_snapshot" || entry.operation === "intent_update") {
+      return;
+    }
     set((s) => ({
       suggestionLog: upsertCapped(s.suggestionLog, entry, (item) => item.id, 50),
-    })),
+    }));
+  },
 
   tickElapsed: () => set((s) => ({ elapsedSeconds: s.elapsedSeconds + 1 })),
 

@@ -29,6 +29,7 @@ import type {
   NudgePayload,
   ObjectionPayload,
   PodRole,
+  SentimentShift,
   SuggestionLogEntry,
   TranscriptEvent,
   UnansweredQuestionPayload,
@@ -59,14 +60,12 @@ function buildAssistantFeed({
   nudges,
   objections,
   unansweredQuestions,
-  suggestionLog,
   onAcceptNudge,
   onDismissNudge,
 }: {
   nudges: NudgePayload[];
   objections: ObjectionPayload[];
   unansweredQuestions: UnansweredQuestionPayload[];
-  suggestionLog: SuggestionLogEntry[];
   onAcceptNudge: (id: string) => void;
   onDismissNudge: (id: string) => void;
 }): AssistantFeedItem[] {
@@ -118,16 +117,6 @@ function buildAssistantFeed({
     });
   }
 
-  for (const s of suggestionLog.slice(-2)) {
-    items.push({
-      id: `suggestion-${s.timestamp}-${s.operation}`,
-      kind: "insight",
-      message: s.summary ?? s.operation.replace(/_/g, " "),
-      contextLabel: "AI suggestion",
-      actionLabel: "Review",
-    });
-  }
-
   return items;
 }
 
@@ -165,7 +154,9 @@ export interface LiveCallWorkspaceProps {
   intentLabel?: string;
   intentSnapshot: IntentSnapshot | null;
   keywordStats: KeywordStats | null;
+  sentimentAE: number;
   sentimentCustomer: number;
+  sentimentShift: SentimentShift | null;
   elapsedSeconds: number;
   isConnected: boolean;
   viewerRole: PodRole | null;
@@ -192,7 +183,9 @@ export function LiveCallWorkspace({
   intentLabel,
   intentSnapshot,
   keywordStats,
+  sentimentAE,
   sentimentCustomer,
+  sentimentShift,
   elapsedSeconds,
   isConnected,
   viewerRole,
@@ -216,7 +209,6 @@ export function LiveCallWorkspace({
       nudges: visibleNudges,
       objections,
       unansweredQuestions,
-      suggestionLog,
       onAcceptNudge,
       onDismissNudge,
     });
@@ -228,7 +220,6 @@ export function LiveCallWorkspace({
     visibleNudges,
     objections,
     unansweredQuestions,
-    suggestionLog,
     onAcceptNudge,
     onDismissNudge,
     assistantScope,
@@ -323,7 +314,9 @@ export function LiveCallWorkspace({
           keywordStats={keywordStats}
           keywords={keywords}
           transcript={transcript}
+          sentimentAE={sentimentAE}
           sentimentCustomer={sentimentCustomer}
+          sentimentShift={sentimentShift}
           openGaps={openGaps}
         />
       </div>

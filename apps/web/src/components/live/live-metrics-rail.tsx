@@ -2,15 +2,21 @@
 
 import { useMemo } from "react";
 import { filterKeywordCounts } from "@/lib/live/keyword-filter";
-import { scoreToTone } from "@/lib/live/sentiment-display";
+import { formatSentimentScore, scoreToTone } from "@/lib/live/sentiment-display";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
-import type { KeywordStats, TranscriptEvent } from "@/types";
+import type { KeywordStats, SentimentShift, TranscriptEvent } from "@/types";
 import { LiveSubsectionHeader } from "@/components/live/live-column-header";
 import { cn } from "@/lib/cn";
 
 const BANT_KEYS = ["budget", "authority", "need", "timeline"] as const;
 
 type BantKey = (typeof BANT_KEYS)[number];
+type SentimentTone = "positive" | "neutral" | "negative";
+type SentimentBar = {
+  id: string;
+  tone: SentimentTone;
+  current?: boolean;
+};
 
 const bantLabels: Record<BantKey, string> = {
   budget: "Budget",
@@ -40,7 +46,9 @@ interface LiveMetricsRailProps {
   keywordStats: KeywordStats | null;
   keywords: string[];
   transcript: TranscriptEvent[];
+  sentimentAE: number;
   sentimentCustomer: number;
+  sentimentShift: SentimentShift | null;
   openGaps: string[];
   className?: string;
 }
@@ -57,8 +65,17 @@ function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistState | nul
   const evidenceById = Object.fromEntries(
     checklist.items
       .filter((i) => i.tier === "bant")
-      .map((i) => [i.id, i.evidence?.[0]?.snippet ?? ""])
-  );
+      .map((i) => {
+        const evidence = i.evidence?.[i.evidence.length - 1];
+        return [
+          i.id,
+          {
+            text: evidence?.value || evidence?.snippet || "",
+            sentiment: evidence?.sentiment,
+          },
+        ];
+      })
+  ) as Record<string, { text: string; sentiment?: string }>;
 
   return (
     <div className="grid grid-cols-2 gap-2">
@@ -89,9 +106,10 @@ function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistState | nul
             >
               {bantStatusLabel(status, key)}
             </p>
-            {evidence && (
+            {evidence?.text && (
               <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2 leading-snug">
-                {evidence}
+                {evidence.sentiment === "negative" ? "Concern: " : ""}
+                {evidence.text}
               </p>
             )}
           </div>
@@ -108,20 +126,30 @@ function SentimentBars({
   transcript: TranscriptEvent[];
   customerScore: number;
 }) {
-  const bars = useMemo(() => {
+  const bars = useMemo<SentimentBar[]>(() => {
+    const currentTone = scoreToTone(customerScore);
     const withSentiment = transcript
       .filter((e) => e.speakerRole === "customer" && e.sentiment)
       .slice(-12);
-    if (withSentiment.length >= 3) {
-      return withSentiment.map((e) => ({
-        tone: e.sentiment as "positive" | "neutral" | "negative",
+    if (withSentiment.length > 0) {
+      const transcriptBars: SentimentBar[] = withSentiment.slice(-7).map((e, index) => ({
+        id: e.id || `${e.timestamp}-${index}`,
+        tone: e.sentiment as SentimentTone,
       }));
+      return [
+        ...transcriptBars,
+        {
+          id: `current-${currentTone}-${Math.round(customerScore * 100)}`,
+          tone: currentTone,
+          current: true,
+        },
+      ];
     }
-    const tone = scoreToTone(customerScore);
-    const fill =
-      tone === "positive" ? 0.85 : tone === "negative" ? 0.35 : 0.55;
-    return Array.from({ length: 8 }, (_, i) => ({
-      tone: i / 7 <= fill ? tone : ("neutral" as const),
+    const fill = currentTone === "positive" ? 0.85 : currentTone === "negative" ? 0.35 : 0.55;
+    return Array.from({ length: 8 }, (_, i): SentimentBar => ({
+      id: `fallback-${i}`,
+      tone: i / 7 <= fill ? currentTone : ("neutral" as const),
+      current: i === 7,
     }));
   }, [transcript, customerScore]);
 
@@ -129,17 +157,58 @@ function SentimentBars({
     <div className="flex items-end gap-1 h-8">
       {bars.map((bar, i) => (
         <div
-          key={i}
+          key={bar.id}
           className={cn(
             "flex-1 rounded-sm min-w-[4px]",
             bar.tone === "positive" && "bg-success",
             bar.tone === "negative" && "bg-destructive/70",
-            bar.tone === "neutral" && "bg-muted-foreground/25"
+            bar.tone === "neutral" && "bg-muted-foreground/25",
+            bar.current && "ring-1 ring-foreground/20"
           )}
           style={{ height: `${40 + (i / Math.max(bars.length - 1, 1)) * 60}%` }}
+          data-sentiment-tone={bar.tone}
+          data-current-sentiment={bar.current ? "true" : undefined}
           aria-hidden
         />
       ))}
+    </div>
+  );
+}
+
+function scoreTextClass(score: number): string {
+  const tone = scoreToTone(score);
+  if (tone === "positive") return "text-success";
+  if (tone === "negative") return "text-destructive";
+  return "text-muted-foreground";
+}
+
+function scoreTileClass(score: number): string {
+  const tone = scoreToTone(score);
+  if (tone === "positive") return "border-success/35 bg-success/5";
+  if (tone === "negative") return "border-destructive/35 bg-destructive/5";
+  return "border-border bg-muted/20";
+}
+
+function SentimentScoreRow({
+  label,
+  score,
+}: {
+  label: string;
+  score: number;
+}) {
+  const tone = scoreToTone(score);
+  return (
+    <div
+      className={cn("min-w-0 rounded-md border px-2 py-1.5", scoreTileClass(score))}
+      data-sentiment-label={label.toLowerCase()}
+      data-sentiment-tone={tone}
+    >
+      <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className={cn("truncate text-[11px] font-semibold", scoreTextClass(score))}>
+        {formatSentimentScore(score)}
+      </p>
     </div>
   );
 }
@@ -149,7 +218,9 @@ export function LiveMetricsRail({
   keywordStats,
   keywords,
   transcript,
+  sentimentAE,
   sentimentCustomer,
+  sentimentShift,
   openGaps,
   className,
 }: LiveMetricsRailProps) {
@@ -194,6 +265,21 @@ export function LiveMetricsRail({
 
       <section>
         <LiveSubsectionHeader title="Sentiment" />
+        <div className="mb-2 grid grid-cols-2 gap-2">
+          <SentimentScoreRow label="Customer" score={sentimentCustomer} />
+          <SentimentScoreRow label="AE" score={sentimentAE} />
+        </div>
+        {sentimentShift && (
+          <p className="mb-2 text-[11px] leading-snug text-muted-foreground">
+            Shift:{" "}
+            <span className={scoreTextClass(sentimentShift.to_score)}>
+              {sentimentShift.message ||
+                (sentimentShift.direction === "negative"
+                  ? "Customer concern rising"
+                  : "Customer confidence improving")}
+            </span>
+          </p>
+        )}
         <SentimentBars transcript={transcript} customerScore={sentimentCustomer} />
       </section>
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import logging
 from typing import Any, Dict, Optional
 
 from dc_core.evidence import AgentEnvelope, validate_envelope
@@ -24,6 +25,8 @@ from app.agents.live_call_agent import bot_chat_response
 from app.agents.sales_copilot_agent import copilot_chat_response
 from app.services.content_export_service import export_revision
 from app.services.template_ingest_service import process_template_ingest
+
+_logger = logging.getLogger(__name__)
 
 
 class Orchestrator:
@@ -273,29 +276,6 @@ class Orchestrator:
         if segment.get("timestamp") is None:
             segment["timestamp"] = elapsed_seconds
 
-        call = self.calls.get_call(ctx, call_id) or {}
-        seed_bant = call.get("bant") if isinstance(call.get("bant"), dict) else None
-
-        stored = self.memory.get_discovery_checklist(ctx.tenant_id, call_id)
-        state = checklist_from_dict(stored) if stored else None
-
-        discovery_out = handle_segment(
-            call_id,
-            text,
-            state=state,
-            elapsed_seconds=elapsed_seconds,
-            seed_bant=seed_bant,
-        )
-        checklist_env = discovery_out["envelope"]
-        validate_envelope(checklist_env)
-        self._log_run(ctx, checklist_env)
-
-        self.memory.set_discovery_checklist(
-            ctx.tenant_id,
-            call_id,
-            discovery_out["checklist"],
-        )
-
         intent_out = handle_transcript_segment(ctx, call_id, segment)
         live_envelope = AgentEnvelope.model_validate(intent_out["envelope"])
         validate_envelope(live_envelope)
@@ -303,26 +283,67 @@ class Orchestrator:
         live_result = live_envelope.result or {}
         live_nudge = live_result.get("nudge")
 
-        # Collect WS messages — the async caller broadcasts them
+        # Collect live WS messages first so transcript enrichment and sentiment
+        # are not blocked by checklist/call lookup failures.
         ws_messages = intent_out.get("ws_messages") or []
-        checklist_data = discovery_out["checklist"]
-        for msg in ws_messages:
-            if msg.get("type") != "intent_update":
-                continue
-            payload = msg.get("payload") or {}
-            intent_label = (payload.get("intent") or {}).get("label")
-            payload["next_actions"] = build_next_actions(
-                checklist_data, intent_label=intent_label
+        discovery_out: Dict[str, Any] = {}
+        checklist_env: AgentEnvelope | None = None
+        checklist_data: Dict[str, Any] = {}
+        bant_signals = []
+        try:
+            call = self.calls.get_call(ctx, call_id) or {}
+            seed_bant = call.get("bant") if isinstance(call.get("bant"), dict) else None
+            transcript_analysis = (
+                live_result.get("transcript") if isinstance(live_result.get("transcript"), dict) else {}
             )
-        ws_messages.append({"type": "checklist_update", "payload": checklist_data})
 
-        bant_signals = discovery_out.get("bant_signals") or []
-        if bant_signals:
-            ws_messages.append({"type": "bant_signal", "payload": bant_signals})
+            stored = self.memory.get_discovery_checklist(ctx.tenant_id, call_id)
+            state = checklist_from_dict(stored) if stored else None
+
+            discovery_out = handle_segment(
+                call_id,
+                text,
+                state=state,
+                elapsed_seconds=elapsed_seconds,
+                seed_bant=seed_bant,
+                sentiment=transcript_analysis.get("sentiment"),
+                speaker_role=segment.get("speakerRole") or segment.get("speaker_role"),
+                signal_type=transcript_analysis.get("signalType") or transcript_analysis.get("signal_type"),
+            )
+            checklist_env = discovery_out["envelope"]
+            validate_envelope(checklist_env)
+            self._log_run(ctx, checklist_env)
+
+            self.memory.set_discovery_checklist(
+                ctx.tenant_id,
+                call_id,
+                discovery_out["checklist"],
+            )
+            checklist_data = discovery_out["checklist"]
+        except Exception:
+            _logger.exception("discovery checklist update failed call_id=%s", call_id)
+
+        if checklist_data:
+            for msg in ws_messages:
+                if msg.get("type") != "intent_update":
+                    continue
+                payload = msg.get("payload") or {}
+                intent_label = (payload.get("intent") or {}).get("label")
+                payload["next_actions"] = build_next_actions(
+                    checklist_data, intent_label=intent_label
+                )
+            discovery_nudge = discovery_out.get("nudge")
+            if discovery_nudge:
+                ws_messages.append({"type": "nudge", "payload": discovery_nudge})
+            ws_messages.append({"type": "checklist_update", "payload": checklist_data})
+
+            bant_signals = discovery_out.get("bant_signals") or []
+            if bant_signals:
+                ws_messages.append({"type": "bant_signal", "payload": bant_signals})
 
         nudge = discovery_out.get("nudge") or live_nudge
         return {
-            "discovery": checklist_env.model_dump(),
+            "discovery": checklist_env.model_dump() if checklist_env else None,
             "live": live_envelope.model_dump(),
             "checklist": checklist_data,
             "nudge": nudge,

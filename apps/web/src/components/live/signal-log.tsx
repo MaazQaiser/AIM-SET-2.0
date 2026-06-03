@@ -51,7 +51,10 @@ export function SignalLog({ signals }: SignalLogProps) {
             </span>
             <div className="min-w-0">
               <p className="font-semibold text-foreground">{cfg.label}</p>
-              <p className="text-muted-foreground leading-snug mt-0.5">{s.label}</p>
+              <p className="text-muted-foreground leading-snug mt-0.5">
+                {s.label}
+                {s.value && !s.label.includes(s.value) ? `: ${s.value}` : ""}
+              </p>
             </div>
           </li>
         );

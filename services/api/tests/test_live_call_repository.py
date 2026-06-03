@@ -101,9 +101,12 @@ def test_live_call_repository_writes_supabase_rows_against_call(monkeypatch):
         {
             "id": "segment-1",
             "speaker_id": "buyer-1",
+            "speaker_name": "Sam Buyer",
             "speaker_role": "customer",
             "text": "Our budget owner needs the Q3 proposal.",
             "offset_seconds": 31,
+            "sentiment": "neutral",
+            "signal_type": "budget_signal",
             "provider": "recall",
             "provider_event_id": "recall-event-1",
         },
@@ -140,6 +143,102 @@ def test_live_call_repository_writes_supabase_rows_against_call(monkeypatch):
 
     assert session_write["payload"]["provider_meeting_id"] == "bot-1"
     assert transcript_write["payload"]["text"] == "Our budget owner needs the Q3 proposal."
+    assert transcript_write["payload"]["speaker_name"] == "Sam Buyer"
+    assert transcript_write["payload"]["sentiment"] == "neutral"
+    assert transcript_write["payload"]["signal_type"] == "budget_signal"
     assert transcript_write["payload"]["provider_event_id"] == "recall-event-1"
     assert suggestion_write["payload"]["operation"] == "proactive_nudge"
     assert suggestion_write["payload"]["target_role"] == "ae"
+
+    repo.update_transcript_event_analysis(
+        ctx,
+        call_id,
+        "segment-1",
+        keywords=["budget", "proposal"],
+        sentiment="negative",
+        signal_type="objection_raised",
+    )
+    transcript_update = next(
+        call
+        for call in fake_supabase.calls
+        if call["table"] == "call_transcript_events" and call["operation"] == "update"
+    )
+    assert transcript_update["payload"]["sentiment"] == "negative"
+    assert transcript_update["payload"]["signal_type"] == "objection_raised"
+
+
+def test_link_provider_meeting_updates_existing_session_without_recursion(monkeypatch):
+    from app.domain import live_call_repository as repo_module
+
+    fake_supabase = _FakeSupabase()
+    tenant_uuid = "00000000-0000-0000-0000-000000000456"
+    clerk_key = "clerk-live-link-test"
+    call_id = "call-live-link"
+    ctx = TenantContext(tenant_id="org-live", user_id="u1", clerk_org_id="org-live")
+
+    store = get_memory_store()
+    store.live_sessions[clerk_key] = {
+        call_id: {
+            "call_id": call_id,
+            "status": "live",
+            "provider": "recall",
+            "provider_meeting_id": None,
+            "summary": {},
+        }
+    }
+
+    monkeypatch.setattr(repo_module, "get_settings", lambda: _SupabaseEnabledSettings())
+    monkeypatch.setattr(repo_module, "get_supabase", lambda: fake_supabase)
+    monkeypatch.setattr(repo_module, "resolve_kb_tenant", lambda _ctx: (tenant_uuid, clerk_key))
+
+    linked = LiveCallRepository().link_provider_meeting(
+        ctx, call_id, "bot-linked", provider="recall"
+    )
+
+    assert linked["provider_meeting_id"] == "bot-linked"
+    assert store.live_sessions[clerk_key][call_id]["provider_meeting_id"] == "bot-linked"
+    session_write = next(
+        call for call in fake_supabase.calls if call["table"] == "call_live_sessions" and call["operation"] == "upsert"
+    )
+    assert session_write["payload"]["provider_meeting_id"] == "bot-linked"
+
+
+def test_live_call_repository_falls_back_to_memory_when_tenant_resolution_fails(monkeypatch):
+    from app.domain import live_call_repository as repo_module
+
+    fake_supabase = _FakeSupabase()
+    call_id = "call-live-fallback"
+    ctx = TenantContext(tenant_id="local-dev-user", user_id="local-dev-user", clerk_org_id=None)
+    fallback_key = "local-dev-user"
+
+    store = get_memory_store()
+    store.live_sessions.pop(fallback_key, None)
+    store.transcript_events.pop(fallback_key, None)
+
+    def _raise_resolution_error(_ctx: TenantContext):
+        raise RuntimeError("tenant service unavailable")
+
+    monkeypatch.setattr(repo_module, "get_settings", lambda: _SupabaseEnabledSettings())
+    monkeypatch.setattr(repo_module, "get_supabase", lambda: fake_supabase)
+    monkeypatch.setattr(repo_module, "resolve_kb_tenant", _raise_resolution_error)
+
+    repo = LiveCallRepository()
+    session = repo.get_or_create_session(ctx, call_id)
+    event = repo.append_transcript_event(
+        ctx,
+        call_id,
+        {
+            "id": "segment-fallback",
+            "speaker_id": "buyer",
+            "speaker_role": "customer",
+            "text": "The CFO and board need to approve budget before Q3 pilot kickoff.",
+            "offset_seconds": 45,
+            "provider_event_id": "fallback-event-1",
+        },
+    )
+
+    assert session["call_id"] == call_id
+    assert event["id"] == "segment-fallback"
+    assert store.live_sessions[fallback_key][call_id]["status"] == "live"
+    assert store.transcript_events[fallback_key][call_id][0]["text"].startswith("The CFO")
+    assert fake_supabase.calls == []

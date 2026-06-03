@@ -91,12 +91,10 @@ function CopilotActionCards({ actions }: { actions: CopilotAgentAction[] }) {
           className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-[11px]"
         >
           <span className="font-medium text-primary">
-            {a.agent ? `Agent: ${a.agent}` : a.tool ?? "Action"}
+            {a.agent ? `Agent: ${a.agent}` : (a.tool ?? "Action")}
           </span>
           {a.summary && <p className="text-muted-foreground mt-0.5">{a.summary}</p>}
-          {a.callId && (
-            <p className="text-muted-foreground/80 text-[10px]">Call: {a.callId}</p>
-          )}
+          {a.callId && <p className="text-muted-foreground/80 text-[10px]">Call: {a.callId}</p>}
         </div>
       ))}
     </div>
@@ -281,10 +279,7 @@ export function BotChatPanel({
     ]
   );
 
-  const suggestedActions = useMemo(
-    () => buildSuggestedActions(suggestedCtx),
-    [suggestedCtx]
-  );
+  const suggestedActions = useMemo(() => buildSuggestedActions(suggestedCtx), [suggestedCtx]);
   const messageCount = messages.length;
 
   useEffect(() => {
@@ -577,10 +572,7 @@ export function BotChatPanel({
       )}
     >
       {attachmentChip}
-      <div
-        className="flex min-h-[3.25rem] items-center gap-2 pl-4 pr-3 py-2"
-        onClick={() => setInputWide(true)}
-      >
+      <div className="flex min-h-[3.25rem] items-center gap-2 pl-4 pr-3 py-2">
         {floatingInputRow}
       </div>
     </form>
@@ -593,50 +585,50 @@ export function BotChatPanel({
     >
       {attachmentChip}
       <div className="flex gap-2 w-full">
-          {isCopilotMode && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) setPendingFile(f);
-                  e.target.value = "";
-                }}
-              />
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                aria-label="Attach file"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Paperclip className="h-4 w-4" />
-              </Button>
-            </>
-          )}
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={inputPlaceholder}
-            disabled={isLoading}
-            className="flex-1 text-sm"
-            aria-label={
-              isCopilotMode
-                ? "Sales Co-pilot message"
-                : mode === "group"
-                  ? "Pod group message"
-                  : "Direct message to Copilot"
-            }
-          />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={isLoading || (!input.trim() && !pendingFile)}
-            aria-label="Send"
-          >
+        {isCopilotMode && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) setPendingFile(f);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              aria-label="Attach file"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+          </>
+        )}
+        <Input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={inputPlaceholder}
+          disabled={isLoading}
+          className="flex-1 text-sm"
+          aria-label={
+            isCopilotMode
+              ? "Sales Co-pilot message"
+              : mode === "group"
+                ? "Pod group message"
+                : "Direct message to Copilot"
+          }
+        />
+        <Button
+          type="submit"
+          size="icon"
+          disabled={isLoading || (!input.trim() && !pendingFile)}
+          aria-label="Send"
+        >
           <Send className="h-4 w-4" />
         </Button>
       </div>
@@ -681,9 +673,7 @@ export function BotChatPanel({
           <div
             className={cn(
               "inline-flex rounded-md border p-0.5",
-              isFloating
-                ? "call-detail-copilot-tab-rail rounded-full"
-                : "border-border bg-muted/30"
+              isFloating ? "call-detail-copilot-tab-rail rounded-full" : "border-border bg-muted/30"
             )}
             role="tablist"
             aria-label="Chat mode"
@@ -759,7 +749,8 @@ export function BotChatPanel({
               : "text-muted-foreground border-border/60"
           )}
         >
-          Global assistant — search KB (vector store), inspect any call, run agents, or upload files.
+          Global assistant — search KB (vector store), inspect any call, run agents, or upload
+          files.
         </p>
       ) : mode === "group" ? (
         <p
@@ -813,7 +804,8 @@ export function BotChatPanel({
               isFloating ? "call-detail-copilot-muted" : "text-muted-foreground"
             )}
           >
-            Ask DC Copilot privately about this call — prep questions, talk tracks, or live coaching.
+            Ask DC Copilot privately about this call — prep questions, talk tracks, or live
+            coaching.
           </p>
         )}
         {error && (
@@ -862,7 +854,11 @@ export function BotChatPanel({
                     {msg.citations && msg.citations.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {msg.citations.map((c, i) => (
-                          <CitationMarker key={`${c.id ?? "citation"}-${i}`} index={i + 1} citation={c} />
+                          <CitationMarker
+                            key={`${c.id ?? "citation"}-${i}`}
+                            index={i + 1}
+                            citation={c}
+                          />
                         ))}
                       </div>
                     )}
@@ -878,9 +874,7 @@ export function BotChatPanel({
                 ) : (
                   <span className="whitespace-pre-wrap break-words">{msg.content}</span>
                 )}
-                {isPrivate && (
-                  <span className="sr-only">Private message</span>
-                )}
+                {isPrivate && <span className="sr-only">Private message</span>}
               </div>
             </div>
           );
@@ -908,9 +902,7 @@ export function BotChatPanel({
         className={cn(
           "call-detail-urbanist fixed bottom-10 left-1/2 z-50 flex -translate-x-1/2 flex-col pointer-events-none",
           "transition-[width] duration-300 ease-out",
-          dockExpanded
-            ? "w-[min(calc(100%-2.5rem),42rem)]"
-            : "w-[min(calc(100%-5rem),19rem)]",
+          dockExpanded ? "w-[min(calc(100%-2.5rem),42rem)]" : "w-[min(calc(100%-5rem),19rem)]",
           className
         )}
         aria-label="DC Copilot floating chat"
@@ -921,7 +913,6 @@ export function BotChatPanel({
             dockExpanded ? "rounded-2xl" : "rounded-full",
             floatingExpanded && "call-detail-liquid-glass--expanded"
           )}
-          onClick={!floatingExpanded ? () => setInputWide(true) : undefined}
         >
           {floatingExpanded && (
             <div className="call-detail-copilot-panel-body flex min-h-[240px] max-h-[min(420px,50vh)] flex-col overflow-hidden">
@@ -934,9 +925,5 @@ export function BotChatPanel({
     );
   }
 
-  return (
-    <div className={cn("flex flex-col h-full min-h-0 bg-card", className)}>
-      {panelBody}
-    </div>
-  );
+  return <div className={cn("flex flex-col h-full min-h-0 bg-card", className)}>{panelBody}</div>;
 }

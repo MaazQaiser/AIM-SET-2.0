@@ -34,7 +34,9 @@ export default function LiveCallPage({ params }: LivePageParams) {
   const acceptNudge = useLiveCall((s) => s.acceptNudge);
   const intentSnapshot = useLiveCall((s) => s.intentSnapshot);
   const keywordStats = useLiveCall((s) => s.keywordStats);
+  const sentimentAE = useLiveCall((s) => s.sentimentAE);
   const sentimentCustomer = useLiveCall((s) => s.sentimentCustomer);
+  const sentimentShift = useLiveCall((s) => s.sentimentShift);
   const isConnected = useLiveCall((s) => s.isConnected);
   const objections = useLiveCall((s) => s.objections);
   const unansweredQuestions = useLiveCall((s) => s.unansweredQuestions);
@@ -104,7 +106,9 @@ export default function LiveCallPage({ params }: LivePageParams) {
       intentLabel={intentLabel}
       intentSnapshot={intentSnapshot}
       keywordStats={keywordStats}
+      sentimentAE={sentimentAE}
       sentimentCustomer={sentimentCustomer}
+      sentimentShift={sentimentShift}
       elapsedSeconds={elapsedSeconds}
       isConnected={isConnected}
       viewerRole={viewerRole}

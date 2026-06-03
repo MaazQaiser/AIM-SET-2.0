@@ -321,6 +321,7 @@ CREATE TABLE IF NOT EXISTS call_transcript_events (
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   call_id TEXT NOT NULL,
   speaker_id TEXT NOT NULL DEFAULT 'unknown',
+  speaker_name TEXT,
   speaker_role TEXT,
   text TEXT NOT NULL,
   offset_seconds NUMERIC NOT NULL DEFAULT 0,
@@ -330,6 +331,12 @@ CREATE TABLE IF NOT EXISTS call_transcript_events (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (tenant_id, call_id, id)
 );
+ALTER TABLE call_transcript_events
+  ADD COLUMN IF NOT EXISTS speaker_name TEXT;
+ALTER TABLE call_transcript_events
+  ADD COLUMN IF NOT EXISTS sentiment TEXT CHECK (sentiment IN ('positive', 'neutral', 'negative'));
+ALTER TABLE call_transcript_events
+  ADD COLUMN IF NOT EXISTS signal_type TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS call_transcript_events_provider_dedupe_idx
   ON call_transcript_events (tenant_id, call_id, provider_event_id)
   WHERE provider_event_id IS NOT NULL;

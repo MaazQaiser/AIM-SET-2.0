@@ -9,8 +9,11 @@ import type { BantSignal, ChecklistItem, DiscoveryChecklistState } from "@dc-cop
 import type {
   IntentSnapshot,
   KeywordStats,
+  LiveSentimentPayload,
   NudgePayload,
   ObjectionPayload,
+  SurfacedKbAsset,
+  SuggestionLogEntry,
   TranscriptEvent,
   UnansweredQuestionPayload,
 } from "@/types";
@@ -67,7 +70,13 @@ function cloneChecklist(
     { id: "authority", label: "Authority", tier: "bant", status: "pending", evidence: [] },
     { id: "need", label: "Need", tier: "bant", status: "pending", evidence: [] },
     { id: "timeline", label: "Timeline", tier: "bant", status: "pending", evidence: [] },
-    { id: "decision_process", label: "Decision process", tier: "secondary", status: "pending", evidence: [] },
+    {
+      id: "decision_process",
+      label: "Decision process",
+      tier: "secondary",
+      status: "pending",
+      evidence: [],
+    },
     { id: "competition", label: "Competition", tier: "secondary", status: "pending", evidence: [] },
     { id: "next_step", label: "Next step", tier: "secondary", status: "pending", evidence: [] },
   ];
@@ -84,8 +93,7 @@ function cloneChecklist(
 }
 
 function scoreChecklist(state: DiscoveryChecklistState): DiscoveryChecklistState {
-  const score = (s: ChecklistItem["status"]) =>
-    s === "confirmed" ? 1 : s === "partial" ? 0.5 : 0;
+  const score = (s: ChecklistItem["status"]) => (s === "confirmed" ? 1 : s === "partial" ? 0.5 : 0);
   const bantItems = state.items.filter((i) => i.tier === "bant");
   const bantCoverage = bantItems.length
     ? bantItems.reduce((a, i) => a + score(i.status), 0) / bantItems.length
@@ -114,13 +122,14 @@ function patchItem(
   state: DiscoveryChecklistState,
   id: ChecklistItem["id"],
   status: ChecklistItem["status"],
-  snippet?: string
+  snippet?: string,
+  value?: string
 ): DiscoveryChecklistState {
   const bantKey = id as keyof DiscoveryChecklistState["bant"];
   const items = state.items.map((item) => {
     if (item.id !== id) return item;
     const evidence = snippet
-      ? [{ snippet, confidence: 0.85, transcriptOffsetSeconds: state.elapsedSeconds }]
+      ? [{ snippet, value, confidence: 0.85, transcriptOffsetSeconds: state.elapsedSeconds }]
       : item.evidence;
     return { ...item, status, evidence };
   });
@@ -129,11 +138,7 @@ function patchItem(
       ? {
           ...state.bant,
           [bantKey]:
-            status === "confirmed"
-              ? "confirmed"
-              : status === "partial"
-                ? "partial"
-                : "unknown",
+            status === "confirmed" ? "confirmed" : status === "partial" ? "partial" : "unknown",
         }
       : state.bant;
   return scoreChecklist({ ...state, items, bant });
@@ -163,6 +168,59 @@ function lineToTranscriptEvent(
   };
 }
 
+function sentimentScore(sentiment: TranscriptEvent["sentiment"]): number {
+  if (sentiment === "positive") return 0.55;
+  if (sentiment === "negative") return -0.65;
+  return 0;
+}
+
+function sentimentShift(
+  fromScore: number,
+  toScore: number,
+  timestamp: number
+): LiveSentimentPayload["shift"] | undefined {
+  if (Math.abs(toScore - fromScore) < 0.25) return undefined;
+  if (toScore < fromScore) {
+    return {
+      direction: "negative",
+      from_score: fromScore,
+      to_score: toScore,
+      timestamp,
+      message: "Customer sentiment shifted toward negative - check engagement.",
+    };
+  }
+  return {
+    direction: "positive",
+    from_score: fromScore,
+    to_score: toScore,
+    timestamp,
+    message: "Customer sentiment is warming after the latest response.",
+  };
+}
+
+function applyEventSentiment(
+  store: ReturnType<typeof useLiveCall.getState>,
+  event: TranscriptEvent
+) {
+  const score = sentimentScore(event.sentiment);
+  if (event.speakerRole === "customer") {
+    const previous = store.sentimentCustomer;
+    store.updateSentiment(
+      store.sentimentAE,
+      score,
+      sentimentShift(previous, score, event.timestamp) ?? store.sentimentShift
+    );
+    return;
+  }
+  if (
+    event.speakerRole === "ae" ||
+    event.speakerRole === "se" ||
+    event.speakerRole === "designer"
+  ) {
+    store.updateSentiment(score, store.sentimentCustomer, store.sentimentShift);
+  }
+}
+
 function addBant(store: ReturnType<typeof useLiveCall.getState>, signal: Omit<BantSignal, "id">) {
   store.addBantSignal({
     ...signal,
@@ -188,6 +246,7 @@ export function applyClientDemoSegment(
 
   const event = lineToTranscriptEvent(callId, line, lineIndex);
   store.appendTranscriptEvent(event);
+  applyEventSentiment(store, event);
 
   const stats = extractKeywords(line.text, store.keywordStats);
   store.applyKeywordStats(stats);
@@ -213,7 +272,8 @@ export function applyClientDemoSegment(
         next_actions: ["Confirm proposal scope and board timeline before end of call."],
       } satisfies IntentSnapshot);
       addNudge(store, {
-        message: "Customer expects a formal proposal after this call — confirm deliverables and date.",
+        message:
+          "Customer expects a formal proposal after this call — confirm deliverables and date.",
         citation: { id: "demo-1", title: "Transcript", type: "transcript", excerpt: line.text },
         role: "ae",
         timestamp: line.offsetSeconds,
@@ -247,6 +307,19 @@ export function applyClientDemoSegment(
         label: "Cloud migration / ops modernization need confirmed",
         timestamp: line.offsetSeconds,
       });
+      addNudge(store, {
+        message:
+          'Customer raised: "operators live in spreadsheets with no real-time unit performance view" - align next questions to this pain.',
+        citation: {
+          id: "demo-pain-ops",
+          title: "Pain point detected",
+          type: "transcript",
+          excerpt: line.text,
+        },
+        role: "ae",
+        timestamp: line.offsetSeconds,
+        source: "live-call",
+      });
       break;
     case 4:
       store.applyIntentUpdate({
@@ -270,12 +343,26 @@ export function applyClientDemoSegment(
         top_keywords: stats.global_top.slice(0, 5),
         next_actions: ["Ask how many locations fail audit per quarter."],
       });
+      addNudge(store, {
+        message:
+          'Customer raised: "Manual brand-standard audits are the bottleneck" - align next questions to this pain.',
+        citation: {
+          id: "demo-pain-audits",
+          title: "Pain point detected",
+          type: "transcript",
+          excerpt: line.text,
+        },
+        role: "ae",
+        timestamp: line.offsetSeconds,
+        source: "live-call",
+      });
       break;
     case 5:
-      checklist = patchItem(checklist, "budget", "confirmed", line.text);
+      checklist = patchItem(checklist, "budget", "confirmed", line.text, "$450K-$600K year one");
       addBant(store, {
         dimension: "budget",
         label: "$450K–$600K year-one envelope · board approval in May",
+        value: "$450K-$600K year one",
         timestamp: line.offsetSeconds,
       });
       addNudge(store, {
@@ -288,10 +375,17 @@ export function applyClientDemoSegment(
       });
       break;
     case 6:
-      checklist = patchItem(checklist, "timeline", "confirmed", line.text);
+      checklist = patchItem(
+        checklist,
+        "timeline",
+        "confirmed",
+        line.text,
+        "Q3 pilot · Q1 production go-live"
+      );
       addBant(store, {
         dimension: "timeline",
         label: "Q3 pilot · Q1 production go-live",
+        value: "Q3 pilot · Q1 production go-live",
         timestamp: line.offsetSeconds,
       });
       break;
@@ -309,7 +403,8 @@ export function applyClientDemoSegment(
       store.addObjection(objection);
       checklist = patchItem(checklist, "competition", "partial", line.text);
       addNudge(store, {
-        message: "Build-vs-buy objection — differentiate time-to-value and franchisee permission model.",
+        message:
+          "Build-vs-buy objection — differentiate time-to-value and franchisee permission model.",
         citation: { id: "demo-comp", title: "Objection", type: "transcript", excerpt: line.text },
         role: "ae",
         timestamp: line.offsetSeconds,
@@ -330,7 +425,7 @@ export function applyClientDemoSegment(
       checklist = patchItem(checklist, "next_step", "partial", line.text);
       break;
     case 11: {
-      checklist = patchItem(checklist, "authority", "partial", line.text);
+      checklist = patchItem(checklist, "authority", "partial", line.text, "CFO readout");
       checklist = patchItem(checklist, "decision_process", "partial", line.text);
       const question: UnansweredQuestionPayload = {
         id: `demo-q-cfo-${lineIndex}`,
@@ -355,14 +450,6 @@ export function applyClientDemoSegment(
 
   if (lineIndex >= 3) {
     store.applyChecklistUpdate(checklist);
-  }
-
-  if (line.speakerRole === "customer" && lineIndex > 0) {
-    const prev = store.sentimentCustomer;
-    const next = lineIndex >= 9 ? 0.55 : lineIndex >= 5 ? 0.35 : 0.25;
-    if (next !== prev) {
-      store.updateSentiment(store.sentimentAE, next, store.sentimentShift);
-    }
   }
 }
 
@@ -389,8 +476,25 @@ export function applyApiDemoResult(data: Record<string, unknown>) {
       if (!msg || typeof msg !== "object") continue;
       const typed = msg as { type?: string; payload?: unknown };
       switch (typed.type) {
+        case "transcript":
+          if (typed.payload && typeof typed.payload === "object") {
+            store.appendTranscriptEvent(typed.payload as TranscriptEvent);
+          }
+          break;
         case "nudge":
           store.addNudge(typed.payload as NudgePayload);
+          break;
+        case "keyword_stats":
+          if (typed.payload && typeof typed.payload === "object") {
+            store.applyKeywordStats(typed.payload as KeywordStats);
+          }
+          break;
+        case "bant_signal":
+          if (Array.isArray(typed.payload)) {
+            for (const signal of typed.payload) store.addBantSignal(signal as BantSignal);
+          } else if (typed.payload && typeof typed.payload === "object") {
+            store.addBantSignal(typed.payload as BantSignal);
+          }
           break;
         case "checklist_update":
           if (typed.payload && typeof typed.payload === "object") {
@@ -400,6 +504,32 @@ export function applyApiDemoResult(data: Record<string, unknown>) {
         case "intent_update":
           if (typed.payload && typeof typed.payload === "object") {
             store.applyIntentUpdate(typed.payload as IntentSnapshot);
+          }
+          break;
+        case "sentiment":
+          if (typed.payload && typeof typed.payload === "object") {
+            const payload = typed.payload as LiveSentimentPayload;
+            store.updateSentiment(payload.ae, payload.customer, payload.shift ?? null);
+          }
+          break;
+        case "kb_assets":
+          if (Array.isArray(typed.payload)) {
+            store.setSurfacedKbAssets(typed.payload as SurfacedKbAsset[]);
+          }
+          break;
+        case "objection":
+          if (typed.payload && typeof typed.payload === "object") {
+            store.addObjection(typed.payload as ObjectionPayload);
+          }
+          break;
+        case "unanswered_question":
+          if (typed.payload && typeof typed.payload === "object") {
+            store.addUnansweredQuestion(typed.payload as UnansweredQuestionPayload);
+          }
+          break;
+        case "suggestion_log":
+          if (typed.payload && typeof typed.payload === "object") {
+            store.appendSuggestionLog(typed.payload as SuggestionLogEntry);
           }
           break;
         default:

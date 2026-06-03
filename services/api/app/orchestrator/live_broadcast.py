@@ -78,20 +78,21 @@ def envelope_to_ws_messages(
             }
         )
 
-    log_entry = {
-        "type": "suggestion_log",
-        "payload": {
-            "id": suggestion_id,
-            "operation": op,
-            "timestamp": ts,
-            "shownAt": shown_at,
-            "confidence": envelope.confidence,
-            "trace_id": envelope.trace_id,
-            "summary": _log_summary(op, result),
-        },
-    }
-    if op not in ("signal_annotation",):
-        messages.append(log_entry)
+    if op not in ("signal_annotation", "intent_snapshot", "intent_update"):
+        messages.append(
+            {
+                "type": "suggestion_log",
+                "payload": {
+                    "id": suggestion_id,
+                    "operation": op,
+                    "timestamp": ts,
+                    "shownAt": shown_at,
+                    "confidence": envelope.confidence,
+                    "trace_id": envelope.trace_id,
+                    "summary": _log_summary(op, result),
+                },
+            }
+        )
 
     return messages
 
@@ -122,6 +123,8 @@ def transcript_event_to_ws(event: Dict[str, Any]) -> Dict[str, Any]:
             "text": event.get("text"),
             "timestamp": ts,
             "keywords": event.get("keywords") or [],
+            "sentiment": event.get("sentiment"),
+            "signalType": event.get("signalType") or event.get("signal_type"),
         },
     }
 
