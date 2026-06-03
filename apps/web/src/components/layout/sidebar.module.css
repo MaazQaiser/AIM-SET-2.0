@@ -121,6 +121,7 @@
 
 .closeButton {
   flex-shrink: 0;
+  align-self: flex-end;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -289,7 +290,8 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  justify-content: space-between;
+  align-items: stretch;
+  gap: 6px;
   width: 288px;
   min-width: 0;
   max-width: 288px;
@@ -300,20 +302,11 @@
   border-left: 1px solid hsl(var(--border) / 0.65);
 }
 
-.widgetsTop {
-  display: flex;
-  flex-shrink: 0;
-  flex-direction: column;
-  gap: 24px;
-  align-items: flex-end;
-  width: 100%;
-}
-
+/* AI Insight — Figma node 145:15363 */
 .aiInsightWrap {
   width: 100%;
-  min-height: 189px;
   padding: 0;
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius);
   overflow: hidden;
 }
 
@@ -325,6 +318,24 @@
   width: 100%;
   min-height: 165px;
   padding: 16px 18px;
+  overflow: hidden;
+  border-radius: var(--radius);
+  border-color: rgb(255 255 255 / 1);
+  font-family: var(--font-urbanist), Urbanist, ui-sans-serif, system-ui, sans-serif;
+  background: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 1) 0%,
+    rgb(255 255 255 / 0.3) 100%
+  );
+}
+
+.aiInsightContent {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
 }
 
 .aiInsightHeader {
@@ -337,9 +348,9 @@
 .aiInsightTitle {
   margin: 0;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 22px;
-  color: hsl(var(--foreground));
+  color: #2e404c;
   white-space: nowrap;
 }
 
@@ -348,23 +359,34 @@
   font-size: 14px;
   font-weight: 400;
   line-height: 22px;
-  color: hsl(var(--muted-foreground));
+  color: #777;
   overflow-wrap: break-word;
 }
 
-.aiInsightDots {
-  display: none;
-}
-
-.widgetsMiddle {
-  position: relative;
+.aiInsightHomeLink {
   display: flex;
   flex-shrink: 0;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  gap: 12px;
+  width: 16px;
+  height: 16px;
+  color: #2e404c;
+  text-decoration: none;
+  transition: opacity 150ms ease;
+}
+
+.aiInsightHomeLink:hover {
+  opacity: 0.72;
+}
+
+.aiInsightDotsSvg {
+  position: absolute;
+  left: -22px;
+  bottom: 0;
+  z-index: 0;
+  display: block;
+  max-width: none;
+  pointer-events: none;
 }
 
 .kbStackScene {
@@ -372,7 +394,8 @@
   flex-shrink: 0;
   width: 218px;
   height: 128px;
-  margin-bottom: -12px;
+  margin-inline: auto;
+  margin-bottom: -6px;
   overflow: visible;
   pointer-events: none;
   opacity: 0.85;
@@ -395,14 +418,6 @@
   position: relative;
   z-index: 1;
   height: 94px;
-}
-
-.widgetsBottom {
-  display: flex;
-  flex-shrink: 0;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
 }
 
 .contentStack {

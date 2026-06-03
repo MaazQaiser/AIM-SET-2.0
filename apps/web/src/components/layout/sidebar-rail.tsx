@@ -15,6 +15,7 @@ import {
   appCardClass,
 } from "@dc-copilot/ui/surfaces";
 import { mainNavItems, footerNavItems } from "./sidebar-nav-config";
+import { ClpNotificationBell } from "@/components/notifications/clp-notification-bell";
 import { useSidebar } from "./sidebar-context";
 import {
   SummitLogoMark,
@@ -117,6 +118,14 @@ export function SidebarRail() {
             styles.railIconButton,
             isActive && appNavItemActiveClass
           );
+
+          if (item.kind === "button" && item.label === "Notification") {
+            return (
+              <div key={item.label} className={buttonClass}>
+                <ClpNotificationBell />
+              </div>
+            );
+          }
 
           if (item.kind === "button") {
             return (

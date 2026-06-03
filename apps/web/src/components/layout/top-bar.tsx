@@ -1,29 +1,12 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { SearchInput } from "@/components/ui/search-input";
+import { ClpNotificationBell } from "@/components/notifications/clp-notification-bell";
 
-/** Hide search on call focus pages — they use a dedicated sticky header instead. */
-function isCallFocusRoute(pathname: string): boolean {
-  return /^\/calls\/[^/]+(\/live|\/post-dc)?$/.test(pathname);
-}
-
+/** Top chrome: notifications aligned to the main content area (sidebar remains separate). */
 export function TopBar() {
-  const pathname = usePathname();
-
-  if (isCallFocusRoute(pathname)) {
-    return null;
-  }
-
   return (
-    <header className="relative z-10 flex h-14 items-center justify-end bg-transparent px-6">
-      <div className="w-full max-w-md">
-        <SearchInput
-          placeholder="Press ⌘K to search"
-          aria-label="Search"
-          className="h-9"
-        />
-      </div>
+    <header className="flex shrink-0 items-center justify-end gap-2 px-4 py-2 sm:px-6">
+      <ClpNotificationBell />
     </header>
   );
 }

@@ -1,38 +1,59 @@
 "use client";
 
-import { Upload } from "lucide-react";
-import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
+import { usePersona } from "@/hooks/use-persona";
 import { AssistantGreeting } from "./assistant-greeting";
 import { DailyBriefingCard } from "./daily-briefing-card";
 import { AiTodoList } from "./ai-todo-list";
 import { UnifiedAgenda } from "./unified-agenda";
 import { QuickActions } from "./quick-actions";
+import { LeadershipDashboardExtras } from "./leadership-dashboard";
+import { DashboardImportPrompt } from "./dashboard-import-prompt";
+import { DashboardSkeletonSections } from "./dashboard-skeleton-sections";
+import { DashboardClpActivity } from "./dashboard-clp-activity";
 import { PageShell } from "@/components/layout/page-shell";
 
 export function DashboardHome() {
   const hasImport = useDcImportsStore((s) => s.preDcRecords.length > 0);
+  const persona = usePersona();
+
+  if (persona === "leadership") {
+    return (
+      <PageShell className="space-y-6">
+        <AssistantGreeting />
+        {!hasImport && <DashboardImportPrompt />}
+        {hasImport ? (
+          <>
+            <DailyBriefingCard />
+            <LeadershipDashboardExtras />
+            <QuickActions />
+          </>
+        ) : (
+          <DashboardSkeletonSections />
+        )}
+      </PageShell>
+    );
+  }
 
   return (
-    <PageShell className="space-y-8">
+    <PageShell className="space-y-1.5">
       <AssistantGreeting />
 
-      {!hasImport ? (
-        <EmptyState
-          icon={Upload}
-          title="Import your leads to get started"
-          description="Upload pre_dc_notes_data.csv in Settings. Calls, your agenda, and AI todos use your imported data."
-          action={{ label: "Go to data import", href: "/settings" }}
-        />
-      ) : (
+      {!hasImport && <DashboardImportPrompt />}
+
+      {hasImport ? (
         <>
           <DailyBriefingCard />
-
-          <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr] lg:items-start">
+          <div className="grid gap-1.5 lg:grid-cols-[1fr_1.2fr] lg:items-start">
             <AiTodoList />
             <UnifiedAgenda />
           </div>
-
+          <DashboardClpActivity />
+          <QuickActions />
+        </>
+      ) : (
+        <>
+          <DashboardSkeletonSections />
           <QuickActions />
         </>
       )}

@@ -1,4 +1,4 @@
-/** Clerk UI aligned with platform tokens (Roboto, cream canvas, hairline cards). */
+/** Clerk UI aligned with platform tokens (Urbanist, cream canvas, hairline cards). */
 export const clerkAppearance = {
   variables: {
     colorPrimary: "hsl(220 12% 22%)",
@@ -10,7 +10,7 @@ export const clerkAppearance = {
     colorNeutral: "hsl(220 13% 86%)",
     colorDanger: "hsl(0 65% 55%)",
     borderRadius: "0.75rem",
-    fontFamily: "var(--font-roboto), ui-sans-serif, system-ui, sans-serif",
+    fontFamily: "var(--font-urbanist), ui-sans-serif, system-ui, sans-serif",
     fontSize: "0.875rem",
   },
   layout: {

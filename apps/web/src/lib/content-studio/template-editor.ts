@@ -38,7 +38,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: Inter, Arial, sans-serif;
+  font-family: Urbanist, Arial, sans-serif;
 }
 
 .slide {

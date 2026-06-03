@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Phone, Search } from "lucide-react";
-import { PageShell } from "@/components/layout/page-shell";
 import { CallCard } from "@/components/call-card";
 import { CallsTable } from "@/components/calls/calls-table";
 import { CallsViewToggle, type CallsViewMode } from "@/components/calls/calls-view-toggle";
@@ -33,10 +32,10 @@ function CallsBody({ calls, view }: { calls: Call[]; view: CallsViewMode }) {
 function ListLoadingSkeleton({ view }: { view: CallsViewMode }) {
   if (view === "list") {
     return (
-      <div className="space-y-2 overflow-hidden rounded-xl border border-border bg-card">
+      <div className="space-y-2 overflow-hidden border-y border-border bg-transparent">
         <Skeleton className="h-10 w-full rounded-none bg-muted/40" />
         {[1, 2, 3, 4, 5].map((i) => (
-          <Skeleton key={i} className="h-14 w-full rounded-none bg-card" />
+          <Skeleton key={i} className="h-14 w-full rounded-none bg-transparent" />
         ))}
       </div>
     );
@@ -50,6 +49,8 @@ function ListLoadingSkeleton({ view }: { view: CallsViewMode }) {
   );
 }
 
+const callsPageClass = "flex min-h-0 flex-1 w-full flex-col px-8 pt-8 pb-8";
+
 export function CallsListClient() {
   const { data: calls = [], isLoading } = useCalls();
   const hasImport = useDcImportsStore((s) => s.preDcRecords.length > 0);
@@ -60,18 +61,18 @@ export function CallsListClient() {
 
   if (isLoading) {
     return (
-      <PageShell size="wide" className="space-y-4">
+      <div className={callsPageClass}>
         <div className="flex items-center justify-between gap-4">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-8 w-24" />
         </div>
         <ListLoadingSkeleton view={view} />
-      </PageShell>
+      </div>
     );
   }
 
   return (
-    <PageShell size="wide" className="flex min-h-0 flex-1 flex-col space-y-0 p-6 sm:p-8">
+    <div className={callsPageClass}>
       <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Calls</h1>
@@ -87,14 +88,14 @@ export function CallsListClient() {
 
       {!hasImport ? (
         <EmptyState
-          icon={Phone}
-          title="No leads yet"
-          description="Import pre_dc_notes_data.csv in Settings to populate calls and briefs."
+            icon={Phone}
+            title="No leads yet"
+            description="Import pre_dc_notes_data.csv in Settings to populate calls and briefs."
           action={{ label: "Import CSV", href: "/settings" }}
         />
       ) : (
         <Tabs defaultValue="all" className="mt-6 flex min-h-0 flex-1 flex-col">
-          <div className="sticky top-0 z-20 -mx-6 shrink-0 border-b border-border/60 bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:-mx-8 sm:px-8">
+          <div className="sticky top-0 z-20 shrink-0 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
             <TabsList className="border-b-0">
               <TabsTrigger value="all">
                 All leads
@@ -147,6 +148,6 @@ export function CallsListClient() {
           </TabsContent>
         </Tabs>
       )}
-    </PageShell>
+    </div>
   );
 }

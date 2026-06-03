@@ -155,7 +155,7 @@ export function CallDetailStickyHeader({
   const compactNav = (
     <header
       className={cn(
-        "call-detail-compact-nav call-detail-liquid-glass call-detail-roboto",
+        "call-detail-compact-nav call-detail-liquid-glass call-detail-urbanist",
         "flex min-h-[3.75rem] items-center"
       )}
       data-visible={compact ? "true" : "false"}

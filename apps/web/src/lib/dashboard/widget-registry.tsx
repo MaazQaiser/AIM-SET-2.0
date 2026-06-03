@@ -38,6 +38,8 @@ import { PostDiscoveryGapsCard } from "@/components/post-dc/post-discovery-gaps-
 import { EmailEditor } from "@/components/post-dc/email-editor";
 import { TaskList } from "@/components/post-dc/crm-task-list";
 import { JiraTicketCard } from "@/components/post-dc/jira-ticket-card";
+import { PostDcClpAnalyticsWidget } from "@/components/post-dc/post-dc-clp-analytics-widget";
+import type { CustomerLandingPage } from "@dc-copilot/types";
 import type {
   CallBrief,
   PostCallEmailDraft,
@@ -109,14 +111,18 @@ export interface BriefWidgetProps {
 export interface PostDcWidgetProps {
   review: PostCallReview;
   call: Call;
+  callId: string;
   accountSnapshot: AccountSnapshotRow[];
   emailDraft?: PostCallEmailDraft | null;
+  internalEmailDraft?: PostCallEmailDraft | null;
   crmTasks?: PostCallTask[];
   jiraTicket?: PostCallJiraTicket | null;
   kbSuggestions?: PostCallKbSuggestion[];
+  emailAttachments?: PostCallEmailDraft["attachments"];
   onApproveCrmTasks?: (ids: string[]) => void;
   onRejectCrmTask?: (id: string) => void;
   onCreateJiraTicket?: (ticket: PostCallJiraTicket) => Promise<void> | void;
+  landingPage?: CustomerLandingPage | null;
 }
 
 /**
@@ -439,5 +445,32 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     sortOrder: 4,
     isAvailable: ({ kbSuggestions }) => arrayLen(kbSuggestions) > 0,
     render: ({ kbSuggestions = [] }) => <PostKbSuggestionsCard suggestions={kbSuggestions} />,
+  },
+  {
+    id: "post.clp_analytics",
+    title: "Landing page analytics",
+    category: "content",
+    column: "center",
+    sortOrder: 6,
+    isAvailable: ({ landingPage }) => landingPage?.status === "published",
+    render: ({ callId, landingPage }) => (
+      <PostDcClpAnalyticsWidget callId={callId} enabled={landingPage?.status === "published"} />
+    ),
+  },
+  {
+    id: "post.internal_email",
+    title: "Internal team email",
+    category: "ai",
+    column: "center",
+    sortOrder: 5,
+    isAvailable: ({ internalEmailDraft }) => Boolean(internalEmailDraft),
+    render: ({ internalEmailDraft }) =>
+      internalEmailDraft ? (
+        <EmailEditor
+          draft={internalEmailDraft}
+          title="Internal team email"
+          description="Edit the internal handoff before sharing with the team."
+        />
+      ) : null,
   },
 ];

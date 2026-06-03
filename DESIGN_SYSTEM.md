@@ -1,6 +1,6 @@
 # DC Copilot Design System
 **Version:** 0.1
-**Stack:** Next.js 16 · Tailwind CSS v4 · shadcn/ui · Inter
+**Stack:** Next.js 16 · Tailwind CSS v4 · shadcn/ui · Urbanist
 **Primary Color:** Blue
 **Last updated:** May 2026
 
@@ -171,11 +171,11 @@ All tokens are declared as HSL triplets (no `hsl()` wrapper) in `globals.css` an
 ### Font Stack
 
 ```css
---font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
---font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+--font-sans: 'Urbanist', ui-sans-serif, system-ui, sans-serif;
+--font-mono: 'Urbanist', ui-sans-serif, system-ui, sans-serif;
 ```
 
-Load Inter via `next/font/google` with `subsets: ['latin']` and `display: 'swap'`.
+Load Urbanist via `next/font/google` with `subsets: ['latin']`, `display: 'swap'`, and weights 400, 500, 600, 700, and 800.
 
 ### Type Scale
 

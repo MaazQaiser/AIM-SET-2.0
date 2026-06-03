@@ -13,6 +13,7 @@ from dc_core.tenancy import TenantContext
 from app.config import get_settings
 from app.deps import get_tenant_context
 from app.domain.kb_constants import ALLOWED_ASSET_TYPES, ALLOWED_EXTENSIONS, EXTENSION_MIME
+from app.domain.kb_project_repository import get_kb_project, list_kb_projects
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.kb_repository import get_kb_repository
 from app.orchestrator.dispatcher import Orchestrator
@@ -45,6 +46,19 @@ def get_asset(asset_id: str, ctx: TenantContext = Depends(get_tenant_context)) -
     if not asset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
     return asset
+
+
+@router.get("/projects")
+def list_projects(ctx: TenantContext = Depends(get_tenant_context)) -> List[Dict[str, Any]]:
+    return list_kb_projects(ctx)
+
+
+@router.get("/projects/{project_id}")
+def get_project(project_id: str, ctx: TenantContext = Depends(get_tenant_context)) -> Dict[str, Any]:
+    project = get_kb_project(ctx, project_id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    return project
 
 
 @router.get("/assets/{asset_id}/preview-text")

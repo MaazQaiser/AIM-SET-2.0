@@ -102,37 +102,35 @@
   min-height: 8px;
 }
 
-/* Call detail canvas — subtle modern yellow */
+/* Call detail canvas — flat cool gray (matches dashboard) */
 main:has(.call-detail-page) {
-  background-color: #fdfbf0;
+  background-color: hsl(var(--background));
 }
 
 .call-detail-page {
-  --background: 48 56% 97%;
-  background-color: #fdfbf0;
+  --background: 205 28% 95%;
+  background-color: #eff3f6;
   min-height: 100%;
-  font-family: var(--font-roboto), Roboto, ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-urbanist), Urbanist, ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Call detail: flat cards — cool gray stroke, consistent radius, no white halo corners */
-.call-detail-page .glass-insight-card {
+/* Call detail: glass cards — slightly tighter radius, Urbanist */
+.call-detail-page .glass-insight-card,
+.call-detail-page .app-card {
   gap: 0;
   overflow: hidden;
   border-radius: 0.75rem;
-  border: 1px solid hsl(var(--border)) !important;
-  background: hsl(var(--card)) !important;
-  box-shadow: none;
-  font-family: var(--font-roboto), Roboto, ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-urbanist), Urbanist, ui-sans-serif, system-ui, sans-serif;
 }
 
 .call-detail-page .glass-insight-card *:not(.font-mono) {
   font-family: inherit;
 }
 
-/* Roboto on call-detail chrome (nav, BANT strip, copilot) */
-.call-detail-roboto,
-.call-detail-roboto *:not(.font-mono) {
-  font-family: var(--font-roboto), Roboto, ui-sans-serif, system-ui, sans-serif;
+/* Urbanist on call-detail chrome (nav, BANT strip, copilot) */
+.call-detail-urbanist,
+.call-detail-urbanist * {
+  font-family: var(--font-urbanist), Urbanist, ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Frosted glass — copilot expanded panel */
@@ -371,7 +369,7 @@ main:has(.call-detail-page) {
 }
 
 .call-detail-liquid-glass--dock {
-  font-family: var(--font-roboto), Roboto, ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-urbanist), Urbanist, ui-sans-serif, system-ui, sans-serif;
   color: #111111;
   background:
     linear-gradient(
@@ -537,7 +535,7 @@ main:has(.call-detail-page) {
 
 /* Compact nav — fixed to viewport top when scrolled (portaled to body) */
 .call-detail-compact-nav {
-  --background: 48 56% 97%;
+  --background: 205 28% 95%;
   --border: 48 20% 88%;
   position: fixed;
   left: 0;
@@ -693,7 +691,54 @@ main:has(.call-detail-page) {
   }
 }
 
-.theme-intercom .call-detail-page .glass-insight-card {
-  border-color: hsl(220 13% 86%) !important;
+.theme-intercom .call-detail-page .glass-insight-card,
+.theme-intercom .call-detail-page .app-card {
+  border-radius: 0.75rem;
+}
+
+/* Flat UI — replace liquid / frosted glass on call detail */
+.call-detail-frosted-surface,
+.call-detail-liquid-glass,
+.call-detail-compact-nav.call-detail-liquid-glass,
+.call-detail-liquid-glass--dock,
+.call-detail-liquid-glass--dock.call-detail-liquid-glass--expanded {
+  border: 1px solid hsl(var(--border) / 0.85) !important;
   background: hsl(var(--card)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+.call-detail-frosted-surface::before,
+.call-detail-liquid-glass::before,
+.call-detail-liquid-glass::after,
+.call-detail-compact-nav.call-detail-liquid-glass::before,
+.call-detail-compact-nav.call-detail-liquid-glass::after {
+  content: none !important;
+  display: none !important;
+}
+
+.call-detail-copilot-panel-body {
+  background: hsl(var(--card)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+.call-detail-liquid-glass--dock .call-detail-copilot-tab-rail {
+  border-color: hsl(var(--border)) !important;
+  background: hsl(var(--muted) / 0.5) !important;
+  box-shadow: none !important;
+}
+
+.call-detail-liquid-glass--dock .call-detail-copilot-tab-active {
+  background: hsl(var(--card)) !important;
+  box-shadow: var(--shadow-soft-xs) !important;
+}
+
+.call-detail-liquid-glass--dock .call-detail-copilot-message-assistant,
+.call-detail-liquid-glass--dock .call-detail-copilot-suggested-btn {
+  border-color: hsl(var(--border)) !important;
+  background: hsl(var(--card)) !important;
+  box-shadow: none !important;
 }

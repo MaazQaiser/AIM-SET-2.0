@@ -4,7 +4,7 @@
  */
 
 .theme-intercom {
-  --font-sans: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
 
   /* Canvas & surfaces — subtle warm yellow page floor */
   --background: 48 56% 97%; /* ~#fdfbf0 */
@@ -61,22 +61,48 @@
   --shadow-soft-lg: none;
 }
 
-.theme-intercom .page-hue {
+.theme-intercom .page-hue,
+.theme-intercom .app-sidebar-panel {
   background-color: #fdfbf0;
 }
 
 .theme-intercom .page-hue::before,
-.theme-intercom .page-hue::after {
-  content: none;
+.theme-intercom .app-sidebar-panel::before {
+  background: radial-gradient(
+    ellipse 158% 115% at -10% 108%,
+    #f6f5ee 0%,
+    #f6f5ee 24%,
+    rgb(246 245 238 / 0.88) 50%,
+    rgb(246 245 238 / 0.38) 70%,
+    transparent 85%
+  );
+  filter: none;
+  opacity: 1;
 }
 
-.theme-intercom .glass-insight-card {
+.theme-intercom .page-hue::after,
+.theme-intercom .app-sidebar-panel::after {
+  content: "";
+  filter: blur(96px);
+  opacity: 0.78;
+}
+
+.theme-intercom .glass-insight-card,
+.theme-intercom .app-card {
   gap: 0;
-  overflow: visible;
-  border: 1px solid #d3cec6;
-  border-radius: 12px;
-  box-shadow: none;
-  background: #ffffff;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.72);
+  border-radius: var(--radius-card);
+  background: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.78) 0%,
+    rgb(255 255 255 / 0.42) 100%
+  );
+  backdrop-filter: blur(12px) saturate(165%);
+  -webkit-backdrop-filter: blur(12px) saturate(165%);
+  box-shadow:
+    0 1px 2px rgb(17 17 17 / 0.04),
+    inset 0 1px 0 rgb(255 255 255 / 0.9);
 }
 
 .theme-intercom .glass-insight-title {
@@ -134,7 +160,6 @@
   border-color: #d3cec6;
 }
 
-.theme-intercom .app-card,
 .theme-intercom .app-sidebar-panel,
 .theme-intercom .app-sidebar-widget,
 .theme-intercom .app-dialog {

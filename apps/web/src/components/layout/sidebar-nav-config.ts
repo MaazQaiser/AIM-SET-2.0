@@ -23,6 +23,7 @@ export const mainNavItems: SidebarNavItem[] = [
   { href: "/content/studio", label: "Deal room", icon: FileText },
   { href: "/coaching", label: "Coaching", icon: GraduationCap },
   { href: "/governance", label: "Governance", icon: Shield },
+  { href: "/analytics/landing-pages", label: "Lead hubs", icon: FileText },
 ];
 
 export type FooterNavItem =
@@ -43,8 +44,8 @@ export interface SidebarWidgetCard {
 
 export const sidebarWidgetCards: SidebarWidgetCard[] = [
   { href: "/knowledge", title: "Knowledge Base", subtitle: "" },
+  { href: "/knowledge/projects", title: "Project Repo", subtitle: "Projects" },
   { href: "/content", title: "Content Manager", subtitle: "" },
-  { href: "/", title: "Home", subtitle: "Home" },
 ];
 
 const PAGE_TITLES: Record<string, string> = {
@@ -55,7 +56,9 @@ const PAGE_TITLES: Record<string, string> = {
   "/coaching": "Coaching",
   "/governance": "Governance",
   "/settings": "Settings",
+  "/knowledge/projects": "Project Repo",
   "/knowledge": "Knowledge Base",
+  "/analytics/landing-pages": "Lead hub analytics",
 };
 
 export function getSidebarPageTitle(pathname: string): string {

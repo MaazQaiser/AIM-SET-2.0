@@ -1,14 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { BookOpen } from "lucide-react";
+import Link from "next/link";
+import { BookOpen, FolderKanban } from "lucide-react";
 import { SearchInput } from "@dc-copilot/ui/components/search-input";
 import { PageShell } from "@/components/layout/page-shell";
 import { KBAssetCard } from "@/components/kb-asset-card";
 import { KbUploadButton } from "@/components/knowledge/kb-upload-button";
 import { KnowledgePreviewDialog } from "@/components/knowledge/knowledge-preview-dialog";
+import { ProjectRepoList } from "@/components/knowledge/project-repo-list";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { Badge } from "@dc-copilot/ui/components/badge";
+import { Button } from "@dc-copilot/ui/components/button";
 import { FilterChip } from "@dc-copilot/ui/components/chip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import { Card, CardContent } from "@dc-copilot/ui/components/card";
@@ -46,12 +49,21 @@ export function KnowledgePageClient() {
             )}
           </p>
         </div>
-        <KbUploadButton />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button asChild variant="outline">
+            <Link href="/knowledge/projects">
+              <FolderKanban className="h-4 w-4" />
+              Project repo
+            </Link>
+          </Button>
+          <KbUploadButton />
+        </div>
       </div>
 
       <Tabs defaultValue={persona === "content-owner" ? "watchlist" : "library"} variant="underline">
         <TabsList>
           <TabsTrigger value="library">Library</TabsTrigger>
+          <TabsTrigger value="projects">Project repo</TabsTrigger>
           {(persona === "content-owner" || persona === "leadership") && (
             <TabsTrigger value="watchlist">Watchlist</TabsTrigger>
           )}
@@ -84,6 +96,10 @@ export function KnowledgePageClient() {
           ) : (
             <EmptyState icon={BookOpen} title="No assets found" description="Try a different search or filter." />
           )}
+        </TabsContent>
+
+        <TabsContent value="projects" className="mt-4">
+          <ProjectRepoList embedded />
         </TabsContent>
 
         <TabsContent value="watchlist" className="mt-4 space-y-3">

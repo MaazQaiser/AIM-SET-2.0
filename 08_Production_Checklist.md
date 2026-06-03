@@ -80,6 +80,9 @@ Items are grouped by domain. Within each domain, items are listed in order of se
 - [ ] LLM provider fallback chain configured and tested (primary → secondary)
 - [ ] Model deprecation handling: tracked upstream changes; rollover plan documented
 - [ ] No outbound customer-facing content auto-sent without explicit user approval
+- [ ] Customer landing pages (CLP): publish requires AE password + explicit publish action
+- [ ] CLP public routes rate-limited; visitor PII consent at identity gate
+- [ ] CLP asset delivery uses token-scoped URLs only (no raw KB asset IDs on public internet)
 
 ### Observability
 - [ ] Every LLM call traced: latency, tokens, cost, model, prompt version, agent

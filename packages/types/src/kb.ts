@@ -42,3 +42,32 @@ export interface KBAssetWithStatus {
   chunkCount?: number;
   ingestError?: string;
 }
+
+export interface KBProject {
+  id: string;
+  title: string;
+  projectName?: string;
+  companyName?: string | null;
+  summary: string;
+  problemStatement?: string;
+  businessOutcome?: string;
+  functionalSolution?: string;
+  technicalSolution?: string;
+  industry?: string;
+  sector?: string;
+  domain?: string;
+  subDomain?: string;
+  companyStage?: string;
+  startDate?: string;
+  endDate?: string;
+  definitionsUrl?: string;
+  fields: Record<string, string>;
+  sourceAssetId: string;
+  sourceAssetIds?: string[];
+  sourceAssetTitle: string;
+  sourceFileName?: string;
+  sourceUploadedAt?: string;
+  sourceAssetType?: string;
+  sourceCount: number;
+  tags: string[];
+}

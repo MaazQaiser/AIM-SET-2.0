@@ -906,7 +906,7 @@ export function BotChatPanel({
       <div
         ref={dockRef}
         className={cn(
-          "call-detail-roboto fixed bottom-10 left-1/2 z-50 flex -translate-x-1/2 flex-col pointer-events-none",
+          "call-detail-urbanist fixed bottom-10 left-1/2 z-50 flex -translate-x-1/2 flex-col pointer-events-none",
           "transition-[width] duration-300 ease-out",
           dockExpanded
             ? "w-[min(calc(100%-2.5rem),42rem)]"

@@ -141,7 +141,25 @@ export function CallDetailColumnLayout<P>({
     );
   }
 
-  // Post-DC and other layouts: 3-column view.
+  // Post-DC: 2-column layout (sidebar handled by PostDcReviewScreen).
+  if (layoutKey === "post-dc") {
+    const grouped = orderWidgetsByColumn(visibleWidgets, columnOrder);
+    const focusWidgets = [...grouped.center, ...grouped.right];
+    return (
+      <div className="space-y-4 min-w-0">
+        <ColumnRail
+          zone="center"
+          label=""
+          widgets={focusWidgets}
+          widgetProps={widgetProps}
+          onHide={(id) => hideWidget(layoutKey, id)}
+          isPrimary
+        />
+      </div>
+    );
+  }
+
+  // Other layouts: 3-column view.
   const grouped = orderWidgetsByColumn(visibleWidgets, columnOrder);
 
   return (

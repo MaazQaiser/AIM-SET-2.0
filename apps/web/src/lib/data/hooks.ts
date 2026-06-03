@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { bffFetch } from "@/lib/api/bff-fetch";
@@ -10,9 +11,16 @@ import type {
   CoachingCandidate,
   KbWatchlistItem,
   KBAsset,
+  KBProject,
   QuarterlyPattern,
 } from "@/types";
-import type { CallBrief, PostCallEmailDraft, PostCallJiraTicket, PostCallPipelineResult } from "@/lib/brief-types";
+import type {
+  CallBrief,
+  ContentToGenerate,
+  PostCallEmailDraft,
+  PostCallJiraTicket,
+  PostCallPipelineResult,
+} from "@/lib/brief-types";
 import {
   FRANCHISE_DEMO_CALL_ID,
   franchiseDemoPostCallArtifacts,
@@ -31,6 +39,15 @@ import type { TaskItem } from "@/components/post-dc/crm-task-list";
 import type { ActivityEvent, AgentRun } from "@/types/agents";
 
 const REFETCH_MS = 30_000;
+
+export interface PreDcContentGenerationGap extends ContentToGenerate {
+  callId: string;
+  accountName: string;
+  leadName?: string;
+  leadTitle?: string;
+  scheduledAt?: string;
+  studioHref: string;
+}
 
 function withEmailAttachments(
   draft: PostCallEmailDraft | undefined,
@@ -404,6 +421,31 @@ export function useKbWatchlist() {
   });
 }
 
+export function useKbProjects() {
+  return useQuery({
+    queryKey: ["kb-projects"],
+    queryFn: async () => {
+      const api = await bffFetch<KBProject[]>("/api/kb/projects");
+      return api ?? [];
+    },
+    staleTime: REFETCH_MS,
+    refetchInterval: REFETCH_MS,
+  });
+}
+
+export function useKbProject(projectId: string) {
+  return useQuery({
+    queryKey: ["kb-project", projectId],
+    queryFn: async () => {
+      const api = await bffFetch<KBProject>(`/api/kb/projects/${projectId}`);
+      if (api) return api;
+      throw new Error(`Project not found: ${projectId}`);
+    },
+    enabled: Boolean(projectId),
+    staleTime: REFETCH_MS,
+  });
+}
+
 export function useQuarterlyPatterns() {
   return useQuery({
     queryKey: ["quarterly-patterns"],
@@ -423,6 +465,105 @@ export function useContentGaps() {
       return api ?? [];
     },
     staleTime: REFETCH_MS,
+  });
+}
+
+function contentStudioHref(item: ContentToGenerate, call: Call, accountName: string) {
+  const params = new URLSearchParams({
+    template: item.type,
+    account: accountName,
+    source: "pre-dc",
+    callId: call.id,
+  });
+  if (call.leadName) params.set("lead", call.leadName);
+  return `/content/studio?${params.toString()}`;
+}
+
+/** Sidebar + Content Manager: real queue counts from the same pipelines as /content */
+export function useContentManagerSidebarStats() {
+  const { data: preDcGaps = [], isLoading, isFetching } = usePreDcContentGenerationGaps();
+  const { data: draftGaps = [] } = useContentGaps();
+  const postRunMetaByCallId = useDcImportsStore((s) => s.postRunMetaByCallId);
+  const emailDraftsByCallId = useDcImportsStore((s) => s.emailDraftsByCallId);
+  const importVersion = useDcImportsStore((s) => s.importVersion ?? 0);
+
+  return useMemo(() => {
+    const missingKeys = new Set<string>();
+    let postDcMissing = 0;
+
+    for (const [callId, meta] of Object.entries(postRunMetaByCallId)) {
+      for (const item of meta?.emailAttachments?.missing ?? []) {
+        const key = `${callId}:${item.name}`;
+        if (!missingKeys.has(key)) {
+          missingKeys.add(key);
+          postDcMissing += 1;
+        }
+      }
+    }
+    for (const [callId, draft] of Object.entries(emailDraftsByCallId)) {
+      for (const item of draft.attachments?.missing ?? []) {
+        const key = `${callId}:${item.name}`;
+        if (!missingKeys.has(key)) {
+          missingKeys.add(key);
+          postDcMissing += 1;
+        }
+      }
+    }
+
+    const preDcCount = preDcGaps.length;
+    const draftReviewCount = draftGaps.filter((g) => g.status !== "approved").length;
+    const toGenerateCount = preDcCount + postDcMissing;
+
+    return {
+      toGenerateCount,
+      preDcCount,
+      postDcMissingCount: postDcMissing,
+      draftReviewCount,
+      isLoading: isLoading || isFetching,
+    };
+  }, [
+    preDcGaps,
+    draftGaps,
+    postRunMetaByCallId,
+    emailDraftsByCallId,
+    importVersion,
+    isLoading,
+    isFetching,
+  ]);
+}
+
+export function usePreDcContentGenerationGaps() {
+  return useQuery({
+    queryKey: ["pre-dc-content-generation-gaps", getImportVersion()],
+    queryFn: async () => {
+      const calls = await fetchCallsFromApi();
+      const gaps = await Promise.all(
+        calls.map(async (call) => {
+          const local = resolveCallBrief(call.id);
+          const api = await bffFetch<CallBrief>(`/api/calls/${call.id}/brief`);
+          const brief = api && local ? mergeCallBrief(local, api) : api ?? local;
+          const accountName = brief?.accountName || call.accountName;
+          return (brief?.contentToGenerate ?? []).map((item) => ({
+            ...item,
+            id: `${call.id}:${item.id}`,
+            callId: call.id,
+            accountName,
+            leadName: call.leadName,
+            leadTitle: call.leadTitle,
+            scheduledAt: call.scheduledAt,
+            studioHref: contentStudioHref(item, call, accountName),
+          }));
+        })
+      );
+      return gaps
+        .flat()
+        .sort((a, b) => {
+          if (a.priority !== b.priority) return a.priority - b.priority;
+          return new Date(a.scheduledAt ?? 0).getTime() - new Date(b.scheduledAt ?? 0).getTime();
+        });
+    },
+    staleTime: REFETCH_MS,
+    refetchInterval: REFETCH_MS,
   });
 }
 

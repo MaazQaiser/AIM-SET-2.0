@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { addHours, isWithinInterval } from "date-fns";
+import { latestPostDcHref } from "@/lib/dashboard/call-links";
 import { useCalls, useCoachingInsights, usePostCallTasks } from "@/lib/data/hooks";
 import type { AgentId } from "@/types/agents";
 
@@ -45,7 +46,7 @@ export function useAiTodos() {
         subtitle: `${pendingTasks.length} item${pendingTasks.length > 1 ? "s" : ""} · Post-call · awaiting sign-off`,
         agent: "post_dc",
         priority: "high",
-        href: "/calls/call-001/post-dc",
+        href: latestPostDcHref(calls),
       });
     }
 

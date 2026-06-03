@@ -233,3 +233,4 @@ export type {
 export * from "./integrations";
 export * from "./content_studio";
 export * from "./discovery-checklist";
+export * from "./landing-page";

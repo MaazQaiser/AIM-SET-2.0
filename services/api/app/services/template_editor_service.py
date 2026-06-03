@@ -88,6 +88,7 @@ def assist_template_edit(
         "Return JSON only with keys html, css, and message. "
         "html must be body markup only, not a full document. css must be plain CSS only. "
         "Do not include scripts, event handlers, iframes, external URLs, @import, or markdown fences. "
+        "Use Urbanist as the sans-serif font family for all generated or edited template CSS. "
         "Preserve useful existing structure and class names unless the instruction asks to change them. "
         "If the user asks to generate, create, build, redesign, or start over, you may replace the full template. "
         "Use polished production styling: CSS variables, clear hierarchy, 8px or smaller radii, balanced spacing, "
@@ -261,7 +262,7 @@ def _fallback_template_generate(artifact_type: str, instruction: str) -> Dict[st
     border = "rgba(255,255,255,0.16)" if dark else "#e2e8f0"
     css = (
         f":root {{ --bg: {background}; --surface: {surface}; --text: {text}; --muted: {muted}; --accent: {color}; --border: {border}; }}\n"
-        "body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, Arial, sans-serif; }\n"
+        "body { margin: 0; background: var(--bg); color: var(--text); font-family: Urbanist, Arial, sans-serif; }\n"
         ".template-root { box-sizing: border-box; background: var(--surface); color: var(--text); }\n"
         ".slide { width: 1280px; min-height: 720px; margin: 0 auto; padding: 58px; aspect-ratio: 16 / 9; overflow: hidden; }\n"
         ".eyebrow { color: var(--accent); font-size: 14px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }\n"
@@ -333,7 +334,7 @@ def _starter_body() -> str:
 def _starter_css() -> str:
     return (
         ":root { --bg: #f8fafc; --surface: #ffffff; --text: #0f172a; --muted: #64748b; --accent: #2563eb; }\n"
-        "body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, Arial, sans-serif; }\n"
+        "body { margin: 0; background: var(--bg); color: var(--text); font-family: Urbanist, Arial, sans-serif; }\n"
         ".slide { box-sizing: border-box; width: 1280px; min-height: 720px; margin: 0 auto; padding: 56px; background: var(--surface); }\n"
         ".eyebrow { color: var(--accent); font-size: 14px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }\n"
         "h1 { max-width: 760px; margin: 18px 0; font-size: 58px; line-height: 1.02; }\n"

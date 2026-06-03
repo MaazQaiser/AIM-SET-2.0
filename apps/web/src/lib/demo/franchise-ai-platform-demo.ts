@@ -387,7 +387,7 @@ export const franchiseDemoPostCallArtifacts = {
   emailDraft: franchiseDemoEmailDraft,
   internalEmailDraft: franchiseDemoInternalEmailDraft,
   crmTasks: franchiseDemoCrmTasks,
-  jiraTicket: franchiseDemoJiraTicket,
+  jiraTicket: null,
   kbSuggestions: franchiseDemoKbSuggestions,
   envelope: franchiseDemoAgentEnvelope,
 };

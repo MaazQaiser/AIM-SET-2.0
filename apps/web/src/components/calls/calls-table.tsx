@@ -38,25 +38,17 @@ function primaryAction(call: Call) {
   if (call.status === "completed") {
     return (
       <Button asChild size="sm" variant="outline" className="h-8">
-        <Link href={`/calls/${call.id}`}>Summary</Link>
+        <Link href={`/calls/${call.id}/post-dc?wrapped=1`}>Summary</Link>
       </Button>
     );
   }
   return <span className="text-xs text-muted-foreground">—</span>;
 }
 
-const accountColumnClasses = {
-  headerClassName:
-    "min-w-[220px] w-[220px] sticky left-0 z-20 bg-card shadow-[inset_-1px_0_0_0_hsl(var(--border))]",
-  cellClassName:
-    "min-w-[220px] w-[220px] sticky left-0 z-10 bg-card group-hover:bg-muted/20 shadow-[inset_-1px_0_0_0_hsl(var(--border))]",
-};
-
 const columns: ColumnDef<Call>[] = [
   {
     accessorKey: "accountName",
     header: "Account",
-    meta: accountColumnClasses,
     cell: ({ row }) => {
       const call = row.original;
       return (
@@ -172,10 +164,13 @@ export function CallsTable({ calls }: CallsTableProps) {
     <DataTable
       columns={columns}
       data={calls}
-      pageSize={20}
-      scrollable
-      stickyHeader
-      maxScrollHeight="max-h-[calc(100vh-18rem)]"
+      pageSize={10}
+      shellClassName="rounded-none border-x-0 border-t-0 bg-transparent"
+      headerClassName="bg-transparent"
+      tableClassName="bg-transparent"
+      bodyClassName="bg-transparent"
+      rowClassName="bg-transparent"
+      paginationClassName="pt-2"
     />
   );
 }

@@ -6,23 +6,19 @@ import { useCall, useCreateJiraTicket, usePostCallReview } from "@/lib/data/hook
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { Skeleton } from "@dc-copilot/ui/components/skeleton";
 import { Badge } from "@dc-copilot/ui/components/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
-import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
-import { AccountSnapshotCard, type AccountSnapshotRow } from "@/components/calls/account-widget-cards";
-import { PreDcResearchCard } from "@/components/pre-call/pre-dc-research-card";
+import { CallDetailColumnLayout } from "@/components/calls/call-detail-column-layout";
+import { LayoutControls } from "@/components/dashboard-grid/layout-controls";
 import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
-import { EmailEditor } from "@/components/post-dc/email-editor";
 import { KbAttachmentCard } from "@/components/post-dc/kb-attachment-card";
-import { TaskList } from "@/components/post-dc/crm-task-list";
-import { JiraTicketCard } from "@/components/post-dc/jira-ticket-card";
-import { PostDiscoveryGapsCard } from "@/components/post-dc/post-discovery-gaps-card";
-import {
-  PostHeadlineCard,
-  PostKbSuggestionsCard,
-  PostLearnedCard,
-  PostScorecardCard,
-  PostSummaryCard,
-} from "@/components/post-dc/post-dc-widget-cards";
+import { POST_DC_WIDGETS } from "@/lib/dashboard/widget-registry";
+import { normalizePostDcWidgetProps } from "@/lib/dashboard/normalize-widget-props";
+import { PostDcSidebar } from "@/components/post-dc/post-dc-sidebar";
+import { PostDcProposalWidget } from "@/components/post-dc/post-dc-proposal-widget";
+import { useLandingPage } from "@/lib/data/clp-hooks";
+import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
+import type { AccountSnapshotRow } from "@/components/calls/account-widget-cards";
+import { PostKbSuggestionsCard } from "@/components/post-dc/post-dc-widget-cards";
+import { cn } from "@/lib/cn";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { sanitizeClientEmailDraft } from "@/lib/post-dc-client-email-safety";
 import type {
@@ -59,6 +55,7 @@ export function PostDcReviewScreen({
 }: PostDcReviewScreenProps) {
   const { data: call, isLoading: callLoading } = useCall(callId);
   const { data: review, isLoading: reviewLoading } = usePostCallReview(callId);
+  const { data: landingPage } = useLandingPage(callId);
   const createJiraTicket = useCreateJiraTicket(callId);
   const emailDraft = useDcImportsStore((s) => s.emailDraftsByCallId[callId]);
   const internalEmailDraft = useDcImportsStore((s) => s.internalEmailDraftsByCallId[callId]);
@@ -225,144 +222,67 @@ export function PostDcReviewScreen({
           )}
         </div>
       ) : (
-        <>
-          <Tabs defaultValue="follow-up" className="space-y-4">
-            <TabsList className="flex h-auto flex-wrap justify-start gap-1">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="follow-up">Emails</TabsTrigger>
-              <TabsTrigger value="tasks">Tasks</TabsTrigger>
-              <TabsTrigger value="coaching">Coaching</TabsTrigger>
-              <TabsTrigger value="content">Content</TabsTrigger>
-            </TabsList>
-
-              <TabsContent value="overview" className="m-0 space-y-4">
-                <div className="grid gap-4 lg:grid-cols-[minmax(240px,0.3fr)_1fr]">
-                  <AccountSnapshotCard rows={snapshot} />
-                  <PostHeadlineCard headline={displayedReview.headline} />
-                </div>
-              <PostSummaryCard summary={displayedReview.summary ?? []} />
-              <div className="grid gap-4 lg:grid-cols-2">
-                <PostDiscoveryGapsCard
-                  gaps={displayedReview.openDiscoveryGaps ?? []}
-                  bantCoverage={displayedReview.discoveryBantCoverage}
-                />
-                <PostLearnedCard learned={displayedReview.learned ?? []} />
-              </div>
-              {displayedReview.researchSections?.length ? (
-                <PreDcResearchCard
-                  sections={displayedReview.researchSections}
-                  title="Post-DC import and outcome fields"
-                />
-              ) : null}
-            </TabsContent>
-
-            <TabsContent value="follow-up" className="m-0 space-y-4">
-              <div className="grid gap-4 xl:grid-cols-2">
-                <section className="space-y-2" aria-label="Client email">
-                  <h2 className="text-sm font-semibold text-foreground">Client email</h2>
-                  <p className="text-xs text-muted-foreground">
-                    MOMs, discussed context, requested attachments, and the next client-facing follow-up.
-                  </p>
-                  {displayedEmailDraft ? (
-                    <EmailEditor
-                      draft={displayedEmailDraft}
-                      title="Client email"
-                      description="Edit the client-facing MOM and attachment note before copying."
-                    />
-                  ) : (
-                    <EmptyState
-                      title="No client email draft"
-                      description="Run wrap-up after the call to generate a client-facing draft."
-                    />
+        <div className="space-y-4">
+          {(() => {
+            const widgetProps = normalizePostDcWidgetProps({
+              review: displayedReview,
+              call,
+              callId,
+              accountSnapshot: snapshot,
+              emailDraft: displayedEmailDraft,
+              internalEmailDraft: displayedInternalEmailDraft,
+              crmTasks: taskList,
+              jiraTicket: displayedJiraTicket,
+              kbSuggestions: postRunMeta?.kbSuggestions ?? [],
+              emailAttachments: displayedEmailDraft?.attachments,
+              landingPage: landingPage ?? null,
+              onApproveCrmTasks: handleApproveTasks,
+              onRejectCrmTask: handleRejectTask,
+              onCreateJiraTicket: handleCreateJiraTicket,
+            });
+            return (
+              <>
+                <LayoutControls layoutKey="post-dc" widgets={POST_DC_WIDGETS} widgetProps={widgetProps} />
+                <div
+                  className={cn(
+                    "grid gap-8",
+                    "grid-cols-1",
+                    "lg:grid-cols-[minmax(300px,0.34fr)_minmax(0,1fr)]",
+                    "lg:items-start"
                   )}
-                </section>
-
-                <section className="space-y-2" aria-label="Internal team email">
-                  <h2 className="text-sm font-semibold text-foreground">Internal team email</h2>
-                  <p className="text-xs text-muted-foreground">
-                    Team action plan with BANT score details, task owners, and next action items.
-                  </p>
-                  {displayedInternalEmailDraft ? (
-                    <EmailEditor
-                      draft={displayedInternalEmailDraft}
-                      title="Internal team email"
-                      description="Edit the internal handoff before sharing it with the team."
-                    />
-                  ) : (
-                    <EmptyState
-                      title="No internal email draft"
-                      description="Run wrap-up after the call to generate the internal team action email."
-                    />
-                  )}
-                </section>
-              </div>
-
-            </TabsContent>
-
-            <TabsContent value="tasks" className="m-0 space-y-4">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Task list</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Follow-up, internal review, meeting, and content tasks created from the call transcript.
-                </p>
-              </div>
-              <BriefDetailCard title="Task list">
-                <TaskList
-                  tasks={taskList}
-                  onApprove={handleApproveTasks}
-                  onReject={handleRejectTask}
-                />
-              </BriefDetailCard>
-              {displayedJiraTicket ? (
-                <JiraTicketCard ticket={displayedJiraTicket} onCreate={handleCreateJiraTicket} />
-              ) : null}
-            </TabsContent>
-
-            <TabsContent value="coaching" className="m-0 space-y-4">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Pod member coaching</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Each internal participant's role, performance, talk time, and areas to work from the completed call.
-                </p>
-              </div>
-              {displayedReview.podScorecard?.length ? (
-                <PostScorecardCard scorecard={displayedReview.podScorecard ?? []} />
-              ) : (
-                <EmptyState
-                  title="No coaching scorecard yet"
-                  description="Pod member performance, talk time, and areas to work appear here after wrap-up."
-                />
-              )}
-            </TabsContent>
-
-            <TabsContent value="content" className="m-0 space-y-4">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Content</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Ready KB assets and missing content that should be generated before follow-up.
-                </p>
-              </div>
-              {hasContent ? (
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <PostKbSuggestionsCard suggestions={postRunMeta?.kbSuggestions ?? []} />
-                  <AttachmentSummaryCard
-                    attachments={displayedEmailDraft?.attachments ?? null}
-                    title="Ready content from KB"
-                    showMissing={false}
+                >
+                  <PostDcSidebar
+                    callId={callId}
+                    accountSnapshot={snapshot}
+                    review={displayedReview}
+                    landingPage={landingPage ?? undefined}
                   />
-                  <div className="lg:col-span-2">
-                    <MissingContentCard attachments={displayedEmailDraft?.attachments ?? null} />
+                  <div className="space-y-4 min-w-0">
+                    <PostDcProposalWidget callId={callId} />
+                    {hasContent ? (
+                      <div className="grid gap-4 lg:grid-cols-2">
+                        <PostKbSuggestionsCard suggestions={postRunMeta?.kbSuggestions ?? []} />
+                        <AttachmentSummaryCard
+                          attachments={displayedEmailDraft?.attachments ?? null}
+                          title="Ready content from KB"
+                          showMissing={false}
+                        />
+                        <div className="lg:col-span-2">
+                          <MissingContentCard attachments={displayedEmailDraft?.attachments ?? null} />
+                        </div>
+                      </div>
+                    ) : null}
+                    <CallDetailColumnLayout
+                      layoutKey="post-dc"
+                      widgets={POST_DC_WIDGETS}
+                      widgetProps={widgetProps}
+                    />
                   </div>
                 </div>
-              ) : (
-                <EmptyState
-                  title="No content suggestions yet"
-                  description="Ready assets and generation gaps appear here after wrap-up reviews the transcript."
-                />
-              )}
-            </TabsContent>
-          </Tabs>
-        </>
+              </>
+            );
+          })()}
+        </div>
       )}
     </div>
   );
@@ -497,6 +417,8 @@ function buildJiraTicketDraft({
     })
   ) as PostCallJiraTicket["bantSnapshot"];
   const allBantConfirmed = BANT_TICKET_KEYS.every((key) => bantSnapshot[key]);
+  if (!allBantConfirmed) return null;
+
   const summaryLines = jiraSafeLines([review?.headline, ...(review?.summary ?? [])], 4);
   const needLines = jiraSafeLines(review?.summary ?? [], 4).filter((line) => !JIRA_TIMELINE_RE.test(line));
   const timelineLines = jiraSafeLines(

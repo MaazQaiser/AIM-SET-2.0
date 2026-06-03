@@ -188,13 +188,13 @@ export function CallCard({ call }: CallCardProps) {
           {isCompleted && (
             <>
               <Button asChild size="sm" variant="outline" className="gap-1.5">
-                <Link href={`/calls/${call.id}`}>
+                <Link href={`/calls/${call.id}/post-dc?wrapped=1`}>
                   View summary
                   <ChevronRight className="h-3.5 w-3.5" />
                 </Link>
               </Button>
               <Button asChild size="sm" variant="ghost" className="ml-auto text-muted-foreground gap-1 text-xs">
-                <Link href={`/calls/${call.id}/post-dc`}>Post-DC review</Link>
+                <Link href={`/calls/${call.id}/post-dc?wrapped=1`}>Post-DC review</Link>
               </Button>
             </>
           )}

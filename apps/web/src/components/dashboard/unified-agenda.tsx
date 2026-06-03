@@ -11,11 +11,12 @@ import {
   isTomorrow,
   startOfDay,
 } from "date-fns";
-import { Phone, CalendarDays, Sparkles, Video, Clock, ExternalLink } from "lucide-react";
+import { Phone, CalendarDays, Sparkles, Video, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { useCalls } from "@/lib/data/hooks";
+import { parseDiscoveryDateTime } from "@/lib/dc-notes/parse-discovery";
 import { useCalendarEvents, useGoogleCalendarConnection } from "@/hooks/use-google-calendar";
 import type { Call } from "@/types";
 import { cn } from "@/lib/cn";
@@ -35,6 +36,29 @@ export interface AgendaItem {
 
 /** Agenda widget only lists today and tomorrow; full schedule is on /calls. */
 const AGENDA_DAY_COUNT = 2;
+
+function callAgendaDate(call: Call): Date {
+  if (call.discoveryCallDatePkt?.trim()) {
+    const parsed = parseDiscoveryDateTime(
+      call.discoveryCallDatePkt,
+      call.discoveryCallTimePkt ?? ""
+    );
+    if (parsed) return new Date(parsed);
+  }
+  return new Date(call.scheduledAt);
+}
+
+function isAgendaCallDay(at: Date): boolean {
+  return isToday(at) || isTomorrow(at);
+}
+
+function shouldIncludeCall(call: Call): boolean {
+  if (call.status === "completed" || call.status === "no-show") return false;
+  if (call.status === "live") return true;
+  const at = callAgendaDate(call);
+  if (!Number.isFinite(at.getTime())) return false;
+  return isAgendaCallDay(at);
+}
 
 function dayLabel(day: Date): string {
   if (isToday(day)) return "Today";
@@ -129,12 +153,13 @@ export function UnifiedAgenda() {
   const items = useMemo(() => {
     const list: AgendaItem[] = [];
     const now = new Date();
-    const horizon = addDays(startOfDay(now), AGENDA_DAY_COUNT);
 
     for (const call of calls) {
-      const at = new Date(call.scheduledAt);
-      if (at < startOfDay(now) || at >= horizon) continue;
-      if (call.status === "completed" || call.status === "no-show") continue;
+      if (!shouldIncludeCall(call)) continue;
+      const at = callAgendaDate(call);
+      // Live calls always bucket under today even if discovery date is stale
+      const displayAt =
+        call.status === "live" && !isAgendaCallDay(at) ? new Date() : at;
 
       list.push({
         id: `call-${call.id}`,
@@ -143,7 +168,7 @@ export function UnifiedAgenda() {
         subtitle: call.leadName
           ? `${call.leadName}${call.leadTitle ? ` · ${call.leadTitle}` : ""} · ${formatPktSchedule(call)}`
           : formatPktSchedule(call),
-        scheduledAt: call.scheduledAt,
+        scheduledAt: displayAt.toISOString(),
         href:
           call.status === "live"
             ? `/calls/${call.id}/live`
@@ -151,14 +176,14 @@ export function UnifiedAgenda() {
         status: call.status,
       });
 
-      const hoursUntil = (at.getTime() - now.getTime()) / 3_600_000;
+      const hoursUntil = (displayAt.getTime() - now.getTime()) / 3_600_000;
       if (
         !call.briefReady &&
         hoursUntil > 0 &&
         hoursUntil <= 4 &&
         (call.status === "upcoming" || call.status === "live")
       ) {
-        const briefAt = addHours(at, -4);
+        const briefAt = addHours(displayAt, -4);
         if (briefAt > now) {
           list.push({
             id: `ai-brief-${call.id}`,
@@ -175,7 +200,7 @@ export function UnifiedAgenda() {
     if (connection?.isConnected && calendarData?.calls) {
       for (const ev of calendarData.calls) {
         const at = new Date(ev.scheduledAt);
-        if (at < startOfDay(now) || at >= horizon) continue;
+        if (!Number.isFinite(at.getTime()) || !isAgendaCallDay(at)) continue;
         const duplicate = list.some(
           (i) =>
             i.type === "call" &&
@@ -222,31 +247,21 @@ export function UnifiedAgenda() {
   return (
     <Card className="h-full">
       <CardHeader className="pb-3">
-        <div className="flex items-start gap-3">
-          <Link
-            href="/calls"
-            aria-label="View full calendar"
-            title="View full calendar"
-            className="shrink-0 rounded-md p-1 -m-1 text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            <span className="sr-only">View full calendar</span>
-            <ExternalLink className="size-6" aria-hidden />
-          </Link>
-          <div className="min-w-0 flex-1 space-y-0.5">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
-              Your agenda
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Calls, calendar, and AI prep — today and tomorrow
-            </p>
-          </div>
-        </div>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
+          Your agenda
+        </CardTitle>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Calls, calendar, and AI prep — today and tomorrow
+        </p>
       </CardHeader>
       <CardContent className="pt-0 space-y-5">
         {grouped.length === 0 ? (
-          <div className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
-            Nothing scheduled for today or tomorrow.
+          <div className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground space-y-2">
+            <p>Nothing scheduled for today or tomorrow.</p>
+            <Link href="/calls" className="text-xs text-primary hover:underline">
+              View full calendar
+            </Link>
           </div>
         ) : (
           grouped.map(({ day, label, items: dayItems }) => (
@@ -264,6 +279,13 @@ export function UnifiedAgenda() {
               </div>
             </section>
           ))
+        )}
+        {grouped.length > 0 && (
+          <p className="text-center pt-1">
+            <Link href="/calls" className="text-xs text-muted-foreground hover:text-primary hover:underline">
+              View full calendar
+            </Link>
+          </p>
         )}
       </CardContent>
     </Card>

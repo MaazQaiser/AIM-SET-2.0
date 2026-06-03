@@ -21,11 +21,15 @@ if os.environ.get("DC_COPILOT_IGNORE_DOTENV") != "true":
 from app.routers import (  # noqa: E402
     dc_notes,
     v1_agents,
+    v1_briefing,
     v1_calls,
+    v1_clp_notifications,
     v1_content_studio,
     v1_copilot,
     v1_integrations_jira,
     v1_kb,
+    v1_landing_page,
+    v1_public_clp,
     v1_workflow,
     v1_webhooks,
     websocket,
@@ -44,11 +48,15 @@ app.add_middleware(
 
 app.include_router(dc_notes.router)
 app.include_router(v1_calls.router)
+app.include_router(v1_landing_page.router)
+app.include_router(v1_public_clp.router)
+app.include_router(v1_clp_notifications.router)
 app.include_router(v1_copilot.router)
 app.include_router(v1_workflow.router)
 app.include_router(v1_kb.router)
 app.include_router(v1_content_studio.router)
 app.include_router(v1_agents.router)
+app.include_router(v1_briefing.router)
 app.include_router(v1_integrations_jira.router)
 app.include_router(v1_webhooks.router)
 app.include_router(websocket.router)

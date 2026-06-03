@@ -116,6 +116,49 @@ class KbRepository:
                     texts.append(text)
         return texts[:limit]
 
+    def list_asset_chunks(self, ctx: TenantContext, asset_id: str, limit: int = 1000) -> List[Dict[str, Any]]:
+        tenant_uuid, clerk_key = self._ctx_keys(ctx)
+        settings = get_settings()
+
+        if settings.supabase_configured:
+            try:
+                supabase = get_supabase()
+                result = (
+                    supabase.table("kb_chunks")
+                    .select("asset_id, chunk_text, chunk_index, metadata")
+                    .eq("tenant_id", tenant_uuid)
+                    .eq("asset_id", asset_id)
+                    .order("chunk_index")
+                    .limit(limit)
+                    .execute()
+                )
+                return [
+                    {
+                        "asset_id": row.get("asset_id") or asset_id,
+                        "chunk_text": row.get("chunk_text") or "",
+                        "chunk_index": row.get("chunk_index") or 0,
+                        "metadata": row.get("metadata") or {},
+                    }
+                    for row in result.data or []
+                ]
+            except Exception:
+                pass
+
+        rows = []
+        for ch in get_memory_store().kb_chunks.get(clerk_key, []):
+            if ch.get("asset_id") != asset_id or ch.get("tenant_id") != tenant_uuid:
+                continue
+            rows.append(
+                {
+                    "asset_id": asset_id,
+                    "chunk_text": ch.get("chunk_text") or "",
+                    "chunk_index": ch.get("chunk_index") or 0,
+                    "metadata": ch.get("metadata") or {},
+                }
+            )
+        rows.sort(key=lambda row: int(row.get("chunk_index") or 0))
+        return rows[:limit]
+
     def create_upload(
         self,
         ctx: TenantContext,

@@ -1,6 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  loadTodoDoneIds,
+  saveTodoDoneIds,
+} from "@/lib/dashboard/todo-completion-storage";
 import Link from "next/link";
 import {
   Bot,
@@ -148,7 +152,19 @@ function TodoRowContent({
 
 export function AiTodoList() {
   const { todos, counts } = useAiTodos();
-  const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
+  const [doneIds, setDoneIds] = useState<Set<string>>(() => new Set());
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setDoneIds(loadTodoDoneIds());
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    saveTodoDoneIds(doneIds);
+  }, [doneIds, hydrated]);
+
   const openCount = todos.filter((t) => !doneIds.has(t.id)).length;
 
   function toggle(id: string) {

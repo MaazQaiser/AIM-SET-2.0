@@ -63,20 +63,28 @@ export function normalizeBriefWidgetProps(
 export function normalizePostDcWidgetProps(
   props: Omit<PostDcWidgetProps, "review" | "accountSnapshot"> & {
     review: PostCallReview;
+    callId: string;
     accountSnapshot?: AccountSnapshotRow[] | null;
     emailDraft?: PostCallEmailDraft | null;
+    internalEmailDraft?: PostCallEmailDraft | null;
     crmTasks?: PostCallTask[] | null;
     jiraTicket?: PostCallJiraTicket | null;
     kbSuggestions?: PostCallKbSuggestion[] | null;
+    emailAttachments?: PostCallEmailDraft["attachments"];
+    landingPage?: import("@dc-copilot/types").CustomerLandingPage | null;
   }
 ): PostDcWidgetProps {
   return {
     ...props,
     review: normalizePostCallReview(props.review),
+    callId: props.callId,
     accountSnapshot: Array.isArray(props.accountSnapshot) ? props.accountSnapshot : [],
     emailDraft: props.emailDraft ?? null,
+    internalEmailDraft: props.internalEmailDraft ?? null,
     crmTasks: Array.isArray(props.crmTasks) ? props.crmTasks : [],
     jiraTicket: props.jiraTicket ?? null,
     kbSuggestions: Array.isArray(props.kbSuggestions) ? props.kbSuggestions : [],
+    emailAttachments: props.emailAttachments,
+    landingPage: props.landingPage ?? null,
   };
 }

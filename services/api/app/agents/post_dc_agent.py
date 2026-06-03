@@ -1464,6 +1464,9 @@ def _jira_ticket(
         for dim in ("budget", "authority", "need", "timeline")
     }
     is_qualified = all(bant_snapshot.values())
+    if not is_qualified:
+        return None
+
     service_line = _first_text(
         _post_field(post_dc_record, "Service Line"),
         (pre_dc_fields or {}).get("Campaign Service - PreDC"),
@@ -1474,7 +1477,7 @@ def _jira_ticket(
     priority = "High" if is_qualified or coverage >= 0.75 else "Medium"
     project_key = str(jira_cfg.get("project_key") or "SALES")
     icp_bucket = _first_text((pre_dc_fields or {}).get("ICP Bucket"), _post_field(post_dc_record, "Was Pre DC ICP bucket correct"))
-    labels = ["discovery-call", "bant-qualified" if is_qualified else "bant-review-needed"]
+    labels = ["discovery-call", "bant-qualified"]
     if icp_bucket:
         labels.append(re.sub(r"[^a-z0-9]+", "-", icp_bucket.lower()).strip("-")[:40])
     description = _jira_description(

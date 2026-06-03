@@ -8,6 +8,8 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/health/deployment",
+  "/p/(.*)",
+  "/api/public/clp/(.*)",
 ]);
 
 const clerkHandler = clerkMiddleware(async (auth, request) => {

@@ -1,0 +1,226 @@
+"use client";
+
+import { useState } from "react";
+import type { ClpComment, ClpProposal, ClpSection, CustomerLandingPage } from "@dc-copilot/types";
+import { cn } from "@/lib/cn";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Input } from "@dc-copilot/ui/components/input";
+import { Textarea } from "@dc-copilot/ui/components/textarea";
+
+interface ClpPublicViewProps {
+  page: CustomerLandingPage;
+  proposal?: ClpProposal | null;
+  comments?: ClpComment[];
+  preview?: boolean;
+  onDocumentOpen?: (assetId: string) => void;
+  onProposalOpen?: () => void;
+  onSendChat?: (body: string) => void;
+  onAddComment?: (sectionId: string, body: string) => void;
+  chatMessages?: { authorName: string; body: string; authorType: string }[];
+}
+
+export function ClpPublicView({
+  page,
+  proposal,
+  comments = [],
+  preview = false,
+  onDocumentOpen,
+  onProposalOpen,
+  onSendChat,
+  onAddComment,
+  chatMessages = [],
+}: ClpPublicViewProps) {
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatText, setChatText] = useState("");
+  const [commentSection, setCommentSection] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState("");
+  const branding = page.branding;
+  const sections = (page.sections ?? []).filter((s) => s.visible !== false);
+
+  return (
+    <div className={cn("min-h-screen bg-background", preview && "rounded-xl border")}>
+      <header className="border-b bg-card px-6 py-8">
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">Lead hub</p>
+        <h1 className="text-2xl font-semibold mt-1">{branding.accountName}</h1>
+        {branding.leadName && (
+          <p className="text-muted-foreground mt-1">Prepared for {branding.leadName}</p>
+        )}
+      </header>
+
+      <nav className="sticky top-0 z-10 border-b bg-card/95 backdrop-blur px-6 py-2 flex gap-4 text-sm overflow-x-auto">
+        {sections.map((s) => (
+          <a key={s.id} href={`#${s.id}`} className="text-muted-foreground hover:text-foreground whitespace-nowrap">
+            {sectionTitle(s)}
+          </a>
+        ))}
+        {proposal && (
+          <a href="#proposal" className="text-muted-foreground hover:text-foreground" onClick={() => onProposalOpen?.()}>
+            Proposal
+          </a>
+        )}
+      </nav>
+
+      <main className="max-w-3xl mx-auto px-6 py-8 space-y-10">
+        {sections.map((section) => (
+          <section key={section.id} id={section.id} className="scroll-mt-20">
+            <div className="flex items-start justify-between gap-2">
+              <h2 className="text-lg font-semibold">{sectionTitle(section)}</h2>
+              {!preview && page.settings?.allowComments !== false && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs h-7"
+                  onClick={() => setCommentSection(commentSection === section.id ? null : section.id)}
+                >
+                  Comment
+                </Button>
+              )}
+            </div>
+            {renderSection(section, onDocumentOpen)}
+            {commentSection === section.id && (
+              <div className="mt-3 space-y-2">
+                <Textarea
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Leave a comment…"
+                  rows={2}
+                />
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (commentText.trim()) {
+                      onAddComment?.(section.id, commentText.trim());
+                      setCommentText("");
+                      setCommentSection(null);
+                    }
+                  }}
+                >
+                  Post comment
+                </Button>
+              </div>
+            )}
+            {comments
+              .filter((c) => c.sectionId === section.id)
+              .map((c) => (
+                <div key={c.id} className="mt-2 text-sm rounded-md border bg-muted/30 px-3 py-2">
+                  <span className="font-medium">{c.authorName}</span>: {c.body}
+                </div>
+              ))}
+          </section>
+        ))}
+
+        {proposal && (
+          <section id="proposal" className="scroll-mt-20" onMouseEnter={() => onProposalOpen?.()}>
+            <h2 className="text-lg font-semibold mb-4">{proposal.title}</h2>
+            <div
+              className="prose prose-sm max-w-none rounded-lg border bg-card p-6"
+              dangerouslySetInnerHTML={{ __html: proposal.html }}
+            />
+          </section>
+        )}
+
+        {branding.aeName && (
+          <section className="rounded-lg border bg-muted/20 p-4 text-sm">
+            <p className="font-medium">Your account team</p>
+            <p>{branding.aeName}</p>
+            {branding.aeEmail && <p className="text-muted-foreground">{branding.aeEmail}</p>}
+          </section>
+        )}
+      </main>
+
+      {!preview && page.settings?.allowChat !== false && (
+        <div className="fixed bottom-6 right-6 z-20">
+          {chatOpen ? (
+            <div className="w-80 rounded-xl border bg-card shadow-lg flex flex-col max-h-96">
+              <div className="px-3 py-2 border-b font-medium text-sm flex justify-between">
+                Chat with {branding.aeName ?? "your team"}
+                <button type="button" className="text-muted-foreground" onClick={() => setChatOpen(false)}>
+                  ×
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2 text-sm">
+                {chatMessages.map((m, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "rounded-md px-2 py-1",
+                      m.authorType === "visitor" ? "bg-primary/10 ml-4" : "bg-muted mr-4"
+                    )}
+                  >
+                    <span className="text-xs font-medium">{m.authorName}</span>
+                    <p>{m.body}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="p-2 border-t flex gap-2">
+                <Input
+                  value={chatText}
+                  onChange={(e) => setChatText(e.target.value)}
+                  placeholder="Message…"
+                  className="h-8 text-sm"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (chatText.trim()) {
+                      onSendChat?.(chatText.trim());
+                      setChatText("");
+                    }
+                  }}
+                >
+                  Send
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button onClick={() => setChatOpen(true)}>Chat with us</Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function sectionTitle(s: ClpSection): string {
+  return s.title ?? s.headline ?? s.type.replace(/_/g, " ");
+}
+
+function renderSection(section: ClpSection, onDocumentOpen?: (assetId: string) => void) {
+  if (section.bullets?.length) {
+    return (
+      <ul className="mt-3 list-disc pl-5 text-sm text-muted-foreground space-y-1">
+        {section.bullets.map((b, i) => (
+          <li key={i}>{b}</li>
+        ))}
+      </ul>
+    );
+  }
+  if (section.assetId) {
+    return (
+      <button
+        type="button"
+        className="mt-3 text-sm text-primary underline"
+        onClick={() => onDocumentOpen?.(section.assetId!)}
+      >
+        Open document
+      </button>
+    );
+  }
+  if (section.links?.length) {
+    return (
+      <ul className="mt-3 space-y-1">
+        {section.links.map((l, i) => (
+          <li key={i}>
+            <a href={l.url} className="text-sm text-primary hover:underline" target="_blank" rel="noopener noreferrer">
+              {l.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  if (section.subhead) {
+    return <p className="mt-2 text-sm text-muted-foreground">{section.subhead}</p>;
+  }
+  return null;
+}

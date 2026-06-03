@@ -111,15 +111,7 @@ def test_post_dc_agent_heuristic_result_shape(monkeypatch):
     assert env.result["task"]["taskList"]
     assert "crmTasks" not in env.result["task"]
     assert all("crm_system" not in task for task in env.result["task"]["taskList"])
-    assert env.result["jiraTicket"]["status"] == "draft_pending_approval"
-    assert env.result["jiraTicket"]["bantSnapshot"]["need"] is True
-    assert env.result["jiraTicket"]["bantSnapshot"]["budget"] is False
-    jira_description = env.result["jiraTicket"]["description"]
-    assert "Client summary:" in jira_description
-    assert "Action items:" in jira_description
-    assert "BANT" not in jira_description
-    assert "Budget" not in jira_description
-    assert "$" not in jira_description
+    assert env.result["jiraTicket"] is None
 
 
 def test_post_dc_agent_generates_jira_draft_for_qualified_call(monkeypatch):

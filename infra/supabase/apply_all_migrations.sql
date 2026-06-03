@@ -363,3 +363,5 @@ ALTER TABLE kb_assets
 -- KB slide preview (008)
 ALTER TABLE kb_assets
   ADD COLUMN IF NOT EXISTS preview_slide_count INT NOT NULL DEFAULT 0;
+
+-- Customer landing pages (009) — run infra/supabase/migrations/009_customer_landing_pages.sql separately if not applied

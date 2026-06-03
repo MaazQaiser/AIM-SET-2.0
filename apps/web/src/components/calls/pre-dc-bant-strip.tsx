@@ -33,7 +33,7 @@ export function PreDcBantStrip({
   return (
     <div
       className={cn(
-        "call-detail-roboto mx-auto inline-flex w-fit max-w-full items-center text-left border shadow-none",
+        "call-detail-urbanist mx-auto inline-flex w-fit max-w-full items-center text-left border shadow-none",
         compact ? "rounded-full py-1.5 pl-4 pr-2.5" : "rounded-full py-2 pl-3.5 pr-2",
         "border-border/80 bg-card",
         className

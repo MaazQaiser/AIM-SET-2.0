@@ -13,6 +13,10 @@ export function AeNotificationPrefs() {
   const [roleOnly, setRoleOnly] = useState(true);
   const [objectionReminders, setObjectionReminders] = useState(false);
   const [designPatterns, setDesignPatterns] = useState(true);
+  const [clpFirstVisit, setClpFirstVisit] = useState(true);
+  const [clpProposalOpen, setClpProposalOpen] = useState(true);
+  const [clpChat, setClpChat] = useState(true);
+  const [clpComments, setClpComments] = useState(true);
 
   const acceptanceRate = 40;
   const teamMedian = 54;
@@ -43,6 +47,28 @@ export function AeNotificationPrefs() {
           <input type="checkbox" checked={roleOnly} onChange={(e) => setRoleOnly(e.target.checked)} />
           Role-specific cues only
         </label>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Customer landing page</p>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={clpFirstVisit} onChange={(e) => setClpFirstVisit(e.target.checked)} />
+            First visitor on a published page
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={clpProposalOpen} onChange={(e) => setClpProposalOpen(e.target.checked)} />
+            Proposal opened
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={clpChat} onChange={(e) => setClpChat(e.target.checked)} />
+            New chat message
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={clpComments} onChange={(e) => setClpComments(e.target.checked)} />
+            New comment
+          </label>
+        </div>
 
         <Separator />
 

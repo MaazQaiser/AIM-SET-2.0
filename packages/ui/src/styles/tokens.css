@@ -1,8 +1,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  --font-sans: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
 
   --text-display: 2rem;
   --text-display--line-height: 1.1;
@@ -62,45 +62,49 @@
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
+  --radius-card: 0.75rem; /* 12px — cards & table shells */
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
 }
 
 :root {
-  --radius: 1rem;
+  --radius: 1.5rem;
 
-  /* Page canvas — warm cream (matches call-detail / editorial) */
-  --background: 48 56% 97%;
-  --foreground: 220 10% 20%;
+  /* Page canvas — #EFF3F6 */
+  --background: 205 28% 95%;
+  --foreground: 220 15% 14%;
 
-  /* Ambient sphere — soft yellow glow, 600px blur */
-  --sphere: 42 62% 86%;
+  /* Bottom-left canvas glow — #F6F5EE */
+  --page-hue-glow: 48 30% 95%;
+
+  /* Ambient sphere — matches canvas in light flat mode */
+  --sphere: 205 28% 95%;
 
   --sidebar: 0 0% 100%;
-  --sidebar-foreground: 220 10% 20%;
-  --sidebar-muted: 220 10% 96%;
-  --sidebar-border: 220 12% 88%;
-  --sidebar-active: 220 10% 94%;
+  --sidebar-foreground: 220 15% 14%;
+  --sidebar-muted: 240 5% 94%;
+  --sidebar-border: 220 10% 90%;
+  --sidebar-active: 0 0% 100%;
 
-  --primary: 220 12% 22%;
+  --primary: 220 15% 14%;
   --primary-foreground: 0 0% 98%;
-  --secondary: 220 10% 92%;
-  --secondary-foreground: 220 10% 20%;
-  --accent: 220 10% 94%;
+  --secondary: 240 5% 92%;
+  --secondary-foreground: 220 15% 14%;
+  --accent: 240 5% 94%;
   --accent-foreground: 220 10% 28%;
-  --muted: 220 11% 91%;
-  --muted-foreground: 220 9% 46%;
+  --muted: 240 5% 93%;
+  --muted-foreground: 220 8% 46%;
 
   --card: 0 0% 100%;
-  --card-foreground: 220 10% 20%;
+  --card-foreground: 220 15% 14%;
   --popover: 0 0% 100%;
-  --popover-foreground: 220 10% 20%;
+  --popover-foreground: 220 15% 14%;
 
-  /* Cool gray strokes (Cursor-like slate) */
-  --border: 220 13% 86%;
-  --input: 220 13% 86%;
-  --ring: 220 12% 22%;
+  /* Hairline strokes — depth via background contrast, not heavy borders */
+  --border: 220 10% 91%;
+  --input: 220 10% 91%;
+  --ring: 220 15% 14%;
 
   --destructive: 0 65% 55%;
   --destructive-foreground: 0 0% 98%;
@@ -113,28 +117,13 @@
   --nudge: 38 85% 52%;
   --nudge-foreground: 38 90% 12%;
 
-  --shadow-card:
-    0 1px 2px hsl(220 10% 20% / 0.03),
-    0 8px 24px -4px hsl(220 10% 20% / 0.06);
-  --shadow-soft-xs:
-    0 1px 1px hsl(220 10% 20% / 0.03),
-    0 2px 4px hsl(220 10% 20% / 0.04);
-  --shadow-soft-sm:
-    0 1px 2px hsl(220 10% 20% / 0.04),
-    0 4px 12px -2px hsl(220 10% 20% / 0.05),
-    0 10px 30px -6px hsl(220 10% 20% / 0.06);
-  --shadow-soft:
-    0 2px 4px hsl(220 10% 20% / 0.04),
-    0 8px 20px -4px hsl(220 10% 20% / 0.07),
-    0 16px 40px -8px hsl(220 10% 20% / 0.08);
-  --shadow-soft-md:
-    0 2px 6px hsl(220 10% 20% / 0.05),
-    0 12px 28px -6px hsl(220 10% 20% / 0.08),
-    0 24px 56px -12px hsl(220 10% 20% / 0.1);
-  --shadow-soft-lg:
-    0 4px 8px hsl(220 10% 20% / 0.05),
-    0 16px 36px -8px hsl(220 10% 20% / 0.1),
-    0 32px 72px -16px hsl(220 10% 20% / 0.12);
+  /* Flat UI — optional micro-elevation only */
+  --shadow-card: none;
+  --shadow-soft-xs: 0 1px 2px hsl(220 15% 14% / 0.04);
+  --shadow-soft-sm: 0 1px 3px hsl(220 15% 14% / 0.05);
+  --shadow-soft: 0 2px 6px hsl(220 15% 14% / 0.06);
+  --shadow-soft-md: 0 4px 12px hsl(220 15% 14% / 0.07);
+  --shadow-soft-lg: 0 8px 24px hsl(220 15% 14% / 0.08);
 }
 
 .dark {

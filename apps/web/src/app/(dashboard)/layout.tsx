@@ -23,7 +23,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <DashboardThemePreview>
                 <div className="page-hue relative flex h-svh">
                   <Sidebar />
-                  <div className="relative z-[1] flex min-w-0 flex-1 flex-col overflow-hidden p-4 pl-[calc(var(--sidebar-rail-width,64px)+1rem)]">
+                  <div className="relative z-[1] flex min-w-0 flex-1 flex-col overflow-hidden pl-[calc(var(--sidebar-rail-width,64px)+1rem)]">
                     <TopBar />
                     <AuthSetupBanner />
                     <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</main>

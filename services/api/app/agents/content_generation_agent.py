@@ -650,7 +650,7 @@ def _build_fallback_html(title: str, artifact_type: str, brief: Dict[str, Any]) 
 
     if artifact_type == "one_pager":
         body = f"""
-        <article style="max-width:960px;margin:0 auto;padding:48px;font-family:Arial,sans-serif;">
+        <article style="max-width:960px;margin:0 auto;padding:48px;font-family:Urbanist, Arial, sans-serif;">
           <h1>{title}</h1>
           <p><strong>Audience:</strong> {audience}</p>
           <p><strong>Style:</strong> {style}</p>
@@ -660,24 +660,24 @@ def _build_fallback_html(title: str, artifact_type: str, brief: Dict[str, Any]) 
         """
     elif artifact_type == "image":
         body = f"""
-        <figure style="width:1280px;height:720px;margin:0 auto;padding:40px;display:flex;flex-direction:column;justify-content:center;background:#f7fafc;font-family:Arial,sans-serif;">
+        <figure style="width:1280px;height:720px;margin:0 auto;padding:40px;display:flex;flex-direction:column;justify-content:center;background:#f7fafc;font-family:Urbanist, Arial, sans-serif;">
           <h1 style="font-size:56px;line-height:1.1;margin:0 0 16px;">{title}</h1>
           <figcaption style="font-size:28px;color:#4a5568;">{audience} · {style}</figcaption>
         </figure>
         """
     else:
         body = f"""
-        <section class="slide" data-slide="1" style="width:1280px;height:720px;margin:0 auto;padding:48px;font-family:Arial,sans-serif;background:#ffffff;">
+        <section class="slide" data-slide="1" style="width:1280px;height:720px;margin:0 auto;padding:48px;font-family:Urbanist, Arial, sans-serif;background:#ffffff;">
           <h1 style="font-size:48px;line-height:1.15;margin:0 0 12px;">{title}</h1>
           <p style="font-size:24px;color:#4a5568;margin:0 0 24px;">Audience: {audience}</p>
           <ul style="font-size:28px;line-height:1.35;">{bullets}</ul>
         </section>
-        <section class="slide" data-slide="2" style="width:1280px;height:720px;margin:0 auto;padding:48px;font-family:Arial,sans-serif;background:#f8fafc;">
+        <section class="slide" data-slide="2" style="width:1280px;height:720px;margin:0 auto;padding:48px;font-family:Urbanist, Arial, sans-serif;background:#f8fafc;">
           <h2 style="font-size:42px;margin:0 0 20px;">Approach</h2>
           <p style="font-size:26px;">Style: {style}</p>
           <p style="font-size:22px;color:#4a5568;">Use this draft as a base; refine content from chat and template selection.</p>
         </section>
-        <section class="slide" data-slide="3" style="width:1280px;height:720px;margin:0 auto;padding:48px;font-family:Arial,sans-serif;background:#ffffff;">
+        <section class="slide" data-slide="3" style="width:1280px;height:720px;margin:0 auto;padding:48px;font-family:Urbanist, Arial, sans-serif;background:#ffffff;">
           <h2 style="font-size:42px;margin:0 0 20px;">Next Steps</h2>
           <ol style="font-size:26px;line-height:1.4;">
             <li>Validate key messages with stakeholders</li>
@@ -1077,7 +1077,7 @@ def _build_slide_preview_html(
             min-height: 100%;
             background: var(--bg, #e8eef7);
             color: var(--text, #0f172a);
-            font-family: Arial, sans-serif;
+            font-family: Urbanist, Arial, sans-serif;
           }}
           body {{
             box-sizing: border-box;

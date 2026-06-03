@@ -32,6 +32,15 @@ class MemoryStore:
         self.transcript_events: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
         self.live_suggestions: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
         self.discovery_checklists: Dict[str, Dict[str, Any]] = {}
+        self.landing_pages: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        self.clp_proposals: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        self.clp_visitors: Dict[str, List[Dict[str, Any]]] = {}
+        self.clp_sessions: Dict[str, List[Dict[str, Any]]] = {}
+        self.clp_events: Dict[str, List[Dict[str, Any]]] = {}
+        self.clp_notifications: Dict[str, List[Dict[str, Any]]] = {}
+        self.clp_comments: Dict[str, List[Dict[str, Any]]] = {}
+        self.clp_chat: Dict[str, List[Dict[str, Any]]] = {}
+        self.clp_public_sessions: Dict[str, Dict[str, Any]] = {}
 
     def list_kb_assets(self, tenant_id: str) -> List[Dict[str, Any]]:
         return self.kb_assets.get(tenant_id, [])

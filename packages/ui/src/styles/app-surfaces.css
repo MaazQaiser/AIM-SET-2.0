@@ -1,21 +1,56 @@
 /**
- * App surface system — shared card, dialog, nav, and scroll chrome.
- * Matches Pre-DC brief cards: hairline border, 12px radius, no shadow.
+ * App surface system — glass cards on #EFF3F6 canvas, flat nav/dialog chrome.
  */
 
 @layer utilities {
   .app-card {
+    position: relative;
     overflow: hidden;
-    border-radius: var(--radius-lg);
-    border: 1px solid hsl(var(--border));
-    background-color: hsl(var(--card));
-    box-shadow: none;
+    border-radius: var(--radius-card);
+    border: 1px solid rgb(255 255 255 / 0.72);
+    background: linear-gradient(
+      180deg,
+      rgb(255 255 255 / 0.78) 0%,
+      rgb(255 255 255 / 0.42) 100%
+    );
+    backdrop-filter: blur(12px) saturate(165%);
+    -webkit-backdrop-filter: blur(12px) saturate(165%);
+    box-shadow:
+      0 1px 2px rgb(17 17 17 / 0.04),
+      inset 0 1px 0 rgb(255 255 255 / 0.9);
+  }
+
+  .dark .app-card {
+    border-color: rgb(255 255 255 / 0.12);
+    background: linear-gradient(
+      180deg,
+      rgb(38 38 44 / 0.88) 0%,
+      rgb(38 38 44 / 0.58) 100%
+    );
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.2),
+      inset 0 1px 0 rgb(255 255 255 / 0.06);
+  }
+
+  @supports not (
+    (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+  ) {
+    .app-card {
+      background: hsl(var(--card));
+      border-color: hsl(var(--border) / 0.85);
+      box-shadow: none;
+    }
+
+    .dark .app-card {
+      background: hsl(var(--card));
+      border-color: hsl(var(--border));
+    }
   }
 
   .app-dialog {
     border-radius: var(--radius-lg);
-    border: 1px solid hsl(var(--border));
-    box-shadow: none;
+    border: 1px solid hsl(var(--border) / 0.85);
+    box-shadow: var(--shadow-soft-sm);
   }
 
   .app-body {
@@ -76,25 +111,24 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid transparent;
-    border-radius: var(--radius-lg);
+    border: none;
+    border-radius: 9999px;
     color: hsl(var(--muted-foreground));
     background: transparent;
     transition:
       background 150ms ease,
-      border-color 150ms ease,
       color 150ms ease;
   }
 
   .app-nav-item:hover {
     color: hsl(var(--foreground));
-    background: hsl(var(--muted) / 0.55);
+    background: hsl(var(--muted) / 0.7);
   }
 
   .app-nav-item-active {
     color: hsl(var(--foreground));
-    border-color: hsl(var(--border));
     background: hsl(var(--card));
+    box-shadow: var(--shadow-soft-xs);
   }
 
   .app-nav-link {
@@ -103,9 +137,9 @@
     gap: 12px;
     height: 44px;
     min-height: 44px;
-    padding: 0 12px;
-    border: 1px solid transparent;
-    border-radius: var(--radius-lg);
+    padding: 0 14px;
+    border: none;
+    border-radius: 9999px;
     font-size: 14px;
     font-weight: 500;
     line-height: 20px;
@@ -114,26 +148,30 @@
     overflow: hidden;
     transition:
       background 150ms ease,
-      border-color 150ms ease,
       color 150ms ease;
   }
 
   .app-nav-link:hover {
     color: hsl(var(--foreground));
-    background: hsl(var(--muted) / 0.45);
+    background: hsl(var(--muted) / 0.55);
   }
 
   .app-nav-link-active {
     color: hsl(var(--foreground));
-    border-color: hsl(var(--border));
-    background: hsl(var(--sidebar-active));
+    font-weight: 600;
+    background: hsl(var(--card));
+    box-shadow: var(--shadow-soft-xs);
   }
 
   .app-sidebar-panel {
-    border-radius: var(--radius-xl);
-    border: 1px solid hsl(var(--border));
-    background: hsl(var(--card));
+    border-radius: var(--radius-lg);
+    border: 1px solid hsl(var(--border) / 0.85);
     box-shadow: none;
+  }
+
+  .app-sidebar-panel > * {
+    position: relative;
+    z-index: 1;
   }
 
   .app-sidebar-widget {
@@ -143,8 +181,8 @@
     width: 100%;
     padding: 16px 12px;
     overflow: hidden;
-    border: 1px solid hsl(var(--border));
-    border-radius: var(--radius-xl);
+    border: 1px solid hsl(var(--border) / 0.85);
+    border-radius: var(--radius-lg);
     text-decoration: none;
     background: hsl(var(--card));
     box-shadow: none;
@@ -152,15 +190,33 @@
   }
 
   .app-sidebar-widget:hover {
-    background: hsl(var(--muted) / 0.35);
+    background: hsl(var(--muted) / 0.4);
   }
 
-  /** Clean data tables — white surface, neat header row */
+  /** Clean data tables — glass surface, neat header row */
   .app-table-wrap {
     overflow: hidden;
-    border-radius: var(--radius-lg);
-    border: 1px solid hsl(var(--border));
-    background-color: hsl(var(--card));
+    border-radius: var(--radius-card);
+    border: 1px solid rgb(255 255 255 / 0.72);
+    background: linear-gradient(
+      180deg,
+      rgb(255 255 255 / 0.78) 0%,
+      rgb(255 255 255 / 0.42) 100%
+    );
+    backdrop-filter: blur(12px) saturate(165%);
+    -webkit-backdrop-filter: blur(12px) saturate(165%);
+    box-shadow:
+      0 1px 2px rgb(17 17 17 / 0.04),
+      inset 0 1px 0 rgb(255 255 255 / 0.9);
+  }
+
+  .dark .app-table-wrap {
+    border-color: rgb(255 255 255 / 0.12);
+    background: linear-gradient(
+      180deg,
+      rgb(38 38 44 / 0.88) 0%,
+      rgb(38 38 44 / 0.58) 100%
+    );
   }
 
   .app-table {
