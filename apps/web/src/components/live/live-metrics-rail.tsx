@@ -3,10 +3,13 @@
 import { useMemo } from "react";
 import { filterKeywordCounts } from "@/lib/live/keyword-filter";
 import { formatSentimentScore, scoreToTone } from "@/lib/live/sentiment-display";
-import type { DiscoveryChecklistState } from "@dc-copilot/types";
-import type { KeywordStats, SentimentShift, TranscriptEvent } from "@/types";
+import type { BantSignal, DiscoveryChecklistState } from "@dc-copilot/types";
+import type { KeywordStats, SentimentShift, SuggestionLogEntry, TranscriptEvent } from "@/types";
 import { LiveSubsectionHeader } from "@/components/live/live-column-header";
+import { SignalLog } from "@/components/live/signal-log";
+import { SuggestionLog } from "@/components/live/suggestion-log";
 import { cn } from "@/lib/cn";
+import { formatBudgetUsd } from "@/lib/currency-format";
 
 const BANT_KEYS = ["budget", "authority", "need", "timeline"] as const;
 
@@ -50,6 +53,8 @@ interface LiveMetricsRailProps {
   sentimentCustomer: number;
   sentimentShift: SentimentShift | null;
   openGaps: string[];
+  bantSignals: BantSignal[];
+  suggestionLog: SuggestionLogEntry[];
   className?: string;
 }
 
@@ -83,6 +88,8 @@ function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistState | nul
         const status = checklist.bant[key] ?? "unknown";
         const variant = bantTileVariant(status, key);
         const evidence = evidenceById[key];
+        const evidenceText =
+          key === "budget" && evidence?.text ? formatBudgetUsd(evidence.text) : evidence?.text;
         return (
           <div
             key={key}
@@ -106,10 +113,10 @@ function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistState | nul
             >
               {bantStatusLabel(status, key)}
             </p>
-            {evidence?.text && (
+            {evidenceText && (
               <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2 leading-snug">
                 {evidence.sentiment === "negative" ? "Concern: " : ""}
-                {evidence.text}
+                {evidenceText}
               </p>
             )}
           </div>
@@ -222,6 +229,8 @@ export function LiveMetricsRail({
   sentimentCustomer,
   sentimentShift,
   openGaps,
+  bantSignals,
+  suggestionLog,
   className,
 }: LiveMetricsRailProps) {
   const keywordPills = useMemo(() => {
@@ -243,6 +252,11 @@ export function LiveMetricsRail({
       <section>
         <LiveSubsectionHeader title="BANT live" />
         <BantLiveTiles checklist={checklist} />
+      </section>
+
+      <section>
+        <LiveSubsectionHeader title="BANT signals" />
+        <SignalLog signals={bantSignals} />
       </section>
 
       <section>
@@ -298,6 +312,13 @@ export function LiveMetricsRail({
           <p className="text-xs text-muted-foreground">Discovery gaps will list here.</p>
         )}
       </section>
+
+      {suggestionLog.length > 0 && (
+        <section>
+          <LiveSubsectionHeader title="AI suggestion log" />
+          <SuggestionLog entries={suggestionLog} compact />
+        </section>
+      )}
     </div>
   );
 }

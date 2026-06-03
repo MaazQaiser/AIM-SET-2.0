@@ -10,6 +10,7 @@ import { SuggestionLog } from "@/components/live/suggestion-log";
 import { UnansweredQuestionsList } from "@/components/live/unanswered-questions-list";
 import { filterKeywordStats } from "@/lib/live/keyword-filter";
 import { scoreEmoji, shiftEmoji } from "@/lib/live/sentiment-display";
+import { formatBudgetSignalLabel } from "@/lib/currency-format";
 import type { BantSignal } from "@/lib/live-types";
 import type {
   KeywordStats,
@@ -60,7 +61,10 @@ function bantSummary(signals: BantSignal[]): string | undefined {
     need: "🎯 Need",
     timeline: "📅 Timeline",
   };
-  const labels = signals.slice(-4).map((s) => `${dims[s.dimension]} · ${s.label}`);
+  const labels = signals.slice(-4).map((s) => {
+    const label = s.dimension === "budget" ? formatBudgetSignalLabel(s.label, s.value) : s.label;
+    return `${dims[s.dimension]} · ${label}`;
+  });
   return labels.join(" · ");
 }
 

@@ -60,8 +60,8 @@ SIGNAL_RULES: List[Tuple[str, List[str], ChecklistItemStatus]] = [
     ("authority", ["reports to", "final say", "signatory", "approves", "approve it", "need to approve", "must approve", "has to approve", "board approval", "approval path", "i decide", "my call", "i approve"], "confirmed"),
     ("need", ["pain", "problem", "challenge", "struggling", "need to", "priority", "impact", "pain point", "overcome", "solution", "looking for", "looking forward", "require", "want to", "wish we", "gap", "issue", "bottleneck", "friction", "limitation", "automat"], "partial"),
     ("need", ["must have", "critical", "urgent need", "business case", "top priority", "deal breaker", "non-negotiable"], "confirmed"),
-    ("timeline", ["timeline", "deadline", "go-live", "go live", "launch", "q1", "q2", "q3", "q4", "by end of", "this quarter", "next quarter", "this year", "next month", "asap", "soon", "urgent", "immediately", "production-grade", "pilot", "next year", "kickoff", "rollout"], "partial"),
-    ("timeline", ["board meeting", "decision by", "kick off", "kickoff", "pilot kickoff", "start date", "go live date", "go-live by", "production go-live", "target date", "production-grade by"], "confirmed"),
+    ("timeline", ["timeline", "eta", "estimated time", "estimated delivery", "delivery date", "completion date", "deadline", "go-live", "go live", "launch", "q1", "q2", "q3", "q4", "by end of", "this quarter", "next quarter", "this year", "next month", "asap", "soon", "urgent", "immediately", "production-grade", "pilot", "next year", "kickoff", "rollout"], "partial"),
+    ("timeline", ["project eta", "board meeting", "decision by", "kick off", "kickoff", "pilot kickoff", "start date", "go live date", "go-live by", "production go-live", "target date", "production-grade by", "complete by", "delivery by"], "confirmed"),
     ("success_criteria", ["success looks like", "success criteria", "kpi", "outcome", "measure", "metric"], "partial"),
     ("stakeholders", ["stakeholder", "who else", "involved", "team members", "evaluating", "colleague"], "partial"),
     ("decision_process", ["procurement", "rfp", "evaluation process", "steps to", "approval process"], "partial"),
@@ -301,10 +301,47 @@ _MONEY_RANGE_RE = re.compile(
     rf"{_MONEY_RE.pattern}\s*(?:-|–|—|to|through|and)\s*{_MONEY_RE.pattern}",
     re.I,
 )
-_WORD_MONEY_RE = re.compile(
-    r"\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|"
-    r"hundred|thousand|million|billion|k)\b(?:[\s-]+(?:one|two|three|four|five|six|"
-    r"seven|eight|nine|ten|eleven|twelve|hundred|thousand|million|billion|k)\b){1,8}",
+_WORD_NUMBER_VALUES = {
+    "zero": 0,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
+    "twenty": 20,
+    "thirty": 30,
+    "forty": 40,
+    "fifty": 50,
+    "sixty": 60,
+    "seventy": 70,
+    "eighty": 80,
+    "ninety": 90,
+}
+_WORD_SCALE_VALUES = {"thousand": 1_000, "k": 1_000, "million": 1_000_000, "billion": 1_000_000_000}
+_WORD_NUMBER_TOKEN_SOURCE = (
+    r"(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|"
+    r"thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|"
+    r"thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|"
+    r"million|billion|k|and)"
+)
+_WORD_MONEY_AMOUNT_SOURCE = rf"{_WORD_NUMBER_TOKEN_SOURCE}(?:[\s-]+{_WORD_NUMBER_TOKEN_SOURCE}){{0,10}}"
+_WORD_MONEY_RE = re.compile(rf"\b{_WORD_MONEY_AMOUNT_SOURCE}\b", re.I)
+_WORD_MONEY_RANGE_RE = re.compile(
+    rf"\b(?P<low>{_WORD_MONEY_AMOUNT_SOURCE})\s*(?:to|through|[-–—])\s*(?P<high>{_WORD_MONEY_AMOUNT_SOURCE})\b",
     re.I,
 )
 _AUTHORITY_RE = re.compile(
@@ -315,14 +352,27 @@ _AUTHORITY_RE = re.compile(
     re.I,
 )
 _MONTH_PATTERN = (
-    r"Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|"
-    r"Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December"
+    r"January|Jan|February|Feb|March|Mar|April|Apr|May|June|Jun|July|Jul|"
+    r"August|Aug|September|Sept|Sep|October|Oct|November|Nov|December|Dec"
+)
+_TIMELINE_NUMBER_PATTERN = (
+    r"\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|"
+    r"twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|"
+    r"twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety"
+)
+_TIMELINE_DURATION_PATTERN = (
+    rf"(?:{_TIMELINE_NUMBER_PATTERN})\s+"
+    r"(?:business\s+days?|days?|weeks?|months?|quarters?)"
 )
 _TIMELINE_RE = re.compile(
     r"\b(?:Q[1-4](?:\s+(?:pilot|kickoff|go-live|production|launch|rollout|readout|approval)){0,3}"
+    rf"|(?:project\s+)?ETA\s*(?:is|of|for|:)?\s*(?:about|around|roughly)?\s*{_TIMELINE_DURATION_PATTERN}(?:\s+(?:from|after|before)\s+[A-Za-z][\w-]*)?"
+    rf"|(?:in|within)\s+{_TIMELINE_DURATION_PATTERN}"
+    rf"|{_TIMELINE_DURATION_PATTERN}\s+(?:from|after|before)\s+[A-Za-z][\w-]*"
     r"|(?:pilot|production|go-live|go live|launch|rollout|kickoff|readout)\s+"
     rf"(?:by|in|before|after)\s+(?:the\s+)?(?:Q[1-4]|{_MONTH_PATTERN}|next quarter|this quarter|next month|this month)"
     rf"|(?:by|before|after)\s+(?:the\s+)?(?:Q[1-4]|{_MONTH_PATTERN}|next quarter|this quarter|next month|this month)"
+    rf"|(?:complete|delivery|delivered|ship|implementation)\s+(?:by|in|before|after|within)\s+(?:the\s+)?(?:Q[1-4]|{_MONTH_PATTERN}|next quarter|this quarter|next month|this month|{_TIMELINE_DURATION_PATTERN})"
     r"|(?:this|next)\s+(?:week|month|quarter|year)"
     rf"|(?:\d{{1,2}}\s+)?(?:{_MONTH_PATTERN})\b)",
     re.I,
@@ -348,12 +398,9 @@ def _extract_bant_value(item_id: str, text: str, snippet: str) -> str:
     if item_id == "budget":
         ranges = [m.group(0) for m in _MONEY_RANGE_RE.finditer(text)]
         amounts = [m.group(0) for m in _MONEY_RE.finditer(text)]
-        word_amounts = [
-            m.group(0)
-            for m in _WORD_MONEY_RE.finditer(text)
-            if re.search(r"\b(?:hundred|thousand|million|billion|k)\b", m.group(0), re.I)
-        ]
-        value = _unique_join([*(ranges or amounts), *word_amounts], limit=3)
+        word_ranges, range_spans = _extract_word_money_ranges(text)
+        word_amounts = _extract_word_money_amounts(text, skip_spans=range_spans)
+        value = _unique_join([*(ranges or amounts), *word_ranges, *word_amounts], limit=3)
         if value:
             return value
     elif item_id == "authority":
@@ -384,6 +431,95 @@ def _extract_bant_value(item_id: str, text: str, snippet: str) -> str:
         if _NEED_RE.search(text):
             return snippet
     return snippet
+
+
+def _parse_word_money_amount(phrase: str) -> Optional[Tuple[int, Optional[int]]]:
+    tokens = [t.lower() for t in re.findall(_WORD_NUMBER_TOKEN_SOURCE, phrase, re.I)]
+    if not tokens:
+        return None
+
+    total = 0
+    current = 0
+    major_scale: Optional[int] = None
+    saw_number = False
+
+    for token in tokens:
+        if token == "and":
+            continue
+        if token in _WORD_NUMBER_VALUES:
+            current += _WORD_NUMBER_VALUES[token]
+            saw_number = True
+        elif token == "hundred":
+            current = (current or 1) * 100
+            saw_number = True
+        elif token in _WORD_SCALE_VALUES:
+            scale = _WORD_SCALE_VALUES[token]
+            total += (current or 1) * scale
+            current = 0
+            major_scale = scale
+            saw_number = True
+
+    value = total + current
+    if not saw_number or value <= 0:
+        return None
+    return value, major_scale
+
+
+def _format_compact_money(value: int) -> str:
+    for scale, suffix in ((1_000_000_000, "B"), (1_000_000, "M"), (1_000, "K")):
+        if abs(value) >= scale:
+            scaled = value / scale
+            if value % scale == 0:
+                return f"${int(scaled)}{suffix}"
+            return f"${scaled:.1f}".rstrip("0").rstrip(".") + suffix
+    return f"${value:,}"
+
+
+def _format_word_money_range(low_phrase: str, high_phrase: str) -> Optional[str]:
+    low = _parse_word_money_amount(low_phrase)
+    high = _parse_word_money_amount(high_phrase)
+    if not low or not high:
+        return None
+
+    low_value, low_scale = low
+    high_value, high_scale = high
+    if low_scale is None and high_scale and low_value < high_scale:
+        low_value *= high_scale
+    if high_scale is None and low_scale and high_value < low_scale:
+        high_value *= low_scale
+    return f"{_format_compact_money(low_value)} to {_format_compact_money(high_value)}"
+
+
+def _extract_word_money_ranges(text: str) -> Tuple[List[str], List[Tuple[int, int]]]:
+    ranges: List[str] = []
+    spans: List[Tuple[int, int]] = []
+    for match in _WORD_MONEY_RANGE_RE.finditer(text):
+        formatted = _format_word_money_range(match.group("low"), match.group("high"))
+        if formatted:
+            ranges.append(formatted)
+            spans.append(match.span())
+    return ranges, spans
+
+
+def _span_overlaps(span: Tuple[int, int], skip_spans: List[Tuple[int, int]]) -> bool:
+    start, end = span
+    return any(start < skip_end and end > skip_start for skip_start, skip_end in skip_spans)
+
+
+def _extract_word_money_amounts(text: str, *, skip_spans: List[Tuple[int, int]]) -> List[str]:
+    amounts: List[str] = []
+    for match in _WORD_MONEY_RE.finditer(text):
+        if _span_overlaps(match.span(), skip_spans):
+            continue
+        phrase = match.group(0)
+        parsed = _parse_word_money_amount(phrase)
+        if not parsed:
+            continue
+        value, scale = parsed
+        if scale is None and "hundred" not in phrase.lower():
+            continue
+        amounts.append(_format_compact_money(value))
+    return amounts
 
 
 def _signal_type_to_item(signal_type: Optional[str]) -> Optional[str]:

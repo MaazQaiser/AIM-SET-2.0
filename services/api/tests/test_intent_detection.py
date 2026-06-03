@@ -50,6 +50,20 @@ def test_keyword_routing_budget():
     assert r["signal_type"] == "budget_signal"
 
 
+def test_keyword_routing_timeline_eta():
+    rules = [
+        {
+            "id": "sr-4",
+            "keyword_pattern": "timeline|eta|estimated delivery|delivery date|completion date|deadline|launch|go-live|kickoff|rollout|pilot|urgent|q[1-4]",
+            "signal_type": "timeline_signal",
+            "enabled": True,
+            "confidence_threshold": 0.7,
+        }
+    ]
+    r = extract_keywords("The project ETA is six weeks from kickoff.", signal_routing=rules)
+    assert r["signal_type"] == "timeline_signal"
+
+
 def test_analyze_segment_updates_counts():
     ctx = TenantContext(tenant_id="test-tenant", user_id="u1")
     call_id = "call-test-budget"

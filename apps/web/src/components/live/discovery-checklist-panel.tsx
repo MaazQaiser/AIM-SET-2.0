@@ -10,6 +10,7 @@ import {
   BriefDetailRow,
 } from "@/components/pre-call/brief-detail-card";
 import { cn } from "@/lib/cn";
+import { formatBudgetUsd } from "@/lib/currency-format";
 import type { BANTScore } from "@/types";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
 
@@ -21,8 +22,9 @@ function bantEvidenceFromChecklist(
     const evidence = item.evidence?.[item.evidence.length - 1];
     const text = evidence?.value || evidence?.snippet;
     if (text) {
+      const displayText = item.id === "budget" ? formatBudgetUsd(text) : text;
       out[item.id as keyof BANTScore] =
-        evidence?.sentiment === "negative" ? `Customer concern: ${text}` : text;
+        evidence?.sentiment === "negative" ? `Customer concern: ${displayText}` : displayText;
     }
   }
   return out;

@@ -41,6 +41,7 @@ export default function LiveCallPage({ params }: LivePageParams) {
   const objections = useLiveCall((s) => s.objections);
   const unansweredQuestions = useLiveCall((s) => s.unansweredQuestions);
   const suggestionLog = useLiveCall((s) => s.suggestionLog);
+  const bantSignals = useLiveCall((s) => s.bantSignals);
   const checklistState = useLiveCall((s) => s.checklistState);
   const { activePanel, setActivePanel } = useCallUI();
 
@@ -102,6 +103,7 @@ export default function LiveCallPage({ params }: LivePageParams) {
       objections={objections}
       unansweredQuestions={unansweredQuestions}
       suggestionLog={suggestionLog}
+      bantSignals={bantSignals}
       checklist={checklistDisplay}
       intentLabel={intentLabel}
       intentSnapshot={intentSnapshot}

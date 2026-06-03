@@ -21,7 +21,7 @@ import { PostDcReviewScreen } from "@/components/post-dc/post-dc-review-screen";
 import { TranscriptViewer } from "@/components/transcript-viewer";
 import { scoreToTone } from "@/lib/live/sentiment-display";
 import type { CallBrief } from "@/lib/brief-types";
-import type { DiscoveryChecklistState } from "@dc-copilot/types";
+import type { BantSignal, DiscoveryChecklistState } from "@dc-copilot/types";
 import type {
   Call,
   IntentSnapshot,
@@ -150,6 +150,7 @@ export interface LiveCallWorkspaceProps {
   objections: ObjectionPayload[];
   unansweredQuestions: UnansweredQuestionPayload[];
   suggestionLog: SuggestionLogEntry[];
+  bantSignals: BantSignal[];
   checklist: DiscoveryChecklistState | null;
   intentLabel?: string;
   intentSnapshot: IntentSnapshot | null;
@@ -179,6 +180,7 @@ export function LiveCallWorkspace({
   objections,
   unansweredQuestions,
   suggestionLog,
+  bantSignals,
   checklist,
   intentLabel,
   intentSnapshot,
@@ -318,6 +320,8 @@ export function LiveCallWorkspace({
           sentimentCustomer={sentimentCustomer}
           sentimentShift={sentimentShift}
           openGaps={openGaps}
+          bantSignals={bantSignals}
+          suggestionLog={suggestionLog}
         />
       </div>
     </>

@@ -2,6 +2,7 @@
 
 import type { BantSignal } from "@/lib/live-types";
 import { cn } from "@/lib/cn";
+import { formatBudgetSignalLabel, formatBudgetUsd, hasBudgetAmount } from "@/lib/currency-format";
 
 interface SignalLogProps {
   signals: BantSignal[];
@@ -38,6 +39,11 @@ export function SignalLog({ signals }: SignalLogProps) {
     <ul className="space-y-1.5">
       {[...signals].reverse().slice(0, 8).map((s) => {
         const cfg = dimConfig[s.dimension];
+        const label =
+          s.dimension === "budget" ? formatBudgetSignalLabel(s.label, s.value) : s.label;
+        const value = s.dimension === "budget" ? formatBudgetUsd(s.value) : s.value;
+        const shouldAppendValue =
+          Boolean(value) && !label.includes(value ?? "") && !hasBudgetAmount(label);
         return (
           <li
             key={s.id}
@@ -52,8 +58,8 @@ export function SignalLog({ signals }: SignalLogProps) {
             <div className="min-w-0">
               <p className="font-semibold text-foreground">{cfg.label}</p>
               <p className="text-muted-foreground leading-snug mt-0.5">
-                {s.label}
-                {s.value && !s.label.includes(s.value) ? `: ${s.value}` : ""}
+                {label}
+                {shouldAppendValue ? `: ${value}` : ""}
               </p>
             </div>
           </li>

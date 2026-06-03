@@ -2,7 +2,8 @@ import { test, expect } from "@playwright/test";
 
 test.setTimeout(120_000);
 
-const CALL_ID = "frontera-franchise-group";
+const RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const CALL_ID = `frontera-franchise-group-e2e-${RUN_ID}`;
 const API_BASE = process.env.PLAYWRIGHT_API_URL ?? "http://localhost:8000";
 const TENANT = "e2e-tenant";
 const USER = "e2e-user";
@@ -40,7 +41,11 @@ async function postDemoSegment(
   });
   expect(res.ok(), `demo-segment failed: ${res.status()} ${await res.text()}`).toBeTruthy();
   const body = (await res.json()) as {
-    checklist?: { bantCoverage?: number; bant?: Record<string, string> };
+    checklist?: {
+      bantCoverage?: number;
+      bant?: Record<string, string>;
+      items?: Array<{ id?: string; evidence?: Array<{ value?: string; snippet?: string }> }>;
+    };
     ws_messages?: unknown[];
   };
   expect(body.checklist).toBeTruthy();
@@ -130,6 +135,28 @@ test.describe("Live call cockpit — DOM + API", () => {
     const out = await postDemoSegment(request, KEY_SEGMENTS[0]);
     expect(out.checklist?.bant?.budget).toBeTruthy();
     expect((out.checklist?.bantCoverage ?? 0) > 0).toBeTruthy();
+  });
+
+  test("API timeline ETA segment appears in BANT timeline UI", async ({ page, request }) => {
+    await page.goto(`/calls/${CALL_ID}/live`, { waitUntil: "domcontentloaded" });
+    await expect(page.locator(`a[href="/calls/${CALL_ID}"]`).first()).toBeVisible({
+      timeout: 20_000,
+    });
+
+    const out = await postDemoSegment(request, {
+      text: "Our project ETA is six weeks from kickoff after procurement.",
+      speaker_role: "customer",
+      offset_seconds: 132,
+    });
+    const timelineItem = out.checklist?.items?.find((item) => item.id === "timeline");
+    const timelineEvidence = timelineItem?.evidence?.at(-1);
+    expect(timelineEvidence?.value).toContain("project ETA is six weeks from kickoff");
+
+    const bantLiveSection = page.locator("section", { hasText: "BANT live" }).first();
+    await expect(bantLiveSection).toContainText(/Timeline/i, { timeout: 25_000 });
+    await expect(bantLiveSection).toContainText(/project ETA is six weeks from kickoff/i, {
+      timeout: 25_000,
+    });
   });
 
   test("API sentiment payloads switch the rail between red and green", async ({

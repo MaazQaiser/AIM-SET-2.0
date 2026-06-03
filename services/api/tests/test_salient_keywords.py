@@ -3,9 +3,10 @@ from dc_tools.bant import build_next_actions, initial_checklist_state, update_ch
 
 
 def test_filters_filler_words():
-    terms = filter_salient_terms(["if", "so", "they", "budget", "franchise", "api"])
+    terms = filter_salient_terms(["if", "so", "they", "budget", "franchise", "api", "eta"])
     assert "budget" in terms
     assert "franchise" in terms
+    assert "eta" in terms
     assert "if" not in terms
     assert "so" not in terms
 
@@ -19,6 +20,20 @@ def test_budget_segment_updates_checklist():
     assert "budget" in changed
     assert updated.bant["budget"] in ("partial", "confirmed")
     assert dims == ["budget"] or "budget" in dims
+    budget_item = next(item for item in updated.items if item.id == "budget")
+    assert budget_item.evidence[-1].value == "$450K to $600K"
+
+
+def test_budget_word_amount_updates_checklist_with_compact_value():
+    state = initial_checklist_state("c1")
+    updated, changed, dims = update_checklist_from_segment(
+        state,
+        "Our budget is around fifty thousand for Q3.",
+    )
+    assert "budget" in changed
+    assert "budget" in dims
+    budget_item = next(item for item in updated.items if item.id == "budget")
+    assert budget_item.evidence[-1].value == "$50K"
 
 
 def test_build_next_actions_from_open_gaps():

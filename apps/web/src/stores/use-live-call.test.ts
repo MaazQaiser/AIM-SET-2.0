@@ -107,6 +107,30 @@ describe("useLiveCall live page state regressions", () => {
     expect(state.sentimentCustomer).toBe(-0.65);
   });
 
+  it("applies BANT signal arrays from API demo fallback messages", () => {
+    applyApiDemoResult({
+      ws_messages: [
+        {
+          type: "bant_signal",
+          payload: [
+            {
+              id: "budget-signal-1",
+              dimension: "budget",
+              label: "Budget signal: $450K to $600K",
+              value: "$450K to $600K",
+              timestamp: 95,
+            },
+          ],
+        },
+      ],
+    });
+
+    const state = useLiveCall.getState();
+    expect(state.bantSignals).toHaveLength(1);
+    expect(state.bantSignals[0].dimension).toBe("budget");
+    expect(state.bantSignals[0].value).toBe("$450K to $600K");
+  });
+
   it("keeps client-only demo sentiment negative on customer pain", () => {
     applyClientDemoSegment("frontera-franchise-group", 3, {
       text: "Honestly it's a nightmare — operators live in spreadsheets with zero visibility.",
