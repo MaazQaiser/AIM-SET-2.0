@@ -6,18 +6,16 @@ import { useCall, useCreateJiraTicket, usePostCallReview } from "@/lib/data/hook
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { Skeleton } from "@dc-copilot/ui/components/skeleton";
 import { Badge } from "@dc-copilot/ui/components/badge";
-import { CallDetailColumnLayout } from "@/components/calls/call-detail-column-layout";
 import { LayoutControls } from "@/components/dashboard-grid/layout-controls";
 import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
 import { KbAttachmentCard } from "@/components/post-dc/kb-attachment-card";
 import { POST_DC_WIDGETS } from "@/lib/dashboard/widget-registry";
 import { normalizePostDcWidgetProps } from "@/lib/dashboard/normalize-widget-props";
 import { PostDcSidebar } from "@/components/post-dc/post-dc-sidebar";
-import { PostDcProposalWidget } from "@/components/post-dc/post-dc-proposal-widget";
+import { PostDcTabbedContent } from "@/components/post-dc/post-dc-tabbed-content";
 import { useLandingPage } from "@/lib/data/clp-hooks";
 import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import type { AccountSnapshotRow } from "@/components/calls/account-widget-cards";
-import { PostKbSuggestionsCard } from "@/components/post-dc/post-dc-widget-cards";
 import { cn } from "@/lib/cn";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { sanitizeClientEmailDraft } from "@/lib/post-dc-client-email-safety";
@@ -251,31 +249,30 @@ export function PostDcReviewScreen({
                     "lg:items-start"
                   )}
                 >
-                  <PostDcSidebar
-                    callId={callId}
-                    accountSnapshot={snapshot}
-                    review={displayedReview}
-                    landingPage={landingPage ?? undefined}
-                  />
-                  <div className="space-y-4 min-w-0">
-                    <PostDcProposalWidget callId={callId} />
-                    {hasContent ? (
-                      <div className="grid gap-4 lg:grid-cols-2">
-                        <PostKbSuggestionsCard suggestions={postRunMeta?.kbSuggestions ?? []} />
-                        <AttachmentSummaryCard
-                          attachments={displayedEmailDraft?.attachments ?? null}
-                          title="Ready content from KB"
-                          showMissing={false}
-                        />
-                        <div className="lg:col-span-2">
-                          <MissingContentCard attachments={displayedEmailDraft?.attachments ?? null} />
-                        </div>
-                      </div>
-                    ) : null}
-                    <CallDetailColumnLayout
-                      layoutKey="post-dc"
+                  <PostDcSidebar accountSnapshot={snapshot} call={call} />
+                  <div className="min-w-0">
+                    <PostDcTabbedContent
+                      callId={callId}
                       widgets={POST_DC_WIDGETS}
                       widgetProps={widgetProps}
+                      landingPage={landingPage ?? null}
+                      embedded={embedded}
+                      followUpExtras={
+                        hasContent ? (
+                          <div className="grid gap-4 lg:grid-cols-2">
+                            <AttachmentSummaryCard
+                              attachments={displayedEmailDraft?.attachments ?? null}
+                              title="Ready content from KB"
+                              showMissing={false}
+                            />
+                            <div className="lg:col-span-2">
+                              <MissingContentCard
+                                attachments={displayedEmailDraft?.attachments ?? null}
+                              />
+                            </div>
+                          </div>
+                        ) : null
+                      }
                     />
                   </div>
                 </div>

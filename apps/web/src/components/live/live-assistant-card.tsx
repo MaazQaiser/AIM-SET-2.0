@@ -65,7 +65,7 @@ export function LiveAssistantCard({
   return (
     <article
       className={cn(
-        "relative rounded-xl border border-border bg-card px-3.5 py-3 shadow-none",
+        "app-card relative px-3.5 py-3 shadow-none",
         className
       )}
     >

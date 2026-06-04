@@ -29,11 +29,11 @@ export function DashboardSkeletonSections() {
             ))}
           </CardContent>
         </Card>
-        <Card className="h-full">
-          <CardHeader className="pb-3">
+        <Card className="flex h-[360px] flex-col">
+          <CardHeader className="shrink-0 pb-3">
             <SkeletonBlock className="h-5 w-28" />
           </CardHeader>
-          <CardContent className="space-y-2 pt-0">
+          <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto pt-0">
             {[1, 2, 3, 4].map((i) => (
               <SkeletonBlock key={i} className="h-12 w-full rounded-lg" />
             ))}

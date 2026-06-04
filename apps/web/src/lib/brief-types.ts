@@ -34,6 +34,10 @@ export type {
   PreDcAgentStatus,
   RelevantDocument,
   RelevantProject,
+  BriefSummarySection,
+  SUMMARY_SECTION_TITLES,
+  SUMMARY_SECTION_ORDER,
+  normalizeSummarySections,
   RelevantProjectSource,
   RelevantDocumentFormat,
 } from "@dc-copilot/types/brief";

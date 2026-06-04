@@ -177,7 +177,7 @@ export function AiTodoList() {
   }
 
   return (
-    <Card className="h-full">
+    <Card className="flex h-[380px] flex-col">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-base flex items-center gap-2">
@@ -196,7 +196,7 @@ export function AiTodoList() {
           </p>
         )}
       </CardHeader>
-      <CardContent className="pt-0 space-y-2">
+      <CardContent className="min-h-0 flex-1 overflow-y-auto pt-0 space-y-2">
         {todos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center rounded-lg border border-dashed bg-muted/20">
             <CheckCircle2 className="h-8 w-8 text-success mb-2" />

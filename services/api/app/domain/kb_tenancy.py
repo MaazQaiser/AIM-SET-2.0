@@ -8,7 +8,7 @@ from app.config import get_settings
 from app.domain.tenant_service import get_tenant_service
 
 
-def resolve_team_tenant(ctx: TenantContext) -> Tuple[str, str]:
+def resolve_team_tenant(ctx: TenantContext, *, allow_memory_fallback: bool = False) -> Tuple[str, str]:
     """
     Resolve (tenant_uuid, clerk_key) for team-scoped data (KB, DC notes, calls).
     When KB_SHARED_MODE is on, all users share one tenant so data syncs across logins.
@@ -17,8 +17,8 @@ def resolve_team_tenant(ctx: TenantContext) -> Tuple[str, str]:
     if settings.kb_shared_mode:
         key = settings.kb_shared_tenant_key.strip() or "dc-copilot-shared"
         shared = TenantContext(tenant_id=key, user_id=ctx.user_id, clerk_org_id=key)
-        return get_tenant_service().resolve(shared)
-    return get_tenant_service().resolve(ctx)
+        return get_tenant_service().resolve(shared, allow_memory_fallback=allow_memory_fallback)
+    return get_tenant_service().resolve(ctx, allow_memory_fallback=allow_memory_fallback)
 
 
 def resolve_kb_tenant(ctx: TenantContext) -> Tuple[str, str]:

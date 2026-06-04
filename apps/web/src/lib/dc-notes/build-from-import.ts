@@ -18,7 +18,12 @@ import {
   parseDiscoveryDateTime,
 } from "@/lib/dc-notes/parse-discovery";
 import { formatCompanyRevenue } from "@/lib/dc-notes/format";
+import { normalizeCompanyStage } from "@/lib/dc-notes/company-stage";
+import { icpScoreFromBucket } from "@/lib/dc-notes/icp-rating";
 import { buildInternalAttendeesFromPreDc } from "@/lib/attendees/build-internal-attendees";
+import { inferAuthorityFromLeadContext } from "@/lib/bant/authority-from-lead";
+
+const NEEDS_CONTENT_FALLBACK = "Needs/content is not identified yet.";
 
 export function slugifyCompany(name: string): string {
   const slug = name
@@ -32,6 +37,122 @@ export function slugifyCompany(name: string): string {
 /** Normalize call id for matching (demo ids omit the `call-` prefix). */
 export function normalizeCallId(callId: string): string {
   return callId.replace(/^call-/, "");
+}
+
+const OUTREACH_STORY_PATTERNS = [
+  "outreach",
+  "cold email",
+  "email campaign",
+  "email and phone",
+  "phone and email",
+  "via email",
+  "via phone",
+  "lead source",
+  "how we landed",
+  "how we got",
+  "responded",
+  "reply",
+  "openness to a call",
+  "bandwidth",
+  "unresponsive",
+  "follow-up",
+  "follow up",
+  "re-engaged",
+  "reengaged",
+  "scheduled",
+  "scheduling",
+  "schedule the call",
+  "booked",
+  "availability",
+  "calendar invite",
+  "meeting invite",
+  "meeting has been confirmed",
+  "meeting confirmed",
+  "discovery call",
+  "intro call",
+  "prior to the call",
+  "nda",
+  "company details",
+  "prospect is",
+  "founder & ceo",
+  "founder and ceo",
+];
+
+function withoutOutreachStory(value: string): string {
+  return value
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(
+      (sentence) =>
+        sentence &&
+        !OUTREACH_STORY_PATTERNS.some((pattern) => sentence.toLowerCase().includes(pattern)),
+    )
+    .join(" ");
+}
+
+function extractNeedPhrase(value: string): string {
+  const text = value.replace(/\s+/g, " ").trim();
+  const patterns = [
+    /\b(?:would\s+)?need(?:s|ed)?(?:\s+(?:is|are|to))?\s+(.+?)(?:,?\s+(?:though|but|however)\b|[.!?]|$)/i,
+    /\b(?:want|wants|wanted|looking for|seeking|requires?|requested|interested in|would like)\s+(?:to\s+)?(.+?)(?:,?\s+(?:though|but|however)\b|[.!?]|$)/i,
+    /\b(?:goal|objective)\s+(?:is|was)\s+(?:to\s+)?(.+?)(?:,?\s+(?:though|but|however)\b|[.!?]|$)/i,
+  ];
+  for (const pattern of patterns) {
+    const need = text.match(pattern)?.[1]?.trim().replace(/^[,;:\s-]+|[,;:\s-]+$/g, "");
+    if (need) return need.replace(/\.$/, "");
+  }
+  return "";
+}
+
+function normalizeNeedText(value: string): string {
+  return value
+    .trim()
+    .replace(
+      /^(?:their\s+)?(?:stated\s+)?(?:need|needs|needed|want|wants|wanted|looking for|seeking|requires?|requested|interested in)(?:\s+(?:is|are|to))?\s+/i,
+      ""
+    )
+    .replace(/\.$/, "");
+}
+
+function businessNeedText(value: string, allowPlain = false): string {
+  const clean = withoutOutreachStory(value);
+  const extracted = extractNeedPhrase(clean) || extractNeedPhrase(value);
+  if (extracted) return normalizeNeedText(extracted);
+  if (allowPlain && clean) return normalizeNeedText(clean);
+  return "";
+}
+
+function painPointText(value: string, allowPlain = false): string {
+  const clean = withoutOutreachStory(value);
+  const painPatterns = [
+    "pain",
+    "challenge",
+    "issue",
+    "problem",
+    "friction",
+    "slow",
+    "slows",
+    "manual",
+    "bottleneck",
+    "gap",
+    "blocker",
+    "struggle",
+    "difficulty",
+    "risk",
+    "unable",
+    "lack",
+    "lacks",
+  ];
+  const matches = clean
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim().replace(/\.$/, ""))
+    .filter(
+      (sentence) =>
+        sentence && painPatterns.some((pattern) => sentence.toLowerCase().includes(pattern))
+    );
+  if (matches.length > 0) return matches.join("; ");
+  if (allowPlain && clean) return normalizeNeedText(clean);
+  return "";
 }
 
 /** Find a Pre-DC CSV row for a call page id or account name. */
@@ -50,14 +171,6 @@ export function findPreDcRecordForCall(
     if (accountKey && company.trim().toLowerCase() === accountKey) return record;
   }
   return undefined;
-}
-
-function icpScoreFromBucket(bucket: string): number {
-  const b = bucket.toLowerCase();
-  if (b.includes("enterprise") || b.includes("desirable")) return 0.88;
-  if (b.includes("sweet spot")) return 0.78;
-  if (b.includes("potential")) return 0.62;
-  return 0.55;
 }
 
 function mapPostDcBant(value: string): BANTStatus {
@@ -98,9 +211,21 @@ export function buildCallFromPreDc(record: PreDCRecord): Call {
     annualRevenue: formatCompanyRevenue(revenueRaw),
     employeeCount: preDcField(record, "employeeCount") || undefined,
     icpBucket: preDcField(record, "icpBucket") || undefined,
+    icpMatch: icpScoreFromBucket(preDcField(record, "icpBucket")),
     website: preDcField(record, "website") || undefined,
     companyTypeIcp: preDcField(record, "companyTypeIcp") || undefined,
-    dealStage: preDcField(record, "companyStage") || preDcField(record, "icpBucket"),
+    dealStage: normalizeCompanyStage({
+      rawStage:
+        preDcField(record, "companyStage") ||
+        preDcField(record, "companyStagePreDc"),
+      companyTypeIcp: preDcField(record, "companyTypeIcp"),
+      icpBucket: preDcField(record, "icpBucket"),
+      annualRevenueRaw: revenueRaw,
+      employeeCount: preDcField(record, "employeeCount"),
+      fundingStage: preDcField(record, "fundingStage"),
+      fundingAmount: preDcField(record, "fundingAmount"),
+      seed: callId,
+    }),
     discoveryCallDatePkt: discoveryCallDatePkt || undefined,
     discoveryCallTimePkt: discoveryCallTimePkt || undefined,
     scheduledAt,
@@ -115,7 +240,10 @@ export function buildCallFromPreDc(record: PreDCRecord): Call {
     })),
     bant: {
       budget: "unknown",
-      authority: "partial",
+      authority:
+        inferAuthorityFromLeadContext({
+          leadTitle: preDcField(record, "prospectPersona"),
+        }) ?? "unknown",
       need: preDcField(record, "describedNeeds") ? "partial" : "unknown",
       timeline: "unknown",
     },
@@ -296,23 +424,26 @@ export function discoveryQuestionsFromPreDc(record: PreDCRecord): string[] {
 export function buildBriefFromPreDc(record: PreDCRecord, callId: string): CallBrief {
   const companyName = preDcField(record, "companyName");
   const leadName = preDcField(record, "leadName");
-  const description = preDcField(record, "companyDescription");
-  const intersection = preDcField(record, "intersectionAreas");
-  const needs = preDcField(record, "describedNeeds");
-  const relevance = preDcField(record, "relevanceToTkxel");
+  const description = withoutOutreachStory(preDcField(record, "companyDescription"));
+  const intersection = painPointText(preDcField(record, "intersectionAreas"));
+  const needs = businessNeedText(preDcField(record, "describedNeeds"), true);
+  const relevance = withoutOutreachStory(preDcField(record, "relevanceToTkxel"));
   const other = preDcField(record, "otherInformation");
   const icpBucket = preDcField(record, "icpBucket");
 
-  const summaryParts = [intersection, needs, relevance].filter(Boolean);
+  const summaryParts = [description, needs, intersection, relevance].filter(Boolean);
   const aiSummary =
     summaryParts.join(" ") ||
     (description.length > 400 ? `${description.slice(0, 400)}…` : description) ||
     `Discovery call prep for ${companyName}.`;
 
-  const pains = [intersection, needs]
+  const pains = [intersection]
     .filter(Boolean)
     .slice(0, 3)
     .map((text, i) => ({ text, confidence: 0.85 - i * 0.08 }));
+  if (pains.length === 0) {
+    pains.push({ text: NEEDS_CONTENT_FALLBACK, confidence: 0.5 });
+  }
 
   return {
     callId,

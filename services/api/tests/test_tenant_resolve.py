@@ -25,3 +25,23 @@ def test_resolve_raises_when_supabase_fails_instead_of_orphan_uuid(monkeypatch):
         assert False, "expected RuntimeError"
     except RuntimeError as exc:
         assert "Could not resolve tenant" in str(exc)
+
+
+def test_resolve_can_use_memory_fallback_for_reads(monkeypatch):
+    monkeypatch.setattr("app.domain.tenant_service.get_settings", lambda: get_settings())
+    settings = get_settings()
+    monkeypatch.setattr(settings, "supabase_url", "https://example.supabase.co")
+    monkeypatch.setattr(settings, "supabase_service_role_key", "test-key")
+
+    svc = TenantService()
+
+    def _timeout(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("app.domain.tenant_service.run_with_timeout", _timeout)
+
+    ctx = TenantContext(tenant_id="org-missing", user_id="u1", clerk_org_id="org-missing")
+    tenant_uuid, clerk_key = svc.resolve(ctx, allow_memory_fallback=True)
+
+    assert clerk_key == "org-missing"
+    assert tenant_uuid

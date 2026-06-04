@@ -178,8 +178,9 @@ export function BriefRelevantContentLoader({ callId, brief }: { callId: string; 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void fetch(`/api/calls/${callId}/relevant-content`)
-      .then(async (res) => {
+    void (async () => {
+      try {
+        const res = await fetch(`/api/calls/${encodeURIComponent(callId)}/relevant-content`);
         if (!res.ok || cancelled) return;
         const data = (await res.json()) as {
           relevantDocuments?: CallBrief["relevantDocuments"];
@@ -193,10 +194,12 @@ export function BriefRelevantContentLoader({ callId, brief }: { callId: string; 
             : prev.relevantDocuments,
           relevantProjects: data.relevantProjects?.length ? data.relevantProjects : prev.relevantProjects,
         }));
-      })
-      .finally(() => {
+      } catch {
+        // Keep the brief usable if the API is temporarily unreachable.
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };

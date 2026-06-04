@@ -88,6 +88,38 @@ export interface BriefResearchSection {
   items: { label: string; value: string }[];
 }
 
+export interface BriefSummarySection {
+  id: "customer_profile" | "customer_pain_points" | "suggested_action" | "relevance";
+  title: string;
+  content: string;
+}
+
+/** Canonical UI labels for Pre-DC summary sections (single source of truth). */
+export const SUMMARY_SECTION_TITLES: Record<BriefSummarySection["id"], string> = {
+  customer_profile: "Profile Summary",
+  customer_pain_points: "Pain Points",
+  suggested_action: "Suggested Action",
+  relevance: "Relevance",
+};
+
+export const SUMMARY_SECTION_ORDER: readonly BriefSummarySection["id"][] = [
+  "customer_profile",
+  "customer_pain_points",
+  "suggested_action",
+  "relevance",
+];
+
+/** Rewrite section titles so cached/LLM payloads always match current labels. */
+export function normalizeSummarySections(
+  sections: BriefSummarySection[] | undefined | null
+): BriefSummarySection[] | undefined {
+  if (!sections?.length) return sections ?? undefined;
+  return sections.map((section) => {
+    const title = SUMMARY_SECTION_TITLES[section.id];
+    return title ? { ...section, title } : section;
+  });
+}
+
 export interface PostDcBriefPreview {
   leadStage: string;
   bottomLineContext: string;
@@ -167,6 +199,7 @@ export interface CallBrief {
   callId: string;
   accountName: string;
   aiSummary: string;
+  summarySections?: BriefSummarySection[];
   opportunityValue?: string;
   dealStage: string;
   daysSinceLastContact: number;

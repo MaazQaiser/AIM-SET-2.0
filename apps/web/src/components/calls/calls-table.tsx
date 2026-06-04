@@ -7,6 +7,9 @@ import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import { DataTable } from "@dc-copilot/ui/components/data-table";
 import { callDetailsHref } from "@/lib/dashboard/call-links";
+import { companyStageForCall } from "@/lib/dc-notes/company-stage";
+import { companyRatingForCall, formatCompanyRating } from "@/lib/dc-notes/icp-rating";
+import { cn } from "@/lib/cn";
 import type { Call, CallStatus } from "@/types";
 
 const STATUS_CONFIG: Record<
@@ -96,23 +99,42 @@ const columns: ColumnDef<Call>[] = [
     ),
   },
   {
-    accessorKey: "dealStage",
-    header: "Stage",
-    cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground max-w-[100px] truncate block">
-        {row.original.dealStage ?? "—"}
-      </span>
-    ),
+    id: "companyStage",
+    accessorFn: (row) => companyStageForCall(row),
+    header: "Company Stage",
+    cell: ({ row }) => {
+      const stage = companyStageForCall(row.original);
+      return (
+        <Badge
+          variant="outline"
+          className={cn(
+            "text-[11px] font-medium max-w-[128px] truncate",
+            stage === "Enterprise" && "border-violet-300/80 bg-violet-50/80 text-violet-900",
+            stage === "Startup" && "border-sky-300/80 bg-sky-50/80 text-sky-900",
+            stage === "Funded Startup" &&
+              "border-indigo-300/80 bg-indigo-50/90 text-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-100 dark:border-indigo-700/60",
+            stage === "Ideation" && "border-amber-300/80 bg-amber-50/80 text-amber-950",
+            stage === "SMB" &&
+              "border-teal-300/80 bg-teal-50/90 text-teal-900 dark:bg-teal-950/40 dark:text-teal-100 dark:border-teal-700/60"
+          )}
+        >
+          {stage}
+        </Badge>
+      );
+    },
   },
   {
-    accessorKey: "briefReady",
-    header: "Brief",
-    cell: ({ row }) =>
-      row.original.briefReady ? (
-        <span className="text-xs font-medium text-success">Ready</span>
-      ) : (
-        <span className="text-xs text-muted-foreground">Pending</span>
-      ),
+    id: "agentRatingSales",
+    accessorFn: (row) => companyRatingForCall(row),
+    header: "Agent Rating Sales",
+    cell: ({ row }) => {
+      const score = companyRatingForCall(row.original);
+      return (
+        <span className="text-sm font-medium tabular-nums text-foreground">
+          {formatCompanyRating(score)}
+        </span>
+      );
+    },
   },
   {
     id: "actions",
@@ -142,11 +164,11 @@ export function CallsTable({ calls }: CallsTableProps) {
       columns={columns}
       data={calls}
       pageSize={10}
-      shellClassName="rounded-none border-x-0 border-t-0 bg-transparent"
-      headerClassName="bg-transparent"
+      shellClassName="overflow-hidden rounded-none border-0 bg-transparent shadow-none"
+      headerClassName="border-0 border-b-0 bg-transparent"
       tableClassName="bg-transparent"
       bodyClassName="bg-transparent"
-      rowClassName="bg-transparent"
+      rowClassName="border-0 border-b-0 bg-transparent hover:bg-muted/20"
       paginationClassName="pt-2"
     />
   );

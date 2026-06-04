@@ -11,6 +11,8 @@ from app.deps import get_supabase
 from app.domain.dc_notes_repository import get_dc_notes_repository
 from app.domain.memory_store import get_memory_store
 from app.domain.supabase_utils import execute_with_retry
+from app.domain.bant_authority import infer_authority_from_lead_title
+from app.domain.brief_summary_sections import apply_summary_titles_to_brief
 from app.domain.kb_tenancy import resolve_team_tenant
 
 
@@ -29,6 +31,91 @@ def call_id_aliases(call_id: str) -> List[str]:
     return list(dict.fromkeys(aliases))
 
 
+def _field_text(fields: Dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = fields.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+_COMPANY_STAGES = ("SMB", "Ideation", "Startup", "Funded Startup", "Enterprise")
+
+
+def _hash_seed(value: str) -> int:
+    h = 0
+    for ch in value:
+        h = (h * 31 + ord(ch)) & 0xFFFFFFFF
+    return abs(h)
+
+
+def _normalize_company_stage(
+    fields: Dict[str, Any],
+    *,
+    call_id: str,
+) -> str:
+    combined = " ".join(
+        [
+            _field_text(fields, "Company Stage", "Company Stage-PreDC"),
+            _field_text(fields, "Company Type ICP - PreDC"),
+            _field_text(fields, "ICP Bucket"),
+        ]
+    ).lower()
+
+    funding_stage = _field_text(fields, "If its a startup, what Stage of Funding?").lower()
+    funding_amount = _field_text(fields, "If its startup, funding amount received?").lower()
+    funding_blob = f"{funding_stage} {funding_amount}"
+
+    if any(
+        token in combined
+        for token in ("enterprise", "enterprice", "desirable", "fortune", "large cap")
+    ):
+        return "Enterprise"
+    if (
+        "funded startup" in combined
+        or "funded start-up" in combined
+        or "venture" in combined
+        or any(token in combined for token in ("series a", "series b", "series c", "series d"))
+        or (funding_amount and ("seed" in funding_blob or "series" in funding_blob))
+    ):
+        return "Funded Startup"
+    if any(
+        token in combined
+        for token in ("startup", "start-up", "seed", "early stage")
+    ):
+        return "Startup"
+    if any(
+        token in combined
+        for token in ("ideation", "evaluation", "discovery", "active opportunity")
+    ):
+        return "Ideation"
+    if any(token in combined for token in ("smb", "small business", "sme", "small cap")):
+        return "SMB"
+
+    revenue = _field_text(fields, "Annual Revenue - PreDC").lower()
+    if "b" in revenue or "million" in revenue or "180m" in revenue:
+        return "Enterprise"
+
+    return _COMPANY_STAGES[_hash_seed(call_id) % len(_COMPANY_STAGES)]
+
+
+def _icp_score_from_bucket(bucket: str) -> float:
+    normalized = bucket.strip().lower()
+    if not normalized:
+        return 0.55
+    if "enterprise" in normalized or "desirable" in normalized:
+        return 0.88
+    if "sweet spot" in normalized or "sweet" in normalized:
+        return 0.78
+    if "potential" in normalized:
+        return 0.62
+    return 0.55
+
+
+def _deal_stage_from_fields(fields: Dict[str, Any], *, call_id: str) -> str:
+    return _normalize_company_stage(fields, call_id=call_id)
+
+
 def build_calls_from_pre_dc(
     pre_rows: List[Dict[str, Any]], post_rows: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
@@ -39,6 +126,10 @@ def build_calls_from_pre_dc(
         if not company:
             continue
         call_id = slugify_company(company)
+        icp_bucket = _field_text(fields, "ICP Bucket")
+        annual_revenue = _field_text(fields, "Annual Revenue - PreDC")
+        employee_count = _field_text(fields, "No. of Employees - PreDC")
+        lead_title = _field_text(fields, "Prospect's Persona")
         calls.append(
             {
                 "id": call_id,
@@ -47,8 +138,23 @@ def build_calls_from_pre_dc(
                 "status": "upcoming",
                 "briefReady": True,
                 "pod": [],
-                "leadName": fields.get("Lead Name-PreDC"),
-                "industry": fields.get("Industry - PreDC"),
+                "bant": {
+                    "budget": "unknown",
+                    "authority": infer_authority_from_lead_title(lead_title),
+                    "need": "unknown",
+                    "timeline": "unknown",
+                },
+                "leadName": _field_text(fields, "Lead Name-PreDC"),
+                "leadTitle": lead_title,
+                "industry": _field_text(fields, "Industry - PreDC"),
+                "annualRevenueRaw": annual_revenue or None,
+                "employeeCount": employee_count or None,
+                "companyTypeIcp": _field_text(fields, "Company Type ICP - PreDC") or None,
+                "dealStage": _deal_stage_from_fields(fields, call_id=call_id),
+                "icpBucket": icp_bucket or None,
+                "icpMatch": _icp_score_from_bucket(icp_bucket),
+                "discoveryCallDatePkt": _field_text(fields, "Discovery Call Date (PKT)") or None,
+                "discoveryCallTimePkt": _field_text(fields, "Discovery Call Time (PKT)") or None,
                 "meetingUrl": _meeting_url_from_fields(fields),
             }
         )
@@ -66,6 +172,9 @@ class CallsService:
     def _clerk_key(self, ctx: TenantContext) -> str:
         _, clerk_key = resolve_team_tenant(ctx)
         return clerk_key
+
+    def _read_tenant_keys(self, ctx: TenantContext) -> tuple[str, str]:
+        return resolve_team_tenant(ctx, allow_memory_fallback=True)
 
     def sync_from_dc_notes(self, ctx: TenantContext) -> List[Dict[str, Any]]:
         notes = self._dc.get_notes(ctx)
@@ -93,7 +202,16 @@ class CallsService:
                 "brief_ready": bool(c.get("briefReady")),
                 "metadata": {
                     "leadName": c.get("leadName"),
+                    "leadTitle": c.get("leadTitle"),
                     "industry": c.get("industry"),
+                    "annualRevenueRaw": c.get("annualRevenueRaw"),
+                    "employeeCount": c.get("employeeCount"),
+                    "companyTypeIcp": c.get("companyTypeIcp"),
+                    "dealStage": c.get("dealStage"),
+                    "icpBucket": c.get("icpBucket"),
+                    "icpMatch": c.get("icpMatch"),
+                    "discoveryCallDatePkt": c.get("discoveryCallDatePkt"),
+                    "discoveryCallTimePkt": c.get("discoveryCallTimePkt"),
                     "meetingUrl": c.get("meetingUrl"),
                 },
             }
@@ -103,13 +221,12 @@ class CallsService:
             supabase.table("calls").upsert(rows).execute()
 
     def list_calls(self, ctx: TenantContext) -> List[Dict[str, Any]]:
-        clerk_key = self._clerk_key(ctx)
+        tenant_uuid, clerk_key = self._read_tenant_keys(ctx)
         if not get_settings().supabase_configured:
             mem_calls = get_memory_store().list_calls(clerk_key)
             if mem_calls:
                 return mem_calls
             return self.sync_from_dc_notes(ctx)
-        tenant_uuid = self._tenant_uuid(ctx)
         supabase = get_supabase()
         try:
             result = execute_with_retry(
@@ -125,7 +242,7 @@ class CallsService:
             mem_calls = get_memory_store().list_calls(clerk_key)
             if mem_calls:
                 return mem_calls
-            raise
+            return []
         rows = result.data or []
         if rows:
             calls = [_row_to_call(r) for r in rows]
@@ -139,14 +256,13 @@ class CallsService:
         return next((c for c in self.list_calls(ctx) if c["id"] in aliases), None)
 
     def get_brief(self, ctx: TenantContext, call_id: str) -> Optional[Dict[str, Any]]:
-        clerk_key = self._clerk_key(ctx)
+        tenant_uuid, clerk_key = self._read_tenant_keys(ctx)
         if not get_settings().supabase_configured:
             for alias in call_id_aliases(call_id):
                 brief = get_memory_store().get_call_brief(clerk_key, alias)
                 if brief:
-                    return brief
+                    return apply_summary_titles_to_brief(brief)
             return None
-        tenant_uuid = self._tenant_uuid(ctx)
         supabase = get_supabase()
         for alias in call_id_aliases(call_id):
             try:
@@ -164,7 +280,7 @@ class CallsService:
             except Exception:
                 brief = get_memory_store().get_call_brief(clerk_key, alias)
                 if brief:
-                    return brief
+                    return apply_summary_titles_to_brief(brief)
                 continue
             rows = result.data or []
             if rows:
@@ -173,7 +289,7 @@ class CallsService:
                     get_memory_store().save_call_brief(clerk_key, alias, payload)
                     if alias != call_id:
                         get_memory_store().save_call_brief(clerk_key, call_id, payload)
-                return payload
+                    return apply_summary_titles_to_brief(payload)
         return None
 
     def save_brief(self, ctx: TenantContext, call_id: str, payload: Dict[str, Any]) -> None:
@@ -314,7 +430,16 @@ def _row_to_call(row: Dict[str, Any]) -> Dict[str, Any]:
         "briefReady": bool(row.get("brief_ready")),
         "pod": [],
         "leadName": meta.get("leadName"),
+        "leadTitle": meta.get("leadTitle"),
         "industry": meta.get("industry"),
+        "annualRevenueRaw": meta.get("annualRevenueRaw"),
+        "employeeCount": meta.get("employeeCount"),
+        "companyTypeIcp": meta.get("companyTypeIcp"),
+        "dealStage": meta.get("dealStage"),
+        "icpBucket": meta.get("icpBucket"),
+        "icpMatch": meta.get("icpMatch"),
+        "discoveryCallDatePkt": meta.get("discoveryCallDatePkt"),
+        "discoveryCallTimePkt": meta.get("discoveryCallTimePkt"),
         "meetingUrl": meta.get("meetingUrl") or meta.get("meeting_url") or meta.get("recall_meeting_url"),
     }
 

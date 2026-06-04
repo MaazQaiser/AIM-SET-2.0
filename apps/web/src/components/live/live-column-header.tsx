@@ -18,7 +18,7 @@ export function LiveColumnHeader({
   return (
     <div
       className={cn(
-        "flex h-11 shrink-0 items-center justify-between gap-3 border-b border-border bg-card px-6",
+        "flex h-11 shrink-0 items-center justify-between gap-3 border-b border-border/60 bg-transparent px-5",
         className
       )}
     >
@@ -34,7 +34,7 @@ export function LiveColumnHeader({
 }
 
 /** Consistent horizontal padding beneath every live column header. */
-export const liveColumnContentPadding = "px-6 py-4";
+export const liveColumnContentPadding = "px-5 py-4";
 
 /** Scrollable column body beneath a live column header. */
 export const liveColumnBodyClass =

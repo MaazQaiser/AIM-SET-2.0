@@ -14,6 +14,7 @@ import type {
   KBProject,
   QuarterlyPattern,
 } from "@/types";
+import { normalizeSummarySections } from "@dc-copilot/types/brief";
 import type {
   CallBrief,
   ContentToGenerate,
@@ -27,6 +28,7 @@ import {
   franchiseDemoPostReview,
   mergeFranchiseDemoCalls,
 } from "@/lib/demo/franchise-ai-platform-demo";
+import { mergeCallsWithImport } from "@/lib/dc-data/merge-calls-with-import";
 import {
   getImportVersion,
   resolveCall,
@@ -106,9 +108,12 @@ function buildInternalEmailFallback(
 }
 
 async function fetchCallsFromApi(): Promise<Call[]> {
+  const imported = resolveCalls();
   const api = await bffFetch<Call[]>("/api/calls");
-  if (api && api.length > 0) return mergeFranchiseDemoCalls(api);
-  return resolveCalls();
+  if (api && api.length > 0) {
+    return mergeFranchiseDemoCalls(mergeCallsWithImport(api, imported));
+  }
+  return mergeFranchiseDemoCalls(imported);
 }
 
 export function useCalls() {
@@ -135,11 +140,15 @@ export function useCall(callId: string) {
 }
 
 function mergeCallBrief(local: CallBrief, api: CallBrief): CallBrief {
+  const summarySections = normalizeSummarySections(
+    api.summarySections?.length ? api.summarySections : local.summarySections
+  );
   return {
     ...local,
     ...api,
     callId: local.callId,
     accountName: api.accountName || local.accountName,
+    summarySections,
     newSignals: api.newSignals?.length ? api.newSignals : local.newSignals,
     pains: api.pains?.length ? api.pains : local.pains,
     objections: api.objections?.length ? api.objections : local.objections,
@@ -171,7 +180,12 @@ export function useCallBrief(callId: string) {
       const local = resolveCallBrief(callId);
       const api = await bffFetch<CallBrief>(`/api/calls/${callId}/brief`);
       if (api && local) return mergeCallBrief(local, api);
-      if (api) return api;
+      if (api) {
+        return { ...api, summarySections: normalizeSummarySections(api.summarySections) };
+      }
+      if (local) {
+        return { ...local, summarySections: normalizeSummarySections(local.summarySections) };
+      }
       return local;
     },
     staleTime: 5_000,

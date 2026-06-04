@@ -25,7 +25,6 @@ import {
   BriefObjectionsCard,
   BriefPainsCard,
   BriefPodNotesCard,
-  BriefSignalsCard,
 } from "@/components/pre-call/brief-widget-cards";
 import {
   PostHeadlineCard,
@@ -135,7 +134,7 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "ai",
     column: "center",
     sortOrder: 0,
-    render: ({ brief }) => <BriefAISummary brief={brief} />,
+    render: ({ brief, call }) => <BriefAISummary brief={brief} call={call} />,
   },
   {
     id: "brief.pre-deck",
@@ -164,15 +163,6 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     sortOrder: 0.75,
     isAvailable: ({ brief }) => arrayLen(brief.contentToGenerate) > 0,
     render: ({ brief }) => <BriefContentToGeneratePanel items={brief.contentToGenerate} />,
-  },
-  {
-    id: "brief.signals",
-    title: "New signals",
-    category: "ai",
-    column: "center",
-    sortOrder: 1,
-    isAvailable: ({ brief }) => arrayLen(brief.newSignals) > 0,
-    render: ({ brief }) => <BriefSignalsCard signals={brief.newSignals ?? []} />,
   },
   {
     id: "brief.discovery",

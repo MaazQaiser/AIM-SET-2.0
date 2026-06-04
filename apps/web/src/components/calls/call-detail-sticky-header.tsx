@@ -1,14 +1,11 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import Link from "next/link";
 import { ArrowLeft, Settings } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@dc-copilot/ui/components/tooltip";
 import { PreDcBantStrip } from "@/components/calls/pre-dc-bant-strip";
-import { AIGeneratedBadge } from "@/components/ai-generated-badge";
 import { useThemePreview } from "@/hooks/use-theme-preview";
 import { cn } from "@/lib/cn";
 import type { BANTScore, Call } from "@/types";
@@ -17,7 +14,6 @@ interface CallDetailStickyHeaderProps {
   call: Call;
   scheduleText: string;
   bant?: BANTScore;
-  compact: boolean;
   showJoinCall: boolean;
   isEditingLayout: boolean;
   onToggleLayout: () => void;
@@ -28,7 +24,7 @@ function HeaderIconTooltip({
   children,
 }: {
   label: string;
-  children: ReactNode;
+  children: React.ReactNode;
 }) {
   return (
     <Tooltip>
@@ -43,11 +39,9 @@ function HeaderIconTooltip({
 function LayoutSettingsButton({
   isEditingLayout,
   onToggleLayout,
-  className,
 }: {
   isEditingLayout: boolean;
   onToggleLayout: () => void;
-  className?: string;
 }) {
   const { isIntercom } = useThemePreview();
   const label = isEditingLayout ? "Done customizing layout" : "Layout settings";
@@ -58,7 +52,7 @@ function LayoutSettingsButton({
         type="button"
         variant={isEditingLayout ? (isIntercom ? "ghost" : "default") : "ghost"}
         size="icon"
-        className={cn("h-9 w-9 shrink-0", isIntercom && "text-[#111111]", className)}
+        className={cn("h-9 w-9 shrink-0", isIntercom && "text-[#111111]")}
         onClick={onToggleLayout}
         aria-label={label}
       >
@@ -68,7 +62,7 @@ function LayoutSettingsButton({
   );
 }
 
-function BackToCallsButton({ className }: { className?: string }) {
+function BackToCallsButton() {
   const { isIntercom } = useThemePreview();
 
   return (
@@ -77,7 +71,7 @@ function BackToCallsButton({ className }: { className?: string }) {
         asChild
         variant="ghost"
         size="icon"
-        className={cn("shrink-0", isIntercom && "text-[#111111]", className)}
+        className={cn("h-9 w-9 shrink-0", isIntercom && "text-[#111111]")}
       >
         <Link href="/calls" aria-label="Back to calls">
           <ArrowLeft className="h-4 w-4" />
@@ -87,58 +81,10 @@ function BackToCallsButton({ className }: { className?: string }) {
   );
 }
 
-function CompactHeaderBar({
-  call,
-  bant,
-  showJoinCall,
-  isEditingLayout,
-  onToggleLayout,
-}: {
-  call: Call;
-  bant?: BANTScore;
-  showJoinCall: boolean;
-  isEditingLayout: boolean;
-  onToggleLayout: () => void;
-}) {
-  const { isIntercom } = useThemePreview();
-  const isLive = call.status === "live";
-  const showActionBar = Boolean(bant) || showJoinCall;
-
-  return (
-    <div className="flex h-12 w-full min-w-0 items-center gap-3 px-6 sm:gap-3.5 sm:px-8">
-      <BackToCallsButton className="h-9 w-9" />
-      <h1
-        className={cn(
-          "min-w-0 flex-1 truncate text-base font-extrabold leading-none tracking-tight",
-          isIntercom ? "text-[#111111]" : "text-foreground"
-        )}
-      >
-        {call.accountName}
-      </h1>
-      {showActionBar && (
-        <PreDcBantStrip
-          bant={bant}
-          callId={call.id}
-          showJoinCall={showJoinCall}
-          isLive={isLive}
-          compact
-          className="mx-0 shrink-0"
-        />
-      )}
-      <LayoutSettingsButton
-        isEditingLayout={isEditingLayout}
-        onToggleLayout={onToggleLayout}
-        className="h-9 w-9"
-      />
-    </div>
-  );
-}
-
 export function CallDetailStickyHeader({
   call,
   scheduleText,
   bant,
-  compact,
   showJoinCall,
   isEditingLayout,
   onToggleLayout,
@@ -146,98 +92,70 @@ export function CallDetailStickyHeader({
   const { isIntercom } = useThemePreview();
   const isLive = call.status === "live";
   const showActionBar = Boolean(bant) || showJoinCall;
-  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    setPortalRoot(document.body);
-  }, []);
-
-  const compactNav = (
-    <header
-      className={cn(
-        "call-detail-compact-nav call-detail-liquid-glass call-detail-urbanist",
-        "flex min-h-[3.75rem] items-center"
-      )}
-      data-visible={compact ? "true" : "false"}
-      aria-hidden={!compact}
-    >
-      <CompactHeaderBar
-        call={call}
-        bant={bant}
-        showJoinCall={showJoinCall}
-        isEditingLayout={isEditingLayout}
-        onToggleLayout={onToggleLayout}
-      />
-    </header>
-  );
 
   return (
-    <>
-      {compact && <div className="h-[3.75rem] shrink-0" aria-hidden />}
-
-      {portalRoot ? createPortal(compactNav, portalRoot) : null}
-
-      {!compact && (
-        <header className="sticky top-0 z-30 w-full pt-9 pb-7 px-16 md:px-24 lg:px-32 bg-transparent transition-[padding,background-color] duration-200">
-          <div className="relative mx-auto w-full max-w-[1480px]">
-            <div className="absolute left-0 top-0 z-10">
-              <BackToCallsButton className="h-9 w-9" />
-            </div>
-            <div className="absolute right-0 top-0 z-10">
-              <LayoutSettingsButton
-                isEditingLayout={isEditingLayout}
-                onToggleLayout={onToggleLayout}
-              />
-            </div>
-
-            <div className="flex flex-col items-center text-center gap-1 px-24 sm:px-32 pt-3 min-w-0">
-              <h1
-                className={cn(
-                  "text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight leading-snug max-w-4xl",
-                  isIntercom ? "text-[#111111]" : "text-foreground"
-                )}
-              >
-                {call.accountName}
-              </h1>
-              <div
-                className={cn(
-                  "flex flex-wrap items-center justify-center gap-x-2 gap-y-2 mt-4 text-sm font-medium",
-                  isIntercom ? "text-[#626260]" : "text-muted-foreground"
-                )}
-              >
-                {call.leadName && (
-                  <span className="font-bold text-foreground/90">
-                    {call.leadName}
-                    {call.leadTitle ? ` · ${call.leadTitle}` : ""}
-                  </span>
-                )}
-                <span>{scheduleText}</span>
-                {!isIntercom && (
-                  <Badge variant="secondary" className="text-xs h-5 font-bold">
-                    Pre-DC
-                  </Badge>
-                )}
-                {call.annualRevenue && !isIntercom && (
-                  <Badge variant="outline" className="text-xs font-mono h-5">
-                    {call.annualRevenue}
-                  </Badge>
-                )}
-                <AIGeneratedBadge />
-              </div>
-
-              {showActionBar && (
-                <PreDcBantStrip
-                  bant={bant}
-                  callId={call.id}
-                  showJoinCall={showJoinCall}
-                  isLive={isLive}
-                  className="mt-6"
-                />
+    <header
+      className={cn(
+        "sticky top-0 z-30 -mx-6 border-b border-border/50 bg-background/90 px-6 pb-5 pt-2 backdrop-blur-md sm:-mx-8 sm:px-8",
+        isIntercom && "border-[#e8e6e3] bg-[#f7f5f3]/95"
+      )}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <BackToCallsButton />
+          <div className="min-w-0 flex-1">
+            <h1
+              className={cn(
+                "type-headline truncate text-foreground sm:type-display",
+                isIntercom && "text-[#111111]"
+              )}
+            >
+              {call.accountName}
+            </h1>
+            <div
+              className={cn(
+                "mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 type-body-sm",
+                isIntercom ? "text-[#626260]" : "text-muted-foreground"
+              )}
+            >
+              {call.leadName && (
+                <span className="font-semibold text-foreground/90">
+                  {call.leadName}
+                  {call.leadTitle ? ` · ${call.leadTitle}` : ""}
+                </span>
+              )}
+              <span>{scheduleText}</span>
+              {!isIntercom && (
+                <Badge variant="secondary" className="h-5 text-xs font-bold">
+                  Pre-DC
+                </Badge>
+              )}
+              {call.annualRevenue && !isIntercom && (
+                <Badge variant="outline" className="h-5 font-mono text-xs">
+                  {call.annualRevenue}
+                </Badge>
               )}
             </div>
           </div>
-        </header>
-      )}
-    </>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          {showActionBar && (
+            <PreDcBantStrip
+              bant={bant}
+              callId={call.id}
+              showJoinCall={showJoinCall}
+              isLive={isLive}
+              compact
+              className="mx-0 shrink-0"
+            />
+          )}
+          <LayoutSettingsButton
+            isEditingLayout={isEditingLayout}
+            onToggleLayout={onToggleLayout}
+          />
+        </div>
+      </div>
+    </header>
   );
 }

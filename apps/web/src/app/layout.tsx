@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Urbanist } from "next/font/google";
+import { Inter, Urbanist } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ClerkGateProvider } from "@/components/providers/clerk-gate";
 import { ThemeProvider } from "@/components/providers/theme-provider";
@@ -8,6 +8,13 @@ import { Toaster } from "sonner";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
 import { getClerkPublishableKey, isClerkConfigured } from "@/lib/public-env";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+  weight: ["400", "500", "600", "700", "800"],
+});
 
 const urbanist = Urbanist({
   subsets: ["latin"],
@@ -31,10 +38,10 @@ function AppDocument({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
-      className={urbanist.variable}
+      className={`${inter.variable} ${urbanist.variable}`}
       suppressHydrationWarning
     >
-      <body className="font-sans antialiased">
+      <body className="font-sans antialiased" suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <TooltipProvider>
             {children}

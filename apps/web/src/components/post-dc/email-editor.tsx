@@ -19,6 +19,7 @@ import { Label } from "@dc-copilot/ui/components/label";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { AIGeneratedBadge } from "@/components/ai-generated-badge";
 import { Separator } from "@dc-copilot/ui/components/separator";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@dc-copilot/ui/components/tooltip";
 import type { PostCallEmailAttachments } from "@/lib/brief-types";
 
@@ -77,18 +78,6 @@ function formatEmailForCopy(draft: EmailDraft) {
     "",
     draft.body_markdown.trim(),
   ].join("\n");
-}
-
-function fallbackCopyText(text: string) {
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand("copy");
-  document.body.removeChild(textarea);
 }
 
 function applyAssistantInstruction(draft: EmailDraft, instruction: string): EmailDraft {
@@ -164,17 +153,11 @@ export function EmailEditor({
 
   async function handleCopyEmail() {
     const text = formatEmailForCopy(local);
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        fallbackCopyText(text);
-      }
-    } catch {
-      fallbackCopyText(text);
+    const copied = await copyTextToClipboard(text);
+    if (copied) {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
     }
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
   }
 
   async function handleAssistantUpdate() {

@@ -4,8 +4,9 @@ import { CallDetailStickyHeader } from "@/components/calls/call-detail-sticky-he
 import { CallDetailTabs } from "@/components/calls/call-detail-tabs";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { Skeleton } from "@dc-copilot/ui/components/skeleton";
-import { useMainScrollCompact } from "@/hooks/use-main-scroll-compact";
-import { useCall } from "@/lib/data/hooks";
+import { PageShell } from "@/components/layout/page-shell";
+import { enrichCallBant } from "@/lib/bant/authority-from-lead";
+import { useCall, useCallBrief } from "@/lib/data/hooks";
 import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import {
@@ -19,8 +20,8 @@ interface CallDetailViewProps {
 }
 
 export function CallDetailView({ callId }: CallDetailViewProps) {
-  const compact = useMainScrollCompact(32);
   const { data: call, isLoading } = useCall(callId);
+  const { data: brief } = useCallBrief(callId);
   const preRecord = useDcImportsStore((s) =>
     findPreDcRecordForCall(s.preDcRecords, callId, call?.accountName)
   );
@@ -29,22 +30,22 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
 
   if (isLoading) {
     return (
-      <div className="px-4 pt-2 pb-4 max-w-[1600px] mx-auto w-full">
-        <Skeleton className="h-16 w-full rounded-lg mb-4" />
+      <PageShell size="wide" className="call-detail-page space-y-6 pb-8">
+        <Skeleton className="h-20 w-full rounded-xl" />
         <Skeleton className="h-96 w-full rounded-xl" />
-      </div>
+      </PageShell>
     );
   }
 
   if (!call) {
     return (
-      <div className="p-6 max-w-5xl mx-auto">
+      <PageShell size="default">
         <EmptyState
           title="Call not found"
           description="This call may have been removed or the link is invalid."
           action={{ label: "Back to calls", href: "/calls" }}
         />
-      </div>
+      </PageShell>
     );
   }
 
@@ -83,40 +84,31 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
 
   const showJoinCall = call.status === "upcoming" || call.status === "live";
 
+  const resolvedBant = enrichCallBant(call.bant, {
+    leadTitle: call.leadTitle ?? (preRecord ? preDcField(preRecord, "prospectPersona") : undefined),
+    clientAttendees: brief?.clientAttendees,
+  });
+
   return (
-    <div className="call-detail-page w-full pt-0 pb-8 min-h-0 text-[0.9375rem] leading-relaxed">
+    <PageShell
+      size="wide"
+      className="call-detail-page min-h-0 space-y-4 pb-8 text-[0.9375rem] leading-relaxed"
+    >
       <CallDetailStickyHeader
         call={call}
         scheduleText={scheduleText}
-        bant={
-          call.bant ?? {
-            budget: "unknown",
-            authority: "unknown",
-            need: "unknown",
-            timeline: "unknown",
-          }
-        }
-        compact={compact}
+        bant={resolvedBant}
         showJoinCall={showJoinCall}
         isEditingLayout={isEditingLayout}
         onToggleLayout={() => setEditingLayout(!isEditingLayout)}
       />
-      <div className="px-16 md:px-24 lg:px-32 max-w-[1480px] mx-auto w-full">
       <CallDetailTabs
         callId={callId}
         discoveryQuestions={discoveryQuestions}
-        bant={
-          call.bant ?? {
-            budget: "unknown",
-            authority: "unknown",
-            need: "unknown",
-            timeline: "unknown",
-          }
-        }
+        bant={resolvedBant}
         call={call}
         accountSnapshot={accountSnapshot}
       />
-      </div>
-    </div>
+    </PageShell>
   );
 }

@@ -37,6 +37,8 @@ export interface Call {
   annualRevenueRaw?: string;
   employeeCount?: string;
   icpBucket?: string;
+  /** ICP fit score 0–1 from bucket / brief (shown as company rating). */
+  icpMatch?: number;
   website?: string;
   companyTypeIcp?: string;
   dealStage?: string;

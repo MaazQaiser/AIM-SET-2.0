@@ -6,6 +6,7 @@ import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import type { CustomerLandingPage } from "@dc-copilot/types";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { toast } from "sonner";
 
 interface PostDcClpStatusCardProps {
@@ -19,8 +20,9 @@ export function PostDcClpStatusCard({ callId, page }: PostDcClpStatusCardProps) 
 
   async function copyLink() {
     if (!page?.publicUrl) return;
-    await navigator.clipboard.writeText(page.publicUrl);
-    toast.success("Landing page link copied");
+    const copied = await copyTextToClipboard(page.publicUrl);
+    if (copied) toast.success("Landing page link copied");
+    else toast.error("Click back into the page before copying");
   }
 
   return (

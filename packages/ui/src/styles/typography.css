@@ -13,32 +13,52 @@
   h3,
   h4,
   h5,
+  h6 {
+    font-family: var(--font-title);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
   h6,
   p {
     overflow-wrap: anywhere;
+  }
+
+  button,
+  input,
+  optgroup,
+  select,
+  textarea {
+    font: inherit;
   }
 }
 
 @layer utilities {
   .type-display {
+    font-family: var(--font-title);
     font-size: var(--text-display);
     line-height: var(--text-display--line-height);
     font-weight: var(--text-display--font-weight);
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
   }
 
   .type-headline {
+    font-family: var(--font-title);
     font-size: var(--text-headline);
     line-height: var(--text-headline--line-height);
     font-weight: var(--text-headline--font-weight);
-    letter-spacing: -0.015em;
+    letter-spacing: 0;
   }
 
   .type-title {
+    font-family: var(--font-title);
     font-size: var(--text-title);
     line-height: var(--text-title--line-height);
     font-weight: var(--text-title--font-weight);
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
   }
 
   .type-subtitle {

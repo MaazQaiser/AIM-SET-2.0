@@ -1,47 +1,356 @@
 "use client";
 
-import { Sparkles, TrendingUp, Calendar, DollarSign, Target, Users } from "lucide-react";
-import { WorkflowAgentBadge } from "@/components/pre-call/workflow-agent-badge";
+import { Sparkles } from "lucide-react";
 import { useWidgetSize } from "@/components/dashboard-grid/dashboard-widget";
 import { BriefDetailCard, briefMainBody } from "@/components/pre-call/brief-detail-card";
 import { parseSummaryHighlights, type SummaryHighlightRule } from "@/lib/brief-summary-highlights";
 import { useAgentConfig } from "@/lib/data/agent-config-hooks";
+import { companyStageForCall, type CompanyStage } from "@/lib/dc-notes/company-stage";
+import { companyRatingForCall, formatCompanyRating } from "@/lib/dc-notes/icp-rating";
 import { useThemePreview } from "@/hooks/use-theme-preview";
-import type { CallBrief } from "@/lib/brief-types";
+import {
+  SUMMARY_SECTION_ORDER,
+  SUMMARY_SECTION_TITLES,
+  normalizeSummarySections,
+  type BriefSummarySection,
+  type CallBrief,
+} from "@dc-copilot/types/brief";
 import { cn } from "@/lib/cn";
+import type { Call } from "@/types";
 
 interface BriefAISummaryProps {
   brief: CallBrief;
+  call?: Call;
 }
 
-const STAGE_COLOR: Record<string, string> = {
-  "Evaluation → Proposal": "bg-blue-100/90 text-blue-800 border-blue-200/80",
-  Discovery: "bg-purple-100/90 text-purple-800 border-purple-200/80",
-  Proposal: "bg-orange-100/90 text-orange-800 border-orange-200/80",
-  "Closed Won": "bg-emerald-100/90 text-emerald-800 border-emerald-200/80",
-  "Closed Lost": "bg-rose-100/90 text-rose-800 border-rose-200/80",
+const STAGE_BADGE_CLASS: Record<CompanyStage, string> = {
+  Enterprise: "border-violet-300/80 bg-violet-50/90 text-violet-900",
+  Startup: "border-sky-300/80 bg-sky-50/90 text-sky-900",
+  "Funded Startup": "border-indigo-300/80 bg-indigo-50/90 text-indigo-900",
+  Ideation: "border-amber-300/80 bg-amber-50/90 text-amber-950",
+  SMB: "border-teal-300/80 bg-teal-50/90 text-teal-900",
 };
+const NEEDS_CONTENT_FALLBACK = "Needs/content is not identified yet.";
 
-function MetaChip({
+function sortedRelevantProjects(brief: CallBrief): NonNullable<CallBrief["relevantProjects"]> {
+  return [...(brief.relevantProjects ?? [])].sort(
+    (a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0)
+  );
+}
+
+function projectNamesSentence(brief: CallBrief): string {
+  const names = sortedRelevantProjects(brief)
+    .map((project) => project.title?.trim())
+    .filter((title, index, all): title is string => Boolean(title) && all.indexOf(title) === index);
+  if (names.length === 0) {
+    return "Relevant projects done: 0.";
+  }
+  const shown = names.slice(0, 5);
+  const suffix = names.length > shown.length ? `, +${names.length - shown.length} more` : "";
+  const projectWord = names.length === 1 ? "project" : "projects";
+  return `Relevant ${projectWord} done: ${names.length} - ${shown.join(", ")}${suffix}.`;
+}
+
+function fallbackRelevanceText(brief: CallBrief): string {
+  const projects = sortedRelevantProjects(brief);
+  const scores = [
+    ...projects.map((project) => project.relevanceScore ?? 0),
+    ...(brief.relevantDocuments ?? []).map((document) => document.relevanceScore ?? 0),
+  ].filter((score) => score > 0);
+  const projectsSentence = projectNamesSentence(brief);
+
+  if (scores.length === 0) {
+    return `${projectsSentence} Overall relevance score is not available yet.`;
+  }
+
+  const pct = Math.round(Math.max(...scores) * 100);
+  return `${projectsSentence} Overall relevance: ${pct}%.`;
+}
+
+function withoutOutreachDetails(value: string): string {
+  const blockedPatterns = [
+    "outreach",
+    "cold email",
+    "email campaign",
+    "email and phone",
+    "phone and email",
+    "via email",
+    "via phone",
+    "lead source",
+    "how we landed",
+    "how we got",
+    "responded",
+    "reply",
+    "openness to a call",
+    "bandwidth",
+    "unresponsive",
+    "follow-up",
+    "follow up",
+    "re-engaged",
+    "reengaged",
+    "scheduled",
+    "scheduling",
+    "schedule the call",
+    "booked",
+    "availability",
+    "calendar invite",
+    "meeting invite",
+    "meeting has been confirmed",
+    "meeting confirmed",
+    "discovery call",
+    "intro call",
+    "prior to the call",
+    "nda",
+    "company details",
+    "prospect is",
+    "founder & ceo",
+    "founder and ceo",
+  ];
+  return value
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(
+      (sentence) =>
+        sentence &&
+        !blockedPatterns.some((pattern) => sentence.toLowerCase().includes(pattern)),
+    )
+    .join(" ");
+}
+
+function extractNeedPhrase(value: string): string {
+  const text = value.replace(/\s+/g, " ").trim();
+  const patterns = [
+    /\b(?:would\s+)?need(?:s|ed)?(?:\s+(?:is|are|to))?\s+(.+?)(?:,?\s+(?:though|but|however)\b|[.!?]|$)/i,
+    /\b(?:want|wants|wanted|looking for|seeking|requires?|requested|interested in|would like)\s+(?:to\s+)?(.+?)(?:,?\s+(?:though|but|however)\b|[.!?]|$)/i,
+    /\b(?:goal|objective)\s+(?:is|was)\s+(?:to\s+)?(.+?)(?:,?\s+(?:though|but|however)\b|[.!?]|$)/i,
+  ];
+  for (const pattern of patterns) {
+    const need = text.match(pattern)?.[1]?.trim().replace(/^[,;:\s-]+|[,;:\s-]+$/g, "");
+    if (need) return need.replace(/\.$/, "");
+  }
+  return "";
+}
+
+function normalizeNeedText(value: string): string {
+  return value
+    .trim()
+    .replace(
+      /^(?:their\s+)?(?:stated\s+)?(?:need|needs|needed|want|wants|wanted|looking for|seeking|requires?|requested|interested in)(?:\s+(?:is|are|to))?\s+/i,
+      ""
+    )
+    .replace(/\.$/, "");
+}
+
+function businessNeedText(value: string, allowPlain = false): string {
+  const clean = withoutOutreachDetails(value);
+  const extracted = extractNeedPhrase(clean) || extractNeedPhrase(value);
+  if (extracted) return normalizeNeedText(extracted);
+  if (allowPlain && clean) return normalizeNeedText(clean);
+  return "";
+}
+
+function painPointText(value: string, allowPlain = false): string {
+  const clean = withoutOutreachDetails(value);
+  const painPatterns = [
+    "pain",
+    "challenge",
+    "issue",
+    "problem",
+    "friction",
+    "slow",
+    "slows",
+    "manual",
+    "bottleneck",
+    "gap",
+    "blocker",
+    "struggle",
+    "difficulty",
+    "risk",
+    "unable",
+    "lack",
+    "lacks",
+  ];
+  const matches = clean
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim().replace(/\.$/, ""))
+    .filter(
+      (sentence) =>
+        sentence && painPatterns.some((pattern) => sentence.toLowerCase().includes(pattern))
+    );
+  if (matches.length > 0) return matches.join("; ");
+  if (allowPlain && clean) return normalizeNeedText(clean);
+  return "";
+}
+
+function fallbackCustomerProfileText(brief: CallBrief): string {
+  const legacySummary = withoutOutreachDetails(brief.aiSummary ?? "");
+  const needs = (brief.pains ?? [])
+    .map((pain) => businessNeedText(pain.text ?? "", true))
+    .filter(Boolean)
+    .slice(0, 2);
+  if (!legacySummary && needs.length === 0) {
+    return NEEDS_CONTENT_FALLBACK;
+  }
+  return [
+    legacySummary || `${brief.accountName} has limited company profile detail captured.`,
+    needs.length > 0 ? `Their stated need is ${needs.join("; ")}.` : NEEDS_CONTENT_FALLBACK,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function fallbackPainPointsText(brief: CallBrief): string {
+  const pains = (brief.pains ?? [])
+    .map((pain) => painPointText(pain.text ?? ""))
+    .filter(Boolean)
+    .slice(0, 3);
+  return pains.length > 0 ? pains.join("; ") : NEEDS_CONTENT_FALLBACK;
+}
+
+function cleanCustomerProfileSection(section: BriefSummarySection, brief: CallBrief): BriefSummarySection {
+  const cleanContent = withoutOutreachDetails(section.content ?? "");
+  const needFromSection = businessNeedText(section.content ?? "");
+  const fallbackNeed = (brief.pains ?? [])
+    .map((pain) => businessNeedText(pain.text ?? "", true))
+    .find(Boolean);
+  const need = normalizeNeedText(needFromSection || fallbackNeed || "");
+  const content = [
+    cleanContent || `${brief.accountName} has limited company profile detail captured.`,
+    need ? `Their stated need is ${need}.` : NEEDS_CONTENT_FALLBACK,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return { ...section, content };
+}
+
+function cleanPainPointsSection(section: BriefSummarySection, brief: CallBrief): BriefSummarySection {
+  const pain = painPointText(section.content ?? "");
+  return { ...section, content: pain || fallbackPainPointsText(brief) };
+}
+
+function cleanRelevanceSection(section: BriefSummarySection, brief: CallBrief): BriefSummarySection {
+  const hasKbMatch =
+    (brief.relevantProjects?.length ?? 0) > 0 || (brief.relevantDocuments?.length ?? 0) > 0;
+  return hasKbMatch ? { ...section, content: fallbackRelevanceText(brief) } : section;
+}
+
+function cleanSummarySection(section: BriefSummarySection, brief: CallBrief): BriefSummarySection {
+  if (section.id === "customer_profile") {
+    return cleanCustomerProfileSection(section, brief);
+  }
+  if (section.id === "customer_pain_points") {
+    return cleanPainPointsSection(section, brief);
+  }
+  if (section.id === "relevance") {
+    return cleanRelevanceSection(section, brief);
+  }
+  return section;
+}
+
+function resolveSummarySections(brief: CallBrief): BriefSummarySection[] {
+  const fallbackSections: BriefSummarySection[] = [
+    {
+      id: "customer_profile",
+      title: SUMMARY_SECTION_TITLES.customer_profile,
+      content: fallbackCustomerProfileText(brief),
+    },
+    {
+      id: "customer_pain_points",
+      title: SUMMARY_SECTION_TITLES.customer_pain_points,
+      content: fallbackPainPointsText(brief),
+    },
+    {
+      id: "suggested_action",
+      title: "Suggested Action",
+      content: "No generated suggested action paragraph is available yet.",
+    },
+    {
+      id: "relevance",
+      title: "Relevance",
+      content: fallbackRelevanceText(brief),
+    },
+  ];
+
+  const sections = (brief.summarySections ?? []).filter((section) => section.content?.trim());
+  if (sections.length > 0) {
+    const byId = new Map(
+      sections.map((section) => [section.id, cleanSummarySection(section, brief)])
+    );
+    const fallbackById = Object.fromEntries(
+      fallbackSections.map((section) => [section.id, section]),
+    ) as Record<BriefSummarySection["id"], BriefSummarySection>;
+    return normalizeSummarySections(
+      SUMMARY_SECTION_ORDER.map((id) => byId.get(id) ?? fallbackById[id])
+    )!;
+  }
+
+  return normalizeSummarySections(fallbackSections)!;
+}
+
+function ValueBadge({
   children,
   className,
-  icon,
 }: {
   children: React.ReactNode;
   className?: string;
-  icon?: React.ReactNode;
 }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium min-w-0 max-w-full",
+        "inline-flex max-w-full items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
         className
       )}
     >
-      {icon}
       <span className="truncate">{children}</span>
     </span>
   );
+}
+
+function splitBriefIcpNote(brief: CallBrief): { companyType?: string; review?: string } {
+  const segments =
+    brief.icpNote
+      ?.split("·")
+      .map((segment) => segment.trim())
+      .filter(Boolean) ?? [];
+
+  return {
+    companyType: segments[0],
+    review: segments[1] ?? segments[0],
+  };
+}
+
+function summaryStatsContext(brief: CallBrief, call?: Call) {
+  const note = splitBriefIcpNote(brief);
+  const companyType = call?.companyTypeIcp?.trim() || note.companyType || "Not captured";
+  const icpBucket = call?.icpBucket?.trim() || note.review;
+  const stage = companyStageForCall({
+    id: call?.id ?? brief.callId,
+    dealStage: call?.dealStage ?? brief.dealStage,
+    companyTypeIcp: call?.companyTypeIcp ?? companyType,
+    icpBucket,
+    annualRevenueRaw: call?.annualRevenueRaw,
+    employeeCount: call?.employeeCount,
+  });
+  const agentRating = formatCompanyRating(
+    companyRatingForCall({
+      id: call?.id ?? brief.callId,
+      icpMatch: call?.icpMatch ?? brief.icpMatch,
+      icpBucket,
+    })
+  );
+
+  const revenue =
+    call?.annualRevenue?.trim() ||
+    brief.opportunityValue?.replace(/\s*annual revenue$/i, "").trim() ||
+    "—";
+
+  return {
+    agentRating,
+    companyType,
+    stage,
+    revenue,
+  };
 }
 
 function HighlightedSummary({
@@ -93,105 +402,73 @@ function HighlightedSummary({
   );
 }
 
-export function BriefAISummary({ brief }: BriefAISummaryProps) {
+export function BriefAISummary({ brief, call }: BriefAISummaryProps) {
   const { isIntercom } = useThemePreview();
   const { data: workflowConfig } = useAgentConfig("workflow");
   const highlightRules = workflowConfig?.summary_highlight_rules;
 
   const { compact, columnZone } = useWidgetSize();
   const isCenter = columnZone === "center";
-  const stageClass = isIntercom
-    ? "bg-card border-border text-muted-foreground"
-    : STAGE_COLOR[brief.dealStage] ?? "bg-muted/60 text-muted-foreground border-border";
-  const contactUrgency = brief.daysSinceLastContact > 14 ? "text-warning" : "text-muted-foreground";
-  const icpPct = Math.round(brief.icpMatch * 100);
-  const icpSegments = brief.icpNote?.split("·").map((s) => s.trim()).filter(Boolean) ?? [];
-  const chipClass = isIntercom ? "bg-card border-border text-muted-foreground" : undefined;
+  const summarySections = resolveSummarySections(brief);
+  const stats = summaryStatsContext(brief, call);
+
+  const statsBadges = (
+    <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0 max-w-[min(100%,20rem)]">
+      <ValueBadge className={STAGE_BADGE_CLASS[stats.stage] ?? "border-border bg-muted/40 text-foreground"}>
+        {stats.stage}
+      </ValueBadge>
+      <ValueBadge className="bg-warning/10 border-warning/25 text-foreground">
+        {stats.agentRating}
+      </ValueBadge>
+      <ValueBadge className="border-border bg-muted/40 text-foreground">
+        {stats.companyType}
+      </ValueBadge>
+      {stats.revenue !== "—" && (
+        <ValueBadge className="bg-warning/15 border-warning/20 text-foreground font-semibold">
+          {stats.revenue}
+        </ValueBadge>
+      )}
+    </div>
+  );
 
   return (
     <BriefDetailCard
       tone="main"
-      title="PRE-DC Workflow summary"
+      title="Summary"
       icon={Sparkles}
       variant="highlight"
+      headerExtra={statsBadges}
       sourceInfo={{
         source: "AI from Pre-DC lead data",
         detail:
-          "The workflow summarizes only the imported lead research: company stage, ICP fit, described need, timing, and Tkxel fit. It is instructed not to invent facts.",
+          "The workflow summarizes imported lead research into one readout. The relevance section shows relevant project count, project names, and the overall KB match percentage.",
       }}
-      headerExtra={<WorkflowAgentBadge />}
     >
-      <div className="space-y-4 min-w-0">
-        {/* Deal context + ICP / firmographic chips (top) */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {brief.opportunityValue && (
-            <MetaChip
+      <div className="space-y-3 min-w-0">
+          {summarySections.map((section) => (
+            <section
+              key={section.id}
               className={cn(
-                chipClass,
-                !isIntercom && "bg-amber-50/90 border-amber-200/70 text-amber-950"
+                "space-y-2 border-t border-border/60 pt-3 first:border-t-0 first:pt-0",
+                section.id === "customer_pain_points" && "border-l-2 border-l-rose-400 pl-3"
               )}
-              icon={
-                <DollarSign
-                  className={cn("h-3 w-3 shrink-0", isIntercom ? "text-[#626260]" : "text-amber-700")}
-                />
-              }
             >
-              {brief.opportunityValue}
-            </MetaChip>
-          )}
-          <MetaChip className={cn("border", stageClass)} icon={<Target className="h-3 w-3 shrink-0" />}>
-            {brief.dealStage}
-          </MetaChip>
-          <MetaChip
-            className={cn(
-              chipClass,
-              !isIntercom && "bg-violet-50/90 border-violet-200/70 text-violet-950"
-            )}
-            icon={
-              <TrendingUp
-                className={cn("h-3 w-3 shrink-0", isIntercom ? "text-[#626260]" : "text-violet-700")}
+              <p
+                className={cn(
+                  "text-xs font-semibold uppercase tracking-wide text-muted-foreground",
+                  section.id === "customer_pain_points" && "text-rose-700"
+                )}
+              >
+                {section.title}
+              </p>
+              <HighlightedSummary
+                text={section.content}
+                clamp={!isCenter && compact}
+                rules={highlightRules}
+                intercomMarks={isIntercom}
               />
-            }
-          >
-            ICP {icpPct}%
-          </MetaChip>
-          {icpSegments.map((segment) => (
-            <MetaChip
-              key={segment}
-              className={cn(
-                chipClass,
-                !isIntercom && "bg-slate-100/90 border-slate-200/70 text-slate-800"
-              )}
-              icon={
-                <Users
-                  className={cn("h-3 w-3 shrink-0", isIntercom ? "text-[#626260]" : "text-slate-600")}
-                />
-              }
-            >
-              {segment}
-            </MetaChip>
+            </section>
           ))}
-          {(!compact || isCenter) && (
-            <MetaChip
-              className={cn(
-                chipClass ?? "bg-background/80 border-border",
-                !isIntercom &&
-                  contactUrgency === "text-warning" &&
-                  "bg-warning/10 border-warning/30 text-warning"
-              )}
-              icon={<Calendar className="h-3 w-3 shrink-0" />}
-            >
-              Last contact {brief.daysSinceLastContact}d ago
-            </MetaChip>
-          )}
-        </div>
-
-        <HighlightedSummary
-          text={brief.aiSummary ?? ""}
-          clamp={!isCenter && compact}
-          rules={highlightRules}
-          intercomMarks={isIntercom}
-        />
       </div>
     </BriefDetailCard>
   );

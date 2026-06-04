@@ -78,12 +78,7 @@ export function BANTScorecard({
                 className={cn("shrink-0", md ? "h-4 w-4" : "h-3.5 w-3.5", config.color)}
               />
               <div className="min-w-0 leading-none text-left">
-                <p
-                  className={cn(
-                    "text-left font-semibold uppercase tracking-wide text-muted-foreground",
-                    md ? "text-[10px]" : "text-[9px]"
-                  )}
-                >
+                <p className="text-left text-xs font-medium text-muted-foreground">
                   {bantLabels[key]}
                 </p>
                 <p
@@ -148,7 +143,7 @@ export function BANTScorecard({
           >
             <Icon className={cn("h-5 w-5 shrink-0", config.color)} />
             <div className="min-w-0 text-left">
-              <p className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide truncate">
+              <p className="text-left text-xs font-medium text-muted-foreground truncate">
                 {bantLabels[key]}
               </p>
               <p className={cn("text-left text-xs font-semibold truncate", config.color)}>

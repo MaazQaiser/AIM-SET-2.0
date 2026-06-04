@@ -21,6 +21,7 @@ from dc_tools.retrieve_kb import default_embed_fn, retrieve_kb
 PROMPTS_ROOT = Path(__file__).resolve().parents[4] / "prompts"
 
 COMPANY_NAME_KEY = "Company Name-PreDC"
+NEEDS_CONTENT_FALLBACK = "Needs/content is not identified yet."
 
 
 def load_prompt(rel_path: str) -> str:
@@ -71,6 +72,7 @@ def research_from_fields(fields: Dict[str, str]) -> Dict[str, str]:
         "intersection": fields.get("Intersection areas b/w tkxel & company", ""),
         "campaign_service": fields.get("Campaign Service - PreDC", ""),
         "other": fields.get("Other Information", ""),
+        "relevance": fields.get("What is their relevance to Tkxel?", ""),
         "discovery_date": fields.get("Discovery Call Date (PKT)", ""),
         "discovery_time": fields.get("Discovery Call Time (PKT)", ""),
     }
@@ -89,6 +91,509 @@ def _heuristic_summary(fields: Dict[str, str], account_name: str) -> str:
     if desc:
         return desc[:400] + ("…" if len(desc) > 400 else "")
     return f"Discovery call prep for **{account_name}**."
+
+
+from app.domain.brief_summary_sections import (
+    SUMMARY_SECTION_TITLES,
+    canonicalize_summary_section_titles,
+)
+
+
+def _summary_section(section_id: str, content: str, fallback: str) -> Dict[str, str]:
+    return {
+        "id": section_id,
+        "title": SUMMARY_SECTION_TITLES[section_id],
+        "content": (content.strip() or fallback).strip(),
+    }
+
+
+def _compact_text(value: Any, limit: int = 260) -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
+
+
+def _without_outreach_details(value: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    blocked_patterns = (
+        "outreach",
+        "cold email",
+        "email campaign",
+        "email and phone",
+        "phone and email",
+        "via email",
+        "via phone",
+        "lead source",
+        "how we landed",
+        "how we got",
+        "responded",
+        "reply",
+        "openness to a call",
+        "bandwidth",
+        "unresponsive",
+        "follow-up",
+        "follow up",
+        "re-engaged",
+        "reengaged",
+        "scheduled",
+        "scheduling",
+        "schedule the call",
+        "booked",
+        "availability",
+        "calendar invite",
+        "meeting invite",
+        "meeting has been confirmed",
+        "meeting confirmed",
+        "discovery call",
+        "intro call",
+        "prior to the call",
+        "nda",
+        "company details",
+        "prospect is",
+        "founder & ceo",
+        "founder and ceo",
+    )
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    kept = [
+        sentence.strip()
+        for sentence in sentences
+        if sentence.strip()
+        and not any(pattern in sentence.lower() for pattern in blocked_patterns)
+    ]
+    return " ".join(kept).strip()
+
+
+def _extract_need_phrase(value: str) -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if not text:
+        return ""
+    patterns = (
+        r"\b(?:would\s+)?need(?:s|ed)?(?:\s+(?:is|are|to))?\s+(.+?)(?:,?\s+(?:though|but|however)\b|[.!?]|$)",
+        r"\b(?:want|wants|wanted|looking for|seeking|requires?|requested|interested in|would like)\s+(?:to\s+)?(.+?)(?:,?\s+(?:though|but|however)\b|[.!?]|$)",
+        r"\b(?:goal|objective)\s+(?:is|was)\s+(?:to\s+)?(.+?)(?:,?\s+(?:though|but|however)\b|[.!?]|$)",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            need = _compact_text(match.group(1).strip(" ,;:-"), 180)
+            if need:
+                return need.rstrip(".")
+    return ""
+
+
+def _normalize_need_text(value: str) -> str:
+    text = str(value or "").strip()
+    text = re.sub(
+        r"^(?:their\s+)?(?:stated\s+)?(?:need|needs|needed|want|wants|wanted|looking for|seeking|requires?|requested|interested in)(?:\s+(?:is|are|to))?\s+",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    return text.strip().rstrip(".")
+
+
+def _business_need_text(value: str, *, allow_plain: bool = False) -> str:
+    clean = _without_outreach_details(value)
+    extracted = _extract_need_phrase(clean) or _extract_need_phrase(value)
+    if extracted:
+        return _normalize_need_text(extracted)
+    if allow_plain and clean:
+        return _normalize_need_text(clean)
+    return ""
+
+
+def _pain_point_text(value: str, *, allow_plain: bool = False) -> str:
+    clean = _without_outreach_details(value)
+    if not clean:
+        return ""
+    pain_patterns = (
+        "pain",
+        "challenge",
+        "issue",
+        "problem",
+        "friction",
+        "slow",
+        "slows",
+        "manual",
+        "bottleneck",
+        "gap",
+        "blocker",
+        "struggle",
+        "difficulty",
+        "risk",
+        "unable",
+        "lack",
+        "lacks",
+    )
+    sentences = re.split(r"(?<=[.!?])\s+", clean)
+    matches = [
+        sentence.strip().rstrip(".")
+        for sentence in sentences
+        if sentence.strip()
+        and any(pattern in sentence.lower() for pattern in pain_patterns)
+    ]
+    if matches:
+        return _compact_text("; ".join(matches), 220)
+    if allow_plain:
+        return _normalize_need_text(clean)
+    return ""
+
+
+def _customer_profile_summary(fields: Dict[str, str], account_name: str) -> str:
+    about_bits = [
+        fields.get("Company Description", ""),
+        fields.get("Industry - PreDC", ""),
+        fields.get("Company Type ICP - PreDC", ""),
+        fields.get("Company Stage", ""),
+        fields.get("Company Stage-PreDC", ""),
+        fields.get("ICP Bucket", ""),
+    ]
+    need_bits = [
+        (fields.get("Have they described their needs", ""), True),
+        (fields.get("Need-PreDC", ""), True),
+        (fields.get("Other Information", ""), False),
+    ]
+
+    about = _compact_text(_without_outreach_details(" ".join(bit for bit in about_bits if bit)), 320)
+    need = _compact_text(
+        "; ".join(
+            bit for bit in (_business_need_text(value, allow_plain=allow_plain) for value, allow_plain in need_bits) if bit
+        ),
+        240,
+    )
+
+    parts = []
+    if about:
+        parts.append(f"{account_name} is about {about}")
+    else:
+        parts.append(f"{account_name} has limited company profile detail captured in the imported Pre-DC row")
+    if need:
+        parts.append(f"Their stated need is {need}")
+    else:
+        parts.append(NEEDS_CONTENT_FALLBACK)
+    return ". ".join(part.strip().rstrip(".") for part in parts if part).strip() + "."
+
+
+def _customer_pain_points_summary(fields: Dict[str, str]) -> str:
+    pain_bits = [
+        _pain_point_text(fields.get("Intersection areas b/w tkxel & company", "")),
+        _pain_point_text(fields.get("Have they described their needs", "")),
+        _pain_point_text(fields.get("Need-PreDC", "")),
+        _pain_point_text(fields.get("Other Information", "")),
+    ]
+    summary = _compact_text("; ".join(bit for bit in pain_bits if bit), 320)
+    return summary or NEEDS_CONTENT_FALLBACK
+
+
+def _heuristic_summary_sections(fields: Dict[str, str], account_name: str) -> List[Dict[str, str]]:
+    action_bits = [
+        fields.get("Campaign Service - PreDC", ""),
+        fields.get("Discovery Call Date (PKT)", ""),
+        fields.get("Discovery Call Time (PKT)", ""),
+    ]
+    relevance_bits = [
+        fields.get("What is their relevance to Tkxel?", ""),
+        fields.get("Intersection areas b/w tkxel & company", ""),
+        fields.get("ICP Bucket", ""),
+    ]
+
+    action_context = " ".join(bit for bit in action_bits if bit).strip()
+    if action_context:
+        action_text = (
+            f"Use the discovery call to validate the main need, confirm timeline and decision process, "
+            f"and prepare content around {action_context}."
+        )
+    else:
+        action_text = (
+            "Use the discovery call to validate the main need, confirm timeline and decision process, "
+            "and identify which sales assets should be prepared next."
+        )
+
+    return [
+        _summary_section(
+            "customer_profile",
+            _customer_profile_summary(fields, account_name),
+            f"{account_name} is queued for discovery prep. Use the imported Pre-DC record as the source of truth.",
+        ),
+        _summary_section(
+            "customer_pain_points",
+            _customer_pain_points_summary(fields),
+            "No specific pain point was captured yet. Use the call to uncover the business problem, current workflow, and urgency.",
+        ),
+        _summary_section("suggested_action", action_text, action_text),
+        _summary_section(
+            "relevance",
+            " ".join(bit for bit in relevance_bits if bit),
+            "Relevance should be confirmed by connecting the prospect's stated need to Tkxel's matching services, proof points, and delivery model.",
+        ),
+    ]
+
+
+def _normalize_summary_sections(parsed: Optional[Dict[str, Any]]) -> List[Dict[str, str]]:
+    if not parsed:
+        return []
+    raw_sections = parsed.get("sections")
+    if isinstance(raw_sections, list):
+        out: List[Dict[str, str]] = []
+        for item in raw_sections:
+            if not isinstance(item, dict):
+                continue
+            section_id = str(item.get("id") or "").strip()
+            if section_id not in SUMMARY_SECTION_TITLES:
+                continue
+            content = str(item.get("content") or item.get("body") or "").strip()
+            if not content:
+                continue
+            out.append(
+                {
+                    "id": section_id,
+                    "title": SUMMARY_SECTION_TITLES[section_id],
+                    "content": content,
+                }
+            )
+        if out:
+            by_id = {s["id"]: s for s in out}
+            return [by_id[key] for key in SUMMARY_SECTION_TITLES if key in by_id]
+
+    aliases = {
+        "customer_profile": ["customer_profile", "customer_profile_summary", "profile"],
+        "customer_pain_points": ["customer_pain_points", "pain_points", "customer_pains"],
+        "suggested_action": ["suggested_action", "actions", "next_action"],
+        "relevance": ["relevance", "why_relevant", "tkxel_relevance"],
+    }
+    out = []
+    for section_id, keys in aliases.items():
+        value = next((parsed.get(key) for key in keys if parsed.get(key)), "")
+        if value:
+            out.append(
+                {
+                    "id": section_id,
+                    "title": SUMMARY_SECTION_TITLES[section_id],
+                    "content": str(value).strip(),
+                }
+            )
+    return out
+
+
+def _complete_summary_sections(
+    sections: List[Dict[str, str]], fields: Dict[str, str], account_name: str
+) -> List[Dict[str, str]]:
+    fallback_by_id = {section["id"]: section for section in _heuristic_summary_sections(fields, account_name)}
+    section_by_id: Dict[str, Dict[str, str]] = {}
+    for section in sections:
+        section_id = section.get("id", "")
+        content = section.get("content", "").strip()
+        if section_id in SUMMARY_SECTION_TITLES and content:
+            section_by_id[section_id] = {
+                "id": section_id,
+                "title": SUMMARY_SECTION_TITLES[section_id],
+                "content": content,
+            }
+    return [
+        section_by_id.get(section_id) or fallback_by_id[section_id]
+        for section_id in SUMMARY_SECTION_TITLES
+    ]
+
+
+def _enrich_customer_profile_section(
+    sections: List[Dict[str, str]], fields: Dict[str, str], account_name: str
+) -> List[Dict[str, str]]:
+    profile = _customer_profile_summary(fields, account_name)
+    enriched: List[Dict[str, str]] = []
+    for section in sections:
+        if section.get("id") == "customer_profile":
+            enriched.append(
+                {
+                    "id": "customer_profile",
+                    "title": SUMMARY_SECTION_TITLES["customer_profile"],
+                    "content": profile,
+                }
+            )
+        else:
+            enriched.append(section)
+    return enriched
+
+
+def _enrich_customer_pain_points_section(
+    sections: List[Dict[str, str]], fields: Dict[str, str]
+) -> List[Dict[str, str]]:
+    pain_points = _customer_pain_points_summary(fields)
+    if not pain_points:
+        return sections
+    enriched: List[Dict[str, str]] = []
+    for section in sections:
+        if section.get("id") == "customer_pain_points":
+            enriched.append(
+                {
+                    "id": "customer_pain_points",
+                    "title": SUMMARY_SECTION_TITLES["customer_pain_points"],
+                    "content": pain_points,
+                }
+            )
+        else:
+            enriched.append(section)
+    return enriched
+
+
+def _score_pct(value: Any) -> Optional[int]:
+    try:
+        score = float(value)
+    except (TypeError, ValueError):
+        return None
+    if score <= 0:
+        return None
+    return round(max(0.0, min(1.0, score)) * 100)
+
+
+def _top_relevant_project(relevant: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    projects = [p for p in relevant.get("relevantProjects") or [] if isinstance(p, dict)]
+    if not projects:
+        return None
+
+    def score(project: Dict[str, Any]) -> float:
+        source_bonus = 0.05 if project.get("source") in ("project_database", "dc_notes") else 0.0
+        try:
+            return float(project.get("relevanceScore") or 0) + source_bonus
+        except (TypeError, ValueError):
+            return source_bonus
+
+    return max(projects, key=score)
+
+
+def _relevant_projects(relevant: Dict[str, Any]) -> List[Dict[str, Any]]:
+    projects = [p for p in relevant.get("relevantProjects") or [] if isinstance(p, dict)]
+    if not projects:
+        return []
+
+    def score(project: Dict[str, Any]) -> float:
+        source_bonus = 0.05 if project.get("source") in ("project_database", "dc_notes") else 0.0
+        try:
+            return float(project.get("relevanceScore") or 0) + source_bonus
+        except (TypeError, ValueError):
+            return source_bonus
+
+    return sorted(projects, key=score, reverse=True)
+
+
+def _top_relevant_document(relevant: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    documents = [d for d in relevant.get("relevantDocuments") or [] if isinstance(d, dict)]
+    if not documents:
+        return None
+
+    def score(document: Dict[str, Any]) -> float:
+        try:
+            return float(document.get("relevanceScore") or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    return max(documents, key=score)
+
+
+def _relevance_level(score: int) -> str:
+    if score >= 85:
+        return "Very high"
+    if score >= 70:
+        return "High"
+    if score >= 45:
+        return "Medium"
+    return "Low"
+
+
+def _manual_relevance_level(value: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    percent_match = re.search(r"\b(\d{1,3})\s*%", text)
+    if percent_match:
+        pct = max(0, min(100, int(percent_match.group(1))))
+        return f"{_relevance_level(pct)} relevance ({pct}%)."
+
+    lowered = text.lower()
+    if any(word in lowered for word in ("very high", "excellent", "strong", "high")):
+        return "High relevance."
+    if any(word in lowered for word in ("medium", "moderate", "good")):
+        return "Medium relevance."
+    if any(word in lowered for word in ("low", "weak", "poor")):
+        return "Low relevance."
+    return ""
+
+
+def _project_names_sentence(projects: List[Dict[str, Any]]) -> str:
+    names: List[str] = []
+    seen = set()
+    for project in projects:
+        title = _compact_text(project.get("title") or project.get("name") or "", 120)
+        key = title.lower()
+        if title and key not in seen:
+            names.append(title)
+            seen.add(key)
+    if not names:
+        return "Relevant projects done: 0."
+
+    shown = names[:5]
+    suffix = f", +{len(names) - len(shown)} more" if len(names) > len(shown) else ""
+    project_word = "project" if len(names) == 1 else "projects"
+    return f"Relevant {project_word} done: {len(names)} - {', '.join(shown)}{suffix}."
+
+
+def _manual_relevance_value(value: str) -> str:
+    manual = _manual_relevance_level(value).rstrip(".")
+    return manual.replace(" relevance", "").strip()
+
+
+def _kb_relevance_summary(
+    account_name: str,
+    research: Dict[str, str],
+    relevant: Dict[str, Any],
+    existing_relevance: str,
+) -> str:
+    projects = _relevant_projects(relevant)
+    document = _top_relevant_document(relevant)
+    scored_matches = [
+        *[_score_pct(project.get("relevanceScore")) for project in projects],
+        _score_pct((document or {}).get("relevanceScore")),
+    ]
+    scores = [score for score in scored_matches if score is not None]
+    projects_sentence = _project_names_sentence(projects)
+    if scores:
+        score = max(scores)
+        return f"{projects_sentence} Overall relevance: {score}%."
+
+    manual_level = _manual_relevance_value(existing_relevance) or _manual_relevance_value(research.get("relevance", ""))
+    if manual_level:
+        return f"{projects_sentence} Overall relevance: {manual_level}."
+
+    return f"{projects_sentence} Overall relevance score is not available yet for {account_name}."
+
+
+def _enrich_relevance_section(
+    sections: List[Dict[str, str]],
+    *,
+    account_name: str,
+    research: Dict[str, str],
+    relevant: Dict[str, Any],
+) -> List[Dict[str, str]]:
+    enriched: List[Dict[str, str]] = []
+    existing_relevance = next(
+        (section.get("content", "") for section in sections if section.get("id") == "relevance"),
+        "",
+    )
+    mapped_relevance = _kb_relevance_summary(account_name, research, relevant, existing_relevance)
+    for section in sections:
+        if section.get("id") == "relevance":
+            enriched.append(
+                {
+                    "id": "relevance",
+                    "title": SUMMARY_SECTION_TITLES["relevance"],
+                    "content": mapped_relevance,
+                }
+            )
+        else:
+            enriched.append(section)
+    return enriched
 
 
 def _heuristic_artifact_plan(fields: Dict[str, str]) -> List[Dict[str, Any]]:
@@ -359,6 +864,7 @@ def run_pre_dc_pipeline(
     total_cost = 0.0
     trace_id = str(uuid.uuid4())
     model_used = "heuristic"
+    summary_sections: List[Dict[str, str]] = []
 
     if settings.anthropic_configured:
         summary_user = f"Account: {account_name}\nCall ID: {call_id}\nTrigger: {trigger}\nCSV row:\n{fields_blob}"
@@ -368,7 +874,13 @@ def run_pre_dc_pipeline(
             model=model,
             fallback_model=fallback,
         )
-        ai_summary = summary_completion.text.strip()
+        summary_json = _extract_json_block(summary_completion.text)
+        summary_sections = _normalize_summary_sections(summary_json)
+        ai_summary = (
+            "\n\n".join(section["content"] for section in summary_sections)
+            if summary_sections
+            else summary_completion.text.strip()
+        )
         total_tokens += summary_completion.tokens_in + summary_completion.tokens_out
         total_cost += summary_completion.cost_usd
         trace_id = summary_completion.trace_id
@@ -462,6 +974,17 @@ def run_pre_dc_pipeline(
             icp_match = 0.62
 
     relevant = build_relevant_content(ctx, account_name, research)
+    summary_sections = _complete_summary_sections(summary_sections, fields, account_name)
+    summary_sections = _enrich_customer_profile_section(summary_sections, fields, account_name)
+    summary_sections = _enrich_customer_pain_points_section(summary_sections, fields)
+    summary_sections = _enrich_relevance_section(
+        summary_sections,
+        account_name=account_name,
+        research=research,
+        relevant=relevant,
+    )
+    summary_sections = canonicalize_summary_section_titles(summary_sections)
+    ai_summary = "\n\n".join(section["content"] for section in summary_sections)
     recommended_deck = _select_recommended_deck(relevant)
     recommended_deck_slides = (
         [
@@ -481,12 +1004,20 @@ def run_pre_dc_pipeline(
         "callId": call_id,
         "accountName": account_name,
         "aiSummary": ai_summary,
+        "summarySections": summary_sections,
         "dealStage": research.get("deal_stage", "Discovery"),
         "daysSinceLastContact": 0,
         "icpMatch": icp_match,
         "icpNote": icp_bucket or None,
         "newSignals": [research.get("other", "")] if research.get("other") else [],
-        "pains": [{"text": research.get("needs", "Discovery needed"), "confidence": 0.8}],
+        "pains": [
+            {
+                "text": _business_need_text(research.get("needs", ""), allow_plain=True)
+                or _pain_point_text(research.get("intersection", ""), allow_plain=True)
+                or NEEDS_CONTENT_FALLBACK,
+                "confidence": 0.8,
+            }
+        ],
         "objections": [],
         "discovery_questions": [
             f"What does success look like for {account_name} in the next 90 days?",

@@ -16,7 +16,6 @@ import {
   BriefObjectionsCard,
   BriefPainsCard,
   BriefPodNotesCard,
-  BriefSignalsCard,
 } from "@/components/pre-call/brief-widget-cards";
 import { DiscoveryChecklistPanel } from "@/components/live/discovery-checklist-panel";
 import { seedChecklistFromCall } from "@/lib/discovery-checklist-seed";
@@ -30,7 +29,6 @@ export {
   BriefObjectionsCard,
   BriefPainsCard,
   BriefPodNotesCard,
-  BriefSignalsCard,
 } from "@/components/pre-call/brief-widget-cards";
 
 interface BriefSectionsProps {
@@ -58,7 +56,7 @@ export function BriefSections({
         </div>
       )}
 
-      <BriefAISummary brief={brief} />
+      <BriefAISummary brief={brief} call={call} />
 
       <BriefPreDeckPanel deck={brief.preDeck} />
 
@@ -67,8 +65,6 @@ export function BriefSections({
       )}
 
       {brief.postDcPreview && <PostDcBriefPreviewCard preview={brief.postDcPreview} />}
-
-      {brief.newSignals?.length > 0 && <BriefSignalsCard signals={brief.newSignals} />}
 
       <InternalAttendeesCard
         attendees={resolveInternalAttendees(brief.internalAttendees, call)}

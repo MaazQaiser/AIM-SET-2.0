@@ -2,7 +2,6 @@
 
 import { Sparkles, DollarSign, Target, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@dc-copilot/ui/components/card";
-import { AIGeneratedBadge } from "@/components/ai-generated-badge";
 import { useAiTodos } from "@/hooks/use-ai-todos";
 import { useDailyBriefing } from "@/hooks/use-daily-briefing";
 import { useCalls } from "@/lib/data/hooks";
@@ -44,7 +43,7 @@ function buildFallbackParagraph(
 export function DailyBriefingCard({ enabled = true }: { enabled?: boolean }) {
   const { data: calls = [] } = useCalls();
   const { topOpportunityCall, pendingApprovalCount, todos } = useAiTodos();
-  const { data: briefing, isLoading, isError } = useDailyBriefing(enabled);
+  const { data: briefing, isLoading } = useDailyBriefing(enabled);
 
   const today = startOfDay(new Date());
   const todaysCalls = calls.filter(
@@ -67,17 +66,43 @@ export function DailyBriefingCard({ enabled = true }: { enabled?: boolean }) {
       pendingApprovalCount,
       briefsNotReady
     );
-  const isAiGenerated = briefing?.source === "llm" && !isError;
+  const statChips = (
+    <>
+      {revenue && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-3 py-1 type-caption font-semibold text-foreground">
+          <DollarSign className="h-3 w-3 text-warning" />
+          Top opp: {revenue}
+        </span>
+      )}
+      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 type-caption font-medium text-foreground">
+        <Target className="h-3 w-3" />
+        {stage}
+      </span>
+      {todaysCalls.length > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 type-caption text-muted-foreground">
+          {todaysCalls.length} call{todaysCalls.length !== 1 ? "s" : ""} today
+        </span>
+      )}
+      {highPriorityTodos > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-3 py-1 type-caption font-semibold text-destructive">
+          <AlertCircle className="h-3 w-3" />
+          {highPriorityTodos} high-priority action{highPriorityTodos !== 1 ? "s" : ""}
+        </span>
+      )}
+    </>
+  );
 
   return (
     <Card>
       <CardContent className="space-y-4 p-5 pt-5">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-warning" />
-          <span className="type-title text-foreground">Daily briefing</span>
-          {isAiGenerated && (
-            <AIGeneratedBadge model={briefing?.model ?? undefined} />
-          )}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Sparkles className="h-4 w-4 shrink-0 text-warning" />
+            <span className="type-title text-foreground">Daily briefing</span>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+            {statChips}
+          </div>
         </div>
         {isLoading && !briefing ? (
           <div className="space-y-2">
@@ -88,29 +113,6 @@ export function DailyBriefingCard({ enabled = true }: { enabled?: boolean }) {
         ) : (
           <p className="type-body-sm leading-relaxed text-foreground/90">{paragraph}</p>
         )}
-        <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-4">
-          {revenue && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-3 py-1 type-caption font-semibold text-foreground">
-              <DollarSign className="h-3 w-3 text-warning" />
-              Top opp: {revenue}
-            </span>
-          )}
-          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 type-caption font-medium text-foreground">
-            <Target className="h-3 w-3" />
-            {stage}
-          </span>
-          {todaysCalls.length > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 type-caption text-muted-foreground">
-              {todaysCalls.length} call{todaysCalls.length !== 1 ? "s" : ""} today
-            </span>
-          )}
-          {highPriorityTodos > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-3 py-1 type-caption font-semibold text-destructive">
-              <AlertCircle className="h-3 w-3" />
-              {highPriorityTodos} high-priority action{highPriorityTodos !== 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
       </CardContent>
     </Card>
   );

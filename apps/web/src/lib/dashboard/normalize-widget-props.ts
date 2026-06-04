@@ -1,3 +1,4 @@
+import { normalizeSummarySections } from "@dc-copilot/types/brief";
 import type {
   CallBrief,
   PostCallEmailDraft,
@@ -15,6 +16,7 @@ export function arrayLen(value: unknown): number {
 export function normalizeCallBrief(brief: CallBrief): CallBrief {
   return {
     ...brief,
+    summarySections: normalizeSummarySections(brief.summarySections) ?? [],
     newSignals: brief.newSignals ?? [],
     clientAttendees: brief.clientAttendees ?? [],
     internalAttendees: brief.internalAttendees ?? [],

@@ -1,8 +1,9 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-title: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
   --text-display: 2rem;
   --text-display--line-height: 1.1;
@@ -75,8 +76,8 @@
   --background: 205 28% 95%;
   --foreground: 220 15% 14%;
 
-  /* Bottom-left canvas glow — #F6F5EE */
-  --page-hue-glow: 48 30% 95%;
+  /* Bottom-left canvas glow — faint warm tint */
+  --page-hue-glow: 48 14% 94%;
 
   /* Ambient sphere — matches canvas in light flat mode */
   --sphere: 205 28% 95%;

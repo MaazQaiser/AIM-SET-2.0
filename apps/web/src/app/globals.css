@@ -107,30 +107,37 @@ main:has(.call-detail-page) {
   background-color: hsl(var(--background));
 }
 
-.call-detail-page {
-  --background: 205 28% 95%;
-  background-color: #eff3f6;
-  min-height: 100%;
-  font-family: var(--font-urbanist), Urbanist, ui-sans-serif, system-ui, sans-serif;
+/* Live call — fill main; column panels scroll, not the page */
+main:has(.live-call-page) {
+  overflow: hidden;
 }
 
-/* Call detail: glass cards — slightly tighter radius, Urbanist */
+main:has(.live-call-page) > * {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.call-detail-page {
+  min-height: 100%;
+  font-family: var(--font-sans);
+}
+
+/* Call detail: glass cards — slightly tighter radius */
 .call-detail-page .glass-insight-card,
 .call-detail-page .app-card {
   gap: 0;
   overflow: hidden;
   border-radius: 0.75rem;
-  font-family: var(--font-urbanist), Urbanist, ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
-.call-detail-page .glass-insight-card *:not(.font-mono) {
-  font-family: inherit;
-}
-
-/* Urbanist on call-detail chrome (nav, BANT strip, copilot) */
-.call-detail-urbanist,
-.call-detail-urbanist * {
-  font-family: var(--font-urbanist), Urbanist, ui-sans-serif, system-ui, sans-serif;
+/* Call-detail chrome inherits the Inter body font; headings keep the title font. */
+.call-detail-urbanist {
+  font-family: var(--font-sans);
 }
 
 /* Frosted glass — copilot expanded panel */
@@ -369,7 +376,7 @@ main:has(.call-detail-page) {
 }
 
 .call-detail-liquid-glass--dock {
-  font-family: var(--font-urbanist), Urbanist, ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
   color: #111111;
   background:
     linear-gradient(

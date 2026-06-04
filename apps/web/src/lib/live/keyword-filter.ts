@@ -253,6 +253,69 @@ export function filterKeywordTerms(terms: string[]): string[] {
   });
 }
 
+export interface LiveKeywordEntry {
+  term: string;
+  count: number;
+}
+
+/** Top keywords with occurrence counts for the live copilot panel. */
+export function buildLiveKeywordEntries(
+  keywordStats: KeywordStats | null,
+  extraTerms: string[],
+  transcript: { text?: string; keywords?: string[] }[] = []
+): LiveKeywordEntry[] {
+  const counts = new Map<string, LiveKeywordEntry>();
+
+  for (const k of filterKeywordCounts(keywordStats?.global_top ?? [])) {
+    const key = normalizeTerm(k.term);
+    counts.set(key, { term: k.term, count: Math.max(1, k.count) });
+  }
+
+  for (const event of transcript) {
+    for (const raw of event.keywords ?? []) {
+      const key = normalizeTerm(raw);
+      if (!isUsefulLiveKeyword(key)) continue;
+      const existing = counts.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        counts.set(key, { term: raw.trim(), count: 1 });
+      }
+    }
+  }
+
+  for (const raw of extraTerms) {
+    const key = normalizeTerm(raw);
+    if (!isUsefulLiveKeyword(key)) continue;
+    if (counts.has(key)) continue;
+    const fromText = countTermInTranscript(key, transcript);
+    counts.set(key, { term: raw.trim(), count: fromText });
+  }
+
+  return [...counts.values()]
+    .sort((a, b) => b.count - a.count || a.term.localeCompare(b.term))
+    .slice(0, 8);
+}
+
+function countTermInTranscript(
+  normalizedTerm: string,
+  transcript: { text?: string }[]
+): number {
+  if (!normalizedTerm) return 1;
+  let total = 0;
+  const pattern = new RegExp(`\\b${escapeRegExp(normalizedTerm)}\\b`, "gi");
+  for (const event of transcript) {
+    const text = event.text ?? "";
+    const matches = text.match(pattern);
+    if (matches) total += matches.length;
+  }
+  return total > 0 ? total : 1;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export function filterKeywordStats(stats: KeywordStats | null): KeywordStats | null {
   if (!stats) return null;
   const global_top = filterKeywordCounts(stats.global_top);

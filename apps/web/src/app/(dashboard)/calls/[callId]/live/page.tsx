@@ -89,7 +89,8 @@ export default function LiveCallPage({ params }: LivePageParams) {
     intentSnapshot?.intent?.display ?? intentSnapshot?.intent?.label;
 
   return (
-    <LiveCallWorkspace
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <LiveCallWorkspace
       callId={callId}
       call={call}
       brief={brief}
@@ -111,11 +112,11 @@ export default function LiveCallPage({ params }: LivePageParams) {
       sentimentShift={sentimentShift}
       elapsedSeconds={elapsedSeconds}
       isConnected={isConnected}
-      viewerRole={viewerRole}
       activePanel={activePanel}
       onPanelChange={setActivePanel}
       onAcceptNudge={(id) => void handleAcceptNudge(id)}
       onDismissNudge={(id) => void handleDismissNudge(id)}
-    />
+      />
+    </div>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { FileText } from "lucide-react";
+import { LiveCollapsibleSection } from "@/components/live/live-collapsible-section";
 import {
   LiveColumnHeader,
   liveColumnContentPadding,
@@ -18,6 +20,8 @@ interface LiveRunningSummaryBarProps {
   checklist: DiscoveryChecklistState | null;
   transcript: TranscriptEvent[];
   className?: string;
+  /** Inside the live copilot column (top), not the full-width footer bar */
+  embedded?: boolean;
 }
 
 function buildSummary({
@@ -67,6 +71,11 @@ function buildSummary({
   return parts.join(" ");
 }
 
+function summaryPreview(text: string, max = 120): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max).trimEnd()}…`;
+}
+
 export function LiveRunningSummaryBar({
   accountName,
   leadName,
@@ -76,6 +85,7 @@ export function LiveRunningSummaryBar({
   checklist,
   transcript,
   className,
+  embedded = false,
 }: LiveRunningSummaryBarProps) {
   const summary = buildSummary({
     accountName,
@@ -87,8 +97,36 @@ export function LiveRunningSummaryBar({
     transcript,
   });
 
+  const [summaryOpen, setSummaryOpen] = useState(true);
+
+  if (embedded) {
+    return (
+      <div
+        className={cn(
+          "app-card shrink-0 overflow-hidden px-3 py-2",
+          summaryOpen && "flex h-[146px] flex-col",
+          className
+        )}
+      >
+        <LiveCollapsibleSection
+          inset
+          title="Running summary"
+          summary={summaryPreview(summary)}
+          defaultOpen
+          className={summaryOpen ? "flex min-h-0 flex-1 flex-col" : undefined}
+          panelClassName={
+            summaryOpen ? "min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]" : undefined
+          }
+          onOpenChange={setSummaryOpen}
+        >
+          <p className="pt-1 text-sm leading-snug text-foreground">{summary}</p>
+        </LiveCollapsibleSection>
+      </div>
+    );
+  }
+
   return (
-    <div className={cn("shrink-0 bg-card", className)}>
+    <div className={cn("shrink-0", className)}>
       <LiveColumnHeader
         icon={FileText}
         title="Running summary"

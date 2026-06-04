@@ -19,7 +19,7 @@ def _deterministic_tenant_uuid(clerk_key: str) -> str:
 class TenantService:
     """Resolve Clerk org / tenant header to Postgres tenant UUID."""
 
-    def resolve(self, ctx: TenantContext) -> Tuple[str, str]:
+    def resolve(self, ctx: TenantContext, *, allow_memory_fallback: bool = False) -> Tuple[str, str]:
         """
         Returns (tenant_uuid, clerk_key).
         clerk_key is the stable string used for in-memory fallback.
@@ -55,6 +55,10 @@ class TenantService:
             tenant_uuid = run_with_timeout(_resolve_from_db, default=None, timeout_sec=12.0)
             if tenant_uuid:
                 return tenant_uuid, clerk_key
+            if allow_memory_fallback:
+                tid = _deterministic_tenant_uuid(clerk_key)
+                get_memory_store().tenant_uuid_map[clerk_key] = tid
+                return tid, clerk_key
             raise RuntimeError(
                 f"Could not resolve tenant '{clerk_key}' in Supabase. "
                 "Check SUPABASE_URL, service role key, and network connectivity."

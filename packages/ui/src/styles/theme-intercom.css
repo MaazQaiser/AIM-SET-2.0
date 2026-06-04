@@ -4,10 +4,12 @@
  */
 
 .theme-intercom {
-  --font-sans: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-title: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
 
-  /* Canvas & surfaces — subtle warm yellow page floor */
-  --background: 48 56% 97%; /* ~#fdfbf0 */
+  /* Canvas & surfaces — subtle warm page floor */
+  --background: 48 18% 97%; /* ~#f9f8f7 */
+  --page-hue-glow: 48 12% 94%;
   --foreground: 0 0% 7%; /* #111111 */
 
   --card: 0 0% 100%;
@@ -63,18 +65,18 @@
 
 .theme-intercom .page-hue,
 .theme-intercom .app-sidebar-panel {
-  background-color: #fdfbf0;
+  background-color: hsl(var(--background));
 }
 
 .theme-intercom .page-hue::before,
 .theme-intercom .app-sidebar-panel::before {
   background: radial-gradient(
-    ellipse 158% 115% at -10% 108%,
-    #f6f5ee 0%,
-    #f6f5ee 24%,
-    rgb(246 245 238 / 0.88) 50%,
-    rgb(246 245 238 / 0.38) 70%,
-    transparent 85%
+    ellipse 168% 125% at -12% 110%,
+    hsl(var(--page-hue-glow)) 0%,
+    hsl(var(--page-hue-glow)) 28%,
+    hsl(var(--page-hue-glow) / 0.68) 52%,
+    hsl(var(--page-hue-glow) / 0.32) 72%,
+    transparent 92%
   );
   filter: none;
   opacity: 1;
@@ -83,8 +85,8 @@
 .theme-intercom .page-hue::after,
 .theme-intercom .app-sidebar-panel::after {
   content: "";
-  filter: blur(96px);
-  opacity: 0.78;
+  filter: blur(88px);
+  opacity: 0.58;
 }
 
 .theme-intercom .glass-insight-card,
@@ -106,6 +108,7 @@
 }
 
 .theme-intercom .glass-insight-title {
+  font-family: var(--font-title);
   font-size: 14px;
   font-weight: 500;
   line-height: 22px;

@@ -44,7 +44,7 @@ export function DashboardHome() {
       {hasImport ? (
         <>
           <DailyBriefingCard />
-          <div className="grid gap-1.5 lg:grid-cols-[1fr_1.2fr] lg:items-start">
+          <div className="grid gap-3 lg:grid-cols-[1fr_1.2fr] lg:items-stretch">
             <AiTodoList />
             <UnifiedAgenda />
           </div>

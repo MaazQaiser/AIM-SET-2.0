@@ -32,6 +32,31 @@ def _clear_memory(monkeypatch):
 def test_pre_dc_ingest_runs_agent_and_saves_brief(monkeypatch):
     _clear_memory(monkeypatch)
     monkeypatch.setenv("WORKFLOW_AGENT_INGEST_SYNC", "true")
+
+    def fake_relevant_content(_ctx, _account_name, _research):
+        return {
+            "relevantDocuments": [],
+            "relevantProjects": [
+                {
+                    "id": "proj-legacy-portal",
+                    "title": "Legacy Portal Modernization",
+                    "source": "project_database",
+                    "relevanceScore": 0.91,
+                    "summary": "B2B SaaS portal modernization with legacy workflow replacement.",
+                    "details": "The project modernized an older portal and aligned discovery around operational workflow gaps.",
+                },
+                {
+                    "id": "proj-onboarding",
+                    "title": "Customer Onboarding Workflow",
+                    "source": "project_database",
+                    "relevanceScore": 0.82,
+                    "summary": "Customer onboarding workflow automation for a SaaS company.",
+                    "details": "The project improved onboarding workflows and reduced customer friction.",
+                }
+            ],
+        }
+
+    monkeypatch.setattr("app.agents.pre_dc_agent.build_relevant_content", fake_relevant_content)
     get_settings.cache_clear()
 
     payload = {
@@ -43,7 +68,11 @@ def test_pre_dc_ingest_runs_agent_and_saves_brief(monkeypatch):
                     "Company Name-PreDC": "Agent Test Co",
                     "Lead Name-PreDC": "Alex",
                     "Industry - PreDC": "SaaS",
-                    "Have they described their needs": "Modernize legacy portal",
+                    "Company Description": "Agent Test Co is a B2B SaaS company with an older customer portal. Outreach landed the lead from a cold email campaign.",
+                    "Have they described their needs": "Modernize legacy portal. The call was scheduled through a calendar invite.",
+                    "Intersection areas b/w tkxel & company": "Legacy portal friction slows customer onboarding.",
+                    "Other Information": "Brian responded positively and expressed openness to a call, but later clarified that his initial reply went out before he had bandwidth. After multiple follow-up attempts via email and phone, Brian re-engaged and mentioned that he would need investor funding to move forward, though he expressed strong confidence in revenue potential. Scheduling was discussed, Brian requested an NDA and company details, and the meeting has been confirmed.",
+                    "Company Type ICP - PreDC": "B2B SaaS",
                     "ICP Bucket": "Sweet spot",
                 },
             }
@@ -59,10 +88,50 @@ def test_pre_dc_ingest_runs_agent_and_saves_brief(monkeypatch):
     calls = CallsService().list_calls(ctx)
     assert any(c["accountName"] == "Agent Test Co" for c in calls)
 
-    call_id = next(c["id"] for c in calls if c["accountName"] == "Agent Test Co")
+    call = next(c for c in calls if c["accountName"] == "Agent Test Co")
+    assert call.get("companyTypeIcp") == "B2B SaaS"
+    assert call.get("icpBucket") == "Sweet spot"
+    assert call.get("icpMatch") == 0.78
+
+    call_id = call["id"]
     brief = CallsService().get_brief(ctx, call_id)
     assert brief is not None
     assert brief.get("aiSummary")
+    assert [s.get("id") for s in brief.get("summarySections", [])] == [
+        "customer_profile",
+        "customer_pain_points",
+        "suggested_action",
+        "relevance",
+    ]
+    titles = {s["id"]: s["title"] for s in brief["summarySections"]}
+    assert titles["customer_profile"] == "Profile Summary"
+    assert titles["customer_pain_points"] == "Pain Points"
+    profile = next(s for s in brief["summarySections"] if s["id"] == "customer_profile")["content"]
+    assert "Agent Test Co is a B2B SaaS company" in profile
+    assert "Modernize legacy portal" in profile
+    assert "investor funding to move forward" in profile
+    assert "Legacy portal friction slows customer onboarding" not in profile
+    assert "Outreach landed" not in profile
+    assert "cold email" not in profile
+    assert "calendar invite" not in profile
+    assert "Brian responded" not in profile
+    assert "bandwidth" not in profile
+    assert "follow-up attempts" not in profile
+    assert "NDA" not in profile
+    pain_points = next(s for s in brief["summarySections"] if s["id"] == "customer_pain_points")["content"]
+    assert "Legacy portal friction slows customer onboarding" in pain_points
+    assert "Modernize legacy portal" not in pain_points
+    assert "investor funding to move forward" not in pain_points
+    assert "Brian responded" not in pain_points
+    relevance = next(s for s in brief["summarySections"] if s["id"] == "relevance")["content"]
+    assert (
+        relevance
+        == "Relevant projects done: 2 - Legacy Portal Modernization, Customer Onboarding Workflow. Overall relevance: 91%."
+    )
+    assert "Agent Test Co is a B2B SaaS company" not in relevance
+    assert "Legacy Portal Modernization" in relevance
+    assert "Customer Onboarding Workflow" in relevance
+    assert "because" not in relevance.lower()
     assert brief.get("artifactPlan")
     assert isinstance(brief.get("artifactPlan"), list)
     assert len(brief["artifactPlan"]) >= 1
@@ -102,6 +171,10 @@ def test_generate_brief_delegates_to_pre_dc_pipeline(monkeypatch):
     result = gen.json().get("result") or gen.json()
     assert result.get("aiSummary")
     assert result.get("artifactPlan")
+    pain_points = next(s for s in result["summarySections"] if s["id"] == "customer_pain_points")[
+        "content"
+    ]
+    assert pain_points == "Needs/content is not identified yet."
 
 
 def test_workflow_config_includes_default_prompts_and_rules(monkeypatch):

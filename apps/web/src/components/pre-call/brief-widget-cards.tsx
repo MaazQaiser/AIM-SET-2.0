@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Eye, HelpCircle, Presentation, Users } from "lucide-react";
+import { AlertCircle, HelpCircle, Presentation, Users } from "lucide-react";
 import { ConfidenceTag } from "@/components/confidence-tag";
 import { BANTScorecard } from "@/components/bant-scorecard";
-import { Button } from "@/components/ui/button";
-import { KbFileFormatBadge } from "@/components/knowledge/kb-file-format-badge";
-import { KbDocumentViewerDialog } from "@/components/pre-call/kb-document-viewer-dialog";
+import { KbAssetPreview } from "@/components/knowledge/kb-asset-preview";
+import { KbFileFormatIcon } from "@/components/knowledge/kb-file-format-badge";
 import {
   BriefDetailAccordion,
   BriefDetailCard,
@@ -75,9 +74,9 @@ function buildBantProvenance(brief?: CallBrief, call?: Call): { label: string; v
   });
 }
 
-const VISIBLE_QUESTION_ROWS = 3;
-/** ~3 single-line question rows + dividers */
-const QUESTIONS_PEEK_HEIGHT = "14rem";
+/** Questions visible before the card body scrolls (all items still listed). */
+const PEEK_DISCOVERY_QUESTIONS = 2;
+const QUESTIONS_PEEK_HEIGHT = "min(18rem,calc(100vh - 12rem))";
 
 function isPresentationDocument(doc: RelevantDocument): boolean {
   const format = doc.format?.toLowerCase();
@@ -250,29 +249,32 @@ export function BriefPainsCard({ pains }: { pains: HypothesizedPain[] }) {
 }
 
 export function BriefDiscoveryQuestionsCard({ questions }: { questions: string[] }) {
-  const extra = questions.length - VISIBLE_QUESTION_ROWS;
+  const scrolls = questions.length > PEEK_DISCOVERY_QUESTIONS;
+  const hiddenCount = scrolls ? questions.length - PEEK_DISCOVERY_QUESTIONS : 0;
 
   return (
     <BriefDetailCard
       tone="main"
       title="Suggested discovery questions"
       icon={HelpCircle}
-      scrollMaxHeight={questions.length > VISIBLE_QUESTION_ROWS ? QUESTIONS_PEEK_HEIGHT : undefined}
+      scrollMaxHeight={scrolls ? QUESTIONS_PEEK_HEIGHT : undefined}
+      headerExtra={
+        scrolls ? (
+          <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
+            {questions.length} questions
+          </span>
+        ) : null
+      }
       sourceInfo={{
         source: "AI and rules from Pre-DC data",
         detail:
-          "Questions are chosen from the company needs, tech context, and strategic fit so the AE can confirm the most important unknowns.",
+          "Questions are chosen from the company needs, tech context, and strategic fit so the AE can confirm the most important unknowns. Up to five are generated from the Pre-DC import; every question stays in the list — scroll when there are more than two.",
       }}
-      headerExtra={
-        extra > 0 ? (
-          <span className="text-xs text-muted-foreground shrink-0">+{extra} more</span>
-        ) : null
-      }
     >
       <ol className="divide-y divide-border">
         {questions.map((q, i) => (
           <li
-            key={q}
+            key={`${i}-${q.slice(0, 48)}`}
             className="flex gap-3 py-3 min-w-0 first:pt-0 last:pb-0"
           >
             <span className="shrink-0 font-mono text-sm text-primary font-bold w-7 pt-0.5">
@@ -284,6 +286,12 @@ export function BriefDiscoveryQuestionsCard({ questions }: { questions: string[]
           </li>
         ))}
       </ol>
+      {scrolls ? (
+        <p className="pt-2 text-[10px] text-muted-foreground border-t border-border/50 mt-1">
+          {hiddenCount} more question{hiddenCount === 1 ? "" : "s"} below — scroll in this card to
+          read Q{PEEK_DISCOVERY_QUESTIONS + 1}–Q{questions.length}.
+        </p>
+      ) : null}
     </BriefDetailCard>
   );
 }
@@ -342,7 +350,6 @@ export function BriefDeckCard({
   relevantDocuments?: CallBrief["relevantDocuments"];
   callId?: string;
 }) {
-  const [activeDoc, setActiveDoc] = useState<RelevantDocument | null>(null);
   const [fetchedDeck, setFetchedDeck] = useState<RelevantDocument | null>(null);
   const [loadingDeck, setLoadingDeck] = useState(false);
   const localDeck = recommendedDeck ?? (relevantDocuments ?? []).find(isPresentationDocument);
@@ -352,16 +359,19 @@ export function BriefDeckCard({
     if (localDeck || fetchedDeck || !callId) return;
     let cancelled = false;
     setLoadingDeck(true);
-    void fetch(`/api/calls/${callId}/relevant-content`)
-      .then(async (res) => {
+    void (async () => {
+      try {
+        const res = await fetch(`/api/calls/${encodeURIComponent(callId)}/relevant-content`);
         if (!res.ok || cancelled) return;
         const data = (await res.json()) as { relevantDocuments?: RelevantDocument[] };
         const match = (data.relevantDocuments ?? []).find(isPresentationDocument);
         if (!cancelled) setFetchedDeck(match ?? null);
-      })
-      .finally(() => {
+      } catch {
+        if (!cancelled) setFetchedDeck(null);
+      } finally {
         if (!cancelled) setLoadingDeck(false);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -401,44 +411,40 @@ export function BriefDeckCard({
     );
   }
 
-  return (
-    <>
-      <BriefDetailCard
-        tone="main"
-        title="Recommended deck"
-        icon={Presentation}
-        sourceInfo={{
-          source: "Knowledge base",
-          detail:
-            "This deck is selected from KB presentation files. The system chooses one PPT/PPTX with the strongest relevance to the account, needs, and service area.",
-        }}
-      >
-        <BriefDetailRow className="space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1 space-y-2">
-              <KbFileFormatBadge fileName={deck.fileName} mimeType={deck.mimeType} />
-              <p className={cn(briefMainLead, briefMainUnderline, "break-words")}>{deck.title}</p>
-              {deck.snippet ? (
-                <p className={cn(briefMainMuted, "line-clamp-2")}>{deck.snippet}</p>
-              ) : null}
-            </div>
-            <Button type="button" variant="outline" size="sm" onClick={() => setActiveDoc(deck)}>
-              <Eye className="h-3.5 w-3.5" />
-              Preview
-            </Button>
-          </div>
-          <p className="text-[10px] text-muted-foreground">
-            {Math.round(deck.relevanceScore * 100)}% relevance from KB
-          </p>
-        </BriefDetailRow>
-      </BriefDetailCard>
+  const previewAsset = {
+    id: deck.assetId,
+    title: deck.title,
+    fileName: deck.fileName,
+    mimeType: deck.mimeType,
+    status: "ready" as const,
+  };
 
-      <KbDocumentViewerDialog
-        document={activeDoc}
-        open={activeDoc !== null}
-        onOpenChange={(open) => !open && setActiveDoc(null)}
+  return (
+    <BriefDetailCard
+      tone="main"
+      title="Recommended deck"
+      icon={Presentation}
+      sourceInfo={{
+        source: "Knowledge base",
+        detail:
+          "This deck is selected from KB presentation files. The system chooses one PPT/PPTX with the strongest relevance to the account, needs, and service area.",
+      }}
+    >
+      <div className="flex items-start gap-3 min-w-0">
+        <KbFileFormatIcon fileName={deck.fileName} mimeType={deck.mimeType} />
+        <div className="min-w-0 flex-1">
+          <p className={cn(briefMainLead, "font-semibold break-words leading-snug")}>
+            {deck.title}
+          </p>
+        </div>
+      </div>
+      <KbAssetPreview
+        asset={previewAsset}
+        indexedText={deck.previewText ?? deck.snippet}
+        compact
+        className="w-full mt-4"
       />
-    </>
+    </BriefDetailCard>
   );
 }
 

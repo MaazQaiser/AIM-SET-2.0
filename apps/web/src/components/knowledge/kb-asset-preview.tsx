@@ -15,10 +15,12 @@ interface KbAssetPreviewProps {
   >;
   /** Pre-loaded indexed text (e.g. from relevant-content). */
   indexedText?: string;
+  /** Shorter preview for inline cards (e.g. call detail recommended deck). */
+  compact?: boolean;
   className?: string;
 }
 
-export function KbAssetPreview({ asset, indexedText, className }: KbAssetPreviewProps) {
+export function KbAssetPreview({ asset, indexedText, compact = false, className }: KbAssetPreviewProps) {
   const meta = resolveKbFileFormat(asset.fileName, asset.mimeType);
   const isPresentation = isPresentationFormat(meta.format);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
@@ -87,14 +89,15 @@ export function KbAssetPreview({ asset, indexedText, className }: KbAssetPreview
   }, [blobUrl]);
 
   if (isPresentation) {
-    return <KbSlidePreview asset={asset} className={className} />;
+    return <KbSlidePreview asset={asset} compact={compact} className={className} />;
   }
 
   if (loading) {
     return (
       <div
         className={cn(
-          "flex min-h-[420px] items-center justify-center gap-2 text-sm text-muted-foreground rounded-lg border bg-muted/20",
+          "flex items-center justify-center gap-2 text-sm text-muted-foreground rounded-lg border bg-muted/20",
+          compact ? "min-h-[200px]" : "min-h-[420px]",
           className
         )}
       >

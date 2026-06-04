@@ -1,5 +1,7 @@
 "use client";
 
+import { KbPowerPointIcon } from "@/components/knowledge/kb-powerpoint-icon";
+import { isPowerPointFormat } from "@/lib/kb/format-brand-icons";
 import { resolveKbFileFormat, type KbFileFormat } from "@/lib/kb/file-format";
 import { cn } from "@/lib/cn";
 
@@ -12,8 +14,8 @@ interface KbFileTypeIconProps {
 }
 
 const sizeMap = {
-  sm: "h-9 w-9",
-  md: "h-11 w-11",
+  sm: "h-[18px] w-[18px]",
+  md: "h-6 w-6",
 };
 
 function PdfIcon({ className }: { className?: string }) {
@@ -57,29 +59,6 @@ function WordIcon({ className }: { className?: string }) {
         fontFamily="system-ui, sans-serif"
       >
         DOC
-      </text>
-    </svg>
-  );
-}
-
-function PowerPointIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 40" fill="none" className={className} aria-hidden>
-      <path
-        d="M6 0h14.5L28 7.5V38a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2Z"
-        fill="#D24726"
-      />
-      <path d="M20 0v7.5H28L20 0Z" fill="#fff" fillOpacity="0.35" />
-      <text
-        x="16"
-        y="27"
-        textAnchor="middle"
-        fill="#fff"
-        fontSize="8"
-        fontWeight="700"
-        fontFamily="system-ui, sans-serif"
-      >
-        PPT
       </text>
     </svg>
   );
@@ -152,7 +131,7 @@ function iconForFormat(format: KbFileFormat) {
       return WordIcon;
     case "ppt":
     case "pptx":
-      return PowerPointIcon;
+      return null;
     case "csv":
       return CsvIcon;
     case "png":
@@ -173,8 +152,25 @@ export function KbFileTypeIcon({
   size = "md",
 }: KbFileTypeIconProps) {
   const format = formatOverride ?? resolveKbFileFormat(fileName, mimeType).format;
-  const Icon = iconForFormat(format);
   const label = resolveKbFileFormat(fileName, mimeType).label;
+
+  if (isPowerPointFormat(format)) {
+    return (
+      <span
+        className={cn("inline-flex shrink-0 items-center justify-center", className)}
+        title={label}
+        aria-hidden
+      >
+        <KbPowerPointIcon
+          size={size === "sm" ? "sm" : "md"}
+          className={cn(sizeMap[size], "drop-shadow-sm")}
+        />
+      </span>
+    );
+  }
+
+  const Icon = iconForFormat(format);
+  if (!Icon) return null;
 
   return (
     <span

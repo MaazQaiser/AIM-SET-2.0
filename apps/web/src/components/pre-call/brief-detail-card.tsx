@@ -55,12 +55,12 @@ export const BRIEF_MAIN_CARD_SCROLL_MAX = "min(40rem,calc(100vh-10rem))";
 export const BRIEF_RELEVANT_CONTENT_SCROLL_MAX = "min(20rem,calc((100vh - 10rem) / 2))";
 
 const mainCardPadding = {
-  header: "px-9 pt-8 pb-5 sm:px-10",
-  body: "px-9 pb-9 pt-0 sm:px-10",
+  header: "px-5 pt-5 pb-3",
+  body: "px-5 pb-5 pt-0",
 };
 const defaultCardPadding = {
-  header: "px-7 pt-7 pb-4",
-  body: "px-7 pb-7 pt-0",
+  header: "px-5 pt-5 pb-3",
+  body: "px-5 pb-5 pt-0",
 };
 
 export interface BriefDetailCardProps {
@@ -106,7 +106,7 @@ function BriefDetailCardTitleRow({
   const { isIntercom } = useThemePreview();
 
   return (
-    <div className={cn("flex items-start justify-between gap-2 min-w-0", className)}>
+    <div className={cn("flex items-center justify-between gap-3 min-w-0", className)}>
       <CardTitle
         className={cn(
           "font-semibold flex items-center gap-2 min-w-0",
@@ -298,7 +298,7 @@ export function BriefDetailFields({
             className={cn(
               isIntercom
                 ? "text-xs text-[#7b7b78]"
-                : "text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                : "text-xs font-semibold uppercase tracking-wide text-muted-foreground"
             )}
           >
             {row.label}

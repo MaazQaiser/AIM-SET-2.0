@@ -127,7 +127,11 @@ export function ClpEditorScreen({ callId }: ClpEditorScreenProps) {
       </div>
 
       <div className="flex-1 grid lg:grid-cols-2 min-h-0">
-        <div className="border-r p-6 space-y-5 overflow-y-auto">
+        <div className="overflow-y-auto border-r bg-muted/20 p-4">
+          <p className="text-xs text-muted-foreground mb-2">Preview as customer</p>
+          <ClpPublicView page={draft} proposal={proposal ?? null} preview />
+        </div>
+        <div className="p-6 space-y-5 overflow-y-auto">
           <PostDcProposalWidget callId={callId} />
           <ClpSectionEditor draft={draft} onChange={saveDraft} />
           <ClpKbAssetsPanel draft={draft} onChange={saveDraft} />
@@ -137,10 +141,6 @@ export function ClpEditorScreen({ callId }: ClpEditorScreenProps) {
               <p className="text-muted-foreground mt-1">{proposal.title}</p>
             </div>
           )}
-        </div>
-        <div className="overflow-y-auto bg-muted/20 p-4">
-          <p className="text-xs text-muted-foreground mb-2">Preview as customer</p>
-          <ClpPublicView page={draft} proposal={proposal ?? null} preview />
         </div>
       </div>
 
