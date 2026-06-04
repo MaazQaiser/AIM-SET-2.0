@@ -510,7 +510,13 @@ export function applyApiDemoResult(data: Record<string, unknown>) {
         case "sentiment":
           if (typed.payload && typeof typed.payload === "object") {
             const payload = typed.payload as LiveSentimentPayload;
-            store.updateSentiment(payload.ae, payload.customer, payload.shift ?? null);
+            store.updateSentiment(
+              payload.ae,
+              payload.customer,
+              payload.shift ?? null,
+              payload.salesRepTone,
+              payload.customerSentiment
+            );
             if (payload.signal) store.addSentimentSignal(payload.signal);
           }
           break;

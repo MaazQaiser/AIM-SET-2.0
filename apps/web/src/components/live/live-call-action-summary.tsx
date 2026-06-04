@@ -134,7 +134,7 @@ export function LiveCallActionSummary({
   if (!hasLiveSignals) return null;
 
   const summaryParts = [
-    `${scoreEmoji(sentimentAE)} AE`,
+    `${scoreEmoji(sentimentAE)} Rep tone`,
     `${scoreEmoji(sentimentCustomer)} Customer`,
     intentDisplay,
     bantPct != null ? `${bantPct}% BANT` : null,

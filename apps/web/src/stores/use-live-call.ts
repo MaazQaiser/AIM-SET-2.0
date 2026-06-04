@@ -3,9 +3,11 @@ import { filterKeywordStats } from "@/lib/live/keyword-filter";
 import type {
   TranscriptEvent,
   NudgePayload,
+  CustomerSentimentCue,
   IntentSnapshot,
   KeywordStats,
   ObjectionPayload,
+  SalesRepToneCue,
   SentimentSignal,
   SentimentShift,
   SurfacedKbAsset,
@@ -23,7 +25,9 @@ interface LiveCallState {
   sentimentSignals: SentimentSignal[];
   elapsedSeconds: number;
   sentimentAE: number;
+  salesRepTone: SalesRepToneCue | null;
   sentimentCustomer: number;
+  customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
   intentSnapshot: IntentSnapshot | null;
   keywordStats: KeywordStats | null;
@@ -42,7 +46,13 @@ interface LiveCallState {
   addSentimentSignal: (signal: SentimentSignal) => void;
   dismissNudge: (id: string) => void;
   acceptNudge: (id: string) => void;
-  updateSentiment: (ae: number, customer: number, shift?: SentimentShift | null) => void;
+  updateSentiment: (
+    ae: number,
+    customer: number,
+    shift?: SentimentShift | null,
+    salesRepTone?: SalesRepToneCue | null,
+    customerSentiment?: CustomerSentimentCue | null
+  ) => void;
   applyIntentUpdate: (payload: IntentSnapshot) => void;
   applyKeywordStats: (stats: KeywordStats) => void;
   applyChecklistUpdate: (state: DiscoveryChecklistState) => void;
@@ -63,7 +73,9 @@ const initialState = {
   sentimentSignals: [],
   elapsedSeconds: 0,
   sentimentAE: 0,
+  salesRepTone: null,
   sentimentCustomer: 0,
+  customerSentiment: null,
   sentimentShift: null,
   intentSnapshot: null,
   keywordStats: null,
@@ -115,6 +127,16 @@ function hasChecklistShape(state: DiscoveryChecklistState): boolean {
     typeof candidate.bant === "object" &&
     Array.isArray(candidate.openGaps)
   );
+}
+
+function normalizeSentimentSignal(signal: SentimentSignal): SentimentSignal {
+  if (/^AE sentiment:/i.test(signal.label)) {
+    return {
+      ...signal,
+      label: signal.label.replace(/^AE sentiment:/i, "Sales rep tone:"),
+    };
+  }
+  return signal;
 }
 
 function mergeTranscriptEvent(
@@ -173,7 +195,12 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
 
   addSentimentSignal: (signal) =>
     set((s) => ({
-      sentimentSignals: upsertCapped(s.sentimentSignals, signal, (item) => item.id, 20),
+      sentimentSignals: upsertCapped(
+        s.sentimentSignals,
+        normalizeSentimentSignal(signal),
+        (item) => item.id,
+        20
+      ),
     })),
 
   dismissNudge: (id) =>
@@ -182,11 +209,19 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
   acceptNudge: (id) =>
     set((s) => ({ pendingNudges: s.pendingNudges.filter((n) => n.id !== id) })),
 
-  updateSentiment: (sentimentAE, sentimentCustomer, shift) =>
+  updateSentiment: (
+    sentimentAE,
+    sentimentCustomer,
+    shift,
+    salesRepTone,
+    customerSentiment
+  ) =>
     set({
       sentimentAE,
       sentimentCustomer,
       ...(shift !== undefined ? { sentimentShift: shift ?? null } : {}),
+      ...(salesRepTone !== undefined ? { salesRepTone } : {}),
+      ...(customerSentiment !== undefined ? { customerSentiment } : {}),
     }),
 
   applyIntentUpdate: (payload) => {

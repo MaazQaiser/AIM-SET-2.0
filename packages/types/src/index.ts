@@ -127,11 +127,27 @@ export interface SentimentSignal {
   snippet?: string;
 }
 
+export interface SalesRepToneCue {
+  label: string;
+  guidance: string;
+  tone: "positive" | "negative" | "neutral";
+  source?: string;
+}
+
+export interface CustomerSentimentCue {
+  label: string;
+  guidance: string;
+  tone: "positive" | "negative" | "neutral";
+  source?: string;
+}
+
 export interface LiveSentimentPayload {
   ae: number;
   customer: number;
   shift?: SentimentShift | null;
   signal?: SentimentSignal | null;
+  salesRepTone?: SalesRepToneCue | null;
+  customerSentiment?: CustomerSentimentCue | null;
 }
 
 export interface SurfacedKbAsset {

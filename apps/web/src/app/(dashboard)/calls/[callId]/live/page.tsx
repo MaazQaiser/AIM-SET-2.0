@@ -35,7 +35,9 @@ export default function LiveCallPage({ params }: LivePageParams) {
   const intentSnapshot = useLiveCall((s) => s.intentSnapshot);
   const keywordStats = useLiveCall((s) => s.keywordStats);
   const sentimentAE = useLiveCall((s) => s.sentimentAE);
+  const salesRepTone = useLiveCall((s) => s.salesRepTone);
   const sentimentCustomer = useLiveCall((s) => s.sentimentCustomer);
+  const customerSentiment = useLiveCall((s) => s.customerSentiment);
   const sentimentShift = useLiveCall((s) => s.sentimentShift);
   const sentimentSignals = useLiveCall((s) => s.sentimentSignals);
   const isConnected = useLiveCall((s) => s.isConnected);
@@ -110,7 +112,9 @@ export default function LiveCallPage({ params }: LivePageParams) {
       intentSnapshot={intentSnapshot}
       keywordStats={keywordStats}
       sentimentAE={sentimentAE}
+      salesRepTone={salesRepTone}
       sentimentCustomer={sentimentCustomer}
+      customerSentiment={customerSentiment}
       sentimentShift={sentimentShift}
       sentimentSignals={sentimentSignals}
       elapsedSeconds={elapsedSeconds}

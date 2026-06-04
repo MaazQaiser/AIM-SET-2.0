@@ -36,17 +36,35 @@ describe("useLiveCall live page state regressions", () => {
   });
 
   it("applies live sentiment payloads used by the metrics rail", () => {
-    useLiveCall.getState().updateSentiment(0.25, -0.5, {
-      direction: "negative",
-      from_score: 0.1,
-      to_score: -0.5,
-      timestamp: 40,
-      message: "Customer sentiment shifted toward negative.",
-    });
+    useLiveCall.getState().updateSentiment(
+      0.25,
+      -0.5,
+      {
+        direction: "negative",
+        from_score: 0.1,
+        to_score: -0.5,
+        timestamp: 40,
+        message: "Customer sentiment shifted toward negative.",
+      },
+      {
+        label: "Empathetic discovery",
+        guidance: "Mirror the buyer's words, then ask one concise follow-up.",
+        tone: "positive",
+        source: "live-call-agent",
+      },
+      {
+        label: "Decision risk",
+        guidance: "Clarify the doubt before advancing.",
+        tone: "negative",
+        source: "live-call-agent",
+      }
+    );
 
     const state = useLiveCall.getState();
     expect(state.sentimentAE).toBe(0.25);
+    expect(state.salesRepTone?.label).toBe("Empathetic discovery");
     expect(state.sentimentCustomer).toBe(-0.5);
+    expect(state.customerSentiment?.label).toBe("Decision risk");
     expect(state.sentimentShift?.direction).toBe("negative");
   });
 
@@ -73,13 +91,31 @@ describe("useLiveCall live page state regressions", () => {
       ws_messages: [
         {
           type: "sentiment",
-          payload: { ae: 0.1, customer: -0.5, shift: null },
+          payload: {
+            ae: 0.1,
+            customer: -0.5,
+            shift: null,
+            salesRepTone: {
+              label: "Focused discovery",
+              guidance: "Keep the question short and tied to the buyer's last point.",
+              tone: "positive",
+              source: "live-call-agent",
+            },
+            customerSentiment: {
+              label: "Pain exposed",
+              guidance: "Validate impact and connect the next answer to that outcome.",
+              tone: "negative",
+              source: "live-call-agent",
+            },
+          },
         },
       ],
     });
 
     expect(useLiveCall.getState().sentimentCustomer).toBe(-0.5);
     expect(useLiveCall.getState().sentimentAE).toBe(0.1);
+    expect(useLiveCall.getState().salesRepTone?.label).toBe("Focused discovery");
+    expect(useLiveCall.getState().customerSentiment?.label).toBe("Pain exposed");
   });
 
   it("keeps sentiment signals from API demo fallback websocket messages", () => {
@@ -124,6 +160,23 @@ describe("useLiveCall live page state regressions", () => {
     expect(state.sentimentSignals[0].tone).toBe("negative");
     expect(state.sentimentSignals[0].snippet).toContain("not sure");
     expect(state.sentimentSignals[1].tone).toBe("positive");
+  });
+
+  it("normalizes legacy AE sentiment signal labels", () => {
+    useLiveCall.getState().addSentimentSignal({
+      id: "sentiment-ae-legacy",
+      label: "AE sentiment: concern",
+      timestamp: 12,
+      speakerRole: "ae",
+      speakerName: "Sarah",
+      tone: "negative",
+      score: -0.5,
+      snippet: "This is getting risky.",
+    });
+
+    const [signal] = useLiveCall.getState().sentimentSignals;
+    expect(signal.label).toBe("Sales rep tone: concern");
+    expect(signal.label).not.toContain("AE");
   });
 
   it("applies enriched transcript and sentiment from API demo fallback messages", () => {

@@ -125,7 +125,9 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
                 store.updateSentiment(
                   msg.payload.ae,
                   msg.payload.customer,
-                  msg.payload.shift ?? null
+                  msg.payload.shift ?? null,
+                  msg.payload.salesRepTone,
+                  msg.payload.customerSentiment
                 );
                 if (msg.payload.signal) {
                   store.addSentimentSignal(msg.payload.signal);

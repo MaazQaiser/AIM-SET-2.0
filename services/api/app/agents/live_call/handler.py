@@ -238,6 +238,10 @@ def handle_transcript_segment(
             payload["shift"] = sent["shift"]
         if sent.get("signal"):
             payload["signal"] = sent["signal"]
+        if sent.get("salesRepTone"):
+            payload["salesRepTone"] = sent["salesRepTone"]
+        if sent.get("customerSentiment"):
+            payload["customerSentiment"] = sent["customerSentiment"]
         ws_messages.append({"type": "sentiment", "payload": payload})
         if sent.get("signal"):
             ws_messages.append({"type": "sentiment_signal", "payload": sent["signal"]})

@@ -2,18 +2,22 @@
 
 import {
   formatSentimentScore,
+  resolveCustomerSentimentCue,
+  resolveSalesRepToneCue,
   scoreEmoji,
   scoreToTone,
   shiftDirectionEmoji,
   shiftEmoji,
   toneEmoji,
 } from "@/lib/live/sentiment-display";
-import type { SentimentShift } from "@/types";
+import type { CustomerSentimentCue, SalesRepToneCue, SentimentShift } from "@/types";
 import { cn } from "@/lib/cn";
 
 interface SentimentDisplayPanelProps {
   aeScore: number;
+  salesRepTone?: SalesRepToneCue | null;
   customerScore: number;
+  customerSentiment?: CustomerSentimentCue | null;
   shift?: SentimentShift | null;
   className?: string;
 }
@@ -21,11 +25,17 @@ interface SentimentDisplayPanelProps {
 function SentimentChip({
   label,
   score,
+  value,
+  helper,
+  toneOverride,
 }: {
   label: string;
   score: number;
+  value?: string;
+  helper?: string;
+  toneOverride?: ReturnType<typeof scoreToTone>;
 }) {
-  const tone = scoreToTone(score);
+  const tone = toneOverride ?? scoreToTone(score);
   return (
     <div
       className={cn(
@@ -42,9 +52,12 @@ function SentimentChip({
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           {label}
         </p>
-        <p className="text-xs font-medium text-foreground truncate">
-          {toneEmoji(tone)} {formatSentimentScore(score)}
+        <p className="text-xs font-medium text-foreground leading-snug">
+          {toneEmoji(tone)} {value ?? formatSentimentScore(score)}
         </p>
+        {helper && (
+          <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">{helper}</p>
+        )}
       </div>
     </div>
   );
@@ -52,15 +65,31 @@ function SentimentChip({
 
 export function SentimentDisplayPanel({
   aeScore,
+  salesRepTone,
   customerScore,
+  customerSentiment,
   shift,
   className,
 }: SentimentDisplayPanelProps) {
+  const repToneCue = resolveSalesRepToneCue(aeScore, salesRepTone);
+  const customerCue = resolveCustomerSentimentCue(customerScore, customerSentiment);
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="grid grid-cols-2 gap-2">
-        <SentimentChip label="AE" score={aeScore} />
-        <SentimentChip label="Customer" score={customerScore} />
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <SentimentChip
+          label="Sales rep tone"
+          score={aeScore}
+          value={repToneCue.label}
+          helper={repToneCue.guidance}
+          toneOverride={repToneCue.tone}
+        />
+        <SentimentChip
+          label="Customer"
+          score={customerScore}
+          value={customerCue.label}
+          helper={customerCue.guidance}
+          toneOverride={customerCue.tone}
+        />
       </div>
       {shift && (
         <output

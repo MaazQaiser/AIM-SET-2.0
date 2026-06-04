@@ -24,11 +24,13 @@ import type { CallBrief } from "@/lib/brief-types";
 import type { BantSignal, DiscoveryChecklistState } from "@dc-copilot/types";
 import type {
   Call,
+  CustomerSentimentCue,
   IntentSnapshot,
   KeywordStats,
   NudgePayload,
   ObjectionPayload,
   PodRole,
+  SalesRepToneCue,
   SentimentSignal,
   SentimentShift,
   SuggestionLogEntry,
@@ -57,25 +59,141 @@ interface AssistantFeedItem {
   onDismiss?: () => void;
 }
 
+function compactAssistantText(value: string): string {
+  return value
+    .replace(/[“”]/g, "\"")
+    .replace(/[’]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function assistantDedupeKey(value: string): string {
+  return compactAssistantText(value).toLowerCase();
+}
+
+function truncateForAssistant(value: string, max = 110): string {
+  const clean = compactAssistantText(value);
+  return clean.length > max ? `${clean.slice(0, max - 3)}...` : clean;
+}
+
+function intentDisplay(snapshot: IntentSnapshot | null): string | null {
+  const intent = snapshot?.intent;
+  const label = intent?.display ?? intent?.label?.replace(/_/g, " ");
+  return label ? compactAssistantText(label) : null;
+}
+
+function nextGapAction(checklist: DiscoveryChecklistState | null): string | null {
+  const gaps = checklist?.openGaps ?? [];
+  if (gaps.includes("authority")) {
+    return "Next move: identify who owns approval and who signs off.";
+  }
+  if (gaps.includes("budget")) {
+    return "Next move: confirm budget range and approval path.";
+  }
+  if (gaps.includes("timeline")) {
+    return "Next move: pin down target date, urgency, and rollout milestone.";
+  }
+  if (gaps.includes("next_step")) {
+    return "Next move: lock a follow-up with the right attendees.";
+  }
+  return null;
+}
+
+function buildLiveIntentAssistance({
+  intentSnapshot,
+  customerSentiment,
+  transcript,
+  checklist,
+}: {
+  intentSnapshot: IntentSnapshot | null;
+  customerSentiment: CustomerSentimentCue | null;
+  transcript: TranscriptEvent[];
+  checklist: DiscoveryChecklistState | null;
+}): AssistantFeedItem | null {
+  const lastCustomer = [...transcript].reverse().find((event) => event.speakerRole === "customer");
+  const latestPain = intentSnapshot?.pains?.at(-1)?.text;
+  const currentIntent = intentDisplay(intentSnapshot);
+
+  if (!lastCustomer && !latestPain && !currentIntent && !customerSentiment) return null;
+
+  const headline = customerSentiment?.label ?? currentIntent ?? "Customer intent emerging";
+  const evidence = latestPain ?? lastCustomer?.text;
+  const guidance =
+    customerSentiment?.guidance ??
+    intentSnapshot?.next_actions?.[0] ??
+    nextGapAction(checklist) ??
+    "Keep discovery open and ask one focused question tied to the customer's last point.";
+  const nextAction = intentSnapshot?.next_actions?.[0] ?? nextGapAction(checklist);
+
+  const messageParts = [`Customer intent: ${headline}.`];
+  if (currentIntent && currentIntent.toLowerCase() !== headline.toLowerCase()) {
+    messageParts.push(`Thread: ${currentIntent}.`);
+  }
+  if (evidence) {
+    messageParts.push(`Signal: "${truncateForAssistant(evidence, 96)}".`);
+  }
+  messageParts.push(guidance);
+  if (nextAction && nextAction !== guidance) {
+    messageParts.push(nextAction);
+  }
+
+  return {
+    id: `live-intent-${lastCustomer?.id ?? headline}`,
+    kind: customerSentiment?.tone === "negative" ? "alert" : "insight",
+    message: messageParts.join(" "),
+    contextLabel: "Customer intent",
+    actionLabel: "Copy note",
+    role: "ae",
+    onAction: () => {
+      void navigator.clipboard.writeText(messageParts.join(" "));
+      toast.success("Copied to clipboard");
+    },
+  };
+}
+
 function buildAssistantFeed({
   nudges,
   objections,
   unansweredQuestions,
+  intentSnapshot,
+  customerSentiment,
+  transcript,
+  checklist,
   onAcceptNudge,
   onDismissNudge,
 }: {
   nudges: NudgePayload[];
   objections: ObjectionPayload[];
   unansweredQuestions: UnansweredQuestionPayload[];
+  intentSnapshot: IntentSnapshot | null;
+  customerSentiment: CustomerSentimentCue | null;
+  transcript: TranscriptEvent[];
+  checklist: DiscoveryChecklistState | null;
   onAcceptNudge: (id: string) => void;
   onDismissNudge: (id: string) => void;
 }): AssistantFeedItem[] {
   const items: AssistantFeedItem[] = [];
+  const seen = new Set<string>();
+  const addItem = (item: AssistantFeedItem) => {
+    const key = assistantDedupeKey(item.message);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    items.push(item);
+  };
+
+  const liveIntentItem = buildLiveIntentAssistance({
+    intentSnapshot,
+    customerSentiment,
+    transcript,
+    checklist,
+  });
+  if (liveIntentItem) addItem(liveIntentItem);
 
   for (const n of nudges) {
+    if (liveIntentItem && /^customer raised:/i.test(n.message)) continue;
     const kind: AssistantCardKind =
       n.source === "discovery-checklist" ? "question" : "insight";
-    items.push({
+    addItem({
       id: n.id,
       kind,
       message: n.message,
@@ -94,7 +212,7 @@ function buildAssistantFeed({
   }
 
   for (const o of objections.slice(-3)) {
-    items.push({
+    addItem({
       id: `objection-${o.id ?? o.objection_text}`,
       kind: "alert",
       message: o.objection_text,
@@ -105,7 +223,7 @@ function buildAssistantFeed({
   }
 
   for (const q of unansweredQuestions.slice(-3)) {
-    items.push({
+    addItem({
       id: `question-${q.id ?? q.text}`,
       kind: "question",
       message: q.text,
@@ -157,7 +275,9 @@ export interface LiveCallWorkspaceProps {
   intentSnapshot: IntentSnapshot | null;
   keywordStats: KeywordStats | null;
   sentimentAE: number;
+  salesRepTone: SalesRepToneCue | null;
   sentimentCustomer: number;
+  customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
   sentimentSignals: SentimentSignal[];
   elapsedSeconds: number;
@@ -188,7 +308,9 @@ export function LiveCallWorkspace({
   intentSnapshot,
   keywordStats,
   sentimentAE,
+  salesRepTone,
   sentimentCustomer,
+  customerSentiment,
   sentimentShift,
   sentimentSignals,
   elapsedSeconds,
@@ -214,6 +336,10 @@ export function LiveCallWorkspace({
       nudges: visibleNudges,
       objections,
       unansweredQuestions,
+      intentSnapshot,
+      customerSentiment,
+      transcript,
+      checklist,
       onAcceptNudge,
       onDismissNudge,
     });
@@ -225,6 +351,10 @@ export function LiveCallWorkspace({
     visibleNudges,
     objections,
     unansweredQuestions,
+    intentSnapshot,
+    customerSentiment,
+    transcript,
+    checklist,
     onAcceptNudge,
     onDismissNudge,
     assistantScope,
@@ -320,7 +450,9 @@ export function LiveCallWorkspace({
           keywords={keywords}
           transcript={transcript}
           sentimentAE={sentimentAE}
+          salesRepTone={salesRepTone}
           sentimentCustomer={sentimentCustomer}
+          customerSentiment={customerSentiment}
           sentimentShift={sentimentShift}
           sentimentSignals={sentimentSignals}
           openGaps={openGaps}

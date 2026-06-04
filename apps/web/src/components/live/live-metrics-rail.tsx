@@ -2,10 +2,17 @@
 
 import { useMemo } from "react";
 import { filterKeywordCounts } from "@/lib/live/keyword-filter";
-import { formatSentimentScore, scoreToTone } from "@/lib/live/sentiment-display";
+import {
+  formatSentimentScore,
+  resolveCustomerSentimentCue,
+  resolveSalesRepToneCue,
+  scoreToTone,
+} from "@/lib/live/sentiment-display";
 import type { BantSignal, DiscoveryChecklistState } from "@dc-copilot/types";
 import type {
   KeywordStats,
+  CustomerSentimentCue,
+  SalesRepToneCue,
   SentimentSignal,
   SentimentShift,
   SuggestionLogEntry,
@@ -25,6 +32,12 @@ type SentimentBar = {
   id: string;
   tone: SentimentTone;
   current?: boolean;
+};
+type SentimentDecisionVariant = "advance" | "probe" | "recover" | "reset";
+type SentimentDecisionCue = {
+  title: string;
+  detail: string;
+  variant: SentimentDecisionVariant;
 };
 
 const bantLabels: Record<BantKey, string> = {
@@ -56,7 +69,9 @@ interface LiveMetricsRailProps {
   keywords: string[];
   transcript: TranscriptEvent[];
   sentimentAE: number;
+  salesRepTone: SalesRepToneCue | null;
   sentimentCustomer: number;
+  customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
   sentimentSignals: SentimentSignal[];
   openGaps: string[];
@@ -198,33 +213,127 @@ function scoreTextClass(score: number): string {
   return "text-muted-foreground";
 }
 
-function scoreTileClass(score: number): string {
-  const tone = scoreToTone(score);
+function scoreTileClass(score: number, toneOverride?: SentimentTone): string {
+  const tone = toneOverride ?? scoreToTone(score);
   if (tone === "positive") return "border-success/35 bg-success/5";
   if (tone === "negative") return "border-destructive/35 bg-destructive/5";
   return "border-border bg-muted/20";
 }
 
 function SentimentScoreRow({
+  id,
   label,
   score,
+  helper,
+  value,
+  toneOverride,
 }: {
+  id: string;
   label: string;
   score: number;
+  helper: string;
+  value?: string;
+  toneOverride?: SentimentTone;
 }) {
-  const tone = scoreToTone(score);
+  const tone = toneOverride ?? scoreToTone(score);
   return (
     <div
-      className={cn("min-w-0 rounded-md border px-2 py-1.5", scoreTileClass(score))}
-      data-sentiment-label={label.toLowerCase()}
+      className={cn(
+        "min-w-0 rounded-md border px-2.5 py-2",
+        scoreTileClass(score, toneOverride)
+      )}
+      data-sentiment-label={id}
       data-sentiment-tone={tone}
     >
       <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className={cn("truncate text-[11px] font-semibold", scoreTextClass(score))}>
-        {formatSentimentScore(score)}
+      <p
+        className={cn(
+          "text-[11px] font-semibold leading-snug",
+          value ? "break-words" : "truncate",
+          tone === "positive" && "text-success",
+          tone === "negative" && "text-destructive",
+          tone === "neutral" && "text-muted-foreground"
+        )}
+      >
+        {value ?? formatSentimentScore(score)}
       </p>
+      <p className="mt-0.5 text-[10px] leading-snug text-foreground/70">{helper}</p>
+    </div>
+  );
+}
+
+function sentimentDecisionCue(
+  customerScore: number,
+  repScore: number,
+  shift: SentimentShift | null
+): SentimentDecisionCue {
+  const customerTone = scoreToTone(customerScore);
+  const repTone = scoreToTone(repScore);
+
+  if (shift?.direction === "negative" || customerTone === "negative") {
+    return {
+      title: "Recover trust",
+      detail:
+        "Acknowledge the concern, ask what outcome is at risk, then tie the next answer to that issue.",
+      variant: "recover",
+    };
+  }
+
+  if (repTone === "negative") {
+    return {
+      title: "Reset your delivery",
+      detail:
+        "Slow down and make the next response concise, buyer-centered, and tied to the customer's words.",
+      variant: "reset",
+    };
+  }
+
+  if (customerTone === "positive") {
+    return {
+      title: "Advance the deal",
+      detail:
+        "Confirm decision criteria, owner, and a next-step date while buyer confidence is high.",
+      variant: "advance",
+    };
+  }
+
+  return {
+    title: "Keep discovery open",
+    detail: "Ask one focused question to surface risk, decision owner, budget, or timeline.",
+    variant: "probe",
+  };
+}
+
+function SentimentDecisionHint({
+  customerScore,
+  repScore,
+  shift,
+}: {
+  customerScore: number;
+  repScore: number;
+  shift: SentimentShift | null;
+}) {
+  const cue = sentimentDecisionCue(customerScore, repScore, shift);
+  return (
+    <div
+      className={cn(
+        "mb-2 rounded-md border px-2.5 py-2",
+        cue.variant === "advance" && "border-success/35 bg-success/5",
+        cue.variant === "recover" && "border-destructive/35 bg-destructive/5",
+        cue.variant === "reset" &&
+          "border-amber-200/70 bg-amber-50/40 dark:border-amber-900/50 dark:bg-amber-950/20",
+        cue.variant === "probe" && "border-border bg-muted/20"
+      )}
+      data-testid="sentiment-decision-cue"
+      data-sentiment-decision={cue.variant}
+    >
+      <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Recommended move
+      </p>
+      <p className="mt-0.5 text-xs font-semibold text-foreground">{cue.title}</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-foreground/75">{cue.detail}</p>
     </div>
   );
 }
@@ -239,6 +348,17 @@ function sentimentSignalTextClass(tone: SentimentSignal["tone"]): string {
   if (tone === "positive") return "text-success";
   if (tone === "negative") return "text-destructive";
   return "text-muted-foreground";
+}
+
+function sentimentSignalValue(signal: SentimentSignal): string {
+  if (signal.speakerRole !== "customer" || /^Sales rep tone:/i.test(signal.label)) {
+    if (signal.tone === "positive") return "On track";
+    if (signal.tone === "negative") return "Adjust";
+    return "Neutral";
+  }
+  if (signal.tone === "positive") return "Confidence";
+  if (signal.tone === "negative") return "Concern";
+  return "Neutral";
 }
 
 function SentimentSignalLog({ signals }: { signals: SentimentSignal[] }) {
@@ -267,7 +387,7 @@ function SentimentSignalLog({ signals }: { signals: SentimentSignal[] }) {
                 sentimentSignalTextClass(signal.tone)
               )}
             >
-              {formatSentimentScore(signal.score)}
+              {sentimentSignalValue(signal)}
             </span>
           </div>
           {signal.snippet && (
@@ -287,7 +407,9 @@ export function LiveMetricsRail({
   keywords,
   transcript,
   sentimentAE,
+  salesRepTone,
   sentimentCustomer,
+  customerSentiment,
   sentimentShift,
   sentimentSignals,
   openGaps,
@@ -309,6 +431,9 @@ export function LiveMetricsRail({
     });
     return gapLabels.slice(0, 6);
   }, [openGaps, checklist]);
+
+  const repToneCue = resolveSalesRepToneCue(sentimentAE, salesRepTone);
+  const customerCue = resolveCustomerSentimentCue(sentimentCustomer, customerSentiment);
 
   return (
     <div className={cn("flex flex-col gap-5", className)}>
@@ -347,10 +472,29 @@ export function LiveMetricsRail({
 
       <section data-testid="sentiment-section">
         <LiveSubsectionHeader title="Sentiment" />
-        <div className="mb-2 grid grid-cols-2 gap-2">
-          <SentimentScoreRow label="Customer" score={sentimentCustomer} />
-          <SentimentScoreRow label="AE" score={sentimentAE} />
+        <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <SentimentScoreRow
+            id="customer"
+            label="Customer"
+            score={sentimentCustomer}
+            value={customerCue.label}
+            helper={customerCue.guidance}
+            toneOverride={customerCue.tone}
+          />
+          <SentimentScoreRow
+            id="sales-rep"
+            label="Sales rep tone"
+            score={sentimentAE}
+            value={repToneCue.label}
+            helper={repToneCue.guidance}
+            toneOverride={repToneCue.tone}
+          />
         </div>
+        <SentimentDecisionHint
+          customerScore={sentimentCustomer}
+          repScore={sentimentAE}
+          shift={sentimentShift}
+        />
         {sentimentShift && (
           <p className="mb-2 text-[11px] leading-snug text-muted-foreground">
             Shift:{" "}
