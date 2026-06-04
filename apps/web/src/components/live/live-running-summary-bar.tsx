@@ -72,11 +72,6 @@ function buildSummary({
   return parts.join(" ");
 }
 
-function summaryPreview(text: string, max = 120): string {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max).trimEnd()}…`;
-}
-
 export function LiveRunningSummaryBar({
   accountName,
   leadName,
@@ -112,7 +107,6 @@ export function LiveRunningSummaryBar({
         <LiveCollapsibleSection
           inset
           title="Running summary"
-          summary={summaryPreview(summary)}
           defaultOpen
           className={summaryOpen ? "flex min-h-0 flex-1 flex-col" : undefined}
           panelClassName={
@@ -120,7 +114,7 @@ export function LiveRunningSummaryBar({
           }
           onOpenChange={setSummaryOpen}
         >
-          <p className="pt-1 text-sm leading-snug text-foreground">{summary}</p>
+          <p className="pt-1 text-sm leading-snug text-foreground break-words">{summary}</p>
         </LiveCollapsibleSection>
       </div>
     );

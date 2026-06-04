@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Mic } from "lucide-react";
+import { Activity, Mic } from "lucide-react";
 import { Card } from "@dc-copilot/ui/components/card";
 import { BotChatPanel } from "@/components/bot-chat-panel";
 import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
@@ -12,6 +12,7 @@ import {
 } from "@/components/live/live-column-header";
 import type { AssistantCardKind } from "@/components/live/live-assistant-card";
 import { LiveInsightsPanel } from "@/components/live/live-insights-panel";
+import { LiveKeywordsBar, LiveSentimentBar, LiveSignalLogs } from "@/components/live/live-metrics-rail";
 import { LiveCallPageHeader } from "@/components/live/live-call-page-header";
 import { LiveRunningSummaryBar } from "@/components/live/live-running-summary-bar";
 import { PostDcReviewScreen } from "@/components/post-dc/post-dc-review-screen";
@@ -141,7 +142,7 @@ export interface LiveCallWorkspaceProps {
   elapsedSeconds: number;
   isConnected: boolean;
   activePanel: string | null;
-  onPanelChange: (panel: "transcript" | "insights" | "chat" | "wrap-up") => void;
+  onPanelChange: (panel: "transcript" | "signals" | "insights" | "chat" | "wrap-up") => void;
   onAcceptNudge: (id: string) => void;
   onDismissNudge: (id: string) => void;
 }
@@ -249,18 +250,61 @@ export function LiveCallWorkspace({
       pains={intentSnapshot?.pains ?? []}
       checklist={checklist}
       transcript={transcript}
+      className="min-w-0"
     />
   );
 
-  const insightsColumn = (
-    <div className="flex h-full min-h-0 w-[400px] shrink-0 flex-col gap-4 overflow-hidden">
+  const liveInsightsMetrics = (
+    <>
+      <LiveKeywordsBar
+        keywordStats={keywordStats}
+        keywords={keywords}
+        transcript={transcript}
+        className="border-0 bg-transparent backdrop-blur-none"
+      />
+      <LiveSentimentBar
+        transcript={transcript}
+        sentimentAE={sentimentAE}
+        salesRepTone={salesRepTone}
+        sentimentCustomer={sentimentCustomer}
+        customerSentiment={customerSentiment}
+        sentimentShift={sentimentShift}
+        className="border-0 bg-transparent backdrop-blur-none"
+      />
+      <LiveSignalLogs
+        sentimentSignals={sentimentSignals}
+        bantSignals={bantSignals}
+      />
+    </>
+  );
+
+  const metricsColumn = (
+    <Card className="flex h-full min-h-0 min-w-0 flex-[3] flex-col overflow-hidden">
+      <LiveColumnHeader icon={Activity} title="Live signals" />
+      <div className="flex min-h-0 flex-1 flex-col divide-y divide-border/60 overflow-y-auto">
+        {liveInsightsMetrics}
+      </div>
+    </Card>
+  );
+
+  const copilotColumn = (
+    <Card className="flex h-full min-h-0 min-w-0 flex-[4] flex-col overflow-hidden">
+      {insightsPanel}
+    </Card>
+  );
+
+  const rightInsightsColumn = (
+    <div className="flex h-full min-h-0 w-[640px] shrink-0 flex-col gap-4 overflow-hidden">
       {runningSummary}
-      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">{insightsPanel}</Card>
+      <div className="flex h-0 min-h-0 flex-1 gap-4 overflow-hidden">
+        {metricsColumn}
+        {copilotColumn}
+      </div>
     </div>
   );
 
   return (
-    <div className="live-call-page flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="live-call-page call-detail-page flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <LiveCallPageHeader
         callId={callId}
         call={call}
@@ -279,7 +323,7 @@ export function LiveCallWorkspace({
             <Card className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               {transcriptColumn}
             </Card>
-            {insightsColumn}
+            {rightInsightsColumn}
           </div>
         </div>
 
@@ -287,13 +331,16 @@ export function LiveCallWorkspace({
           <Tabs
             value={activePanel ?? "transcript"}
             onValueChange={(v) =>
-              onPanelChange(v as "transcript" | "insights" | "chat" | "wrap-up")
+              onPanelChange(v as "transcript" | "signals" | "insights" | "chat" | "wrap-up")
             }
             className="flex min-h-0 flex-1 flex-col overflow-hidden"
           >
             <TabsList className="h-10 w-full shrink-0 justify-start overflow-x-auto rounded-none border-b border-border/60 bg-transparent px-0">
               <TabsTrigger value="transcript" className="text-xs">
                 Transcript
+              </TabsTrigger>
+              <TabsTrigger value="signals" className="text-xs">
+                Signals
               </TabsTrigger>
               <TabsTrigger value="insights" className="text-xs">
                 Live copilot
@@ -311,6 +358,14 @@ export function LiveCallWorkspace({
               className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
             >
               <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">{transcriptColumn}</Card>
+            </TabsContent>
+            <TabsContent
+              value="signals"
+              className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+            >
+              <Card className="flex min-h-0 flex-1 flex-col overflow-hidden divide-y divide-border/60">
+                {liveInsightsMetrics}
+              </Card>
             </TabsContent>
             <TabsContent
               value="insights"

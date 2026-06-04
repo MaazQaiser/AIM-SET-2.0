@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
-import { DashboardWidget } from "@/components/dashboard-grid/dashboard-widget";
 import { PostDcProposalWidget } from "@/components/post-dc/post-dc-proposal-widget";
+import { JiraTicketCard } from "@/components/post-dc/jira-ticket-card";
 import { PostDcClpActivityCard } from "@/components/post-dc/post-dc-clp-activity-card";
 import { PostDcClpStatusCard } from "@/components/post-dc/post-dc-clp-status-card";
 import {
@@ -12,6 +12,7 @@ import {
   type PostDcTabId,
 } from "@/components/post-dc/post-dc-tab-config";
 import type { PostDcWidgetProps, WidgetSpec } from "@/lib/dashboard/widget-registry";
+import type { PostCallJiraTicket } from "@/lib/brief-types";
 import { cn } from "@/lib/cn";
 import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
 import type { CustomerLandingPage } from "@dc-copilot/types";
@@ -23,8 +24,8 @@ interface PostDcTabbedContentProps {
   widgets: WidgetSpec<PostDcWidgetProps>[];
   widgetProps: PostDcWidgetProps;
   landingPage?: CustomerLandingPage | null;
-  /** Proposal / KB attachment panels (follow-up tab extras) */
-  followUpExtras?: React.ReactNode;
+  jiraTicket?: PostCallJiraTicket | null;
+  onCreateJiraTicket?: (ticket: PostCallJiraTicket) => Promise<void> | void;
   embedded?: boolean;
 }
 
@@ -33,10 +34,11 @@ export function PostDcTabbedContent({
   widgets,
   widgetProps,
   landingPage,
-  followUpExtras,
+  jiraTicket,
+  onCreateJiraTicket,
   embedded = false,
 }: PostDcTabbedContentProps) {
-  const [activeTab, setActiveTab] = useState<PostDcTabId>("outcomes");
+  const [activeTab, setActiveTab] = useState<PostDcTabId>("overview");
   const hidden = useDashboardLayoutStore((s) => s.hidden["post-dc"] ?? EMPTY_HIDDEN);
   const hideWidget = useDashboardLayoutStore((s) => s.hideWidget);
 
@@ -60,8 +62,11 @@ export function PostDcTabbedContent({
   }, [widgets, hidden, widgetProps]);
 
   const tabHasContent = (tabId: PostDcTabId) => {
-    if (tabId === "follow-up") {
-      return visibleByTab["follow-up"].length > 0 || Boolean(followUpExtras);
+    if (tabId === "proposal") {
+      return true;
+    }
+    if (tabId === "jira") {
+      return Boolean(jiraTicket);
     }
     if (tabId === "landing") {
       return visibleByTab.landing.length > 0 || Boolean(landingPage);
@@ -92,28 +97,44 @@ export function PostDcTabbedContent({
         ))}
       </TabsList>
 
-      <TabsContent value="outcomes" className="m-0 space-y-4 focus-visible:outline-none">
+      <TabsContent value="overview" className="m-0 space-y-4 focus-visible:outline-none">
         <PostDcWidgetRail
-          widgets={visibleByTab.outcomes}
+          widgets={visibleByTab.overview}
           widgetProps={widgetProps}
           onHide={(id) => hideWidget("post-dc", id)}
-          emptyMessage="No outcome cards yet. Run wrap-up or import post-DC notes to populate this tab."
+          emptyMessage="No overview yet. Run wrap-up or import post-DC notes to populate this tab."
+        />
+      </TabsContent>
+
+      <TabsContent value="coaching" className="m-0 space-y-4 focus-visible:outline-none">
+        <PostDcWidgetRail
+          widgets={visibleByTab.coaching}
+          widgetProps={widgetProps}
+          onHide={(id) => hideWidget("post-dc", id)}
+          emptyMessage="Pod member coaching scorecards appear here after wrap-up."
         />
       </TabsContent>
 
       <TabsContent value="follow-up" className="m-0 space-y-4 focus-visible:outline-none">
-        <PostDcProposalWidget callId={callId} />
-        {followUpExtras}
         <PostDcWidgetRail
           widgets={visibleByTab["follow-up"]}
           widgetProps={widgetProps}
           onHide={(id) => hideWidget("post-dc", id)}
-          emptyMessage={
-            followUpExtras
-              ? undefined
-              : "Follow-up emails and KB suggestions appear here after wrap-up."
-          }
+          emptyMessage="Follow-up emails appear here after wrap-up."
         />
+      </TabsContent>
+
+      <TabsContent value="content" className="m-0 space-y-4 focus-visible:outline-none">
+        <PostDcWidgetRail
+          widgets={visibleByTab.content}
+          widgetProps={widgetProps}
+          onHide={(id) => hideWidget("post-dc", id)}
+          emptyMessage="Suggest Content and Missing content sections appear here after wrap-up."
+        />
+      </TabsContent>
+
+      <TabsContent value="proposal" className="m-0 space-y-4 focus-visible:outline-none">
+        <PostDcProposalWidget callId={callId} />
       </TabsContent>
 
       <TabsContent value="actions" className="m-0 space-y-4 focus-visible:outline-none">
@@ -121,8 +142,18 @@ export function PostDcTabbedContent({
           widgets={visibleByTab.actions}
           widgetProps={widgetProps}
           onHide={(id) => hideWidget("post-dc", id)}
-          emptyMessage="CRM tasks and Jira drafts show up here when the post-call pipeline generates them."
+          emptyMessage="CRM tasks show up here when the post-call pipeline generates them."
         />
+      </TabsContent>
+
+      <TabsContent value="jira" className="m-0 space-y-4 focus-visible:outline-none">
+        {jiraTicket ? (
+          <JiraTicketCard ticket={jiraTicket} onCreate={onCreateJiraTicket} />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Run wrap-up to generate a Jira ticket draft for this call.
+          </p>
+        )}
       </TabsContent>
 
       <TabsContent value="landing" className="m-0 space-y-4 focus-visible:outline-none">
@@ -158,17 +189,11 @@ function PostDcWidgetRail<P>({
   }
 
   return (
-    <div className="flex flex-col gap-4 min-w-0">
+    <div className="flex w-full min-w-0 flex-col gap-4">
       {widgets.map((spec) => (
-        <DashboardWidget
-          key={spec.id}
-          title={spec.title}
-          isEditing={false}
-          columnZone="center"
-          onHide={() => onHide(spec.id)}
-        >
+        <div key={spec.id} className="w-full min-w-0">
           {spec.render(widgetProps)}
-        </DashboardWidget>
+        </div>
       ))}
     </div>
   );

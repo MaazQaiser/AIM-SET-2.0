@@ -6,8 +6,6 @@ import { useCall, useCreateJiraTicket, usePostCallReview } from "@/lib/data/hook
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { LayoutControls } from "@/components/dashboard-grid/layout-controls";
-import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
-import { KbAttachmentCard } from "@/components/post-dc/kb-attachment-card";
 import { POST_DC_WIDGETS } from "@/lib/dashboard/widget-registry";
 import { normalizePostDcWidgetProps } from "@/lib/dashboard/normalize-widget-props";
 import { PostDcSidebar } from "@/components/post-dc/post-dc-sidebar";
@@ -20,8 +18,6 @@ import { cn } from "@/lib/cn";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { sanitizeClientEmailDraft } from "@/lib/post-dc-client-email-safety";
 import type {
-  PostCallEmailAttachments,
-  PostCallEmailAttachmentMissing,
   PostCallJiraTicket,
   PostCallReview,
   PostCallTask,
@@ -109,11 +105,6 @@ export function PostDcReviewScreen({
   async function handleCreateJiraTicket(ticket: PostCallJiraTicket) {
     await createJiraTicket.mutateAsync(ticket);
   }
-
-  const hasContent =
-    (postRunMeta?.kbSuggestions?.length ?? 0) > 0 ||
-    (displayedEmailDraft?.attachments?.found.length ?? 0) > 0 ||
-    (displayedEmailDraft?.attachments?.missing.length ?? 0) > 0;
 
   if ((!importsHydrated || callLoading || reviewLoading) && !call) {
     return embedded ? (
@@ -257,23 +248,9 @@ export function PostDcReviewScreen({
                       widgets={POST_DC_WIDGETS}
                       widgetProps={widgetProps}
                       landingPage={landingPage ?? null}
+                      jiraTicket={displayedJiraTicket}
+                      onCreateJiraTicket={handleCreateJiraTicket}
                       embedded={embedded}
-                      followUpExtras={
-                        hasContent ? (
-                          <div className="grid gap-4 lg:grid-cols-2">
-                            <AttachmentSummaryCard
-                              attachments={displayedEmailDraft?.attachments ?? null}
-                              title="Ready content from KB"
-                              showMissing={false}
-                            />
-                            <div className="lg:col-span-2">
-                              <MissingContentCard
-                                attachments={displayedEmailDraft?.attachments ?? null}
-                              />
-                            </div>
-                          </div>
-                        ) : null
-                      }
                     />
                   </div>
                 </div>
@@ -283,90 +260,6 @@ export function PostDcReviewScreen({
         </div>
       )}
     </div>
-  );
-}
-
-function AttachmentSummaryCard({
-  attachments,
-  title = "Email attachments from KB",
-  showMissing = true,
-}: {
-  attachments: PostCallEmailAttachments | null;
-  title?: string;
-  showMissing?: boolean;
-}) {
-  const found = attachments?.found ?? [];
-  const missing = attachments?.missing ?? [];
-
-  return (
-    <BriefDetailCard title={title}>
-      <div className="space-y-3">
-        <div className="space-y-2">
-          <p className="text-[10px] font-semibold uppercase text-muted-foreground">Found in KB</p>
-          {found.length > 0 ? (
-            <div className="space-y-1.5">
-              {found.map((asset) => (
-                <KbAttachmentCard key={asset.assetId} asset={asset} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">No matching KB assets are ready to attach yet.</p>
-          )}
-        </div>
-        {showMissing ? (
-          <div className="space-y-2">
-            <p className="text-[10px] font-semibold uppercase text-muted-foreground">
-              Need to create before attaching
-            </p>
-            {missing.length > 0 ? (
-              <div className="space-y-1.5">
-                {missing.map((asset) => (
-                  <MissingContentItem key={asset.name} asset={asset} />
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">No attachment creation needs were flagged.</p>
-            )}
-          </div>
-        ) : null}
-      </div>
-    </BriefDetailCard>
-  );
-}
-
-function MissingContentCard({ attachments }: { attachments: PostCallEmailAttachments | null }) {
-  const missing = attachments?.missing ?? [];
-
-  return (
-    <BriefDetailCard title="Missing content to generate">
-      <div className="space-y-2">
-        <p className="text-xs text-muted-foreground">
-          Content gaps from the transcript that should be created before adding attachments or sending the next proposal pack.
-        </p>
-        {missing.length > 0 ? (
-          <div className="space-y-1.5">
-            {missing.map((asset) => (
-              <MissingContentItem key={asset.name} asset={asset} />
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">No missing content was flagged for generation.</p>
-        )}
-      </div>
-    </BriefDetailCard>
-  );
-}
-
-function MissingContentItem({ asset }: { asset: PostCallEmailAttachmentMissing }) {
-  return (
-    <a
-      href={asset.contentStudioLink}
-      className="block rounded-md border border-dashed border-border px-3 py-2 text-xs hover:bg-muted/40"
-    >
-      <span className="font-medium text-foreground">{asset.name}</span>
-      <span className="mt-1 block text-muted-foreground">{asset.requiredData}</span>
-      <span className="mt-1 block text-primary">Generate in Content Studio</span>
-    </a>
   );
 }
 
@@ -415,7 +308,6 @@ function buildJiraTicketDraft({
     })
   ) as PostCallJiraTicket["bantSnapshot"];
   const allBantConfirmed = BANT_TICKET_KEYS.every((key) => bantSnapshot[key]);
-  if (!allBantConfirmed) return null;
 
   const summaryLines = jiraSafeLines([review?.headline, ...(review?.summary ?? [])], 4);
   const needLines = jiraSafeLines(review?.summary ?? [], 4).filter((line) => !JIRA_TIMELINE_RE.test(line));

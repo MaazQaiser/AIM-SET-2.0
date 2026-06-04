@@ -27,7 +27,7 @@ import {
 } from "@/components/pre-call/brief-widget-cards";
 import {
   PostHeadlineCard,
-  PostKbSuggestionsCard,
+  PostDcContentSuggestionsCard,
   PostLearnedCard,
   PostScorecardCard,
   PostSummaryCard,
@@ -349,7 +349,7 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
   },
   {
     id: "post.summary",
-    title: "Summary",
+    title: "Call summary",
     category: "ai",
     column: "center",
     sortOrder: 1,
@@ -357,7 +357,7 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
   },
   {
     id: "post.learned",
-    title: "BANT & learnings",
+    title: "BANT",
     category: "qualification",
     column: "center",
     sortOrder: 2,
@@ -430,12 +430,20 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
   },
   {
     id: "post.kb_suggestions",
-    title: "KB suggestions",
+    title: "Content",
     category: "content",
     column: "right",
     sortOrder: 4,
-    isAvailable: ({ kbSuggestions }) => arrayLen(kbSuggestions) > 0,
-    render: ({ kbSuggestions = [] }) => <PostKbSuggestionsCard suggestions={kbSuggestions} />,
+    isAvailable: ({ kbSuggestions, emailAttachments }) =>
+      arrayLen(kbSuggestions) > 0 ||
+      arrayLen(emailAttachments?.found) > 0 ||
+      arrayLen(emailAttachments?.missing) > 0,
+    render: ({ kbSuggestions = [], emailAttachments }) => (
+      <PostDcContentSuggestionsCard
+        attachments={emailAttachments ?? null}
+        kbSuggestions={kbSuggestions}
+      />
+    ),
   },
   {
     id: "post.clp_analytics",

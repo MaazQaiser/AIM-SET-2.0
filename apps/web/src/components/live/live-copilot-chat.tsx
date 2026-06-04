@@ -200,7 +200,7 @@ export function LiveCopilotChatComposer({ className }: { className?: string }) {
   const { input, setInput, isLoading, error, handleSubmit } = useLiveCopilotChatContext();
 
   return (
-    <div className={cn("shrink-0 border-t border-border/60 bg-card/80", className)}>
+    <div className={cn("shrink-0 border-t border-border/60 bg-transparent", className)}>
       {error && <p className="px-4 pt-2 text-[11px] text-destructive">{error}</p>}
       <form onSubmit={handleSubmit} className="flex gap-2 px-4 py-3">
         <Input

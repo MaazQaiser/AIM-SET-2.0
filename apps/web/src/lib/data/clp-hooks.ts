@@ -83,7 +83,11 @@ export function useGenerateClpProposal(callId: string) {
       if (!res.ok) throw new Error("Proposal generate failed");
       return res.json() as Promise<ClpProposal>;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["landing-page", callId] }),
+    onSuccess: (proposal) => {
+      qc.setQueryData(["clp-proposal", callId], proposal);
+      qc.invalidateQueries({ queryKey: ["clp-proposal", callId] });
+      qc.invalidateQueries({ queryKey: ["landing-page", callId] });
+    },
   });
 }
 

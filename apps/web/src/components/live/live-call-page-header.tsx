@@ -57,7 +57,7 @@ export function LiveCallPageHeader({
   sentimentTone,
 }: LiveCallPageHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 shrink-0 border-b border-border/50 bg-background/90 px-6 py-4 backdrop-blur-md sm:px-8">
+    <header className="sticky top-0 z-30 shrink-0 border-b border-border/50 bg-background/75 px-6 py-4 backdrop-blur-md sm:px-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <Button

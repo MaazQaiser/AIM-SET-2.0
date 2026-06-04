@@ -1,8 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
-import { Badge } from "@dc-copilot/ui/components/badge";
+import { useMemo } from "react";
 import { SignalLog } from "@/components/live/signal-log";
 import { SuggestionLog } from "@/components/live/suggestion-log";
 import { buildLiveKeywordEntries } from "@/lib/live/keyword-filter";
@@ -290,7 +288,43 @@ function KeywordPills({ keywords }: { keywords: { term: string; count: number }[
   );
 }
 
-function KeywordsRow({ keywords }: { keywords: { term: string; count: number }[] }) {
+function keywordSummary(keywords: { term: string; count: number }[]): string {
+  if (keywords.length === 0) return "Topics appear as the call progresses.";
+  return keywords
+    .slice(0, 4)
+    .map(({ term, count }) => `${term} ${count}`)
+    .join(" · ");
+}
+
+function KeywordsRow({
+  keywords,
+  layout = "inline",
+}: {
+  keywords: { term: string; count: number }[];
+  layout?: "inline" | "stack" | "stack-content";
+}) {
+  const body =
+    keywords.length > 0 ? (
+      <div className="flex flex-wrap items-center gap-1.5">
+        <KeywordPills keywords={keywords} />
+      </div>
+    ) : (
+      <p className="text-xs text-muted-foreground">Topics appear as the call progresses.</p>
+    );
+
+  if (layout === "stack-content") {
+    return <div className="flex min-w-0 flex-col gap-2">{body}</div>;
+  }
+
+  if (layout === "stack") {
+    return (
+      <div className="flex min-w-0 flex-col gap-2">
+        <span className="text-xs font-semibold text-foreground">Keywords</span>
+        {body}
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-w-0 items-center gap-2">
       <span className="shrink-0 text-xs font-semibold text-foreground">Keywords</span>
@@ -307,7 +341,132 @@ function KeywordsRow({ keywords }: { keywords: { term: string; count: number }[]
   );
 }
 
+export function LiveKeywordsBar({
+  keywordStats,
+  keywords,
+  transcript,
+  className,
+}: {
+  keywordStats: KeywordStats | null;
+  keywords: string[];
+  transcript: TranscriptEvent[];
+  className?: string;
+}) {
+  const keywordEntries = useMemo(
+    () => buildLiveKeywordEntries(keywordStats, keywords, transcript),
+    [keywordStats, keywords, transcript]
+  );
+
+  return (
+    <div className={cn("shrink-0", className)}>
+      <LiveCollapsibleSection
+        flush
+        title="Keywords"
+        count={keywordEntries.length > 0 ? keywordEntries.length : undefined}
+        summary={keywordSummary(keywordEntries)}
+        defaultOpen
+      >
+        <KeywordsRow keywords={keywordEntries} layout="stack-content" />
+      </LiveCollapsibleSection>
+    </div>
+  );
+}
+
 function SentimentSection({
+  transcript,
+  sentimentAE,
+  salesRepTone,
+  sentimentCustomer,
+  customerSentiment,
+  sentimentShift,
+  className,
+  layout = "inline",
+}: {
+  transcript: TranscriptEvent[];
+  sentimentAE: number;
+  salesRepTone: SalesRepToneCue | null;
+  sentimentCustomer: number;
+  customerSentiment: CustomerSentimentCue | null;
+  sentimentShift: SentimentShift | null;
+  className?: string;
+  layout?: "inline" | "stack" | "stack-content";
+}) {
+  const repToneCue = resolveSalesRepToneCue(sentimentAE, salesRepTone);
+  const customerCue = resolveCustomerSentimentCue(sentimentCustomer, customerSentiment);
+
+  const chips = (
+    <div className={cn("flex items-center gap-1.5", layout !== "inline" ? "flex-wrap" : "shrink-0 flex-nowrap")}>
+      <SentimentScoreChip
+        label="Customer"
+        score={sentimentCustomer}
+        value={customerCue.label}
+        toneOverride={customerCue.tone}
+      />
+      <SentimentScoreChip
+        label="AE"
+        score={sentimentAE}
+        value={repToneCue.label}
+        toneOverride={repToneCue.tone}
+      />
+    </div>
+  );
+
+  const shiftMessage = sentimentShift ? (
+    <p className="text-[11px] leading-snug text-muted-foreground">
+      Shift:{" "}
+      <span className={scoreTextClass(sentimentShift.to_score)}>
+        {sentimentShift.message ||
+          (sentimentShift.direction === "negative"
+            ? "Customer concern rising"
+            : "Customer confidence improving")}
+      </span>
+    </p>
+  ) : null;
+
+  const stackBody = (
+    <>
+      {chips}
+      <SentimentBars compact transcript={transcript} customerScore={sentimentCustomer} />
+      {shiftMessage}
+    </>
+  );
+
+  if (layout === "stack-content") {
+    return (
+      <div className={cn("flex min-w-0 flex-col gap-2", className)}>
+        {stackBody}
+      </div>
+    );
+  }
+
+  if (layout === "stack") {
+    return (
+      <div className={cn("px-3 py-2.5", className)}>
+        <div className="flex min-w-0 flex-col gap-2">
+          <span className="text-xs font-semibold text-foreground">Sentiment</span>
+          {stackBody}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("px-3 py-2.5", className)}>
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="shrink-0 text-xs font-semibold text-foreground">Sentiment</span>
+        {chips}
+        <SentimentBars
+          compact
+          transcript={transcript}
+          customerScore={sentimentCustomer}
+        />
+      </div>
+      {shiftMessage && <div className="mt-1.5">{shiftMessage}</div>}
+    </div>
+  );
+}
+
+export function LiveSentimentBar({
   transcript,
   sentimentAE,
   salesRepTone,
@@ -328,40 +487,23 @@ function SentimentSection({
   const customerCue = resolveCustomerSentimentCue(sentimentCustomer, customerSentiment);
 
   return (
-    <div className={cn("px-3 py-2.5", className)}>
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="shrink-0 text-xs font-semibold text-foreground">Sentiment</span>
-        <div className="flex shrink-0 flex-nowrap items-center gap-1.5">
-          <SentimentScoreChip
-            label="Customer"
-            score={sentimentCustomer}
-            value={customerCue.label}
-            toneOverride={customerCue.tone}
-          />
-          <SentimentScoreChip
-            label="AE"
-            score={sentimentAE}
-            value={repToneCue.label}
-            toneOverride={repToneCue.tone}
-          />
-        </div>
-        <SentimentBars
-          compact
+    <div className={cn("shrink-0", className)}>
+      <LiveCollapsibleSection
+        flush
+        title="Sentiment"
+        summary={`Customer ${customerCue.label} · AE ${repToneCue.label}`}
+        defaultOpen
+      >
+        <SentimentSection
+          layout="stack-content"
           transcript={transcript}
-          customerScore={sentimentCustomer}
+          sentimentAE={sentimentAE}
+          salesRepTone={salesRepTone}
+          sentimentCustomer={sentimentCustomer}
+          customerSentiment={customerSentiment}
+          sentimentShift={sentimentShift}
         />
-      </div>
-      {sentimentShift && (
-        <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
-          Shift:{" "}
-          <span className={scoreTextClass(sentimentShift.to_score)}>
-            {sentimentShift.message ||
-              (sentimentShift.direction === "negative"
-                ? "Customer concern rising"
-                : "Customer confidence improving")}
-          </span>
-        </p>
-      )}
+      </LiveCollapsibleSection>
     </div>
   );
 }
@@ -400,7 +542,7 @@ function SentimentSignalLog({
   }
 
   return (
-    <ul className={cn("space-y-1.5", compact && "max-h-32 overflow-y-auto")}>
+    <ul className={cn("space-y-1.5", compact && "max-h-[340px] overflow-y-auto")}>
       {[...signals]
         .reverse()
         .slice(0, compact ? 4 : 8)
@@ -440,6 +582,67 @@ function SentimentSignalLog({
   );
 }
 
+function sentimentSignalsSummary(signals: SentimentSignal[]): string {
+  if (signals.length === 0) return "Signals will appear as the conversation progresses.";
+  const latest = [...signals].reverse()[0];
+  return latest.label;
+}
+
+function bantSignalsSummary(signals: BantSignal[]): string {
+  if (signals.length === 0) return "BANT signals will appear as the conversation progresses.";
+  const dims: Record<BantSignal["dimension"], string> = {
+    budget: "Budget",
+    authority: "Authority",
+    need: "Need",
+    timeline: "Timeline",
+  };
+  const latest = signals[signals.length - 1];
+  return `${dims[latest.dimension]} · ${latest.label}`;
+}
+
+export function LiveSignalLogs({
+  sentimentSignals,
+  bantSignals,
+}: {
+  sentimentSignals: SentimentSignal[];
+  bantSignals: BantSignal[];
+}) {
+  if (sentimentSignals.length === 0 && bantSignals.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      {sentimentSignals.length > 0 && (
+        <div className="shrink-0" data-testid="sentiment-signals-section">
+          <LiveCollapsibleSection
+            flush
+            title="Sentiment signals"
+            count={sentimentSignals.length}
+            summary={sentimentSignalsSummary(sentimentSignals)}
+            defaultOpen
+          >
+            <SentimentSignalLog signals={sentimentSignals} compact />
+          </LiveCollapsibleSection>
+        </div>
+      )}
+      {bantSignals.length > 0 && (
+        <div className="shrink-0">
+          <LiveCollapsibleSection
+            flush
+            title="BANT signals"
+            count={bantSignals.length}
+            summary={bantSignalsSummary(bantSignals)}
+            defaultOpen
+          >
+            <SignalLog signals={bantSignals} />
+          </LiveCollapsibleSection>
+        </div>
+      )}
+    </>
+  );
+}
+
 function UncoveredBlock({ uncovered }: { uncovered: string[] }) {
   if (uncovered.length > 0) {
     return (
@@ -454,52 +657,6 @@ function UncoveredBlock({ uncovered }: { uncovered: string[] }) {
     );
   }
   return <p className="text-xs text-muted-foreground">Discovery gaps will list here.</p>;
-}
-
-function StillUncoveredStickyTrigger({
-  uncovered,
-  open,
-  onToggle,
-}: {
-  uncovered: string[];
-  open: boolean;
-  onToggle: () => void;
-}) {
-  const variant = uncovered.length > 0 ? "attention" : "default";
-
-  return (
-    <div
-      className={cn(
-        "shrink-0",
-        variant === "attention" && "bg-amber-50/40 dark:bg-amber-950/20"
-      )}
-    >
-      <button
-        type="button"
-        className="flex w-full shrink-0 items-start gap-2 rounded-none px-5 py-2 text-left transition-colors hover:bg-muted/40"
-        aria-expanded={open}
-        onClick={onToggle}
-      >
-        <ChevronDown
-          className={cn(
-            "mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
-            open && "rotate-180"
-          )}
-          aria-hidden
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-foreground">Still uncovered</span>
-            {uncovered.length > 0 && (
-              <Badge variant="warning" className="text-[10px] px-1.5 py-0">
-                {uncovered.length}
-              </Badge>
-            )}
-          </div>
-        </div>
-      </button>
-    </div>
-  );
 }
 
 export function LiveMetricsRail({
@@ -536,65 +693,17 @@ export function LiveMetricsRail({
   }, [openGaps, checklist]);
 
   const bantSummary = bantLiveSummary(checklist);
-  const [uncoveredOpen, setUncoveredOpen] = useState(uncovered.length > 0);
 
   if (layout === "copilot-panel") {
     return (
       <div
         className={cn(
-          "flex min-h-0 h-0 flex-1 flex-col overflow-hidden border-y border-border/60 bg-card/50",
+          "flex min-h-0 h-0 flex-1 flex-col overflow-hidden border-y border-border/60 bg-transparent",
           className
         )}
       >
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:thin]">
-          <div className="sticky top-0 z-10 shrink-0 divide-y divide-border/60 border-b border-border/60 bg-card/95 backdrop-blur-sm">
-            <div className="px-5 py-2.5">
-              <KeywordsRow keywords={keywordEntries} />
-            </div>
-            <SentimentSection
-              className="px-5 py-2.5"
-              transcript={transcript}
-              sentimentAE={sentimentAE}
-              salesRepTone={salesRepTone}
-              sentimentCustomer={sentimentCustomer}
-              customerSentiment={customerSentiment}
-              sentimentShift={sentimentShift}
-            />
-            <StillUncoveredStickyTrigger
-              uncovered={uncovered}
-              open={uncoveredOpen}
-              onToggle={() => setUncoveredOpen((v) => !v)}
-            />
-          </div>
-
-          <div className="flex flex-col gap-4 px-5 py-4">
-            {uncoveredOpen && (
-              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2.5">
-                <UncoveredBlock uncovered={uncovered} />
-              </div>
-            )}
-            {sentimentSignals.length > 0 && (
-              <section
-                className="rounded-md border border-border/60 bg-muted/20 px-3 py-2.5"
-                data-testid="sentiment-signals-section"
-              >
-                <LiveSubsectionHeader title="Sentiment signals" />
-                <SentimentSignalLog signals={sentimentSignals} compact />
-              </section>
-            )}
-            {bantSignals.length > 0 && (
-              <section className="rounded-md border border-border/60 bg-muted/20 px-3 py-2.5">
-                <LiveSubsectionHeader title="BANT signals" />
-                <SignalLog signals={bantSignals} />
-              </section>
-            )}
-            {suggestionLog.length > 0 && (
-              <section className="rounded-md border border-border/60 bg-muted/20 px-3 py-2.5">
-                <SuggestionLog entries={suggestionLog} compact />
-              </section>
-            )}
-            {panelChildren}
-          </div>
+          <div className="flex flex-col gap-4 px-5 py-4">{panelChildren}</div>
         </div>
       </div>
     );

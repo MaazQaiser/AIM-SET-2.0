@@ -23,6 +23,8 @@ import type { PostCallEmailAttachmentFound } from "@/lib/brief-types";
 
 interface KbAttachmentCardProps {
   asset: PostCallEmailAttachmentFound;
+  /** Flat list row — no fill, no radius, bottom divider only */
+  variant?: "card" | "list";
 }
 
 function attachmentFileName(asset: PostCallEmailAttachmentFound) {
@@ -37,7 +39,7 @@ function formatMatchScore(score?: number): string | null {
   return `${pct}% match`;
 }
 
-export function KbAttachmentCard({ asset }: KbAttachmentCardProps) {
+export function KbAttachmentCard({ asset, variant = "list" }: KbAttachmentCardProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const fileName = attachmentFileName(asset);
   const formatMeta = resolveKbFileFormat(fileName, asset.mimeType);
@@ -59,18 +61,30 @@ export function KbAttachmentCard({ asset }: KbAttachmentCardProps) {
     <>
       <div
         className={cn(
-          "flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5",
-          "shadow-sm transition-colors hover:border-border/80 hover:bg-muted/20"
+          "flex items-center gap-3",
+          variant === "list"
+            ? "rounded-none bg-transparent px-0 py-0"
+            : "rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm transition-colors hover:border-border/80 hover:bg-muted/20"
         )}
       >
         <KbFileTypeIcon fileName={fileName} mimeType={asset.mimeType} size="md" />
 
         <div className="min-w-0 flex-1 space-y-0.5">
-          <p className="truncate text-sm font-medium text-foreground">{asset.name}</p>
-          <p className="truncate text-[11px] text-muted-foreground">{fileName}</p>
-          {matchLabel ? (
-            <p className="text-[11px] font-medium tabular-nums text-foreground">{matchLabel}</p>
-          ) : null}
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="min-w-0 truncate text-sm font-medium text-foreground">{asset.name}</p>
+            {matchLabel ? (
+              <span className="shrink-0 text-[11px] font-medium tabular-nums text-muted-foreground">
+                {matchLabel}
+              </span>
+            ) : null}
+          </div>
+          {variant === "list" && asset.reason ? (
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              <span className="font-medium text-foreground/80">Why it matched:</span> {asset.reason}
+            </p>
+          ) : (
+            <p className="truncate text-[11px] text-muted-foreground">{fileName}</p>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center gap-0.5">

@@ -1,15 +1,25 @@
 "use client";
 
-import { Brain, FileSearch, Sparkles, Users } from "lucide-react";
+import { Brain, FilePlus2, FileSearch, Sparkles, Users } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
+import { Button } from "@dc-copilot/ui/components/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   BriefDetailCard,
   BriefDetailRow,
 } from "@/components/pre-call/brief-detail-card";
 import type {
+  PostCallEmailAttachmentFound,
+  PostCallEmailAttachmentMissing,
+  PostCallEmailAttachments,
   PostCallKbSuggestion,
   PostCallReview,
 } from "@/lib/brief-types";
+import { KbAttachmentCard } from "@/components/post-dc/kb-attachment-card";
 
 export function PostHeadlineCard({ headline }: { headline: string }) {
   return (
@@ -21,7 +31,7 @@ export function PostHeadlineCard({ headline }: { headline: string }) {
 
 export function PostSummaryCard({ summary }: { summary: string[] }) {
   return (
-    <BriefDetailCard title="Summary" icon={Brain}>
+    <BriefDetailCard title="Call summary" icon={Brain}>
       <ul className="divide-y divide-border">
         {summary.map((p) => (
           <li key={p} className="py-2.5 text-sm text-muted-foreground whitespace-pre-wrap break-words first:pt-0 last:pb-0">
@@ -128,7 +138,7 @@ export function PostLearnedCard({ learned }: { learned: PostCallReview["learned"
   if (learned.length === 0) return null;
 
   return (
-    <BriefDetailCard title="BANT learnings">
+    <BriefDetailCard title="BANT">
       <ul className="space-y-2">
         {learned.map((item) => (
           <li key={item.label}>
@@ -147,54 +157,134 @@ export function PostLearnedCard({ learned }: { learned: PostCallReview["learned"
   );
 }
 
-export function PostKbSuggestionsCard({ suggestions }: { suggestions: PostCallKbSuggestion[] }) {
-  if (suggestions.length === 0) return null;
+export function PostDcContentSuggestionsCard({
+  attachments,
+  kbSuggestions = [],
+}: {
+  attachments?: PostCallEmailAttachments | null;
+  kbSuggestions?: PostCallKbSuggestion[];
+}) {
+  const found = mergeFoundContent(attachments?.found ?? [], kbSuggestions);
+  const missing = attachments?.missing ?? [];
+
+  if (found.length === 0 && missing.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Suggested KB content and missing assets appear here after wrap-up.
+      </p>
+    );
+  }
 
   return (
-    <BriefDetailCard title="Content suggestions" icon={FileSearch} scrollMaxHeight="14rem">
-      <ul className="space-y-2">
-        {suggestions.map((item) => (
-          <li key={item.assetId}>
-            <BriefDetailRow>
-              <div className="flex items-start justify-between gap-2 min-w-0">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground break-words">
-                    {kbSuggestionTitle(item)}
-                  </p>
-                  <p className="mt-0.5 text-[10px] font-mono text-muted-foreground break-all">
-                    {item.assetId}
-                  </p>
-                </div>
-                {typeof item.score === "number" && (
-                  <Badge variant="outline" className="shrink-0 text-[10px]">
-                    {Math.round(item.score * 100)}%
-                  </Badge>
-                )}
+    <div className="flex w-full min-w-0 flex-col gap-4">
+      <BriefDetailCard title="Suggest Content" icon={FileSearch} className="w-full">
+        <p className="text-xs text-muted-foreground">
+          Content available in the knowledge base that matches this call.
+        </p>
+        {found.length > 0 ? (
+          <div className="mt-3 flex w-full min-w-0 flex-col divide-y divide-border">
+            {found.map((asset) => (
+              <div key={asset.assetId} className="min-w-0 py-3 first:pt-0 last:pb-0">
+                <KbAttachmentCard asset={asset} variant="list" />
               </div>
-              <div className="mt-2 space-y-1.5 text-xs">
-                <p className="text-muted-foreground">
-                  <span className="font-medium text-foreground">Why it matched:</span>{" "}
-                  {kbSuggestionReason(item)}
-                </p>
-                <p className="text-muted-foreground">
-                  <span className="font-medium text-foreground">Suggested use:</span>{" "}
-                  {item.suggestedUse ?? "Use as supporting proof in the follow-up or proposal."}
-                </p>
-                {(item.downloadUrl || item.assetId) && (
-                  <a
-                    href={item.downloadUrl ?? `/api/kb/assets/${item.assetId}/file`}
-                    className="inline-flex text-xs font-medium text-primary hover:underline"
-                  >
-                    Open asset
-                  </a>
-                )}
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-muted-foreground">
+            No matching KB assets were found for this call yet.
+          </p>
+        )}
+      </BriefDetailCard>
+
+      <BriefDetailCard title="Missing content" className="w-full">
+        <p className="text-xs text-muted-foreground">
+          Content not available in the KB — suggested to generate before follow-up or proposal.
+        </p>
+        {missing.length > 0 ? (
+          <div className="mt-3 flex w-full min-w-0 flex-col divide-y divide-border">
+            {missing.map((asset) => (
+              <div key={asset.name} className="min-w-0 py-3 first:pt-0 last:pb-0">
+                <MissingContentItem asset={asset} />
               </div>
-            </BriefDetailRow>
-          </li>
-        ))}
-      </ul>
-    </BriefDetailCard>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-muted-foreground">
+            No missing content was flagged for generation.
+          </p>
+        )}
+      </BriefDetailCard>
+    </div>
   );
+}
+
+function formatMissingContentReason(requiredData: string): string {
+  const text = requiredData.trim();
+  if (!text) return "Suggested from discovery gaps on this call.";
+
+  const evidenceMatch = text.match(/Transcript evidence:\s*(.+)/i);
+  if (evidenceMatch?.[1]) return evidenceMatch[1].trim();
+
+  const createMatch = text.match(/Create or find:\s*(.+)/i);
+  if (createMatch?.[1]) return createMatch[1].replace(/\.\s*Transcript evidence:.*$/i, "").trim();
+
+  return text;
+}
+
+function MissingContentItem({ asset }: { asset: PostCallEmailAttachmentMissing }) {
+  const reason = formatMissingContentReason(asset.requiredData);
+
+  return (
+    <div className="flex items-center gap-3 rounded-none bg-transparent px-0 py-0">
+      <FilePlus2 className="h-6 w-6 shrink-0 text-muted-foreground" aria-hidden />
+
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <p className="truncate text-sm font-medium text-foreground">{asset.name}</p>
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          <span className="font-medium text-foreground/80">Why need to generate:</span> {reason}
+        </p>
+      </div>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            asChild
+            variant="ghost"
+            size="icon-sm"
+            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+          >
+            <a href={asset.contentStudioLink} aria-label={`Generate ${asset.name} in Content Studio`}>
+              <Sparkles className="h-4 w-4" />
+            </a>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">Generate</TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
+
+function mergeFoundContent(
+  found: PostCallEmailAttachmentFound[],
+  kbSuggestions: PostCallKbSuggestion[]
+): PostCallEmailAttachmentFound[] {
+  const seen = new Set(found.map((item) => item.assetId));
+  const merged = [...found];
+
+  for (const suggestion of kbSuggestions) {
+    if (seen.has(suggestion.assetId)) continue;
+    seen.add(suggestion.assetId);
+    merged.push({
+      name: kbSuggestionTitle(suggestion),
+      assetId: suggestion.assetId,
+      snippet: suggestion.snippet,
+      downloadUrl: suggestion.downloadUrl ?? `/api/kb/assets/${suggestion.assetId}/file`,
+      reason: suggestion.reason?.trim() || kbSuggestionReason(suggestion),
+      matchScore: suggestion.score ?? undefined,
+    });
+  }
+
+  return merged;
 }
 
 function kbSuggestionTitle(item: PostCallKbSuggestion) {
