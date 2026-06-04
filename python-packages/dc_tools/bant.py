@@ -56,8 +56,8 @@ DEFAULT_PLAYBOOK: Dict[str, str] = {
 SIGNAL_RULES: List[Tuple[str, List[str], ChecklistItemStatus]] = [
     ("budget", ["budget", "pricing", "cost", "spend", "investment", "approved budget", "dollar", "price", "afford", "expensive", "cheap", "limited budget", "money", "funding", "financial", "carved", "envelope", "year one", "year-one", "four hundred", "six hundred", "million", "thousand", "budget owner", "budget range"], "partial"),
     ("budget", ["budget approved", "allocated", "signed off", "funding approved", "set aside", "earmarked", "board still has to bless", "board has to bless"], "confirmed"),
-    ("authority", ["decision maker", "economic buyer", "sign off", "cio", "cto", "cfo", "ceo", "coo", "cpo", "vp ", "director", "board", "manager", "head of", "lead", "chief", "executive", "owner", "budget owner", "procurement", "finance", "legal", "approval committee", "steering committee"], "partial"),
-    ("authority", ["reports to", "final say", "signatory", "approves", "approve it", "need to approve", "must approve", "has to approve", "board approval", "approval path", "i decide", "my call", "i approve"], "confirmed"),
+    ("authority", ["decision maker", "economic buyer", "sign off", "cio", "cto", "cfo", "ceo", "coo", "cpo", "vp ", "director", "board", "head of", "budget owner", "final approver", "signatory", "approval committee", "steering committee"], "partial"),
+    ("authority", ["reports to", "final say", "signatory", "approves", "approve it", "need to approve", "must approve", "has to approve", "board approval", "board bless", "approval path", "owns the decision", "own the decision", "i decide", "my call", "i approve"], "confirmed"),
     ("need", ["pain", "problem", "challenge", "struggling", "need to", "priority", "impact", "pain point", "overcome", "solution", "looking for", "looking forward", "require", "want to", "wish we", "gap", "issue", "bottleneck", "friction", "limitation", "automat"], "partial"),
     ("need", ["must have", "critical", "urgent need", "business case", "top priority", "deal breaker", "non-negotiable"], "confirmed"),
     ("timeline", ["timeline", "eta", "estimated time", "estimated delivery", "delivery date", "completion date", "deadline", "go-live", "go live", "launch", "q1", "q2", "q3", "q4", "by end of", "this quarter", "next quarter", "this year", "next month", "asap", "soon", "urgent", "immediately", "production-grade", "pilot", "next year", "kickoff", "rollout"], "partial"),
@@ -347,8 +347,13 @@ _WORD_MONEY_RANGE_RE = re.compile(
 _AUTHORITY_RE = re.compile(
     r"\b(?:decision maker|economic buyer|budget owner|final approver|signatory|"
     r"cfo|ceo|cto|cio|coo|cpo|vp(?:\s+of\s+\w+)?|director(?:\s+of\s+\w+)?|"
-    r"head of\s+\w+|board|procurement|finance|legal|security|steering committee|"
-    r"approval committee|manager|owner)\b",
+    r"head of\s+\w+|board|steering committee|approval committee)\b",
+    re.I,
+)
+_AUTHORITY_APPROVAL_ENTITY_RE = re.compile(r"\b(?:procurement|finance|legal)\b", re.I)
+_AUTHORITY_APPROVAL_ACTION_RE = re.compile(r"\b(?:approv\w*|sign[ -]?off|review|bless\w*)\b", re.I)
+_SELF_AUTHORITY_RE = re.compile(
+    r"\b(?:i decide|my call|i approve|i own(?:s)? the decision|i am the decision maker)\b",
     re.I,
 )
 _MONTH_PATTERN = (
@@ -394,6 +399,16 @@ _PAIN_NEED_RE = re.compile(
 )
 
 
+def _extract_authority_values(text: str) -> str:
+    values = [m.group(0) for m in _AUTHORITY_RE.finditer(text)]
+    for match in _AUTHORITY_APPROVAL_ENTITY_RE.finditer(text):
+        window = text[max(0, match.start() - 80) : min(len(text), match.end() + 80)]
+        if _AUTHORITY_APPROVAL_ACTION_RE.search(window):
+            values.append(match.group(0))
+    values.extend(m.group(0) for m in _SELF_AUTHORITY_RE.finditer(text))
+    return _unique_join(values, limit=4)
+
+
 def _extract_bant_value(item_id: str, text: str, snippet: str) -> str:
     if item_id == "budget":
         ranges = [m.group(0) for m in _MONEY_RANGE_RE.finditer(text)]
@@ -404,9 +419,10 @@ def _extract_bant_value(item_id: str, text: str, snippet: str) -> str:
         if value:
             return value
     elif item_id == "authority":
-        value = _unique_join([m.group(0) for m in _AUTHORITY_RE.finditer(text)], limit=4)
+        value = _extract_authority_values(text)
         if value:
             return value
+        return ""
     elif item_id == "timeline":
         milestones = [m.group(0) for m in _TIMELINE_MILESTONE_RE.finditer(text)]
         milestone_quarters = {
@@ -585,10 +601,12 @@ def _apply_signals(
             if it.id != item_id:
                 continue
             new_status = _merge_status(it.status, tier_status)
+            value = _extract_bant_value(item_id, text, snippet)
+            if item_id == "authority" and not value:
+                continue
             status_changed = new_status != it.status
             if status_changed:
                 it.status = new_status
-            value = _extract_bant_value(item_id, text, snippet)
             it.evidence.append(
                 ChecklistEvidence(
                     snippet=snippet[:200],

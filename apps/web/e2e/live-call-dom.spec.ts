@@ -127,7 +127,18 @@ test.describe("Live call cockpit — DOM + API", () => {
     expect((lastSegment.checklist?.bantCoverage ?? 0) > 0).toBeTruthy();
     const bant = lastSegment.checklist?.bant ?? {};
     expect(["partial", "confirmed"]).toContainEqual(bant.budget);
+    expect(["partial", "confirmed"]).toContainEqual(bant.authority);
     expect(["partial", "confirmed"]).toContainEqual(bant.timeline);
+
+    const authorityItem = lastSegment.checklist?.items?.find((item) => item.id === "authority");
+    const authorityEvidence = authorityItem?.evidence?.at(-1);
+    expect(authorityEvidence?.value?.toLowerCase()).toContain("board");
+    expect(authorityEvidence?.value).not.toMatch(/ai-native platform|dashboard/i);
+
+    const bantLiveSection = page.getByTestId("bant-live-section");
+    await expect(bantLiveSection).toContainText(/Authority/i, { timeout: 25_000 });
+    await expect(bantLiveSection).toContainText(/board/i, { timeout: 25_000 });
+    await expect(bantLiveSection).not.toContainText(/AI-native platform to/i);
   });
 
   test("API demo-segment updates BANT checklist", async ({ request }) => {
@@ -152,7 +163,7 @@ test.describe("Live call cockpit — DOM + API", () => {
     const timelineEvidence = timelineItem?.evidence?.at(-1);
     expect(timelineEvidence?.value).toContain("project ETA is six weeks from kickoff");
 
-    const bantLiveSection = page.locator("section", { hasText: "BANT live" }).first();
+    const bantLiveSection = page.getByTestId("bant-live-section");
     await expect(bantLiveSection).toContainText(/Timeline/i, { timeout: 25_000 });
     await expect(bantLiveSection).toContainText(/project ETA is six weeks from kickoff/i, {
       timeout: 25_000,

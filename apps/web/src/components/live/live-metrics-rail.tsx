@@ -74,8 +74,10 @@ function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistState | nul
     );
   }
 
+  const items = Array.isArray(checklist.items) ? checklist.items : [];
+  const bant = checklist.bant ?? {};
   const evidenceById = Object.fromEntries(
-    checklist.items
+    items
       .filter((i) => i.tier === "bant")
       .map((i) => {
         const evidence = i.evidence?.[i.evidence.length - 1];
@@ -90,9 +92,9 @@ function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistState | nul
   ) as Record<string, { text: string; sentiment?: string }>;
 
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-1 gap-2">
       {BANT_KEYS.map((key) => {
-        const status = checklist.bant[key] ?? "unknown";
+        const status = bant[key] ?? "unknown";
         const variant = bantTileVariant(status, key);
         const evidence = evidenceById[key];
         const evidenceText =
@@ -101,7 +103,7 @@ function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistState | nul
           <div
             key={key}
             className={cn(
-              "rounded-lg border px-2.5 py-2 min-w-0",
+              "rounded-lg border px-3 py-2.5 min-w-0",
               variant === "good" && "border-success/30 bg-success/5",
               variant === "warn" && "border-destructive/25 bg-destructive/5",
               variant === "neutral" && "border-border bg-muted/20"
@@ -112,7 +114,7 @@ function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistState | nul
             </p>
             <p
               className={cn(
-                "text-[10px] font-bold uppercase mt-0.5",
+                "text-[11px] font-bold uppercase mt-0.5",
                 variant === "good" && "text-success",
                 variant === "warn" && "text-destructive",
                 variant === "neutral" && "text-foreground"
@@ -121,7 +123,7 @@ function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistState | nul
               {bantStatusLabel(status, key)}
             </p>
             {evidenceText && (
-              <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2 leading-snug">
+              <p className="text-xs text-foreground/75 mt-1.5 leading-relaxed break-words">
                 {evidence.sentiment === "negative" ? "Concern: " : ""}
                 {evidenceText}
               </p>
@@ -253,13 +255,15 @@ function SentimentSignalLog({ signals }: { signals: SentimentSignal[] }) {
       {[...signals].reverse().slice(0, 6).map((signal) => (
         <li
           key={signal.id}
-          className={cn("rounded-lg border px-2.5 py-2", sentimentSignalClass(signal.tone))}
+          className={cn("rounded-lg border px-3 py-2.5", sentimentSignalClass(signal.tone))}
         >
           <div className="flex items-start justify-between gap-2">
-            <p className="text-xs font-semibold text-foreground">{signal.label}</p>
+            <p className="min-w-0 text-sm font-semibold leading-snug text-foreground">
+              {signal.label}
+            </p>
             <span
               className={cn(
-                "shrink-0 text-[10px] font-semibold",
+                "shrink-0 text-xs font-semibold leading-snug",
                 sentimentSignalTextClass(signal.tone)
               )}
             >
@@ -267,7 +271,7 @@ function SentimentSignalLog({ signals }: { signals: SentimentSignal[] }) {
             </span>
           </div>
           {signal.snippet && (
-            <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+            <p className="mt-1.5 text-xs leading-relaxed text-foreground/75 break-words">
               {signal.snippet}
             </p>
           )}
@@ -299,7 +303,8 @@ export function LiveMetricsRail({
 
   const uncovered = useMemo(() => {
     const gapLabels = openGaps.map((g) => {
-      const item = checklist?.items.find((i) => i.id === g);
+      const items = Array.isArray(checklist?.items) ? checklist.items : [];
+      const item = items.find((i) => i.id === g);
       return item?.suggestedQuestion ?? g.replace(/_/g, " ");
     });
     return gapLabels.slice(0, 6);
@@ -307,7 +312,7 @@ export function LiveMetricsRail({
 
   return (
     <div className={cn("flex flex-col gap-5", className)}>
-      <section>
+      <section data-testid="bant-live-section">
         <LiveSubsectionHeader title="BANT live" />
         <BantLiveTiles checklist={checklist} />
       </section>

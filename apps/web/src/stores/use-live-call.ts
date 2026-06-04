@@ -103,6 +103,20 @@ function uniqueBy<T>(items: T[], getKey: (item: T) => unknown): T[] {
   });
 }
 
+function hasChecklistShape(state: DiscoveryChecklistState): boolean {
+  const candidate = state as unknown as {
+    items?: unknown;
+    bant?: unknown;
+    openGaps?: unknown;
+  };
+  return (
+    Array.isArray(candidate.items) &&
+    candidate.bant != null &&
+    typeof candidate.bant === "object" &&
+    Array.isArray(candidate.openGaps)
+  );
+}
+
 function mergeTranscriptEvent(
   existing: TranscriptEvent,
   incoming: TranscriptEvent
@@ -191,8 +205,10 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
 
   applyKeywordStats: (stats) => set({ keywordStats: filterKeywordStats(stats) }),
 
-  applyChecklistUpdate: (state) =>
-    set({ checklistState: state as DiscoveryChecklistState }),
+  applyChecklistUpdate: (state) => {
+    if (!hasChecklistShape(state)) return;
+    set({ checklistState: state as DiscoveryChecklistState });
+  },
 
   setSurfacedKbAssets: (assets) => {
     const seen = new Set<string>();

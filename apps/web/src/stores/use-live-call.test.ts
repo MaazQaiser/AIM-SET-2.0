@@ -175,6 +175,22 @@ describe("useLiveCall live page state regressions", () => {
     expect(state.bantSignals[0].value).toBe("$450K to $600K");
   });
 
+  it("ignores malformed checklist payloads from partial API demo fallback results", () => {
+    applyApiDemoResult({
+      checklist: {},
+      ws_messages: [
+        {
+          type: "sentiment",
+          payload: { ae: 0, customer: -0.5 },
+        },
+      ],
+    });
+
+    const state = useLiveCall.getState();
+    expect(state.checklistState).toBeNull();
+    expect(state.sentimentCustomer).toBe(-0.5);
+  });
+
   it("keeps client-only demo sentiment negative on customer pain", () => {
     applyClientDemoSegment("frontera-franchise-group", 3, {
       text: "Honestly it's a nightmare — operators live in spreadsheets with zero visibility.",

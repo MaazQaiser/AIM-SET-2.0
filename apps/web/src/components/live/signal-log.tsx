@@ -48,7 +48,7 @@ export function SignalLog({ signals }: SignalLogProps) {
           <li
             key={s.id}
             className={cn(
-              "flex items-start gap-2 rounded-md border px-2.5 py-2 text-xs",
+              "flex items-start gap-2 rounded-lg border px-3 py-2.5 text-xs",
               cfg.accent
             )}
           >
@@ -57,7 +57,7 @@ export function SignalLog({ signals }: SignalLogProps) {
             </span>
             <div className="min-w-0">
               <p className="font-semibold text-foreground">{cfg.label}</p>
-              <p className="text-muted-foreground leading-snug mt-0.5">
+              <p className="text-foreground/75 leading-relaxed mt-0.5 break-words">
                 {label}
                 {shouldAppendValue ? `: ${value}` : ""}
               </p>

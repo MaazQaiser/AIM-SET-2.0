@@ -47,12 +47,13 @@ function buildSummary({
     }
   }
 
-  if (checklist) {
+  if (checklist && typeof checklist.bantCoverage === "number") {
     const bantPct = Math.round(checklist.bantCoverage * 100);
     parts.push(`BANT coverage at ${bantPct}%.`);
-    if (checklist.openGaps.length > 0) {
+    const openGaps = Array.isArray(checklist.openGaps) ? checklist.openGaps : [];
+    if (openGaps.length > 0) {
       parts.push(
-        `Still to cover: ${checklist.openGaps.map((g) => g.replace(/_/g, " ")).join(", ")}.`
+        `Still to cover: ${openGaps.map((g) => g.replace(/_/g, " ")).join(", ")}.`
       );
     }
   }
