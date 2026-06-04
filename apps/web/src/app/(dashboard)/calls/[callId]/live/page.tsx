@@ -35,12 +35,16 @@ export default function LiveCallPage({ params }: LivePageParams) {
   const intentSnapshot = useLiveCall((s) => s.intentSnapshot);
   const keywordStats = useLiveCall((s) => s.keywordStats);
   const sentimentAE = useLiveCall((s) => s.sentimentAE);
+  const salesRepTone = useLiveCall((s) => s.salesRepTone);
   const sentimentCustomer = useLiveCall((s) => s.sentimentCustomer);
+  const customerSentiment = useLiveCall((s) => s.customerSentiment);
   const sentimentShift = useLiveCall((s) => s.sentimentShift);
+  const sentimentSignals = useLiveCall((s) => s.sentimentSignals);
   const isConnected = useLiveCall((s) => s.isConnected);
   const objections = useLiveCall((s) => s.objections);
   const unansweredQuestions = useLiveCall((s) => s.unansweredQuestions);
   const suggestionLog = useLiveCall((s) => s.suggestionLog);
+  const bantSignals = useLiveCall((s) => s.bantSignals);
   const checklistState = useLiveCall((s) => s.checklistState);
   const { activePanel, setActivePanel } = useCallUI();
 
@@ -103,13 +107,17 @@ export default function LiveCallPage({ params }: LivePageParams) {
       objections={objections}
       unansweredQuestions={unansweredQuestions}
       suggestionLog={suggestionLog}
+      bantSignals={bantSignals}
       checklist={checklistDisplay}
       intentLabel={intentLabel}
       intentSnapshot={intentSnapshot}
       keywordStats={keywordStats}
       sentimentAE={sentimentAE}
+      salesRepTone={salesRepTone}
       sentimentCustomer={sentimentCustomer}
+      customerSentiment={customerSentiment}
       sentimentShift={sentimentShift}
+      sentimentSignals={sentimentSignals}
       elapsedSeconds={elapsedSeconds}
       isConnected={isConnected}
       activePanel={activePanel}

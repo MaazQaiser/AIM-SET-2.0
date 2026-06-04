@@ -248,6 +248,209 @@ def _detect_sentiment_shift(
     return session.sentiment_shift if session.segment_count % 1 == 0 else None
 
 
+def _latest_meaningful_sentiment_score(
+    session: LiveCallSession,
+    series_key: str,
+    fallback: float,
+) -> float:
+    scores = (
+        float(point.get("valence", 0.0))
+        for point in reversed(session.sentiment_series.get(series_key, [])[-8:])
+    )
+    for score in scores:
+        if abs(score) >= 0.2:
+            return round(score, 3)
+    return fallback
+
+
+def _is_internal_speaker(speaker_role: str) -> bool:
+    return speaker_role.lower() in {"ae", "se", "designer", "pod", "agent", "rep", "sales"}
+
+
+def _public_sales_rep_tone(cue: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not cue:
+        return None
+    return {
+        "label": cue["label"],
+        "guidance": cue["guidance"],
+        "tone": cue["tone"],
+        "source": cue.get("source", "live-call-agent"),
+    }
+
+
+def _public_customer_sentiment(cue: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not cue:
+        return None
+    return {
+        "label": cue["label"],
+        "guidance": cue["guidance"],
+        "tone": cue["tone"],
+        "source": cue.get("source", "live-call-agent"),
+    }
+
+
+def _sales_rep_tone_cue(
+    text: str,
+    sentiment: Dict[str, Any],
+    speaker_role: str,
+) -> Optional[Dict[str, Any]]:
+    if not _is_internal_speaker(speaker_role):
+        return None
+
+    lowered = text.lower()
+    word_count = len(re.findall(r"[a-z0-9']+", lowered))
+    asks_question = "?" in text
+    acknowledges = re.search(
+        r"\b(understood|thanks|thank you|got it|appreciate|makes sense|i hear you)\b",
+        lowered,
+    )
+
+    if word_count > 55:
+        return {
+            "label": "Over-explaining",
+            "guidance": "Pause and shorten the next answer; ask the buyer to react before continuing.",
+            "tone": "negative",
+            "score": -0.45,
+            "source": "live-call-agent",
+        }
+    if acknowledges and asks_question:
+        return {
+            "label": "Empathetic discovery",
+            "guidance": "Good direction: mirror the buyer's words, then ask one concise follow-up.",
+            "tone": "positive",
+            "score": 0.4,
+            "source": "live-call-agent",
+        }
+    if asks_question:
+        return {
+            "label": "Focused discovery",
+            "guidance": "Keep the question short and tied to the buyer's last point.",
+            "tone": "positive",
+            "score": 0.3,
+            "source": "live-call-agent",
+        }
+    if sentiment.get("label") == "negative":
+        return {
+            "label": "Needs reset",
+            "guidance": "Soften the wording, slow down, and frame risk around the buyer's outcome.",
+            "tone": "negative",
+            "score": -0.45,
+            "source": "live-call-agent",
+        }
+    if sentiment.get("label") == "positive":
+        return {
+            "label": "Confident support",
+            "guidance": "Keep the energy buyer-centered and confirm the next decision step.",
+            "tone": "positive",
+            "score": 0.35,
+            "source": "live-call-agent",
+        }
+    return {
+        "label": "Steady delivery",
+        "guidance": "Maintain a calm pace and ask one focused follow-up.",
+        "tone": "neutral",
+        "score": 0.0,
+        "source": "live-call-agent",
+    }
+
+
+def _customer_sentiment_cue(
+    text: str,
+    sentiment: Dict[str, Any],
+    speaker_role: str,
+) -> Optional[Dict[str, Any]]:
+    if _is_internal_speaker(speaker_role):
+        return None
+
+    lowered = text.lower()
+    label = sentiment.get("label")
+    word_count = len(re.findall(r"[a-z0-9']+", lowered))
+    if label == "neutral" and word_count < 3:
+        return None
+    if re.search(
+        r"\b(nightmare|bottleneck|broken|manual|spreadsheet|spreadsheets|pain|problem)\b",
+        lowered,
+    ):
+        return {
+            "label": "Pain exposed",
+            "guidance": "Validate the pain, quantify business impact, then connect the next answer to that outcome.",
+            "tone": "negative",
+            "source": "live-call-agent",
+        }
+    if re.search(r"\b(not sure|concerned|worried|skeptical|doubt|uncertain|risk|delay)\b", lowered):
+        return {
+            "label": "Decision risk",
+            "guidance": "Clarify the doubt, ask what would reduce risk, and avoid pushing before trust recovers.",
+            "tone": "negative",
+            "source": "live-call-agent",
+        }
+    if re.search(r"\b(move forward|exactly what|great|excited|proposal|appreciate|ready)\b", lowered):
+        return {
+            "label": "Buying confidence",
+            "guidance": "Confirm decision criteria, owner, and next-step date while confidence is high.",
+            "tone": "positive",
+            "source": "live-call-agent",
+        }
+    if "?" in text:
+        return {
+            "label": "Evaluating fit",
+            "guidance": "Answer directly, then ask how this maps to their decision criteria.",
+            "tone": "neutral",
+            "source": "live-call-agent",
+        }
+    if label == "positive":
+        return {
+            "label": "Engaged buyer",
+            "guidance": "Reinforce the outcome they liked and move toward a concrete next step.",
+            "tone": "positive",
+            "source": "live-call-agent",
+        }
+    if label == "negative":
+        return {
+            "label": "Decision risk",
+            "guidance": "Acknowledge the concern, ask what is at risk, then address that issue.",
+            "tone": "negative",
+            "source": "live-call-agent",
+        }
+    return {
+        "label": "Listening mode",
+        "guidance": "Keep discovery open and ask one focused question to reveal intent.",
+        "tone": "neutral",
+        "source": "live-call-agent",
+    }
+
+
+def _sentiment_signal(
+    transcript_payload: Dict[str, Any],
+    sentiment: Dict[str, Any],
+    sales_rep_tone: Optional[Dict[str, Any]] = None,
+    customer_sentiment: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    label = sentiment.get("label")
+    if label not in ("positive", "negative"):
+        return None
+
+    speaker_role = transcript_payload.get("speakerRole") or "customer"
+    speaker_name = transcript_payload.get("speakerName") or "Speaker"
+    tone_label = "concern" if label == "negative" else "upbeat"
+    signal_label = (
+        f"Customer sentiment: {(customer_sentiment or {}).get('label') or tone_label}"
+        if speaker_role == "customer"
+        else f"Sales rep tone: {(sales_rep_tone or {}).get('label') or tone_label}"
+    )
+    score = float(sentiment.get("score") or 0.0)
+    return {
+        "id": f"sentiment-{transcript_payload.get('id') or uuid.uuid4()}",
+        "label": signal_label,
+        "timestamp": float(transcript_payload.get("timestamp") or 0),
+        "speakerRole": speaker_role,
+        "speakerName": speaker_name,
+        "tone": label,
+        "score": score,
+        "snippet": (transcript_payload.get("text") or "")[:200],
+    }
+
+
 def _retrieve_kb_hits(ctx: TenantContext, query: str, limit: int = 3) -> List[Dict[str, Any]]:
     settings = get_settings()
     try:
@@ -298,6 +501,13 @@ def analyze_segment(
 
     kw_result = extract_keywords(text, signal_routing=routing)
     sentiment = analyze_sentiment(text, speaker_role)
+    sales_rep_tone = _sales_rep_tone_cue(text, sentiment, speaker_role)
+    customer_sentiment = _customer_sentiment_cue(text, sentiment, speaker_role)
+    if sales_rep_tone:
+        sentiment = {
+            "label": sales_rep_tone["tone"],
+            "score": sales_rep_tone["score"],
+        }
 
     session.segment_count += 1
     _update_keyword_counts(session, speaker_id, kw_result["terms"])
@@ -314,9 +524,20 @@ def analyze_segment(
     session.sentiment_series[series_key] = session.sentiment_series[series_key][-120:]
 
     if series_key == "ae":
-        session.last_ae_score = sentiment["score"]
+        session.last_ae_score = _latest_meaningful_sentiment_score(
+            session,
+            series_key,
+            session.last_ae_score,
+        )
+        session.last_sales_rep_tone = _public_sales_rep_tone(sales_rep_tone)
     else:
-        session.last_customer_score = sentiment["score"]
+        session.last_customer_score = _latest_meaningful_sentiment_score(
+            session,
+            series_key,
+            session.last_customer_score,
+        )
+        if customer_sentiment:
+            session.last_customer_sentiment = _public_customer_sentiment(customer_sentiment)
 
     new_pains = _detect_pains(text, session, call_id, timestamp)
     shift = _detect_sentiment_shift(session, speaker_role, sentiment["score"], timestamp)
@@ -332,6 +553,12 @@ def analyze_segment(
         "sentiment": sentiment["label"],
         "signalType": kw_result.get("signal_type"),
     }
+    sentiment_signal = _sentiment_signal(
+        transcript_payload,
+        sentiment,
+        sales_rep_tone,
+        customer_sentiment,
+    )
 
     nudge: Optional[Dict[str, Any]] = None
     focus_suggestion: Optional[Dict[str, Any]] = None
@@ -465,6 +692,9 @@ def analyze_segment(
             "ae": session.last_ae_score,
             "customer": session.last_customer_score,
             "shift": shift,
+            "signal": sentiment_signal,
+            "salesRepTone": session.last_sales_rep_tone,
+            "customerSentiment": session.last_customer_sentiment,
         },
         "nudge": nudge,
         "citations": citations,

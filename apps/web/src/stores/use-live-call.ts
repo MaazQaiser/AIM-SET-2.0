@@ -3,9 +3,12 @@ import { filterKeywordStats } from "@/lib/live/keyword-filter";
 import type {
   TranscriptEvent,
   NudgePayload,
+  CustomerSentimentCue,
   IntentSnapshot,
   KeywordStats,
   ObjectionPayload,
+  SalesRepToneCue,
+  SentimentSignal,
   SentimentShift,
   SurfacedKbAsset,
   SuggestionLogEntry,
@@ -19,9 +22,12 @@ interface LiveCallState {
   transcript: TranscriptEvent[];
   pendingNudges: NudgePayload[];
   bantSignals: BantSignal[];
+  sentimentSignals: SentimentSignal[];
   elapsedSeconds: number;
   sentimentAE: number;
+  salesRepTone: SalesRepToneCue | null;
   sentimentCustomer: number;
+  customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
   intentSnapshot: IntentSnapshot | null;
   keywordStats: KeywordStats | null;
@@ -37,9 +43,16 @@ interface LiveCallState {
   appendTranscriptEvent: (event: TranscriptEvent) => void;
   addNudge: (nudge: NudgePayload) => void;
   addBantSignal: (signal: BantSignal) => void;
+  addSentimentSignal: (signal: SentimentSignal) => void;
   dismissNudge: (id: string) => void;
   acceptNudge: (id: string) => void;
-  updateSentiment: (ae: number, customer: number, shift?: SentimentShift | null) => void;
+  updateSentiment: (
+    ae: number,
+    customer: number,
+    shift?: SentimentShift | null,
+    salesRepTone?: SalesRepToneCue | null,
+    customerSentiment?: CustomerSentimentCue | null
+  ) => void;
   applyIntentUpdate: (payload: IntentSnapshot) => void;
   applyKeywordStats: (stats: KeywordStats) => void;
   applyChecklistUpdate: (state: DiscoveryChecklistState) => void;
@@ -57,9 +70,12 @@ const initialState = {
   transcript: [],
   pendingNudges: [],
   bantSignals: [],
+  sentimentSignals: [],
   elapsedSeconds: 0,
   sentimentAE: 0,
+  salesRepTone: null,
   sentimentCustomer: 0,
+  customerSentiment: null,
   sentimentShift: null,
   intentSnapshot: null,
   keywordStats: null,
@@ -97,6 +113,30 @@ function uniqueBy<T>(items: T[], getKey: (item: T) => unknown): T[] {
     seen.add(key);
     return true;
   });
+}
+
+function hasChecklistShape(state: DiscoveryChecklistState): boolean {
+  const candidate = state as unknown as {
+    items?: unknown;
+    bant?: unknown;
+    openGaps?: unknown;
+  };
+  return (
+    Array.isArray(candidate.items) &&
+    candidate.bant != null &&
+    typeof candidate.bant === "object" &&
+    Array.isArray(candidate.openGaps)
+  );
+}
+
+function normalizeSentimentSignal(signal: SentimentSignal): SentimentSignal {
+  if (/^AE sentiment:/i.test(signal.label)) {
+    return {
+      ...signal,
+      label: signal.label.replace(/^AE sentiment:/i, "Sales rep tone:"),
+    };
+  }
+  return signal;
 }
 
 function mergeTranscriptEvent(
@@ -153,17 +193,35 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
       bantSignals: upsertCapped(s.bantSignals, signal, (item) => item.id, 20),
     })),
 
+  addSentimentSignal: (signal) =>
+    set((s) => ({
+      sentimentSignals: upsertCapped(
+        s.sentimentSignals,
+        normalizeSentimentSignal(signal),
+        (item) => item.id,
+        20
+      ),
+    })),
+
   dismissNudge: (id) =>
     set((s) => ({ pendingNudges: s.pendingNudges.filter((n) => n.id !== id) })),
 
   acceptNudge: (id) =>
     set((s) => ({ pendingNudges: s.pendingNudges.filter((n) => n.id !== id) })),
 
-  updateSentiment: (sentimentAE, sentimentCustomer, shift) =>
+  updateSentiment: (
+    sentimentAE,
+    sentimentCustomer,
+    shift,
+    salesRepTone,
+    customerSentiment
+  ) =>
     set({
       sentimentAE,
       sentimentCustomer,
       ...(shift !== undefined ? { sentimentShift: shift ?? null } : {}),
+      ...(salesRepTone !== undefined ? { salesRepTone } : {}),
+      ...(customerSentiment !== undefined ? { customerSentiment } : {}),
     }),
 
   applyIntentUpdate: (payload) => {
@@ -182,8 +240,10 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
 
   applyKeywordStats: (stats) => set({ keywordStats: filterKeywordStats(stats) }),
 
-  applyChecklistUpdate: (state) =>
-    set({ checklistState: state as DiscoveryChecklistState }),
+  applyChecklistUpdate: (state) => {
+    if (!hasChecklistShape(state)) return;
+    set({ checklistState: state as DiscoveryChecklistState });
+  },
 
   setSurfacedKbAssets: (assets) => {
     const seen = new Set<string>();

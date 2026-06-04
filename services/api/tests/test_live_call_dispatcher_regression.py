@@ -39,6 +39,37 @@ def test_live_segment_sentiment_survives_discovery_failure(monkeypatch):
     assert sentiment_messages[-1]["payload"]["customer"] < 0
 
 
+def test_live_segment_sentiment_survives_agent_config_tenant_failure(monkeypatch):
+    ctx = TenantContext(tenant_id="live-regression-config-fallback", user_id="u1")
+    call_id = "call-live-regression-config-fallback"
+
+    def fail_resolve(_ctx):
+        raise RuntimeError("simulated tenant lookup failure")
+
+    monkeypatch.setattr(
+        "app.domain.agent_config_repository.resolve_kb_tenant",
+        fail_resolve,
+    )
+
+    out = Orchestrator().dispatch_live_segment(
+        ctx,
+        call_id,
+        {
+            "id": "regression-config-fallback-1",
+            "text": "Manual audits are a nightmare and a bottleneck.",
+            "speakerId": "buyer-1",
+            "speakerName": "Sam Buyer",
+            "speakerRole": "customer",
+            "timestamp": 35,
+        },
+        elapsed_seconds=35,
+    )
+
+    sentiment_messages = _messages_of_type(out, "sentiment")
+    assert sentiment_messages
+    assert sentiment_messages[-1]["payload"]["customer"] < 0
+
+
 def test_live_segment_pain_point_nudge_reaches_ws_messages():
     ctx = TenantContext(tenant_id="live-regression-pain", user_id="u1")
     call_id = "call-live-regression-pain"

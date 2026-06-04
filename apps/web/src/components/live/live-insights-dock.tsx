@@ -9,11 +9,19 @@ import { SignalLog } from "@/components/live/signal-log";
 import { SuggestionLog } from "@/components/live/suggestion-log";
 import { UnansweredQuestionsList } from "@/components/live/unanswered-questions-list";
 import { filterKeywordStats } from "@/lib/live/keyword-filter";
-import { scoreEmoji, shiftEmoji } from "@/lib/live/sentiment-display";
+import {
+  resolveCustomerSentimentCue,
+  resolveSalesRepToneCue,
+  scoreEmoji,
+  shiftEmoji,
+} from "@/lib/live/sentiment-display";
+import { formatBudgetSignalLabel } from "@/lib/currency-format";
 import type { BantSignal } from "@/lib/live-types";
 import type {
   KeywordStats,
+  CustomerSentimentCue,
   ObjectionPayload,
+  SalesRepToneCue,
   SentimentShift,
   SuggestionLogEntry,
   UnansweredQuestionPayload,
@@ -26,7 +34,9 @@ interface LiveInsightsDockProps {
   bantSignals: BantSignal[];
   keywordStats: KeywordStats | null;
   sentimentAE: number;
+  salesRepTone?: SalesRepToneCue | null;
   sentimentCustomer: number;
+  customerSentiment?: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
 }
 
@@ -60,7 +70,10 @@ function bantSummary(signals: BantSignal[]): string | undefined {
     need: "🎯 Need",
     timeline: "📅 Timeline",
   };
-  const labels = signals.slice(-4).map((s) => `${dims[s.dimension]} · ${s.label}`);
+  const labels = signals.slice(-4).map((s) => {
+    const label = s.dimension === "budget" ? formatBudgetSignalLabel(s.label, s.value) : s.label;
+    return `${dims[s.dimension]} · ${label}`;
+  });
   return labels.join(" · ");
 }
 
@@ -77,7 +90,9 @@ export function LiveInsightsDock({
   bantSignals,
   keywordStats,
   sentimentAE,
+  salesRepTone,
   sentimentCustomer,
+  customerSentiment,
   sentimentShift,
 }: LiveInsightsDockProps) {
   const filteredKeywordStats = useMemo(
@@ -92,6 +107,8 @@ export function LiveInsightsDock({
 
   const hasSentiment =
     sentimentAE !== 0 || sentimentCustomer !== 0 || sentimentShift != null;
+  const repToneCue = resolveSalesRepToneCue(sentimentAE, salesRepTone);
+  const customerCue = resolveCustomerSentimentCue(sentimentCustomer, customerSentiment);
 
   const visibleSectionCount = useMemo(() => {
     let n = 0;
@@ -124,14 +141,16 @@ export function LiveInsightsDock({
       {hasSentiment && (
         <LiveCollapsibleSection
           title="Sentiment"
-          summary={`${scoreEmoji(sentimentAE)} AE · ${scoreEmoji(sentimentCustomer)} Customer${
+          summary={`${scoreEmoji(sentimentAE)} ${repToneCue.label} · ${scoreEmoji(sentimentCustomer)} ${customerCue.label}${
             sentimentShift ? ` · ${shiftEmoji(sentimentShift.direction)} shift` : ""
           }`}
           defaultOpen
         >
           <SentimentDisplayPanel
             aeScore={sentimentAE}
+            salesRepTone={salesRepTone}
             customerScore={sentimentCustomer}
+            customerSentiment={customerSentiment}
             shift={sentimentShift}
             className="pt-2"
           />

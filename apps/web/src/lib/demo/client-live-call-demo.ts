@@ -12,6 +12,7 @@ import type {
   LiveSentimentPayload,
   NudgePayload,
   ObjectionPayload,
+  SentimentSignal,
   SurfacedKbAsset,
   SuggestionLogEntry,
   TranscriptEvent,
@@ -509,7 +510,19 @@ export function applyApiDemoResult(data: Record<string, unknown>) {
         case "sentiment":
           if (typed.payload && typeof typed.payload === "object") {
             const payload = typed.payload as LiveSentimentPayload;
-            store.updateSentiment(payload.ae, payload.customer, payload.shift ?? null);
+            store.updateSentiment(
+              payload.ae,
+              payload.customer,
+              payload.shift ?? null,
+              payload.salesRepTone,
+              payload.customerSentiment
+            );
+            if (payload.signal) store.addSentimentSignal(payload.signal);
+          }
+          break;
+        case "sentiment_signal":
+          if (typed.payload && typeof typed.payload === "object") {
+            store.addSentimentSignal(typed.payload as SentimentSignal);
           }
           break;
         case "kb_assets":

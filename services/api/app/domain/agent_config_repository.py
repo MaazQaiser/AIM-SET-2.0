@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -12,6 +13,8 @@ from app.domain.memory_store import get_memory_store
 from app.deps import get_supabase
 from app.domain.supabase_helpers import run_with_timeout
 
+_logger = logging.getLogger(__name__)
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -22,12 +25,25 @@ def _tenant_keys(ctx: TenantContext) -> tuple[str, str]:
     return tenant_uuid, clerk_key
 
 
+def _fallback_clerk_key(ctx: TenantContext) -> str:
+    return ctx.clerk_org_id or ctx.tenant_id or ctx.user_id or "local-dev"
+
+
 class AgentConfigRepository:
     def get_config(self, ctx: TenantContext, agent_id: str) -> Dict[str, Any]:
         if agent_id not in AGENT_IDS:
             raise ValueError(f"Unknown agent_id: {agent_id}")
 
-        _, clerk_key = _tenant_keys(ctx)
+        tenant_uuid: Optional[str] = None
+        try:
+            tenant_uuid, clerk_key = _tenant_keys(ctx)
+        except Exception:
+            clerk_key = _fallback_clerk_key(ctx)
+            _logger.exception(
+                "tenant resolution failed for agent config; using default config agent_id=%s tenant_key=%s",
+                agent_id,
+                clerk_key,
+            )
         store = get_memory_store()
         saved: Optional[Dict[str, Any]] = store.agent_configs.get(clerk_key, {}).get(agent_id)
         if saved is None and agent_id == "workflow":
@@ -35,9 +51,7 @@ class AgentConfigRepository:
 
         if saved is None:
             settings = get_settings()
-            if settings.supabase_configured:
-                tenant_uuid, _ = _tenant_keys(ctx)
-
+            if settings.supabase_configured and tenant_uuid:
                 def _fetch(fetch_agent_id: str) -> Optional[Dict[str, Any]]:
                     row = (
                         get_supabase()

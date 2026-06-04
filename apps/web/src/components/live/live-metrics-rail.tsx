@@ -3,10 +3,26 @@
 import { useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
+import { SignalLog } from "@/components/live/signal-log";
+import { SuggestionLog } from "@/components/live/suggestion-log";
 import { buildLiveKeywordEntries } from "@/lib/live/keyword-filter";
-import { formatSentimentScore, scoreToTone } from "@/lib/live/sentiment-display";
+import {
+  formatSentimentScore,
+  resolveCustomerSentimentCue,
+  resolveSalesRepToneCue,
+  scoreToTone,
+} from "@/lib/live/sentiment-display";
+import type { BantSignal } from "@/lib/live-types";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
-import type { KeywordStats, SentimentShift, TranscriptEvent } from "@/types";
+import type {
+  CustomerSentimentCue,
+  KeywordStats,
+  SalesRepToneCue,
+  SentimentShift,
+  SentimentSignal,
+  SuggestionLogEntry,
+  TranscriptEvent,
+} from "@/types";
 import { LiveCollapsibleSection } from "@/components/live/live-collapsible-section";
 import { LiveSubsectionHeader } from "@/components/live/live-column-header";
 import { cn } from "@/lib/cn";
@@ -58,8 +74,13 @@ interface LiveMetricsRailProps {
   keywords: string[];
   transcript: TranscriptEvent[];
   sentimentAE: number;
+  salesRepTone: SalesRepToneCue | null;
   sentimentCustomer: number;
+  customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
+  sentimentSignals: SentimentSignal[];
+  bantSignals: BantSignal[];
+  suggestionLog: SuggestionLogEntry[];
   openGaps: string[];
   /** stack | accordions | copilot-panel (sticky metrics + scrollable body) */
   layout?: "stack" | "accordions" | "copilot-panel";
@@ -79,8 +100,9 @@ export function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistStat
     );
   }
 
+  const checklistItems = Array.isArray(checklist.items) ? checklist.items : [];
   const evidenceById = Object.fromEntries(
-    checklist.items
+    checklistItems
       .filter((i) => i.tier === "bant")
       .map((i) => {
         const evidence = i.evidence?.[i.evidence.length - 1];
@@ -204,15 +226,15 @@ function SentimentBars({
   );
 }
 
-function scoreTextClass(score: number): string {
-  const tone = scoreToTone(score);
+function scoreTextClass(score: number, toneOverride?: SentimentTone): string {
+  const tone = toneOverride ?? scoreToTone(score);
   if (tone === "positive") return "text-success";
   if (tone === "negative") return "text-destructive";
   return "text-warning";
 }
 
-function scoreTileClass(score: number): string {
-  const tone = scoreToTone(score);
+function scoreTileClass(score: number, toneOverride?: SentimentTone): string {
+  const tone = toneOverride ?? scoreToTone(score);
   if (tone === "positive") return "border-success/35 bg-success/5";
   if (tone === "negative") return "border-destructive/35 bg-destructive/5";
   return "border-warning/35 bg-warning/5";
@@ -221,23 +243,27 @@ function scoreTileClass(score: number): string {
 function SentimentScoreChip({
   label,
   score,
+  value,
+  toneOverride,
 }: {
   label: string;
   score: number;
+  value?: string;
+  toneOverride?: SentimentTone;
 }) {
-  const tone = scoreToTone(score);
+  const tone = toneOverride ?? scoreToTone(score);
   return (
     <span
       className={cn(
         "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border py-0.5 pl-2 pr-2 text-[11px]",
-        scoreTileClass(score)
+        scoreTileClass(score, tone)
       )}
       data-sentiment-label={label.toLowerCase()}
       data-sentiment-tone={tone}
     >
       <span className="font-medium text-muted-foreground">{label}</span>
-      <span className={cn("font-semibold", scoreTextClass(score))}>
-        {formatSentimentScore(score)}
+      <span className={cn("max-w-[8rem] truncate font-semibold", scoreTextClass(score, tone))}>
+        {value ?? formatSentimentScore(score)}
       </span>
     </span>
   );
@@ -284,23 +310,40 @@ function KeywordsRow({ keywords }: { keywords: { term: string; count: number }[]
 function SentimentSection({
   transcript,
   sentimentAE,
+  salesRepTone,
   sentimentCustomer,
+  customerSentiment,
   sentimentShift,
   className,
 }: {
   transcript: TranscriptEvent[];
   sentimentAE: number;
+  salesRepTone: SalesRepToneCue | null;
   sentimentCustomer: number;
+  customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
   className?: string;
 }) {
+  const repToneCue = resolveSalesRepToneCue(sentimentAE, salesRepTone);
+  const customerCue = resolveCustomerSentimentCue(sentimentCustomer, customerSentiment);
+
   return (
     <div className={cn("px-3 py-2.5", className)}>
       <div className="flex min-w-0 items-center gap-2">
         <span className="shrink-0 text-xs font-semibold text-foreground">Sentiment</span>
         <div className="flex shrink-0 flex-nowrap items-center gap-1.5">
-          <SentimentScoreChip label="Customer" score={sentimentCustomer} />
-          <SentimentScoreChip label="AE" score={sentimentAE} />
+          <SentimentScoreChip
+            label="Customer"
+            score={sentimentCustomer}
+            value={customerCue.label}
+            toneOverride={customerCue.tone}
+          />
+          <SentimentScoreChip
+            label="AE"
+            score={sentimentAE}
+            value={repToneCue.label}
+            toneOverride={repToneCue.tone}
+          />
         </div>
         <SentimentBars
           compact
@@ -320,6 +363,80 @@ function SentimentSection({
         </p>
       )}
     </div>
+  );
+}
+
+function sentimentSignalClass(tone: SentimentSignal["tone"]): string {
+  if (tone === "positive") return "border-success/30 bg-success/5";
+  if (tone === "negative") return "border-destructive/30 bg-destructive/5";
+  return "border-warning/30 bg-warning/5";
+}
+
+function sentimentSignalTextClass(tone: SentimentSignal["tone"]): string {
+  if (tone === "positive") return "text-success";
+  if (tone === "negative") return "text-destructive";
+  return "text-warning";
+}
+
+function sentimentSignalValue(signal: SentimentSignal): string {
+  const pct = Math.round(Math.abs(signal.score) * 100);
+  if (signal.tone === "neutral") return "Neutral";
+  return signal.tone === "positive" ? `+${pct}%` : `-${pct}%`;
+}
+
+function SentimentSignalLog({
+  signals,
+  compact = false,
+}: {
+  signals: SentimentSignal[];
+  compact?: boolean;
+}) {
+  if (signals.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Sentiment signals will appear as the conversation progresses.
+      </p>
+    );
+  }
+
+  return (
+    <ul className={cn("space-y-1.5", compact && "max-h-32 overflow-y-auto")}>
+      {[...signals]
+        .reverse()
+        .slice(0, compact ? 4 : 8)
+        .map((signal) => (
+          <li
+            key={signal.id}
+            className={cn(
+              "rounded-lg border px-3 py-2 text-xs",
+              sentimentSignalClass(signal.tone)
+            )}
+            data-sentiment-tone={signal.tone}
+          >
+            <div className="flex min-w-0 items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-foreground">{signal.label}</p>
+                <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
+                  {signal.speakerName ?? signal.speakerRole}
+                </p>
+              </div>
+              <span
+                className={cn(
+                  "shrink-0 rounded-full border border-current/20 px-1.5 py-0.5 text-[10px] font-semibold",
+                  sentimentSignalTextClass(signal.tone)
+                )}
+              >
+                {sentimentSignalValue(signal)}
+              </span>
+            </div>
+            {signal.snippet && (
+              <p className="mt-1.5 line-clamp-2 leading-snug text-foreground/75">
+                {signal.snippet}
+              </p>
+            )}
+          </li>
+        ))}
+    </ul>
   );
 }
 
@@ -391,8 +508,13 @@ export function LiveMetricsRail({
   keywords,
   transcript,
   sentimentAE,
+  salesRepTone,
   sentimentCustomer,
+  customerSentiment,
   sentimentShift,
+  sentimentSignals,
+  bantSignals,
+  suggestionLog,
   openGaps,
   layout = "stack",
   bantInHeader = false,
@@ -405,8 +527,9 @@ export function LiveMetricsRail({
   );
 
   const uncovered = useMemo(() => {
+    const checklistItems = Array.isArray(checklist?.items) ? checklist.items : [];
     const gapLabels = openGaps.map((g) => {
-      const item = checklist?.items.find((i) => i.id === g);
+      const item = checklistItems.find((i) => i.id === g);
       return item?.suggestedQuestion ?? g.replace(/_/g, " ");
     });
     return gapLabels.slice(0, 6);
@@ -432,7 +555,9 @@ export function LiveMetricsRail({
               className="px-5 py-2.5"
               transcript={transcript}
               sentimentAE={sentimentAE}
+              salesRepTone={salesRepTone}
               sentimentCustomer={sentimentCustomer}
+              customerSentiment={customerSentiment}
               sentimentShift={sentimentShift}
             />
             <StillUncoveredStickyTrigger
@@ -447,6 +572,26 @@ export function LiveMetricsRail({
               <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2.5">
                 <UncoveredBlock uncovered={uncovered} />
               </div>
+            )}
+            {sentimentSignals.length > 0 && (
+              <section
+                className="rounded-md border border-border/60 bg-muted/20 px-3 py-2.5"
+                data-testid="sentiment-signals-section"
+              >
+                <LiveSubsectionHeader title="Sentiment signals" />
+                <SentimentSignalLog signals={sentimentSignals} compact />
+              </section>
+            )}
+            {bantSignals.length > 0 && (
+              <section className="rounded-md border border-border/60 bg-muted/20 px-3 py-2.5">
+                <LiveSubsectionHeader title="BANT signals" />
+                <SignalLog signals={bantSignals} />
+              </section>
+            )}
+            {suggestionLog.length > 0 && (
+              <section className="rounded-md border border-border/60 bg-muted/20 px-3 py-2.5">
+                <SuggestionLog entries={suggestionLog} compact />
+              </section>
             )}
             {panelChildren}
           </div>
@@ -478,9 +623,51 @@ export function LiveMetricsRail({
         <SentimentSection
           transcript={transcript}
           sentimentAE={sentimentAE}
+          salesRepTone={salesRepTone}
           sentimentCustomer={sentimentCustomer}
+          customerSentiment={customerSentiment}
           sentimentShift={sentimentShift}
         />
+
+        {sentimentSignals.length > 0 && (
+          <LiveCollapsibleSection
+            flush
+            title="Sentiment signals"
+            summary={`${sentimentSignals.length} recent signals`}
+            count={sentimentSignals.length}
+            defaultOpen={sentimentSignals.length <= 3}
+          >
+            <div className="pt-2" data-testid="sentiment-signals-section">
+              <SentimentSignalLog signals={sentimentSignals} compact />
+            </div>
+          </LiveCollapsibleSection>
+        )}
+
+        {bantSignals.length > 0 && (
+          <LiveCollapsibleSection
+            flush
+            title="BANT signals"
+            summary={`${bantSignals.length} captured signals`}
+            count={bantSignals.length}
+          >
+            <div className="pt-2">
+              <SignalLog signals={bantSignals} />
+            </div>
+          </LiveCollapsibleSection>
+        )}
+
+        {suggestionLog.length > 0 && (
+          <LiveCollapsibleSection
+            flush
+            title="AI suggestion log"
+            summary={`${suggestionLog.length} suggestions shown`}
+            count={suggestionLog.length}
+          >
+            <div className="pt-2">
+              <SuggestionLog entries={suggestionLog} compact />
+            </div>
+          </LiveCollapsibleSection>
+        )}
 
         <LiveCollapsibleSection
           flush
@@ -517,9 +704,25 @@ export function LiveMetricsRail({
         <SentimentSection
           transcript={transcript}
           sentimentAE={sentimentAE}
+          salesRepTone={salesRepTone}
           sentimentCustomer={sentimentCustomer}
+          customerSentiment={customerSentiment}
           sentimentShift={sentimentShift}
         />
+      </section>
+
+      <section data-testid="sentiment-signals-section">
+        <LiveSubsectionHeader title="Sentiment signals" />
+        <SentimentSignalLog signals={sentimentSignals} />
+      </section>
+
+      <section>
+        <LiveSubsectionHeader title="BANT signals" />
+        <SignalLog signals={bantSignals} />
+      </section>
+
+      <section>
+        <SuggestionLog entries={suggestionLog} />
       </section>
 
       <section>

@@ -380,7 +380,7 @@ def default_agent_config(agent_id: str) -> Dict[str, Any]:
             {"id": "sr-1", "keyword_pattern": "competitor|alternative|vs\\s|compared to", "signal_type": "competitor_mentioned", "nudge_type": "objection_handler", "target_role": "AE", "enabled": True, "confidence_threshold": 0.75},
             {"id": "sr-2", "keyword_pattern": "budget|cost|price|pricing|invoice|spend", "signal_type": "budget_signal", "nudge_type": "discovery_question", "target_role": "AE", "enabled": True, "confidence_threshold": 0.70},
             {"id": "sr-3", "keyword_pattern": "integration|API|technical|architecture|stack", "signal_type": "technical_question", "nudge_type": "reference_asset", "target_role": "SE", "enabled": True, "confidence_threshold": 0.65},
-            {"id": "sr-4", "keyword_pattern": "timeline|deadline|launch|go-live|urgent", "signal_type": "timeline_signal", "nudge_type": "discovery_question", "target_role": "AE", "enabled": True, "confidence_threshold": 0.70},
+            {"id": "sr-4", "keyword_pattern": "timeline|eta|estimated delivery|delivery date|completion date|deadline|launch|go-live|kickoff|rollout|pilot|urgent|q[1-4]", "signal_type": "timeline_signal", "nudge_type": "discovery_question", "target_role": "AE", "enabled": True, "confidence_threshold": 0.70},
             {"id": "sr-5", "keyword_pattern": "design|mockup|prototype|UX|demo", "signal_type": "design_query", "nudge_type": "reference_asset", "target_role": "Designer", "enabled": False, "confidence_threshold": 0.60},
         ]
 

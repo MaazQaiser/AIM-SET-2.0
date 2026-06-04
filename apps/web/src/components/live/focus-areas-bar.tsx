@@ -3,6 +3,7 @@
 import { Activity, Target } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { cn } from "@/lib/cn";
+import { formatBudgetSignalLabel } from "@/lib/currency-format";
 import type { BantSignal } from "@/lib/live-types";
 
 const dimStyles: Record<
@@ -71,6 +72,8 @@ export function FocusAreasBar({ areas, intentLabel, bantSignals = [] }: FocusAre
           ))}
           {recentSignals.map((s) => {
             const style = dimStyles[s.dimension];
+            const label =
+              s.dimension === "budget" ? formatBudgetSignalLabel(s.label, s.value) : s.label;
             return (
               <span
                 key={s.id}
@@ -78,11 +81,11 @@ export function FocusAreasBar({ areas, intentLabel, bantSignals = [] }: FocusAre
                   "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] shadow-sm",
                   style.className
                 )}
-                title={s.label}
+                title={label}
               >
                 <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", style.dot)} aria-hidden />
                 <span className="font-medium text-foreground/90">{style.label}</span>
-                <span className="text-muted-foreground truncate max-w-[140px]">{s.label}</span>
+                <span className="text-muted-foreground truncate max-w-[140px]">{label}</span>
               </span>
             );
           })}

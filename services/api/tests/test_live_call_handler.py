@@ -78,6 +78,12 @@ def test_handle_transcript_segment_emits_analyzed_sentiment():
     ]
     assert sentiment_messages
     assert sentiment_messages[-1]["payload"]["customer"] < 0
+    assert sentiment_messages[-1]["payload"]["signal"]["tone"] == "negative"
+    sentiment_signal_messages = [
+        msg for msg in out["ws_messages"] if msg.get("type") == "sentiment_signal"
+    ]
+    assert sentiment_signal_messages
+    assert sentiment_signal_messages[-1]["payload"]["snippet"].startswith("I'm not sure")
     events = get_live_call_repository().list_transcript_events(ctx, call_id)
     assert events[-1]["sentiment"] == "negative"
 

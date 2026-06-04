@@ -50,6 +50,20 @@ def test_keyword_routing_budget():
     assert r["signal_type"] == "budget_signal"
 
 
+def test_keyword_routing_timeline_eta():
+    rules = [
+        {
+            "id": "sr-4",
+            "keyword_pattern": "timeline|eta|estimated delivery|delivery date|completion date|deadline|launch|go-live|kickoff|rollout|pilot|urgent|q[1-4]",
+            "signal_type": "timeline_signal",
+            "enabled": True,
+            "confidence_threshold": 0.7,
+        }
+    ]
+    r = extract_keywords("The project ETA is six weeks from kickoff.", signal_routing=rules)
+    assert r["signal_type"] == "timeline_signal"
+
+
 def test_analyze_segment_updates_counts():
     ctx = TenantContext(tenant_id="test-tenant", user_id="u1")
     call_id = "call-test-budget"
@@ -86,6 +100,100 @@ def test_analyze_segment_prioritizes_pain_point_nudge():
     assert out["nudge"]["message"].startswith("Customer raised:")
     assert "bottleneck" in out["nudge"]["message"]
     assert out["intent_update"]["pains"]
+
+
+def test_analyze_segment_emits_sentiment_signal_and_ignores_neutral_filler():
+    ctx = TenantContext(tenant_id="test-tenant-sentiment-signal", user_id="u1")
+    call_id = "call-test-sentiment-signal"
+
+    concern = analyze_segment(
+        ctx,
+        call_id,
+        {
+            "id": "sentiment-signal-1",
+            "text": "I'm not sure that you will be able to help us overcome this challenge.",
+            "speakerId": "cust-1",
+            "speakerName": "Alex",
+            "speakerRole": "customer",
+            "timestamp": 19,
+        },
+    )
+
+    assert concern["transcript"]["sentiment"] == "negative"
+    assert concern["sentiment"]["customer"] < 0
+    assert concern["sentiment"]["signal"]["tone"] == "negative"
+    assert concern["sentiment"]["signal"]["label"] == "Customer sentiment: Decision risk"
+    assert concern["sentiment"]["customerSentiment"]["label"] == "Decision risk"
+    assert "Clarify the doubt" in concern["sentiment"]["customerSentiment"]["guidance"]
+    assert concern["sentiment"]["signal"]["snippet"].startswith("I'm not sure")
+
+    filler = analyze_segment(
+        ctx,
+        call_id,
+        {
+            "id": "sentiment-signal-2",
+            "text": "now",
+            "speakerId": "cust-1",
+            "speakerName": "Alex",
+            "speakerRole": "customer",
+            "timestamp": 54,
+        },
+    )
+
+    assert filler["transcript"]["sentiment"] == "neutral"
+    assert filler["sentiment"]["signal"] is None
+    assert filler["sentiment"]["customer"] < 0
+    assert filler["sentiment"]["customerSentiment"] == concern["sentiment"]["customerSentiment"]
+
+
+def test_internal_speaker_sentiment_signal_uses_sales_rep_label():
+    ctx = TenantContext(tenant_id="test-tenant-sales-rep-sentiment-signal", user_id="u1")
+    call_id = "call-test-sales-rep-sentiment-signal"
+
+    out = analyze_segment(
+        ctx,
+        call_id,
+        {
+            "id": "sentiment-signal-sales-rep",
+            "text": "I'm concerned this is getting confusing and risky.",
+            "speakerId": "ae-sarah",
+            "speakerName": "Sarah",
+            "speakerRole": "ae",
+            "timestamp": 24,
+        },
+    )
+
+    assert out["sentiment"]["signal"]["tone"] == "negative"
+    assert out["sentiment"]["signal"]["label"] == "Sales rep tone: Needs reset"
+    assert "AE" not in out["sentiment"]["signal"]["label"]
+    assert out["sentiment"]["salesRepTone"]["label"] == "Needs reset"
+    assert "Soften the wording" in out["sentiment"]["salesRepTone"]["guidance"]
+    assert out["sentiment"]["salesRepTone"]["tone"] == "negative"
+
+
+def test_internal_speaker_discovery_question_gets_actionable_tone_cue():
+    ctx = TenantContext(tenant_id="test-tenant-sales-rep-discovery-tone", user_id="u1")
+    call_id = "call-test-sales-rep-discovery-tone"
+
+    out = analyze_segment(
+        ctx,
+        call_id,
+        {
+            "id": "sentiment-signal-sales-rep-question",
+            "text": (
+                "Understood. When you say AI-native for franchise ops, "
+                "what's broken today across corporate and franchisees?"
+            ),
+            "speakerId": "ae-sarah",
+            "speakerName": "Sarah",
+            "speakerRole": "ae",
+            "timestamp": 30,
+        },
+    )
+
+    assert out["transcript"]["sentiment"] == "positive"
+    assert out["sentiment"]["salesRepTone"]["label"] == "Empathetic discovery"
+    assert out["sentiment"]["salesRepTone"]["guidance"].startswith("Good direction")
 
 
 def test_analyze_segment_detects_positive_customer_recovery_shift():
@@ -135,6 +243,7 @@ def test_analyze_segment_detects_positive_customer_recovery_shift():
     assert out["transcript"]["sentiment"] == "positive"
     assert out["sentiment"]["customer"] > 0
     assert out["sentiment"]["shift"]["direction"] == "positive"
+    assert out["sentiment"]["customerSentiment"]["label"] == "Buying confidence"
 
 
 def test_analyze_segment_survives_tenant_resolution_failure(monkeypatch):

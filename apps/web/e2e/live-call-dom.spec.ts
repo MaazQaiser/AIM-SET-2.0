@@ -2,7 +2,8 @@ import { test, expect } from "@playwright/test";
 
 test.setTimeout(120_000);
 
-const CALL_ID = "frontera-franchise-group";
+const RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const CALL_ID = `frontera-franchise-group-e2e-${RUN_ID}`;
 const API_BASE = process.env.PLAYWRIGHT_API_URL ?? "http://localhost:8000";
 const TENANT = "e2e-tenant";
 const USER = "e2e-user";
@@ -40,7 +41,11 @@ async function postDemoSegment(
   });
   expect(res.ok(), `demo-segment failed: ${res.status()} ${await res.text()}`).toBeTruthy();
   const body = (await res.json()) as {
-    checklist?: { bantCoverage?: number; bant?: Record<string, string> };
+    checklist?: {
+      bantCoverage?: number;
+      bant?: Record<string, string>;
+      items?: Array<{ id?: string; evidence?: Array<{ value?: string; snippet?: string }> }>;
+    };
     ws_messages?: unknown[];
   };
   expect(body.checklist).toBeTruthy();
@@ -73,17 +78,59 @@ test.describe("Live call cockpit — DOM + API", () => {
     ).toBeVisible({
       timeout: 60_000,
     });
-    await expect(
-      page.getByText(/Customer raised:|align next questions to this pain/i).first()
-    ).toBeVisible({
-      timeout: 45_000,
-    });
+    const assistantCards = page.getByTestId("live-assistant-card");
+    const customerIntentCard = assistantCards.filter({ hasText: /Customer intent:/i }).first();
+    await expect(customerIntentCard).toBeVisible({ timeout: 45_000 });
+    await expect(customerIntentCard).toContainText(
+      /Pain exposed|Decision risk|Buying confidence|Evaluating fit|Listening mode/i
+    );
+    await expect(customerIntentCard).not.toContainText(/Customer raised:/i);
+    await expect
+      .poll(async () => {
+        const cardTexts = (await assistantCards.allInnerTexts()).map((text) =>
+          text.replace(/\s+/g, " ").trim().toLowerCase()
+        );
+        return new Set(cardTexts).size === cardTexts.length;
+      })
+      .toBeTruthy();
 
-    const sentimentSection = page.locator("section", { hasText: "Sentiment" }).first();
+    const sentimentSection = page.getByTestId("sentiment-section");
+    const customerTile = sentimentSection.locator('[data-sentiment-label="customer"]');
+    const repToneTile = sentimentSection.locator('[data-sentiment-label="sales-rep"]');
     await expect(sentimentSection).toContainText("Customer");
+    await expect(sentimentSection).toContainText(/Sales rep tone/i);
+    await expect(sentimentSection).toContainText(/Recommended move/i);
+    await expect(sentimentSection).not.toContainText(/\bAE\b/);
+    await expect(page.locator("body")).not.toContainText(/\bAE\b/);
+    await expect(customerTile).not.toContainText(/[+-]\d+%\s+(concern|upbeat)/i);
+    await expect(customerTile).toContainText(
+      /Pain exposed|Decision risk|Buying confidence|Evaluating fit|Listening mode/i
+    );
+    await expect(repToneTile).not.toContainText(/[+-]\d+%\s+(concern|upbeat)/i);
+    await expect(repToneTile).toContainText(
+      /Empathetic discovery|Focused discovery|Steady delivery|Needs reset|Confident support/i
+    );
+    await expect
+      .poll(async () => {
+        const bodyText = await page.locator("body").innerText();
+        const salesRepToneLines = bodyText
+          .split(/\n/)
+          .filter((line) => /Sales rep tone/i.test(line));
+        return salesRepToneLines.join("\n");
+      })
+      .not.toMatch(/[+-]\d+%\s+(concern|upbeat)/i);
+    await expect
+      .poll(async () => {
+        const bodyText = await page.locator("body").innerText();
+        const customerSentimentLines = bodyText
+          .split(/\n/)
+          .filter((line) => /Customer sentiment:/i.test(line));
+        return customerSentimentLines.join("\n");
+      })
+      .not.toMatch(/[+-]\d+%\s+(concern|upbeat)/i);
     await expect
       .poll(async () => sentimentSection.innerText(), { timeout: 45_000 })
-      .toMatch(/Customer\s+-\d+%\s+concern/i);
+      .toMatch(/Customer\s+(Pain exposed|Decision risk|Buying confidence|Evaluating fit|Listening mode)/i);
 
     await expect(page.getByText(/budget|four hundred|six hundred|carved/i).first()).toBeVisible({
       timeout: 90_000,
@@ -122,7 +169,18 @@ test.describe("Live call cockpit — DOM + API", () => {
     expect((lastSegment.checklist?.bantCoverage ?? 0) > 0).toBeTruthy();
     const bant = lastSegment.checklist?.bant ?? {};
     expect(["partial", "confirmed"]).toContainEqual(bant.budget);
+    expect(["partial", "confirmed"]).toContainEqual(bant.authority);
     expect(["partial", "confirmed"]).toContainEqual(bant.timeline);
+
+    const authorityItem = lastSegment.checklist?.items?.find((item) => item.id === "authority");
+    const authorityEvidence = authorityItem?.evidence?.at(-1);
+    expect(authorityEvidence?.value?.toLowerCase()).toContain("board");
+    expect(authorityEvidence?.value).not.toMatch(/ai-native platform|dashboard/i);
+
+    const bantLiveSection = page.getByTestId("bant-live-section");
+    await expect(bantLiveSection).toContainText(/Authority/i, { timeout: 25_000 });
+    await expect(bantLiveSection).toContainText(/board/i, { timeout: 25_000 });
+    await expect(bantLiveSection).not.toContainText(/AI-native platform to/i);
   });
 
   test("API demo-segment updates BANT checklist", async ({ request }) => {
@@ -132,6 +190,28 @@ test.describe("Live call cockpit — DOM + API", () => {
     expect((out.checklist?.bantCoverage ?? 0) > 0).toBeTruthy();
   });
 
+  test("API timeline ETA segment appears in BANT timeline UI", async ({ page, request }) => {
+    await page.goto(`/calls/${CALL_ID}/live`, { waitUntil: "domcontentloaded" });
+    await expect(page.locator(`a[href="/calls/${CALL_ID}"]`).first()).toBeVisible({
+      timeout: 20_000,
+    });
+
+    const out = await postDemoSegment(request, {
+      text: "Our project ETA is six weeks from kickoff after procurement.",
+      speaker_role: "customer",
+      offset_seconds: 132,
+    });
+    const timelineItem = out.checklist?.items?.find((item) => item.id === "timeline");
+    const timelineEvidence = timelineItem?.evidence?.at(-1);
+    expect(timelineEvidence?.value).toContain("project ETA is six weeks from kickoff");
+
+    const bantLiveSection = page.getByTestId("bant-live-section");
+    await expect(bantLiveSection).toContainText(/Timeline/i, { timeout: 25_000 });
+    await expect(bantLiveSection).toContainText(/project ETA is six weeks from kickoff/i, {
+      timeout: 25_000,
+    });
+  });
+
   test("API sentiment payloads switch the rail between red and green", async ({
     page,
     request,
@@ -139,9 +219,17 @@ test.describe("Live call cockpit — DOM + API", () => {
     await page.goto(`/calls/${CALL_ID}/live`, { waitUntil: "domcontentloaded" });
     await expect(page.getByText("Connecting stream…")).toBeHidden({ timeout: 25_000 });
 
-    const sentimentSection = page.locator("section", { hasText: "Sentiment" }).first();
+    const sentimentSection = page.getByTestId("sentiment-section");
+    const sentimentSignalsSection = page.getByTestId("sentiment-signals-section");
     const customerTile = sentimentSection.locator('[data-sentiment-label="customer"]');
+    const repToneTile = sentimentSection.locator('[data-sentiment-label="sales-rep"]');
+    const decisionCue = page.getByTestId("sentiment-decision-cue");
     const currentBar = sentimentSection.locator('[data-current-sentiment="true"]').last();
+
+    await expect(customerTile).not.toContainText(/[+-]\d+%\s+(concern|upbeat)/i);
+    await expect(repToneTile).toContainText(/Sales rep tone/i);
+    await expect(repToneTile).not.toContainText(/[+-]\d+%\s+(concern|upbeat)/i);
+    await expect(decisionCue).toContainText(/Recommended move/i);
 
     await postDemoSegment(request, {
       text: "Manual audits are a nightmare and a bottleneck, and we are concerned about delays.",
@@ -155,7 +243,16 @@ test.describe("Live call cockpit — DOM + API", () => {
     await expect
       .poll(async () => currentBar.getAttribute("data-sentiment-tone"), { timeout: 25_000 })
       .toBe("negative");
-    await expect(sentimentSection).toContainText(/Customer\s*-\d+%\s+concern/i);
+    await expect(customerTile).toContainText(/Pain exposed|Decision risk/i);
+    await expect(customerTile).not.toContainText(/[+-]\d+%\s+(concern|upbeat)/i);
+    await expect
+      .poll(async () => decisionCue.getAttribute("data-sentiment-decision"), { timeout: 25_000 })
+      .toBe("recover");
+    await expect(decisionCue).toContainText(/Recover trust/i);
+    await expect(sentimentSignalsSection).toContainText(/Customer sentiment:\s*(Pain exposed|Decision risk)/i, {
+      timeout: 25_000,
+    });
+    await expect(sentimentSignalsSection).toContainText(/nightmare and a bottleneck/i);
 
     await postDemoSegment(request, {
       text: "That's a great first answer and exactly what we needed. We are excited to move forward.",
@@ -169,6 +266,8 @@ test.describe("Live call cockpit — DOM + API", () => {
     await expect
       .poll(async () => currentBar.getAttribute("data-sentiment-tone"), { timeout: 25_000 })
       .toBe("positive");
-    await expect(sentimentSection).toContainText(/Customer\s*\+\d+%\s+upbeat/i);
+    await expect(customerTile).toContainText(/Buying confidence|Engaged buyer/i);
+    await expect(customerTile).not.toContainText(/[+-]\d+%\s+(concern|upbeat)/i);
+    await expect(sentimentSignalsSection).toContainText(/Customer sentiment:\s*(Buying confidence|Engaged buyer)/i);
   });
 });

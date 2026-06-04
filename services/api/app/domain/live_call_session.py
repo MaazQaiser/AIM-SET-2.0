@@ -32,7 +32,9 @@ class LiveCallSession:
     focus_areas: List[str] = field(default_factory=list)
     brief_context: BriefContext = field(default_factory=BriefContext)
     last_ae_score: float = 0.0
+    last_sales_rep_tone: Optional[Dict[str, Any]] = None
     last_customer_score: float = 0.0
+    last_customer_sentiment: Optional[Dict[str, Any]] = None
     customer_recent_scores: List[float] = field(default_factory=list)
     segment_count: int = 0
     topic_spike_counts: Dict[str, int] = field(default_factory=dict)
@@ -46,7 +48,9 @@ class LiveCallSession:
             "top_keywords": self.top_keywords,
             "keyword_stats": self.keyword_stats_payload(),
             "sentiment_ae": self.last_ae_score,
+            "sales_rep_tone": self.last_sales_rep_tone,
             "sentiment_customer": self.last_customer_score,
+            "customer_sentiment": self.last_customer_sentiment,
             "sentiment_shift": self.sentiment_shift,
         }
 

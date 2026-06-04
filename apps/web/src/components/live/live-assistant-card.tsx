@@ -51,6 +51,7 @@ export interface LiveAssistantCardProps {
 }
 
 export function LiveAssistantCard({
+  id,
   kind,
   message,
   contextLabel,
@@ -64,6 +65,8 @@ export function LiveAssistantCard({
 
   return (
     <article
+      data-testid="live-assistant-card"
+      data-assistant-id={id}
       className={cn(
         "app-card relative px-3.5 py-3 shadow-none",
         className

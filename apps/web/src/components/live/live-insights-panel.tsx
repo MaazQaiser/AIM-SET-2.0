@@ -11,8 +11,17 @@ import {
   LiveCopilotChatThread,
 } from "@/components/live/live-copilot-chat";
 import { LiveMetricsRail } from "@/components/live/live-metrics-rail";
+import type { BantSignal } from "@/lib/live-types";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
-import type { KeywordStats, SentimentShift, TranscriptEvent } from "@/types";
+import type {
+  CustomerSentimentCue,
+  KeywordStats,
+  SalesRepToneCue,
+  SentimentShift,
+  SentimentSignal,
+  SuggestionLogEntry,
+  TranscriptEvent,
+} from "@/types";
 
 export interface LiveInsightsFeedItem {
   id: string;
@@ -32,8 +41,13 @@ interface LiveInsightsPanelProps {
   keywords: string[];
   transcript: TranscriptEvent[];
   sentimentAE: number;
+  salesRepTone: SalesRepToneCue | null;
   sentimentCustomer: number;
+  customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
+  sentimentSignals: SentimentSignal[];
+  bantSignals: BantSignal[];
+  suggestionLog: SuggestionLogEntry[];
   openGaps: string[];
 }
 
@@ -45,8 +59,13 @@ export function LiveInsightsPanel({
   keywords,
   transcript,
   sentimentAE,
+  salesRepTone,
   sentimentCustomer,
+  customerSentiment,
   sentimentShift,
+  sentimentSignals,
+  bantSignals,
+  suggestionLog,
   openGaps,
 }: LiveInsightsPanelProps) {
   return (
@@ -61,8 +80,13 @@ export function LiveInsightsPanel({
           keywords={keywords}
           transcript={transcript}
           sentimentAE={sentimentAE}
+          salesRepTone={salesRepTone}
           sentimentCustomer={sentimentCustomer}
+          customerSentiment={customerSentiment}
           sentimentShift={sentimentShift}
+          sentimentSignals={sentimentSignals}
+          bantSignals={bantSignals}
+          suggestionLog={suggestionLog}
           openGaps={openGaps}
           panelChildren={
             <>

@@ -236,7 +236,15 @@ def handle_transcript_segment(
         payload = {"ae": sent.get("ae", 0), "customer": sent.get("customer", 0)}
         if sent.get("shift"):
             payload["shift"] = sent["shift"]
+        if sent.get("signal"):
+            payload["signal"] = sent["signal"]
+        if sent.get("salesRepTone"):
+            payload["salesRepTone"] = sent["salesRepTone"]
+        if sent.get("customerSentiment"):
+            payload["customerSentiment"] = sent["customerSentiment"]
         ws_messages.append({"type": "sentiment", "payload": payload})
+        if sent.get("signal"):
+            ws_messages.append({"type": "sentiment_signal", "payload": sent["signal"]})
 
     nudge = analysis.get("nudge")
     for e in envelopes:
