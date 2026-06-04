@@ -19,6 +19,7 @@ import { normalizeSummarySections } from "@dc-copilot/types/brief";
 import type {
   CallBrief,
   ContentToGenerate,
+  PostCallEmailAttachmentMissing,
   PostCallEmailDraft,
   PostCallJiraTicket,
   PostCallPipelineResult,
@@ -41,6 +42,8 @@ import {
 import { hasClientUnsafeEmailText, sanitizeClientEmailDraft } from "@/lib/post-dc-client-email-safety";
 import type { TaskItem } from "@/components/post-dc/crm-task-list";
 import type { ActivityEvent, AgentRun } from "@/types/agents";
+import type { PlannedArtifactType } from "@dc-copilot/types/brief";
+import { mapPostDcGapType } from "@/lib/content/group-post-dc-gaps";
 
 const REFETCH_MS = 30_000;
 
@@ -51,6 +54,35 @@ export interface PreDcContentGenerationGap extends ContentToGenerate {
   leadTitle?: string;
   scheduledAt?: string;
   studioHref: string;
+}
+
+export interface PostDcContentGenerationGap {
+  id: string;
+  callId: string;
+  accountName: string;
+  leadName?: string;
+  leadTitle?: string;
+  scheduledAt?: string;
+  name: string;
+  type: PlannedArtifactType;
+  priority: number;
+  status: "missing";
+  reason: string;
+  neededFor: string;
+  studioHref: string;
+}
+
+function formatPostDcMissingReason(requiredData: string): string {
+  const text = requiredData.trim();
+  if (!text) return "Suggested from discovery gaps on this call.";
+
+  const evidenceMatch = text.match(/Transcript evidence:\s*(.+)/i);
+  if (evidenceMatch?.[1]) return evidenceMatch[1].trim();
+
+  const createMatch = text.match(/Create or find:\s*(.+)/i);
+  if (createMatch?.[1]) return createMatch[1].replace(/\.\s*Transcript evidence:.*$/i, "").trim();
+
+  return text;
 }
 
 function withEmailAttachments(
@@ -584,6 +616,70 @@ export function usePreDcContentGenerationGaps() {
           if (a.priority !== b.priority) return a.priority - b.priority;
           return new Date(a.scheduledAt ?? 0).getTime() - new Date(b.scheduledAt ?? 0).getTime();
         });
+    },
+    staleTime: REFETCH_MS,
+    refetchInterval: REFETCH_MS,
+  });
+}
+
+function collectPostDcMissingGaps(
+  calls: Call[],
+  postRunMetaByCallId: Record<string, { emailAttachments?: { missing?: PostCallEmailAttachmentMissing[] } }>,
+  emailDraftsByCallId: Record<string, PostCallEmailDraft>
+): PostDcContentGenerationGap[] {
+  const callById = new Map(calls.map((call) => [call.id, call]));
+  const seen = new Set<string>();
+  const gaps: PostDcContentGenerationGap[] = [];
+
+  const addMissing = (callId: string, item: PostCallEmailAttachmentMissing) => {
+    const key = `${callId}:${item.name.trim().toLowerCase()}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    const call = callById.get(callId);
+    gaps.push({
+      id: key,
+      callId,
+      accountName: call?.accountName ?? callId,
+      leadName: call?.leadName,
+      leadTitle: call?.leadTitle,
+      scheduledAt: call?.scheduledAt,
+      name: item.name,
+      type: mapPostDcGapType(item.name),
+      priority: 2,
+      status: "missing",
+      reason: formatPostDcMissingReason(item.requiredData),
+      neededFor: "Post-call follow-up and email attachments",
+      studioHref: item.contentStudioLink || "/content/studio",
+    });
+  };
+
+  for (const [callId, meta] of Object.entries(postRunMetaByCallId)) {
+    for (const item of meta?.emailAttachments?.missing ?? []) {
+      addMissing(callId, item);
+    }
+  }
+
+  for (const [callId, draft] of Object.entries(emailDraftsByCallId)) {
+    for (const item of draft.attachments?.missing ?? []) {
+      addMissing(callId, item);
+    }
+  }
+
+  return gaps.sort((a, b) => {
+    const accountCompare = a.accountName.localeCompare(b.accountName);
+    if (accountCompare !== 0) return accountCompare;
+    return (a.leadName ?? "").localeCompare(b.leadName ?? "");
+  });
+}
+
+export function usePostDcContentGenerationGaps() {
+  return useQuery({
+    queryKey: ["post-dc-content-generation-gaps", getImportVersion()],
+    queryFn: async () => {
+      const calls = await fetchCallsFromApi();
+      const { postRunMetaByCallId, emailDraftsByCallId } = useDcImportsStore.getState();
+      return collectPostDcMissingGaps(calls, postRunMetaByCallId, emailDraftsByCallId);
     },
     staleTime: REFETCH_MS,
     refetchInterval: REFETCH_MS,

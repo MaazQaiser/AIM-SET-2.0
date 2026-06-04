@@ -1,24 +1,33 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import {
   ArrowUpRight,
-  Building2,
   CalendarClock,
   FilePlus2,
   FileText,
   Lightbulb,
-  User,
   Users,
 } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import { PageShell } from "@/components/layout/page-shell";
 import { AIGeneratedBadge } from "@/components/ai-generated-badge";
-import { useContentGaps, usePreDcContentGenerationGaps } from "@/lib/data/hooks";
-import type { PreDcContentGenerationGap } from "@/lib/data/hooks";
+import {
+  useContentGaps,
+  usePostDcContentGenerationGaps,
+  usePreDcContentGenerationGaps,
+} from "@/lib/data/hooks";
+import {
+  groupPreDcGaps,
+  type ContentGenerationLead,
+  type PreDcGenerationGroup,
+} from "@/lib/content/group-pre-dc-gaps";
+import { groupPostDcGaps } from "@/lib/content/group-post-dc-gaps";
 
 const statusConfig = {
   draft: { variant: "warning" as const, label: "Draft ready" },
@@ -31,95 +40,20 @@ const preDcStatusConfig = {
   partial: { variant: "warning" as const, label: "Partial" },
 };
 
+type ContentInputTab = "pre-dc" | "post-dc";
+
 function formatArtifactType(value: string) {
   return value.replace(/_/g, " ");
-}
-
-function formatCallTime(value?: string) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function normalizeDocumentKey(item: PreDcContentGenerationGap) {
-  return `${item.type}:${item.name.trim().replace(/\s+/g, " ").toLowerCase()}`;
-}
-
-interface PreDcGenerationGroup {
-  id: string;
-  name: string;
-  type: PreDcContentGenerationGap["type"];
-  priority: number;
-  status: PreDcContentGenerationGap["status"];
-  reason: string;
-  neededFor: string;
-  studioHref: string;
-  leads: PreDcContentGenerationGap[];
-}
-
-function buildGroupStudioHref(group: Omit<PreDcGenerationGroup, "studioHref">) {
-  const params = new URLSearchParams({
-    template: group.type,
-    source: "pre-dc",
-    asset: group.name,
-    leadCount: String(group.leads.length),
-  });
-  return `/content/studio?${params.toString()}`;
-}
-
-function groupPreDcGaps(items: PreDcContentGenerationGap[]): PreDcGenerationGroup[] {
-  const byDocument = new Map<string, Omit<PreDcGenerationGroup, "studioHref">>();
-
-  for (const item of items) {
-    const key = normalizeDocumentKey(item);
-    const existing = byDocument.get(key);
-    if (!existing) {
-      byDocument.set(key, {
-        id: key,
-        name: item.name,
-        type: item.type,
-        priority: item.priority,
-        status: item.status,
-        reason: item.reason,
-        neededFor: item.neededFor,
-        leads: [item],
-      });
-      continue;
-    }
-
-    existing.priority = Math.min(existing.priority, item.priority);
-    existing.status = existing.status === "missing" || item.status === "missing" ? "missing" : "partial";
-    existing.leads.push(item);
-  }
-
-  return [...byDocument.values()]
-    .map((group) => ({
-      ...group,
-      studioHref: buildGroupStudioHref(group),
-      leads: group.leads.sort((a, b) => {
-        const accountCompare = a.accountName.localeCompare(b.accountName);
-        if (accountCompare !== 0) return accountCompare;
-        return (a.leadName ?? "").localeCompare(b.leadName ?? "");
-      }),
-    }))
-    .sort((a, b) => {
-      if (a.priority !== b.priority) return a.priority - b.priority;
-      if (b.leads.length !== a.leads.length) return b.leads.length - a.leads.length;
-      return a.name.localeCompare(b.name);
-    });
 }
 
 export default function ContentPage() {
   const { data: gaps = [] } = useContentGaps();
   const { data: preDcGaps = [] } = usePreDcContentGenerationGaps();
+  const { data: postDcGaps = [] } = usePostDcContentGenerationGaps();
   const preDcGroups = groupPreDcGaps(preDcGaps);
-  const hasAnyGaps = preDcGaps.length > 0 || gaps.length > 0;
+  const postDcGroups = groupPostDcGaps(postDcGaps);
+  const hasAgentInputs = preDcGaps.length > 0 || postDcGaps.length > 0;
+  const hasAnyGaps = hasAgentInputs || gaps.length > 0;
 
   return (
     <PageShell size="wide">
@@ -135,9 +69,12 @@ export default function ContentPage() {
         </Button>
       </div>
 
-      {preDcGroups.length > 0 && (
-        <PreDcGenerationQueue gapCount={preDcGaps.length} groups={preDcGroups} />
-      )}
+      <ContentAgentInputsSection
+        preDcGroups={preDcGroups}
+        preDcGapCount={preDcGaps.length}
+        postDcGroups={postDcGroups}
+        postDcGapCount={postDcGaps.length}
+      />
 
       {gaps.length > 0 && (
         <div className="space-y-4">
@@ -192,87 +129,139 @@ export default function ContentPage() {
         <EmptyState
           icon={Lightbulb}
           title="No content gaps detected"
-          description="Missing Pre-DC assets will appear here with the lead they belong to."
+          description="Missing Pre-DC and Post-DC assets will appear here with the lead they belong to."
         />
       )}
     </PageShell>
   );
 }
 
-function PreDcGenerationQueue({
-  groups,
-  gapCount,
+function ContentAgentInputsSection({
+  preDcGroups,
+  preDcGapCount,
+  postDcGroups,
+  postDcGapCount,
 }: {
-  groups: PreDcGenerationGroup[];
-  gapCount: number;
+  preDcGroups: PreDcGenerationGroup[];
+  preDcGapCount: number;
+  postDcGroups: PreDcGenerationGroup[];
+  postDcGapCount: number;
 }) {
+  const defaultTab: ContentInputTab = preDcGapCount > 0 ? "pre-dc" : "post-dc";
+  const [activeTab, setActiveTab] = useState<ContentInputTab>(defaultTab);
+
+  const activeGroups = activeTab === "pre-dc" ? preDcGroups : postDcGroups;
+  const activeGapCount = activeTab === "pre-dc" ? preDcGapCount : postDcGapCount;
+  const description =
+    activeTab === "pre-dc"
+      ? "Missing assets detected during call prep, grouped by required document."
+      : "Missing assets flagged after call wrap-up, grouped by required document.";
+
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-foreground">Pre-DC content agent inputs</h2>
-          <p className="text-xs text-muted-foreground">
-            Missing assets detected during call prep, grouped by required document.
-          </p>
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as ContentInputTab)}
+        className="space-y-3"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-foreground">Content agent inputs</h2>
+            <p className="text-xs text-muted-foreground">{description}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <TabsList className="h-9 rounded-lg bg-muted/50 p-1">
+              <TabsTrigger value="pre-dc" className="text-xs px-3">
+                Pre-DC
+                {preDcGapCount > 0 && (
+                  <span className="ml-1.5 rounded-full bg-background px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
+                    {preDcGapCount}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="post-dc" className="text-xs px-3">
+                Post-DC
+                {postDcGapCount > 0 && (
+                  <span className="ml-1.5 rounded-full bg-background px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
+                    {postDcGapCount}
+                  </span>
+                )}
+              </TabsTrigger>
+            </TabsList>
+            {activeGroups.length > 0 && (
+              <Badge variant="warning">
+                {activeGroups.length} asset{activeGroups.length === 1 ? "" : "s"} across {activeGapCount}{" "}
+                lead{activeGapCount === 1 ? "" : "s"}
+              </Badge>
+            )}
+          </div>
         </div>
-        <Badge variant="warning">
-          {groups.length} asset{groups.length === 1 ? "" : "s"} across {gapCount} lead
-          {gapCount === 1 ? "" : "s"}
-        </Badge>
-      </div>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        {groups.map((group) => (
-          <PreDcGenerationCard key={group.id} group={group} />
-        ))}
-      </div>
+        <TabsContent value="pre-dc" className="m-0 focus-visible:outline-none">
+          <ContentGenerationGrid groups={preDcGroups} emptyMessage="No Pre-DC content gaps detected yet." />
+        </TabsContent>
+        <TabsContent value="post-dc" className="m-0 focus-visible:outline-none">
+          <ContentGenerationGrid
+            groups={postDcGroups}
+            emptyMessage="No Post-DC content gaps detected yet. Run call wrap-up to flag missing assets."
+          />
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }
 
-function PreDcGenerationCard({ group }: { group: PreDcGenerationGroup }) {
+function ContentGenerationGrid({
+  groups,
+  emptyMessage,
+}: {
+  groups: PreDcGenerationGroup[];
+  emptyMessage: string;
+}) {
+  if (groups.length === 0) {
+    return (
+      <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+        {emptyMessage}
+      </p>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 lg:grid-cols-2">
+      {groups.map((group) => (
+        <ContentGenerationCard key={group.id} group={group} />
+      ))}
+    </div>
+  );
+}
+
+function ContentGenerationCard({ group }: { group: PreDcGenerationGroup }) {
   const status = preDcStatusConfig[group.status];
   const visibleLeads = group.leads.slice(0, 4);
   const remainingLeadCount = Math.max(group.leads.length - visibleLeads.length, 0);
 
   return (
-    <Card className="overflow-hidden">
+    <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-2">
-            <FilePlus2 className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-            <div className="min-w-0">
-              <CardTitle className="break-words text-sm font-medium">{group.name}</CardTitle>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="capitalize">
-                  {formatArtifactType(group.type)}
-                </Badge>
-                <Badge variant={status.variant}>{status.label}</Badge>
-                <Badge variant="outline">P{group.priority}</Badge>
-                <Badge variant="outline">
-                  <Users className="h-3 w-3" />
-                  Needed by {group.leads.length} lead{group.leads.length === 1 ? "" : "s"}
-                </Badge>
-              </div>
+        <div className="flex min-w-0 items-start gap-2">
+          <FilePlus2 className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+          <div className="min-w-0">
+            <CardTitle className="break-words text-sm font-medium">{group.name}</CardTitle>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="capitalize">
+                {formatArtifactType(group.type)}
+              </Badge>
+              <Badge variant={status.variant}>{status.label}</Badge>
+              <Badge variant="outline">P{group.priority}</Badge>
+              <Badge variant="outline">
+                <Users className="h-3 w-3" />
+                Needed by {group.leads.length} lead{group.leads.length === 1 ? "" : "s"}
+              </Badge>
             </div>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
-        <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3 text-xs">
-          <p className="font-medium text-foreground">Leads needing this asset</p>
-          <div className="space-y-2">
-            {visibleLeads.map((lead) => (
-              <LeadNeedRow key={lead.id} item={lead} />
-            ))}
-          </div>
-          {remainingLeadCount > 0 && (
-            <p className="text-muted-foreground">
-              +{remainingLeadCount} more lead{remainingLeadCount === 1 ? "" : "s"} need this same document.
-            </p>
-          )}
-        </div>
-
         <div className="space-y-2 text-xs">
           <p className="text-muted-foreground">
             <span className="font-medium text-foreground">Why generate it: </span>
@@ -282,6 +271,20 @@ function PreDcGenerationCard({ group }: { group: PreDcGenerationGroup }) {
             <span className="font-medium text-foreground">Needed for: </span>
             {group.neededFor}
           </p>
+        </div>
+
+        <div className="space-y-2 text-xs">
+          <p className="font-medium text-foreground">Leads needing this asset</p>
+          <div className="flex flex-wrap items-center gap-2">
+            {visibleLeads.map((lead) => (
+              <LeadNeedRow key={lead.id} item={lead} />
+            ))}
+          </div>
+          {remainingLeadCount > 0 && (
+            <p className="text-muted-foreground">
+              +{remainingLeadCount} more lead{remainingLeadCount === 1 ? "" : "s"} need this same document.
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -297,38 +300,16 @@ function PreDcGenerationCard({ group }: { group: PreDcGenerationGroup }) {
   );
 }
 
-function LeadNeedRow({ item }: { item: PreDcContentGenerationGap }) {
-  const callTime = formatCallTime(item.scheduledAt);
-
+function LeadNeedRow({ item }: { item: ContentGenerationLead }) {
   return (
-    <div className="grid gap-2 border-t border-border/60 pt-2 first:border-t-0 first:pt-0 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto]">
-      <QueueMeta icon={User} label="Lead" value={item.leadName ?? "Lead not assigned"} />
-      <QueueMeta icon={Building2} label="Account" value={item.accountName} />
-      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-        {item.leadTitle && <QueueMeta icon={FileText} label="Role" value={item.leadTitle} />}
-        {callTime && <QueueMeta icon={CalendarClock} label="Call" value={callTime} />}
-        <Button asChild size="sm" variant="outline" className="h-7 px-2">
-          <Link href={`/calls/${item.callId}`}>Open</Link>
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function QueueMeta({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof User;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex min-w-0 items-center gap-2">
-      <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span className="min-w-0 truncate font-medium text-foreground">{value}</span>
-    </div>
+    <Link href={`/calls/${item.callId}`} className="inline-flex">
+      <Badge
+        variant="outline"
+        className="gap-1.5 text-[10px] font-medium transition-colors hover:bg-muted/40"
+      >
+        <span>{item.leadName ?? "Lead not assigned"}</span>
+        <ArrowUpRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+      </Badge>
+    </Link>
   );
 }
