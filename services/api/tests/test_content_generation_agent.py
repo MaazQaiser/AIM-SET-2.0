@@ -88,7 +88,7 @@ class _FakeContentStudioRepo:
 def test_studio_turn_collects_basics_then_slide_count_and_outline(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "")
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     get_settings.cache_clear()
     repo = _FakeContentStudioRepo()
     ctx = TenantContext(tenant_id="tenant-content", user_id="user-content")
@@ -184,3 +184,30 @@ def test_studio_turn_collects_basics_then_slide_count_and_outline(monkeypatch):
     assert "Faster intake" in preview_edit.result["html"]
     assert "before and after process chart" in preview_edit.result["html"]
     assert len(repo.revisions) == 2
+
+
+def test_studio_turn_accepts_short_pain_point_reply(monkeypatch):
+    monkeypatch.setenv("SUPABASE_URL", "")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    get_settings.cache_clear()
+    repo = _FakeContentStudioRepo()
+    repo.project["brief"] = {
+        "artifact_type": "deck",
+        "audience": "All fintech project stakeholders",
+        "content_context": "Portfolio overview",
+    }
+    ctx = TenantContext(tenant_id="tenant-content", user_id="user-content")
+
+    reply = run_studio_turn(
+        ctx,
+        project_id="project-1",
+        user_message="Mobile app optimisation",
+        allow_generation=False,
+        repo=repo,
+    )
+
+    assert reply.result["turn_type"] == "ask"
+    assert reply.result["ask"] == ["How many slides should this deck include?"]
+    assert repo.project["brief"]["pain_points_coverage"] == ["Mobile app optimisation"]
+    assert "Which customer pain points" not in str(reply.result)

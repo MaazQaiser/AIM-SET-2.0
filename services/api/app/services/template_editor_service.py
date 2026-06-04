@@ -105,7 +105,7 @@ def assist_template_edit(
         ensure_ascii=False,
     )
 
-    completion = LlmClient(api_key=get_settings().anthropic_api_key or None).complete(
+    completion = LlmClient(api_key=get_settings().llm_api_key or None).complete(
         system=system,
         user=user,
         max_tokens=4096,
@@ -212,7 +212,7 @@ def _fallback_template_edit(html: str, css: str, instruction: str) -> Dict[str, 
     return {
         "html": html,
         "css": next_css,
-        "message": "Updated the CSS draft locally. Add an Anthropic API key for richer Sonnet edits.",
+        "message": "Updated the CSS draft locally. Add an OpenAI API key for richer model edits.",
     }
 
 
@@ -283,7 +283,7 @@ def _fallback_template_generate(artifact_type: str, instruction: str) -> Dict[st
     return {
         "html": html,
         "css": css,
-        "message": "Generated a polished starter template locally. Add an Anthropic API key for richer Sonnet generation.",
+        "message": "Generated a polished starter template locally. Add an OpenAI API key for richer generation.",
     }
 
 

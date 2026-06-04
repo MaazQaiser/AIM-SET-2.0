@@ -49,7 +49,7 @@ def test_validate_template_html_blocks_unsafe_markup_and_css() -> None:
 
 
 def test_assist_template_edit_fallback_updates_css_without_api_key(monkeypatch) -> None:
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     get_settings.cache_clear()
     ctx = TenantContext(tenant_id="tenant-template-editor", user_id="user-template-editor")
 
@@ -69,7 +69,7 @@ def test_assist_template_edit_fallback_updates_css_without_api_key(monkeypatch) 
 
 
 def test_assist_template_edit_fallback_can_generate_polished_template(monkeypatch) -> None:
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     get_settings.cache_clear()
     ctx = TenantContext(tenant_id="tenant-template-editor", user_id="user-template-editor")
 

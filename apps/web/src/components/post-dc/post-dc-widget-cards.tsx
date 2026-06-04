@@ -45,7 +45,7 @@ export function PostScorecardCard({ scorecard }: { scorecard: PostCallReview["po
               <div className="flex items-start justify-between gap-3 min-w-0">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{row.member}</p>
-                  <p className="mt-0.5 text-[10px] uppercase text-muted-foreground">
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
                     Role in call: {row.roleInCall || row.role}
                   </p>
                 </div>
@@ -69,7 +69,7 @@ export function PostScorecardCard({ scorecard }: { scorecard: PostCallReview["po
               ) : null}
               {areasToWork(row).length > 0 ? (
                 <div className="mt-3 space-y-1">
-                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+                  <p className="text-[10px] font-semibold text-muted-foreground">
                     Areas to work
                   </p>
                   <ul className="space-y-1">
@@ -96,7 +96,7 @@ export function PostScorecardCard({ scorecard }: { scorecard: PostCallReview["po
 function MetricPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-border bg-muted/30 px-2.5 py-2">
-      <p className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</p>
+      <p className="text-[10px] font-semibold text-muted-foreground">{label}</p>
       <p className="mt-0.5 text-xs font-medium text-foreground">{value}</p>
     </div>
   );
@@ -133,7 +133,7 @@ export function PostLearnedCard({ learned }: { learned: PostCallReview["learned"
         {learned.map((item) => (
           <li key={item.label}>
             <BriefDetailRow>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="text-[10px] font-semibold text-muted-foreground">
                 {item.label}
               </p>
               <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words mt-1">

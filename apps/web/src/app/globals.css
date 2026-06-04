@@ -102,11 +102,6 @@
   min-height: 8px;
 }
 
-/* Call detail canvas — flat cool gray (matches dashboard) */
-main:has(.call-detail-page) {
-  background-color: hsl(var(--background));
-}
-
 /* Live call — fill main; column panels scroll, not the page */
 main:has(.live-call-page) {
   overflow: hidden;

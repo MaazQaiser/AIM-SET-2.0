@@ -116,7 +116,7 @@ export function KbAttachmentCard({ asset }: KbAttachmentCardProps) {
               <span className="truncate">{asset.name}</span>
             </DialogTitle>
             <DialogDescription className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
                 {formatMeta.label}
               </span>
               <span className="break-all">{fileName}</span>

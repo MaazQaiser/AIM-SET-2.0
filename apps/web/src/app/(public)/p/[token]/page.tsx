@@ -109,7 +109,7 @@ export default function PublicLandingPage({ params }: PageParams) {
 
   if (step === "password") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+      <div className="min-h-screen flex items-center justify-center p-6">
         <div className="w-full max-w-sm space-y-4 rounded-xl border bg-card p-6">
           <h1 className="text-lg font-semibold">Enter password</h1>
           <p className="text-sm text-muted-foreground">This page is shared privately with you.</p>
@@ -130,7 +130,7 @@ export default function PublicLandingPage({ params }: PageParams) {
 
   if (step === "identity") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+      <div className="min-h-screen flex items-center justify-center p-6">
         <div className="w-full max-w-sm space-y-4 rounded-xl border bg-card p-6">
           <h1 className="text-lg font-semibold">Welcome</h1>
           <p className="text-xs text-muted-foreground">

@@ -91,7 +91,7 @@ export function LiveInsightsPanel({
           panelChildren={
             <>
               <div className="shrink-0 border-t border-border/50 pt-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-[10px] font-semibold text-muted-foreground">
                   Live prompts
                 </p>
               </div>

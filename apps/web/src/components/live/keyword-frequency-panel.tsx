@@ -23,7 +23,7 @@ export function KeywordFrequencyPanel({ stats }: KeywordFrequencyPanelProps) {
     <div className="space-y-2 text-xs">
       {globalTop.length > 0 && (
         <div>
-          <p className="font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+          <p className="font-semibold text-muted-foreground mb-1">
             Top keywords
           </p>
           <p className="text-[10px] text-muted-foreground mb-1.5">

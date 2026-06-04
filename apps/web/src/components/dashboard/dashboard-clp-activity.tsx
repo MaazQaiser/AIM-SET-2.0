@@ -28,7 +28,7 @@ export function DashboardClpActivity() {
   if (topCallId && (page?.status === "published" || page?.status === "draft")) {
     return (
       <section className="space-y-1.5">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+        <h2 className="text-sm font-semibold text-muted-foreground">
           Landing page activity
         </h2>
         <div className="max-w-md">
@@ -42,7 +42,7 @@ export function DashboardClpActivity() {
 
   return (
     <section className="space-y-1.5">
-      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+      <h2 className="text-sm font-semibold text-muted-foreground">
         Landing page activity
       </h2>
       <Card>

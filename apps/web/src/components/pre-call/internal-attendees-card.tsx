@@ -80,7 +80,7 @@ function InternalAttendeeDetailDialog({
         <section className="pt-2">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <h4 className="text-[10px] font-semibold text-muted-foreground">
               Why they&apos;re on this call
             </h4>
           </div>

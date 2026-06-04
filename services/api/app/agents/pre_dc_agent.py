@@ -855,7 +855,7 @@ def run_pre_dc_pipeline(
     plan_prompt = resolve_prompt(cfg, "artifact_plan", "workflow/artifact_plan/v1.0.0.md")
     fulfill_prompt = resolve_prompt(cfg, "artifact_fulfill", "workflow/artifact_fulfill/v1.0.0.md")
 
-    llm = LlmClient(api_key=settings.anthropic_api_key or None)
+    llm = LlmClient(api_key=settings.llm_api_key or None)
     model = model_policy.get("model_name") or "claude-sonnet-4-20250514"
     fallback = model_policy.get("fallback_model_name") or "claude-sonnet-4-20250514"
 

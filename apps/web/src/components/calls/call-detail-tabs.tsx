@@ -15,8 +15,8 @@ import { useCallBrief, usePostCallReview } from "@/lib/data/hooks";
 import { seedChecklistFromCall } from "@/lib/discovery-checklist-seed";
 import { usePersona } from "@/hooks/use-persona";
 import { Button } from "@dc-copilot/ui/components/button";
-import { Skeleton } from "@dc-copilot/ui/components/skeleton";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
+import { CallDetailPageLoader } from "@/components/layout/page-loaders";
 import type { AccountSnapshotRow } from "@/components/calls/account-widget-cards";
 import type { BANTScore, Call } from "@/types";
 import { cn } from "@/lib/cn";
@@ -65,8 +65,8 @@ export function CallDetailTabs({
     }
   };
 
-  if (briefLoading) {
-    return <BriefTabSkeleton />;
+  if (briefLoading && !brief) {
+    return <CallDetailPageLoader />;
   }
 
   if (!brief) {
@@ -143,24 +143,6 @@ export function CallDetailTabs({
         brief={brief}
         checklist={seedChecklistFromCall(call)}
       />
-    </div>
-  );
-}
-
-function BriefTabSkeleton() {
-  return (
-    <div className="mt-3 space-y-4">
-      <Skeleton className="h-40 w-full rounded-xl" />
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(280px,0.34fr)_1fr]">
-        <div className="space-y-4">
-          <Skeleton className="h-40 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
-        </div>
-        <div className="space-y-4">
-          <Skeleton className="h-36 w-full rounded-xl" />
-          <Skeleton className="h-48 w-full rounded-xl" />
-        </div>
-      </div>
     </div>
   );
 }

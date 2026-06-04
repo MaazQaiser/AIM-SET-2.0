@@ -17,7 +17,7 @@ export function UnansweredQuestionsList({ questions, compact }: UnansweredQuesti
   return (
     <div className="space-y-2">
       {!compact && (
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+        <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
           <AlertCircle className="h-3 w-3 text-amber-600" />
           Unanswered prospect questions
         </p>

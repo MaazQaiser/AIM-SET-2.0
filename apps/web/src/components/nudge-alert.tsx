@@ -24,7 +24,7 @@ export function NudgeAlert({ nudge, onAccept, onDismiss }: NudgeAlertProps) {
       <Zap className="mt-0.5 h-4 w-4 shrink-0 text-nudge" aria-hidden />
       <div className="flex-1 min-w-0">
         {nudge.source === "discovery-checklist" && (
-          <span className="text-[10px] font-medium uppercase tracking-wide text-primary mb-1 block">
+          <span className="text-[10px] font-medium text-primary mb-1 block">
             Discovery
           </span>
         )}

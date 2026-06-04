@@ -400,12 +400,18 @@ def _agent_input_summary(
     live_snapshot: Optional[Dict[str, Any]],
     live_suggestions: Optional[List[Dict[str, Any]]],
     discovery_snapshot: Optional[Dict[str, Any]],
+    call_agent_handoff: Optional[Dict[str, Any]] = None,
     source_record_count: int = 0,
     kb_hit_count: int = 0,
 ) -> Dict[str, Any]:
     discovery = _snapshot_result(discovery_snapshot)
     return {
         "sources": [
+            {
+                "name": "live_call_agent_handoff",
+                "description": "Canonical call-end output: transcript, transcript summary, defined signals, BANT, sentiment, and live summary.",
+                "count": 1 if call_agent_handoff else 0,
+            },
             {
                 "name": "call_transcript_events",
                 "description": "Speaker-attributed transcript captured during the live call.",
@@ -437,6 +443,8 @@ def _agent_input_summary(
         "liveSuggestionCount": len(live_suggestions or []),
         "hasLiveSignalSnapshot": bool(live_snapshot),
         "hasDiscoverySnapshot": bool(discovery),
+        "hasCallAgentHandoff": bool(call_agent_handoff),
+        "callAgentHandoffSections": list((call_agent_handoff or {}).keys()),
     }
 
 
@@ -1593,6 +1601,7 @@ def run_post_dc_pipeline(
     live_snapshot: Optional[Dict[str, Any]] = None,
     live_suggestions: Optional[List[Dict[str, Any]]] = None,
     transcript_events: Optional[List[Dict[str, Any]]] = None,
+    call_agent_handoff: Optional[Dict[str, Any]] = None,
     post_dc_record: Optional[Dict[str, Any]] = None,
 ) -> AgentEnvelope:
     settings = get_settings()
@@ -1600,7 +1609,7 @@ def run_post_dc_pipeline(
     model_policy = cfg.get("model_policy") or {}
     model = model_policy.get("model_name") or "claude-sonnet-4-20250514"
     fallback = model_policy.get("fallback_model_name") or "claude-sonnet-4-20250514"
-    llm = LlmClient(api_key=settings.anthropic_api_key or None)
+    llm = LlmClient(api_key=settings.llm_api_key or None)
 
     account_name = _account_name(call, pre_dc_fields, call_id)
     transcript_excerpt = _transcript_excerpt(transcript_events)
@@ -1639,9 +1648,17 @@ def run_post_dc_pipeline(
         live_snapshot=live_snapshot,
         live_suggestions=live_suggestions,
         discovery_snapshot=discovery_snapshot,
+        call_agent_handoff=call_agent_handoff,
         source_record_count=sum(1 for item in (call, pre_dc_fields, call_brief, post_dc_record) if item),
         kb_hit_count=len(hits),
     )
+    call_agent_outputs = call_agent_handoff or {
+        "discovery_snapshot": _snapshot_result(discovery_snapshot),
+        "live_signal_snapshot": live_snapshot or {},
+        "live_suggestions": live_suggestion_context,
+        "transcript_event_count": len(transcript_events or []),
+        "transcript_digest": transcript_digest,
+    }
 
     context = {
         "call_id": call_id,
@@ -1658,13 +1675,7 @@ def run_post_dc_pipeline(
         "pod_talk_time": pod_talk_time,
         "transcript_events": _transcript_event_payload(transcript_events),
         "conversation_context": conversation_context,
-        "call_agent_outputs": {
-            "discovery_snapshot": _snapshot_result(discovery_snapshot),
-            "live_signal_snapshot": live_snapshot or {},
-            "live_suggestions": live_suggestion_context,
-            "transcript_event_count": len(transcript_events or []),
-            "transcript_digest": transcript_digest,
-        },
+        "call_agent_outputs": call_agent_outputs,
         "agent_inputs": agent_inputs,
         "kb_hits": hits[:4],
     }

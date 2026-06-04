@@ -7,6 +7,8 @@ import { useCallStream } from "@/hooks/use-call-stream";
 import { useLiveCallInit } from "@/hooks/use-live-call-init";
 import { usePersona } from "@/hooks/use-persona";
 import { useCall, useCallBrief, usePostCallReview } from "@/lib/data/hooks";
+import { LiveCallPageLoader } from "@/components/layout/page-loaders";
+import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { seedChecklistFromCall } from "@/lib/discovery-checklist-seed";
 import { useCallUI } from "@/stores/use-call-ui";
 import { useLiveCall } from "@/stores/use-live-call";
@@ -23,9 +25,14 @@ export default function LiveCallPage({ params }: LivePageParams) {
   useCallStream({ callId, enabled: Boolean(callId) });
 
   const persona = usePersona();
-  const { data: call } = useCall(callId);
+  const importsHydrated = useDcImportsStore((s) => s.importsHydrated);
+  const { data: call, isLoading: callLoading } = useCall(callId);
   const { data: brief } = useCallBrief(callId);
   const { data: postReview } = usePostCallReview(callId);
+
+  if ((!importsHydrated || callLoading) && !call) {
+    return <LiveCallPageLoader />;
+  }
 
   const transcript = useLiveCall((s) => s.transcript);
   const pendingNudges = useLiveCall((s) => s.pendingNudges);

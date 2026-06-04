@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import uuid
+from collections import Counter
 from typing import Any, Dict, List, Optional, Tuple
 
 from dc_core.evidence import AgentEnvelope, Citation, validate_envelope
@@ -31,6 +32,11 @@ _OBJECTION_PATTERNS = re.compile(
     r"not sure we can|competitor|alternative vendor|compared to)\b",
     re.I,
 )
+
+HANDOFF_TRANSCRIPT_LIMIT = 500
+HANDOFF_SIGNAL_LIMIT = 80
+HANDOFF_SENTIMENT_SIGNAL_LIMIT = 30
+BANT_DIMENSIONS = ("budget", "authority", "need", "timeline")
 
 
 def _transcript_citation(call_id: str, snippet: str, confidence: float = 0.7) -> Citation:
@@ -116,14 +122,14 @@ def _invoke_llm_json(
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     settings = get_settings()
     system = (runtime.get("system_prompt") or "") + f"\n\nRespond with JSON only:\n{schema_hint}"
-    if not settings.anthropic_configured and not settings.anthropic_api_key:
+    if not settings.llm_configured:
         return {"content": "Review the latest transcript segment and respond when ready."}, {
             "tokens": 0,
             "usd": 0.0,
             "model": "stub",
             "trace_id": str(uuid.uuid4()),
         }
-    completion = LlmClient(api_key=settings.anthropic_api_key or None).complete(
+    completion = LlmClient(api_key=settings.llm_api_key or None).complete(
         system=system,
         user=user,
         model=runtime.get("model_name") or "claude-3-haiku-20240307",
@@ -364,6 +370,311 @@ def _heuristic_nudge_message(hit: Dict[str, Any], text: str) -> str:
     return "New signal — consider a targeted discovery question."
 
 
+def _snapshot_result(snapshot: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    if not snapshot:
+        return {}
+    result = snapshot.get("result")
+    return result if isinstance(result, dict) else snapshot
+
+
+def _event_text(event: Dict[str, Any]) -> str:
+    return str(event.get("text") or "").strip()
+
+
+def _event_offset(event: Dict[str, Any]) -> float:
+    try:
+        return float(event.get("offset_seconds") or event.get("timestamp") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _event_speaker(event: Dict[str, Any]) -> str:
+    return str(
+        event.get("speaker_name")
+        or event.get("speakerName")
+        or event.get("speaker_id")
+        or event.get("speakerId")
+        or "Speaker"
+    )
+
+
+def _event_role(event: Dict[str, Any]) -> str:
+    role = str(event.get("speaker_role") or event.get("speakerRole") or "").lower()
+    if role in ("prospect", "guest"):
+        return "customer"
+    return role or "unknown"
+
+
+def _transcript_line(event: Dict[str, Any]) -> Optional[str]:
+    text = _event_text(event)
+    if not text:
+        return None
+    offset = int(_event_offset(event))
+    prefix = f"{_event_speaker(event)} @{offset}s" if offset else _event_speaker(event)
+    return f"{prefix}: {text}"
+
+
+def _handoff_transcript_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    payload: List[Dict[str, Any]] = []
+    for event in events[-HANDOFF_TRANSCRIPT_LIMIT:]:
+        text = _event_text(event)
+        if not text:
+            continue
+        payload.append(
+            {
+                "id": event.get("id"),
+                "speaker_id": event.get("speaker_id") or event.get("speakerId"),
+                "speaker_name": _event_speaker(event),
+                "speaker_role": _event_role(event),
+                "offset_seconds": _event_offset(event),
+                "text": text,
+                "keywords": event.get("keywords") or [],
+                "sentiment": event.get("sentiment"),
+                "signal_type": event.get("signal_type") or event.get("signalType"),
+            }
+        )
+    return payload
+
+
+def _transcript_full_text(events: List[Dict[str, Any]]) -> str:
+    return "\n".join(
+        line
+        for event in events[-HANDOFF_TRANSCRIPT_LIMIT:]
+        if (line := _transcript_line(event))
+    )
+
+
+def _transcript_summary(events: List[Dict[str, Any]]) -> Dict[str, Any]:
+    event_count = len([event for event in events if _event_text(event)])
+    speakers = {_event_speaker(event) for event in events if _event_text(event)}
+    duration_seconds = int(max((_event_offset(event) for event in events), default=0))
+    keyword_counts: Counter[str] = Counter()
+    signal_counts: Counter[str] = Counter()
+    sentiment_counts: Counter[str] = Counter()
+    for event in events:
+        for keyword in event.get("keywords") or []:
+            if str(keyword).strip():
+                keyword_counts[str(keyword)] += 1
+        signal_type = event.get("signal_type") or event.get("signalType")
+        if signal_type:
+            signal_counts[str(signal_type)] += 1
+        sentiment = event.get("sentiment")
+        if sentiment:
+            sentiment_counts[str(sentiment)] += 1
+
+    headline = (
+        f"{event_count} transcript segments captured"
+        if event_count
+        else "No transcript captured"
+    )
+    bullets = [
+        f"Speakers captured: {len(speakers)}.",
+        f"Conversation span: {duration_seconds}s.",
+    ]
+    if keyword_counts:
+        bullets.append(
+            "Top keywords: "
+            + ", ".join(term for term, _ in keyword_counts.most_common(5))
+            + "."
+        )
+    if signal_counts:
+        bullets.append(
+            "Defined signals: "
+            + ", ".join(f"{name} ({count})" for name, count in signal_counts.most_common(5))
+            + "."
+        )
+    if sentiment_counts:
+        bullets.append(
+            "Sentiment mix: "
+            + ", ".join(f"{name} ({count})" for name, count in sentiment_counts.most_common())
+            + "."
+        )
+    return {
+        "headline": headline,
+        "bullets": bullets,
+        "event_count": event_count,
+        "speaker_count": len(speakers),
+        "duration_seconds": duration_seconds,
+        "top_keywords": [
+            {"term": term, "count": count}
+            for term, count in keyword_counts.most_common(10)
+        ],
+        "signal_counts": dict(signal_counts),
+        "sentiment_counts": dict(sentiment_counts),
+    }
+
+
+def _sentiment_handoff(
+    events: List[Dict[str, Any]],
+    live_snapshot: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    by_role: Dict[str, Counter[str]] = {}
+    signals: List[Dict[str, Any]] = []
+    for event in events:
+        sentiment = event.get("sentiment")
+        if not sentiment:
+            continue
+        role = _event_role(event)
+        by_role.setdefault(role, Counter())[str(sentiment)] += 1
+        if sentiment in ("positive", "negative"):
+            signals.append(
+                {
+                    "speaker": _event_speaker(event),
+                    "speaker_role": role,
+                    "offset_seconds": _event_offset(event),
+                    "sentiment": sentiment,
+                    "text": _event_text(event)[:240],
+                }
+            )
+
+    snapshot = live_snapshot or {}
+    return {
+        "ae_score": snapshot.get("sentiment_ae"),
+        "customer_score": snapshot.get("sentiment_customer"),
+        "sales_rep_tone": snapshot.get("sales_rep_tone"),
+        "customer_sentiment": snapshot.get("customer_sentiment"),
+        "sentiment_shift": snapshot.get("sentiment_shift"),
+        "event_counts": {role: dict(counts) for role, counts in by_role.items()},
+        "signals": signals[-HANDOFF_SENTIMENT_SIGNAL_LIMIT:],
+    }
+
+
+def _defined_signals_handoff(
+    events: List[Dict[str, Any]],
+    suggestions: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    signals: List[Dict[str, Any]] = []
+    counts: Counter[str] = Counter()
+    for event in events:
+        signal_type = event.get("signal_type") or event.get("signalType")
+        if not signal_type:
+            continue
+        counts[str(signal_type)] += 1
+        signals.append(
+            {
+                "source": "transcript",
+                "signal_type": signal_type,
+                "speaker": _event_speaker(event),
+                "speaker_role": _event_role(event),
+                "offset_seconds": _event_offset(event),
+                "text": _event_text(event)[:240],
+                "keywords": event.get("keywords") or [],
+            }
+        )
+
+    for item in suggestions[-HANDOFF_SIGNAL_LIMIT:]:
+        operation = str(item.get("operation") or "suggestion")
+        payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
+        signal_type = operation
+        if operation == "objection_detected":
+            signal_type = "objection_raised"
+        elif operation == "unanswered_question_flag":
+            signal_type = "unanswered_question"
+        elif operation == "kb_surface":
+            signal_type = "reference_asset"
+        counts[signal_type] += 1
+        signals.append(
+            {
+                "source": "live_call_suggestion",
+                "signal_type": signal_type,
+                "operation": operation,
+                "target_role": item.get("target_role"),
+                "offset_seconds": item.get("transcript_offset_seconds"),
+                "confidence": item.get("confidence"),
+                "status": item.get("status"),
+                "payload": payload,
+            }
+        )
+
+    return {
+        "signal_counts": dict(counts),
+        "signals": signals[-HANDOFF_SIGNAL_LIMIT:],
+    }
+
+
+def _bant_handoff(discovery_snapshot: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    result = _snapshot_result(discovery_snapshot)
+    checklist = result.get("checklist") if isinstance(result.get("checklist"), dict) else {}
+    items = checklist.get("items") if isinstance(checklist.get("items"), list) else []
+    signals: List[Dict[str, Any]] = []
+    for item in items:
+        item_id = str(item.get("id") or "")
+        if item_id not in BANT_DIMENSIONS:
+            continue
+        evidence = item.get("evidence") if isinstance(item.get("evidence"), list) else []
+        for ev in evidence[-3:]:
+            if not isinstance(ev, dict):
+                continue
+            signals.append(
+                {
+                    "dimension": item_id,
+                    "label": item.get("label") or item_id.title(),
+                    "status": item.get("status"),
+                    "value": ev.get("value"),
+                    "snippet": ev.get("snippet"),
+                    "sentiment": ev.get("sentiment"),
+                    "speaker_role": ev.get("speakerRole"),
+                    "signal_type": ev.get("signalType"),
+                    "offset_seconds": ev.get("transcriptOffsetSeconds"),
+                    "confidence": ev.get("confidence"),
+                }
+            )
+
+    return {
+        "coverage": checklist.get("bantCoverage") or result.get("bantCoverage"),
+        "status": checklist.get("bant") or {},
+        "progression": result.get("bantProgression") or {},
+        "open_gaps": result.get("openGaps") or checklist.get("openGaps") or [],
+        "signals": signals,
+    }
+
+
+def build_call_agent_handoff(
+    ctx: TenantContext,
+    call_id: str,
+    *,
+    discovery_snapshot: Optional[Dict[str, Any]] = None,
+    live_snapshot: Optional[Dict[str, Any]] = None,
+    live_suggestions: Optional[List[Dict[str, Any]]] = None,
+    transcript_events: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Canonical Live Call Agent handoff consumed by Post-DC."""
+    repo = get_live_call_repository()
+    events = transcript_events if transcript_events is not None else repo.list_transcript_events(ctx, call_id, limit=HANDOFF_TRANSCRIPT_LIMIT)
+    suggestions = live_suggestions if live_suggestions is not None else repo.list_suggestions(ctx, call_id, limit=200)
+    transcript_summary = _transcript_summary(events)
+    suggestion_counts = Counter(str(s.get("operation") or "unknown") for s in suggestions)
+    accepted = sum(1 for s in suggestions if s.get("status") == "accepted")
+    dismissed = sum(1 for s in suggestions if s.get("status") == "dismissed")
+
+    return {
+        "agent": "live-call",
+        "operation": "call_end_handoff",
+        "call_id": call_id,
+        "transcript": {
+            "event_count": len(events),
+            "events": _handoff_transcript_events(events),
+            "full_text": _transcript_full_text(events),
+        },
+        "transcript_summary": transcript_summary,
+        "defined_signals": _defined_signals_handoff(events, suggestions),
+        "bant": _bant_handoff(discovery_snapshot),
+        "sentiment": _sentiment_handoff(events, live_snapshot),
+        "summary": {
+            "headline": transcript_summary["headline"],
+            "bullets": transcript_summary["bullets"],
+            "intent_snapshot": (live_snapshot or {}).get("intent"),
+            "focus_areas": (live_snapshot or {}).get("focus_areas") or [],
+            "pains": (live_snapshot or {}).get("pains") or [],
+            "suggestion_counts": dict(suggestion_counts),
+            "accepted": accepted,
+            "dismissed": dismissed,
+            "total_suggestions": len(suggestions),
+            "transcript_segments": len(events),
+        },
+    }
+
+
 def handle_transcript_segment(call_id: str, text: str) -> AgentEnvelope:
     """Legacy single-envelope entry; prefer process_transcript_segment."""
     ctx = TenantContext(tenant_id="legacy", user_id="legacy")
@@ -443,21 +754,10 @@ def bot_chat_response(
 
 
 def build_session_summary(ctx: TenantContext, call_id: str) -> Dict[str, Any]:
+    handoff = build_call_agent_handoff(ctx, call_id)
+    # Preserve the legacy intent snapshot if the lightweight transcript session
+    # has one that has not yet been folded into the richer handoff.
     state = get_session(call_id)
-    repo = get_live_call_repository()
-    suggestions = repo.list_suggestions(ctx, call_id, limit=200)
-    accepted = sum(1 for s in suggestions if s.get("status") == "accepted")
-    dismissed = sum(1 for s in suggestions if s.get("status") == "dismissed")
-    by_op: Dict[str, int] = {}
-    for s in suggestions:
-        op = s.get("operation", "unknown")
-        by_op[op] = by_op.get(op, 0) + 1
-    return {
-        "call_id": call_id,
-        "intent_snapshot": state.intent_snapshot,
-        "suggestion_counts": by_op,
-        "accepted": accepted,
-        "dismissed": dismissed,
-        "total_suggestions": len(suggestions),
-        "transcript_segments": len(repo.list_transcript_events(ctx, call_id)),
-    }
+    if state.intent_snapshot and not handoff["summary"].get("intent_snapshot"):
+        handoff["summary"]["intent_snapshot"] = state.intent_snapshot
+    return handoff

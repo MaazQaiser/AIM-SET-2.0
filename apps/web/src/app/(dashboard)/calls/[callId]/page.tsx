@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { CallDetailPageClient } from "@/components/calls/call-detail-page-client";
-import { Skeleton } from "@dc-copilot/ui/components/skeleton";
+import { CallDetailPageLoader } from "@/components/layout/page-loaders";
 
 export const metadata: Metadata = { title: "Call brief" };
 
@@ -12,14 +12,7 @@ interface Params {
 export default async function CallDetailPage({ params }: Params) {
   const { callId } = await params;
   return (
-    <Suspense
-      fallback={
-        <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
-          <Skeleton className="h-10 w-64" />
-          <Skeleton className="h-96 w-full" />
-        </div>
-      }
-    >
+    <Suspense fallback={<CallDetailPageLoader />}>
       <CallDetailPageClient callId={callId} />
     </Suspense>
   );

@@ -61,7 +61,7 @@ export function ClpKbAssetsPanel({ draft, onChange }: ClpKbAssetsPanelProps) {
 
       {draft.selectedAssets.length > 0 && (
         <div className="space-y-1">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="text-[10px] font-medium text-muted-foreground">
             On page ({draft.selectedAssets.length})
           </p>
           <ul className="space-y-1">
@@ -87,7 +87,7 @@ export function ClpKbAssetsPanel({ draft, onChange }: ClpKbAssetsPanelProps) {
 
       {draft.aiSuggestions.length > 0 && (
         <div className="space-y-1">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="text-[10px] font-medium text-muted-foreground">
             AI suggestions
           </p>
           <ul className="space-y-1">

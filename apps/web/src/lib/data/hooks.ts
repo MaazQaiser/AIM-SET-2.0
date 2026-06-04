@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { bffFetch } from "@/lib/api/bff-fetch";
+import { buildArtifactStudioHref } from "@/lib/content-studio/artifact-studio-href";
 import type {
   Call,
   CoachingInsight,
@@ -21,6 +22,7 @@ import type {
   PostCallEmailDraft,
   PostCallJiraTicket,
   PostCallPipelineResult,
+  PostCallReview,
 } from "@/lib/brief-types";
 import {
   FRANCHISE_DEMO_CALL_ID,
@@ -117,24 +119,28 @@ async function fetchCallsFromApi(): Promise<Call[]> {
 }
 
 export function useCalls() {
+  const localCalls = mergeFranchiseDemoCalls(resolveCalls());
   return useQuery({
     queryKey: ["calls", getImportVersion()],
     queryFn: fetchCallsFromApi,
+    placeholderData: localCalls.length > 0 ? localCalls : undefined,
     staleTime: REFETCH_MS,
     refetchInterval: REFETCH_MS,
   });
 }
 
 export function useCall(callId: string) {
+  const localCall = resolveCall(callId);
   return useQuery({
     queryKey: ["call", callId, getImportVersion()],
     queryFn: async () => {
+      const local = resolveCall(callId);
       const api = await bffFetch<Call>(`/api/calls/${callId}`);
       if (api) return api;
-      const local = resolveCall(callId);
-      if (!local) throw new Error(`Call not found: ${callId}`);
-      return local;
+      if (local) return local;
+      throw new Error(`Call not found: ${callId}`);
     },
+    placeholderData: localCall,
     staleTime: REFETCH_MS,
   });
 }
@@ -174,6 +180,7 @@ function mergeCallBrief(local: CallBrief, api: CallBrief): CallBrief {
 }
 
 export function useCallBrief(callId: string) {
+  const localBrief = resolveCallBrief(callId);
   return useQuery({
     queryKey: ["call-brief", callId, getImportVersion()],
     queryFn: async () => {
@@ -188,6 +195,7 @@ export function useCallBrief(callId: string) {
       }
       return local;
     },
+    placeholderData: localBrief ?? undefined,
     staleTime: 5_000,
     refetchInterval: (query) => {
       const brief = query.state.data;
@@ -200,8 +208,10 @@ export function useCallBrief(callId: string) {
 }
 
 export function usePostCallReview(callId: string) {
-  return useQuery({
+  const localReview = resolvePostCallReview(callId);
+  return useQuery<PostCallReview | null>({
     queryKey: ["post-call", callId, getImportVersion()],
+    placeholderData: localReview,
     queryFn: async () => {
       if (callId === FRANCHISE_DEMO_CALL_ID) {
         const state = useDcImportsStore.getState();
@@ -483,14 +493,13 @@ export function useContentGaps() {
 }
 
 function contentStudioHref(item: ContentToGenerate, call: Call, accountName: string) {
-  const params = new URLSearchParams({
-    template: item.type,
-    account: accountName,
-    source: "pre-dc",
+  return buildArtifactStudioHref({
+    type: item.type,
     callId: call.id,
+    accountName,
+    leadName: call.leadName,
+    assetName: item.name,
   });
-  if (call.leadName) params.set("lead", call.leadName);
-  return `/content/studio?${params.toString()}`;
 }
 
 /** Sidebar + Content Manager: real queue counts from the same pipelines as /content */

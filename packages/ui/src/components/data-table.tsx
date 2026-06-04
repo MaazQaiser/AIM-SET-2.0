@@ -50,6 +50,180 @@ interface DataTableProps<TData, TValue> {
   rowClassName?: string;
   /** Optional classes for the pagination row */
   paginationClassName?: string;
+  /** When true, pagination is omitted (render DataTablePagination separately). */
+  hidePagination?: boolean;
+}
+
+export interface DataTableViewProps<TData, TValue> {
+  table: ReactTable<TData>;
+  columns: ColumnDef<TData, TValue>[];
+  searchKey?: string;
+  searchPlaceholder?: string;
+  scrollable?: boolean;
+  stickyHeader?: boolean;
+  maxScrollHeight?: string;
+  clipBody?: boolean;
+  shellClassName?: string;
+  scrollClassName?: string;
+  bodyClipClassName?: string;
+  tableClassName?: string;
+  headerClassName?: string;
+  bodyClassName?: string;
+  rowClassName?: string;
+  className?: string;
+}
+
+export function useDataTableInstance<TData, TValue>({
+  columns,
+  data,
+  pageSize = 10,
+}: Pick<DataTableProps<TData, TValue>, "columns" | "data" | "pageSize">) {
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+
+  return useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    state: { sorting, columnFilters },
+    initialState: { pagination: { pageSize } },
+  });
+}
+
+export function DataTablePagination<TData>({
+  table,
+  className,
+  iconOnly = false,
+}: {
+  table: ReactTable<TData>;
+  className?: string;
+  iconOnly?: boolean;
+}) {
+  return (
+    <div className={cn("flex shrink-0 items-center justify-between border-t border-border/60 bg-card pt-3", className)}>
+      <p className="text-sm text-muted-foreground">
+        Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+      </p>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size={iconOnly ? "icon" : "sm"}
+          className={iconOnly ? "h-8 w-8" : undefined}
+          onClick={() => table.previousPage()}
+          disabled={!table.getCanPreviousPage()}
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          {!iconOnly && "Previous"}
+        </Button>
+        <Button
+          variant="outline"
+          size={iconOnly ? "icon" : "sm"}
+          className={iconOnly ? "h-8 w-8" : undefined}
+          onClick={() => table.nextPage()}
+          disabled={!table.getCanNextPage()}
+          aria-label="Next page"
+        >
+          {!iconOnly && "Next"}
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export function DataTableView<TData, TValue>({
+  table,
+  columns,
+  searchKey,
+  searchPlaceholder = "Search...",
+  scrollable = false,
+  stickyHeader = false,
+  maxScrollHeight = "max-h-[calc(100vh-16rem)]",
+  clipBody = false,
+  shellClassName,
+  scrollClassName,
+  bodyClipClassName,
+  tableClassName,
+  headerClassName,
+  bodyClassName,
+  rowClassName,
+  className,
+}: DataTableViewProps<TData, TValue>) {
+  const tableClasses = cn(
+    "w-full border-collapse bg-card text-sm",
+    scrollable && "min-w-max",
+    tableClassName
+  );
+
+  const useBodyClip = scrollable && clipBody;
+
+  const header = (
+    <DataTableHeader
+      table={table}
+      scrollable={scrollable}
+      stickyHeader={stickyHeader}
+      headerClassName={headerClassName}
+    />
+  );
+
+  const body = (
+    <DataTableBody
+      table={table}
+      columns={columns as ColumnDef<TData, unknown>[]}
+      scrollable={scrollable}
+      bodyClassName={bodyClassName}
+      rowClassName={rowClassName}
+    />
+  );
+
+  const tableContent = useBodyClip ? (
+    <div className="min-w-max">
+      <table className={tableClasses}>{header}</table>
+      <div className={cn("box-border overflow-hidden", bodyClipClassName)}>
+        <table className={tableClasses}>{body}</table>
+      </div>
+    </div>
+  ) : (
+    <table className={tableClasses}>
+      {header}
+      {body}
+    </table>
+  );
+
+  return (
+    <div className={cn("space-y-4", className)}>
+      {searchKey && (
+        <Input
+          placeholder={searchPlaceholder}
+          value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
+          onChange={(e) => table.getColumn(searchKey)?.setFilterValue(e.target.value)}
+          className="max-w-sm"
+        />
+      )}
+
+      <div
+        className={cn(
+          "overflow-hidden rounded-xl border border-border bg-card",
+          shellClassName
+        )}
+      >
+        <div
+          className={cn(
+            scrollable ? cn("overflow-auto", maxScrollHeight) : undefined,
+            scrollClassName
+          )}
+        >
+          {tableContent}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function DataTableHeader<TData>({
@@ -198,116 +372,33 @@ export function DataTable<TData, TValue>({
   bodyClassName,
   rowClassName,
   paginationClassName,
+  hidePagination = false,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-
-  const table = useReactTable({
-    data,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    state: { sorting, columnFilters },
-    initialState: { pagination: { pageSize } },
-  });
-
-  const tableClasses = cn(
-    "w-full border-collapse bg-card text-sm",
-    scrollable && "min-w-max",
-    tableClassName
-  );
-
-  const useBodyClip = scrollable && clipBody;
-
-  const header = (
-    <DataTableHeader
-      table={table}
-      scrollable={scrollable}
-      stickyHeader={stickyHeader}
-      headerClassName={headerClassName}
-    />
-  );
-
-  const body = (
-    <DataTableBody
-      table={table}
-      columns={columns as ColumnDef<TData, unknown>[]}
-      scrollable={scrollable}
-      bodyClassName={bodyClassName}
-      rowClassName={rowClassName}
-    />
-  );
-
-  const tableContent = useBodyClip ? (
-    <div className="min-w-max">
-      <table className={tableClasses}>{header}</table>
-      <div className={cn("box-border overflow-hidden", bodyClipClassName)}>
-        <table className={tableClasses}>{body}</table>
-      </div>
-    </div>
-  ) : (
-    <table className={tableClasses}>
-      {header}
-      {body}
-    </table>
-  );
+  const table = useDataTableInstance({ columns, data, pageSize });
 
   return (
     <div className="space-y-4">
-      {searchKey && (
-        <Input
-          placeholder={searchPlaceholder}
-          value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
-          onChange={(e) => table.getColumn(searchKey)?.setFilterValue(e.target.value)}
-          className="max-w-sm"
-        />
+      <DataTableView
+        table={table}
+        columns={columns}
+        searchKey={searchKey}
+        searchPlaceholder={searchPlaceholder}
+        scrollable={scrollable}
+        stickyHeader={stickyHeader}
+        maxScrollHeight={maxScrollHeight}
+        clipBody={clipBody}
+        shellClassName={shellClassName}
+        scrollClassName={scrollClassName}
+        bodyClipClassName={bodyClipClassName}
+        tableClassName={tableClassName}
+        headerClassName={headerClassName}
+        bodyClassName={bodyClassName}
+        rowClassName={rowClassName}
+        className="space-y-4"
+      />
+      {!hidePagination && (
+        <DataTablePagination table={table} className={paginationClassName} />
       )}
-
-      <div
-        className={cn(
-          "overflow-hidden rounded-xl border border-border bg-card",
-          shellClassName
-        )}
-      >
-        <div
-          className={cn(
-            scrollable ? cn("overflow-auto", maxScrollHeight) : undefined,
-            scrollClassName
-          )}
-        >
-          {tableContent}
-        </div>
-      </div>
-
-      <div className={cn("flex items-center justify-between", paginationClassName)}>
-        <p className="text-sm text-muted-foreground">
-          Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
-        </p>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

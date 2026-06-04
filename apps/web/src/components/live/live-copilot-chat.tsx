@@ -168,7 +168,7 @@ export function LiveCopilotChatThread({ className }: { className?: string }) {
 
   return (
     <div className={cn("space-y-2", className)} aria-live="polite">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-t border-border/50 pt-3">
+      <p className="text-[10px] font-semibold text-muted-foreground border-t border-border/50 pt-3">
         Copilot chat
       </p>
       {threadMessages.map((msg) => (

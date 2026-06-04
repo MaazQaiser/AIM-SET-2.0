@@ -1,5 +1,6 @@
 /**
- * App surface system — glass cards on #EFF3F6 canvas, flat nav/dialog chrome.
+ * App surface system — glass cards on the official .page-hue canvas, flat nav/dialog chrome.
+ * Do not paint full-page shells with bg-background; the body canvas shows through.
  */
 
 @layer utilities {

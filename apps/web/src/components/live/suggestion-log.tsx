@@ -22,7 +22,7 @@ export function SuggestionLog({ entries, compact }: SuggestionLogProps) {
   return (
     <div className="space-y-1 max-h-32 overflow-y-auto">
       {!compact && (
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="text-xs font-semibold text-muted-foreground">
           AI suggestion log
         </p>
       )}

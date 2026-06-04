@@ -32,7 +32,7 @@ export function BotChatSuggestedActions({
     <div className={cn("shrink-0 border-b border-border px-3 py-2.5 space-y-2", className)}>
       <div
         className={cn(
-          "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide",
+          "flex items-center gap-1.5 text-[10px] font-semibold",
           buttonClassName ? "call-detail-copilot-muted" : "text-muted-foreground"
         )}
       >

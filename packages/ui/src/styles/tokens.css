@@ -72,11 +72,11 @@
 :root {
   --radius: 1.5rem;
 
-  /* Page canvas — #EFF3F6 */
+  /* Page canvas — official app background (#EFF3F6 + warm glow via .page-hue) */
   --background: 205 28% 95%;
   --foreground: 220 15% 14%;
 
-  /* Bottom-left canvas glow — faint warm tint */
+  /* Bottom-left glow — paired with .page-hue on <body> */
   --page-hue-glow: 48 14% 94%;
 
   /* Ambient sphere — matches canvas in light flat mode */

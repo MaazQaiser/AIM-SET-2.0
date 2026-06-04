@@ -41,7 +41,7 @@ def process_template_ingest(
 
         system = load_vision_prompt()
         runtime = get_content_generation_runtime(ctx)
-        client = LlmClient(api_key=settings.anthropic_api_key or None)
+        client = LlmClient(api_key=settings.llm_api_key or None)
         sections: List[str] = []
         all_vars: Dict[str, str] = {}
 

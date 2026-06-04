@@ -105,7 +105,7 @@ def test_pre_dc_ingest_runs_agent_and_saves_brief(monkeypatch):
     ]
     titles = {s["id"]: s["title"] for s in brief["summarySections"]}
     assert titles["customer_profile"] == "Profile Summary"
-    assert titles["customer_pain_points"] == "Pain Points"
+    assert titles["customer_pain_points"] == "Client needs"
     profile = next(s for s in brief["summarySections"] if s["id"] == "customer_profile")["content"]
     assert "Agent Test Co is a B2B SaaS company" in profile
     assert "Modernize legacy portal" in profile

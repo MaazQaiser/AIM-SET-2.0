@@ -39,8 +39,36 @@ export const briefCardScrollClass = appScrollClass;
 /** Left sidebar scroll areas — thinner thumb than main column. */
 export const briefSidebarScrollClass = appScrollSidebarClass;
 
-/** Shared shell: cool border, clipped corners (overrides glass-insight-card). */
+/** Shared shell: glass card + zero gap between header/body. */
 export const briefCardShellClass = cn(appCardClass, "gap-0");
+
+/** Outer layout shared by Summary and all Pre-DC brief cards. */
+export const BRIEF_CARD_LAYOUT_CLASS = "flex min-h-0 w-full flex-col overflow-hidden";
+
+const mainCardPadding = {
+  header: "px-6 pt-5 pb-3",
+  body: "px-6 pb-5 pt-0",
+};
+const defaultCardPadding = {
+  header: "px-6 pt-5 pb-3",
+  body: "px-6 pb-5 pt-0",
+};
+
+export const briefStickyHeaderClassName = cn(
+  "shrink-0 space-y-0",
+  defaultCardPadding.header,
+  "sticky top-0 z-10",
+  "border-0 bg-transparent"
+);
+
+export function briefScrollBodyClassName(tone: "default" | "main" = "default", sidebar = false) {
+  return cn(
+    "min-h-0",
+    tone === "main" ? mainCardPadding.body : defaultCardPadding.body,
+    sidebar ? briefSidebarScrollClass : briefCardScrollClass,
+    "flex-1 overflow-y-auto overflow-x-hidden pt-1"
+  );
+}
 
 /** Detail modals on Pre-DC — same border, radius, and shadow as brief cards. */
 export const briefDetailDialogClass = appDialogClass;
@@ -53,15 +81,6 @@ export const BRIEF_MAIN_CARD_SCROLL_MAX = "min(40rem,calc(100vh-10rem))";
 
 /** Relevant content — half the main column cap, scroll inside. */
 export const BRIEF_RELEVANT_CONTENT_SCROLL_MAX = "min(20rem,calc((100vh - 10rem) / 2))";
-
-const mainCardPadding = {
-  header: "px-5 pt-5 pb-3",
-  body: "px-5 pb-5 pt-0",
-};
-const defaultCardPadding = {
-  header: "px-5 pt-5 pb-3",
-  body: "px-5 pb-5 pt-0",
-};
 
 export interface BriefDetailCardProps {
   title: string;
@@ -84,7 +103,7 @@ export interface BriefDetailCardProps {
   enableMainScroll?: boolean;
 }
 
-const stickyHeaderSurface = () => "bg-card";
+const stickyHeaderSurface = () => "border-0 bg-transparent";
 
 function BriefDetailCardTitleRow({
   title,
@@ -149,7 +168,7 @@ function SourceInfoIcon({ info }: { info: BriefSourceInfo }) {
           </button>
         </TooltipTrigger>
         <TooltipContent side="top" align="start" className="max-w-xs space-y-1.5 p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-[10px] font-semibold text-muted-foreground">
             Source: {info.source}
           </p>
           <p className="text-xs leading-relaxed">{info.detail}</p>
@@ -218,8 +237,7 @@ export function BriefDetailCard({
     <Card
       className={cn(
         briefCardShellClass,
-        "flex min-h-0 w-full flex-col",
-        scrollableBody && "overflow-hidden",
+        BRIEF_CARD_LAYOUT_CLASS,
         variant === "warning" && "border-warning/35",
         isIntercom && variant === "highlight" && "border-l-[3px] border-l-[#ff5600]",
         className
@@ -228,9 +246,9 @@ export function BriefDetailCard({
     >
       <CardHeader
         className={cn(
-          "shrink-0 space-y-0",
-          tone === "main" ? mainCardPadding.header : defaultCardPadding.header,
-          scrollableBody && cn("sticky top-0 z-10", stickyHeaderSurface())
+          scrollableBody
+            ? briefStickyHeaderClassName
+            : cn("shrink-0 space-y-0", tone === "main" ? mainCardPadding.header : defaultCardPadding.header)
         )}
       >
         <BriefDetailCardTitleRow
@@ -244,10 +262,10 @@ export function BriefDetailCard({
       </CardHeader>
       <CardContent
         className={cn(
-          "min-h-0",
-          tone === "main" ? mainCardPadding.body : defaultCardPadding.body,
           tone === "main" ? briefMainBody : "text-[0.9375rem] leading-relaxed",
-          scrollableBody && cn(briefCardScrollClass, "flex-1 overflow-y-auto overflow-x-hidden pt-1")
+          scrollableBody
+            ? briefScrollBodyClassName(tone)
+            : cn("min-h-0", tone === "main" ? mainCardPadding.body : defaultCardPadding.body)
         )}
       >
         {children}
@@ -298,7 +316,7 @@ export function BriefDetailFields({
             className={cn(
               isIntercom
                 ? "text-xs text-[#7b7b78]"
-                : "text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                : "text-xs font-semibold text-muted-foreground"
             )}
           >
             {row.label}
@@ -337,7 +355,6 @@ export function BriefDetailAccordion({
         type="button"
         className={cn(
           "sticky top-0 z-[9] flex w-full items-center justify-between gap-2 py-2.5 text-left text-sm min-w-0",
-          stickyHeaderSurface(),
           "hover:opacity-80"
         )}
         onClick={() => setOpen((v) => !v)}

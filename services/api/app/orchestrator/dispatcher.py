@@ -21,7 +21,7 @@ from app.domain.dc_notes_repository import get_dc_notes_repository
 from app.domain.content_studio_repository import get_content_studio_repository
 from app.domain.agent_runs_repository import get_agent_runs_repository
 from app.domain.memory_store import get_memory_store
-from app.agents.live_call_agent import bot_chat_response
+from app.agents.live_call_agent import bot_chat_response, build_call_agent_handoff
 from app.agents.sales_copilot_agent import copilot_chat_response
 from app.services.content_export_service import export_revision
 from app.services.template_ingest_service import process_template_ingest
@@ -145,6 +145,15 @@ class Orchestrator:
         live_repo = get_live_call_repository()
         transcript_events = live_repo.list_transcript_events(ctx, call_id, limit=500)
         live_suggestions = live_repo.list_suggestions(ctx, call_id, limit=200)
+        call_agent_handoff = build_call_agent_handoff(
+            ctx,
+            call_id,
+            discovery_snapshot=discovery_snapshot,
+            live_snapshot=live_snapshot,
+            live_suggestions=live_suggestions,
+            transcript_events=transcript_events,
+        )
+        live_repo.end_session(ctx, call_id, call_agent_handoff)
         post_env = run_post_dc_pipeline(
             ctx,
             call_id,
@@ -155,6 +164,7 @@ class Orchestrator:
             live_snapshot=live_snapshot,
             live_suggestions=live_suggestions,
             transcript_events=transcript_events,
+            call_agent_handoff=call_agent_handoff,
             post_dc_record=post_dc_record,
         )
         validate_envelope(post_env)
@@ -168,6 +178,7 @@ class Orchestrator:
             out["discovery"] = discovery_snapshot
         if live_snapshot:
             out["live_signals"] = live_snapshot
+        out["call_agent_outputs"] = call_agent_handoff
         return out
 
     def dispatch_call_end(self, ctx: TenantContext, call_id: str) -> Dict[str, Any]:

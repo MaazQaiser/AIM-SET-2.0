@@ -22,7 +22,7 @@ export function IntentPainStream({ intent, pains, nextActions = [] }: IntentPain
     <div className="space-y-3 text-xs">
       {intent && (
         <div className="glass-insight-card p-2.5 shadow-none">
-          <p className="font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+          <p className="font-semibold text-muted-foreground mb-1">
             Call intent
           </p>
           <p className="text-foreground font-medium">
@@ -36,7 +36,7 @@ export function IntentPainStream({ intent, pains, nextActions = [] }: IntentPain
       )}
       {nextActions.length > 0 && (
         <div className="rounded-lg border border-primary/25 bg-primary/5 p-2.5">
-          <p className="font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+          <p className="font-semibold text-muted-foreground mb-1.5">
             Next actions
           </p>
           <ul className="space-y-1.5">
@@ -50,7 +50,7 @@ export function IntentPainStream({ intent, pains, nextActions = [] }: IntentPain
       )}
       {pains.length > 0 && (
         <div>
-          <p className="font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+          <p className="font-semibold text-muted-foreground mb-1.5">
             Pain points
           </p>
           <ul className="space-y-2">

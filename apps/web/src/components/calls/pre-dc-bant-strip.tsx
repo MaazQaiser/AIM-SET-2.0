@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { BANTScorecard } from "@/components/bant-scorecard";
+import { briefCardShellClass } from "@/components/pre-call/brief-detail-card";
 import { Button } from "@dc-copilot/ui/components/button";
 import { useThemePreview } from "@/hooks/use-theme-preview";
 import { cn } from "@/lib/cn";
@@ -33,21 +34,26 @@ export function PreDcBantStrip({
   return (
     <div
       className={cn(
-        "call-detail-urbanist mx-auto inline-flex w-fit max-w-full items-center text-left border shadow-none",
-        compact ? "rounded-full py-1.5 pl-4 pr-2.5" : "rounded-full py-2 pl-3.5 pr-2",
-        "border-border/80 bg-card",
+        "call-detail-urbanist",
+        briefCardShellClass,
+        "text-card-foreground shadow-none",
+        "inline-flex w-fit max-w-full min-h-0 flex-row items-center overflow-hidden text-left",
+        compact ? "gap-0 px-4 py-2" : "gap-0 px-5 py-2.5",
         className
       )}
       aria-label="BANT and call actions"
     >
-      {bant && <BANTScorecard bant={bant} layout="strip" stripScale="md" />}
+      {bant && (
+        <div className={cn(compact ? "px-1" : "px-0.5")}>
+          <BANTScorecard bant={bant} layout="strip" stripScale="md" />
+        </div>
+      )}
       {showJoinCall && bant && (
         <span
           aria-hidden
           className={cn(
-            compact ? "mx-3 h-8" : "mx-2.5 h-8",
-            "w-px shrink-0 self-center",
-            "bg-border"
+            compact ? "mx-3" : "mx-2.5",
+            "h-8 w-px shrink-0 self-center bg-border/60"
           )}
         />
       )}

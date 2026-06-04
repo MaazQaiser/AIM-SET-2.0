@@ -20,7 +20,7 @@ function EventRow({ call }: { call: CalendarMappedCall }) {
     <div className="flex items-start gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
       {/* Date block */}
       <div className="shrink-0 w-12 text-center rounded-md bg-primary/10 py-1">
-        <p className="text-[10px] font-semibold uppercase text-primary tracking-wide">
+        <p className="text-[10px] font-semibold text-primary">
           {format(start, "MMM")}
         </p>
         <p className="text-lg font-bold text-primary leading-none">

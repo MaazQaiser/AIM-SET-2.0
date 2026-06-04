@@ -49,7 +49,7 @@ function SentimentChip({
         {scoreEmoji(score)}
       </span>
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="text-[10px] font-semibold text-muted-foreground">
           {label}
         </p>
         <p className="text-xs font-medium text-foreground leading-snug">

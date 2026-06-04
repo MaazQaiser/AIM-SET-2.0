@@ -8,7 +8,7 @@ import {
   type AccountSnapshotRow,
 } from "@/components/calls/account-widget-cards";
 import { BriefAISummary } from "@/components/pre-call/brief-ai-summary";
-import { BriefArtifactsPanel } from "@/components/pre-call/brief-artifacts-panel";
+import { BriefDiscoveryArtifactsTabbedPanel } from "@/components/pre-call/brief-discovery-artifacts-tabbed-panel";
 import { BriefPreDeckPanel } from "@/components/pre-call/brief-pre-deck-panel";
 import { BriefContentToGeneratePanel } from "@/components/pre-call/brief-content-to-generate-panel";
 import { ClientAttendeesCard } from "@/components/pre-call/client-attendees-card";
@@ -17,7 +17,6 @@ import { resolveInternalAttendees } from "@/lib/attendees/build-internal-attende
 import { ClientHistoryCard } from "@/components/pre-call/client-history-card";
 import { PostDcBriefPreviewCard } from "@/components/pre-call/post-dc-brief-preview";
 import { PreDcResearchCard } from "@/components/pre-call/pre-dc-research-card";
-import { BriefRelevantContentLoader } from "@/components/pre-call/brief-relevant-content";
 import {
   BriefBANTCard,
   BriefDeckCard,
@@ -147,13 +146,17 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
   },
   {
     id: "brief.workflow-artifacts",
-    title: "PRE-DC Workflow artifacts",
+    title: "Discovery Call Artifacts",
     category: "content",
     column: "center",
     sortOrder: 0.5,
-    isAvailable: ({ brief }) =>
-      arrayLen(brief.artifactPlan) > 0 || arrayLen(brief.artifactFulfillment) > 0,
-    render: ({ brief }) => <BriefArtifactsPanel brief={brief} />,
+    isAvailable: ({ brief, call }) =>
+      arrayLen(brief.artifactPlan) > 0 ||
+      arrayLen(brief.artifactFulfillment) > 0 ||
+      Boolean(call.id),
+    render: ({ brief, call }) => (
+      <BriefDiscoveryArtifactsTabbedPanel brief={brief} call={call} />
+    ),
   },
   {
     id: "brief.content-to-generate",
@@ -195,10 +198,8 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     category: "content",
     column: "center",
     sortOrder: 3.5,
-    isAvailable: ({ call }) => Boolean(call.id),
-    render: ({ brief, call }) => (
-      <BriefRelevantContentLoader callId={call.id} brief={brief} />
-    ),
+    isAvailable: () => false,
+    render: () => null,
   },
   {
     id: "brief.pains",

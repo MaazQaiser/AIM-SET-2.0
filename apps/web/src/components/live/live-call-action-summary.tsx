@@ -40,7 +40,7 @@ function MetricTile({
         variant === "default" && "border-border bg-card/50"
       )}
     >
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <p className="text-[10px] font-semibold text-muted-foreground">
         {label}
       </p>
       <p className="text-sm font-medium text-foreground mt-0.5 truncate">{value}</p>
@@ -185,7 +185,7 @@ export function LiveCallActionSummary({
           />
         </div>
         <div className="mt-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+          <p className="text-[10px] font-semibold text-muted-foreground mb-1.5">
             Recommended actions
           </p>
           <ul className="space-y-1.5">

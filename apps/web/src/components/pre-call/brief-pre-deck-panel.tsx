@@ -132,7 +132,7 @@ export function BriefPreDeckPanel({ deck }: BriefPreDeckPanelProps) {
               >
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-3">
                   <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <p className="text-[10px] font-semibold text-muted-foreground">
                       Slide {index + 1}
                     </p>
                     <h3 className="mt-1 text-lg font-semibold text-foreground break-words">

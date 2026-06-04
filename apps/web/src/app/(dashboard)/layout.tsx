@@ -20,7 +20,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <DcImportsHydrator />
             <Suspense fallback={null}>
               <DashboardThemePreview>
-                <div className="page-hue relative flex h-svh">
+                <div className="relative flex h-svh">
                   <Sidebar />
                   <div className="relative z-[1] flex min-w-0 flex-1 flex-col overflow-hidden pl-[calc(var(--sidebar-rail-width,64px)+1rem)]">
                     <AuthSetupBanner />

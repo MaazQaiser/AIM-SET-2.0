@@ -32,7 +32,7 @@ export function KbFileFormatBadge({ fileName, mimeType, className }: KbFileForma
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-md border border-border/80 bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
+        "inline-flex items-center gap-1 rounded-md border border-border/80 bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground",
         isPpt && "border-transparent bg-transparent px-0 py-0 normal-case tracking-normal",
         className
       )}

@@ -175,7 +175,7 @@ function WeekView({ calls, weekStart }: { calls: Call[]; weekStart: Date }) {
                 today ? "border-primary/20 bg-primary/10" : "border-border bg-muted/30"
               )}
             >
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="text-[10px] font-semibold text-muted-foreground">
                 {format(day, "EEE")}
               </p>
               <p className={cn("text-lg font-semibold tabular-nums", today && "text-primary")}>

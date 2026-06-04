@@ -17,17 +17,29 @@ class LlmCompletion:
     trace_id: str
 
 
+def resolve_openai_model(model: str) -> str:
+    """Map legacy Claude model ids from agent config to OpenAI models."""
+    if model.startswith("gpt-"):
+        return model
+    lower = model.lower()
+    if "haiku" in lower:
+        return "gpt-4o-mini"
+    if "opus" in lower or "sonnet" in lower:
+        return "gpt-4o"
+    return "gpt-4o-mini"
+
+
 class LlmClient:
-    """Anthropic wrapper with deterministic fallback when API key absent."""
+    """OpenAI wrapper with deterministic fallback when API key absent."""
 
     def __init__(self, api_key: Optional[str] = None) -> None:
-        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY", "")
 
     def complete(
         self,
         system: str,
         user: str,
-        model: str = "claude-opus-4-1-20250805",
+        model: str = "gpt-4o-mini",
         max_tokens: int = 2048,
         fallback_model: Optional[str] = None,
     ) -> LlmCompletion:
@@ -42,21 +54,22 @@ class LlmClient:
                 trace_id=trace_id,
             )
 
-        result = self._call_anthropic(
+        resolved = resolve_openai_model(model)
+        result = self._call_openai(
             system=system,
             user=user,
-            model=model,
+            model=resolved,
             max_tokens=max_tokens,
             trace_id=trace_id,
         )
         if result is not None:
             return result
 
-        if fallback_model and fallback_model != model:
-            result = self._call_anthropic(
+        if fallback_model and resolve_openai_model(fallback_model) != resolved:
+            result = self._call_openai(
                 system=system,
                 user=user,
-                model=fallback_model,
+                model=resolve_openai_model(fallback_model),
                 max_tokens=max_tokens,
                 trace_id=trace_id,
             )
@@ -72,7 +85,7 @@ class LlmClient:
             trace_id=trace_id,
         )
 
-    def _call_anthropic(
+    def _call_openai(
         self,
         *,
         system: str,
@@ -82,19 +95,22 @@ class LlmClient:
         trace_id: str,
     ) -> Optional[LlmCompletion]:
         try:
-            import anthropic  # type: ignore
+            from openai import OpenAI
 
-            client = anthropic.Anthropic(api_key=self.api_key, timeout=120.0)
-            msg = client.messages.create(
+            client = OpenAI(api_key=self.api_key, timeout=120.0)
+            response = client.chat.completions.create(
                 model=model,
                 max_tokens=max_tokens,
-                system=system,
-                messages=[{"role": "user", "content": user}],
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
             )
-            text = msg.content[0].text if msg.content else ""
-            usage = getattr(msg, "usage", None)
-            tokens_in = getattr(usage, "input_tokens", 0) if usage else 0
-            tokens_out = getattr(usage, "output_tokens", 0) if usage else 0
+            choice = response.choices[0] if response.choices else None
+            text = (choice.message.content or "") if choice and choice.message else ""
+            usage = getattr(response, "usage", None)
+            tokens_in = getattr(usage, "prompt_tokens", 0) if usage else 0
+            tokens_out = getattr(usage, "completion_tokens", 0) if usage else 0
             return LlmCompletion(
                 text=text,
                 model=model,
@@ -111,7 +127,7 @@ class LlmClient:
         system: str,
         image_png_bytes: bytes,
         user_text: str = "Convert this slide to HTML/CSS.",
-        model: str = "claude-opus-4-1-20250805",
+        model: str = "gpt-4o",
         max_tokens: int = 4096,
         fallback_model: Optional[str] = None,
     ) -> LlmCompletion:
@@ -127,28 +143,35 @@ class LlmClient:
                 trace_id=trace_id,
             )
 
-        result = self._call_anthropic_vision(
+        resolved = resolve_openai_model(model)
+        if resolved == "gpt-4o-mini":
+            resolved = "gpt-4o"
+        result = self._call_openai_vision(
             system=system,
             b64=b64,
             user_text=user_text,
-            model=model,
+            model=resolved,
             max_tokens=max_tokens,
             trace_id=trace_id,
         )
         if result is not None:
             return result
 
-        if fallback_model and fallback_model != model:
-            result = self._call_anthropic_vision(
-                system=system,
-                b64=b64,
-                user_text=user_text,
-                model=fallback_model,
-                max_tokens=max_tokens,
-                trace_id=trace_id,
-            )
-            if result is not None:
-                return result
+        if fallback_model:
+            fb = resolve_openai_model(fallback_model)
+            if fb == "gpt-4o-mini":
+                fb = "gpt-4o"
+            if fb != resolved:
+                result = self._call_openai_vision(
+                    system=system,
+                    b64=b64,
+                    user_text=user_text,
+                    model=fb,
+                    max_tokens=max_tokens,
+                    trace_id=trace_id,
+                )
+                if result is not None:
+                    return result
 
         return LlmCompletion(
             text='<section class="slide" data-slide="1"><p>Template slide (vision fallback)</p></section>',
@@ -159,7 +182,7 @@ class LlmClient:
             trace_id=trace_id,
         )
 
-    def _call_anthropic_vision(
+    def _call_openai_vision(
         self,
         *,
         system: str,
@@ -170,34 +193,31 @@ class LlmClient:
         trace_id: str,
     ) -> Optional[LlmCompletion]:
         try:
-            import anthropic  # type: ignore
+            from openai import OpenAI
 
-            client = anthropic.Anthropic(api_key=self.api_key, timeout=120.0)
-            msg = client.messages.create(
+            client = OpenAI(api_key=self.api_key, timeout=120.0)
+            response = client.chat.completions.create(
                 model=model,
                 max_tokens=max_tokens,
-                system=system,
                 messages=[
+                    {"role": "system", "content": system},
                     {
                         "role": "user",
                         "content": [
                             {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "image/png",
-                                    "data": b64,
-                                },
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/png;base64,{b64}"},
                             },
                             {"type": "text", "text": user_text},
                         ],
-                    }
+                    },
                 ],
             )
-            text = msg.content[0].text if msg.content else ""
-            usage = getattr(msg, "usage", None)
-            tokens_in = getattr(usage, "input_tokens", 0) if usage else 0
-            tokens_out = getattr(usage, "output_tokens", 0) if usage else 0
+            choice = response.choices[0] if response.choices else None
+            text = (choice.message.content or "") if choice and choice.message else ""
+            usage = getattr(response, "usage", None)
+            tokens_in = getattr(usage, "prompt_tokens", 0) if usage else 0
+            tokens_out = getattr(usage, "completion_tokens", 0) if usage else 0
             return LlmCompletion(
                 text=text,
                 model=model,
@@ -219,6 +239,11 @@ def _fallback_complete(system: str, user: str) -> str:
 
 
 def _estimate_cost(model: str, tokens_in: int, tokens_out: int) -> float:
-    rate_in = 3.0 if "opus" in model else 1.0 if "sonnet" in model else 0.25
-    rate_out = 15.0 if "opus" in model else 5.0 if "sonnet" in model else 1.25
+    lower = model.lower()
+    if "gpt-4o" in lower and "mini" not in lower:
+        rate_in, rate_out = 2.5, 10.0
+    elif "gpt-4" in lower:
+        rate_in, rate_out = 10.0, 30.0
+    else:
+        rate_in, rate_out = 0.15, 0.6
     return (tokens_in * rate_in + tokens_out * rate_out) / 1_000_000

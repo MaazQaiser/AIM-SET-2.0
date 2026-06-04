@@ -40,9 +40,9 @@ export function ClpPublicView({
   const sections = (page.sections ?? []).filter((s) => s.visible !== false);
 
   return (
-    <div className={cn("min-h-screen bg-background", preview && "rounded-xl border")}>
+    <div className={cn("min-h-screen", preview && "rounded-xl border")}>
       <header className="border-b bg-card px-6 py-8">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Lead hub</p>
+        <p className="text-xs text-muted-foreground">Lead hub</p>
         <h1 className="text-2xl font-semibold mt-1">{branding.accountName}</h1>
         {branding.leadName && (
           <p className="text-muted-foreground mt-1">Prepared for {branding.leadName}</p>

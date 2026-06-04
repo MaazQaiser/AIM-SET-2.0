@@ -4,9 +4,11 @@ import { Building2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import {
   BriefDetailAccordion,
+  BRIEF_CARD_LAYOUT_CLASS,
   BRIEF_SIDEBAR_CARD_SCROLL_MAX,
   briefCardShellClass,
-  briefSidebarScrollClass,
+  briefScrollBodyClassName,
+  briefStickyHeaderClassName,
 } from "@/components/pre-call/brief-detail-card";
 import { PreDcResearchAccordions } from "@/components/pre-call/pre-dc-research-accordions";
 import type { BriefWidgetProps } from "@/lib/dashboard/widget-registry";
@@ -28,21 +30,16 @@ export function PreDcCustomerInfoPanel({ widgets, widgetProps }: PreDcCustomerIn
 
   return (
     <Card
-      className={cn(briefCardShellClass, "flex min-h-0 flex-col")}
+      className={cn(briefCardShellClass, BRIEF_CARD_LAYOUT_CLASS)}
       style={{ maxHeight: BRIEF_SIDEBAR_CARD_SCROLL_MAX }}
     >
-      <CardHeader className="sticky top-0 z-10 shrink-0 bg-card px-7 pt-6 pb-3">
+      <CardHeader className={briefStickyHeaderClassName}>
         <CardTitle className="text-base font-extrabold tracking-tight flex items-center gap-2">
           <Building2 className="h-4 w-4 shrink-0 text-foreground" />
           Customer & account
         </CardTitle>
       </CardHeader>
-      <CardContent
-        className={cn(
-          briefSidebarScrollClass,
-          "min-h-0 flex-1 space-y-2 overflow-y-auto overflow-x-hidden px-7 pb-6 pt-3"
-        )}
-      >
+      <CardContent className={cn(briefScrollBodyClassName("default", true), "space-y-2")}>
         {hasResearch && <PreDcResearchAccordions sections={researchSections} />}
         {otherWidgets.map((spec) => (
           <BriefDetailAccordion key={spec.id} title={spec.title} defaultOpen={false} loud>

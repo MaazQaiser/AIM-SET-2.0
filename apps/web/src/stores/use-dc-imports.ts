@@ -55,6 +55,8 @@ interface DcImportsState {
   postDcFileName: string | null;
   importedAt: string | null;
   importVersion: number;
+  /** True after the first loadFromDb attempt finishes (success or failure). */
+  importsHydrated: boolean;
   loadFromDb: () => Promise<void>;
   clearImports: () => Promise<void>;
 }
@@ -75,6 +77,7 @@ const emptyState = {
   postDcFileName: null as string | null,
   importedAt: null as string | null,
   importVersion: 0,
+  importsHydrated: false,
 };
 
 function applyBuilt(
@@ -137,28 +140,34 @@ export const useDcImportsStore = create<DcImportsState>()((set, get) => ({
       discoverySnapshotsByCallId: { ...s.discoverySnapshotsByCallId, [callId]: snapshot },
     })),
   loadFromDb: async () => {
-    const res = await fetch("/api/dc-notes");
-    if (!res.ok) {
-      const err = (await res.json().catch(() => null)) as { detail?: string; error?: string } | null;
-      throw new Error(err?.detail ?? err?.error ?? `Failed to load DC notes (${res.status})`);
+    try {
+      const res = await fetch("/api/dc-notes");
+      if (!res.ok) {
+        const err = (await res.json().catch(() => null)) as { detail?: string; error?: string } | null;
+        throw new Error(err?.detail ?? err?.error ?? `Failed to load DC notes (${res.status})`);
+      }
+
+      const data = (await res.json()) as {
+        pre_dc_records?: PreDCRecord[];
+        post_dc_records?: PostDCRecord[];
+      };
+
+      const preDcRecords = data.pre_dc_records ?? [];
+      const postDcRecords = data.post_dc_records ?? [];
+      const state = get();
+
+      set({
+        ...applyBuilt(preDcRecords, postDcRecords),
+        importedAt: preDcRecords.length || postDcRecords.length ? new Date().toISOString() : null,
+        importVersion: state.importVersion + 1,
+        importsHydrated: true,
+      });
+    } catch (error) {
+      set({ importsHydrated: true });
+      throw error;
     }
-
-    const data = (await res.json()) as {
-      pre_dc_records?: PreDCRecord[];
-      post_dc_records?: PostDCRecord[];
-    };
-
-    const preDcRecords = data.pre_dc_records ?? [];
-    const postDcRecords = data.post_dc_records ?? [];
-    const state = get();
-
-    set({
-      ...applyBuilt(preDcRecords, postDcRecords),
-      importedAt: preDcRecords.length || postDcRecords.length ? new Date().toISOString() : null,
-      importVersion: state.importVersion + 1,
-    });
   },
   clearImports: async () => {
-    set({ ...emptyState, importVersion: get().importVersion + 1 });
+    set({ ...emptyState, importVersion: get().importVersion + 1, importsHydrated: true });
   },
 }));

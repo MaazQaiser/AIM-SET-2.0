@@ -1,13 +1,13 @@
-import { Calendar, Clock, Users, Building2, Briefcase, ChevronRight, DollarSign } from "lucide-react";
+import { Calendar, Clock, ArrowUpRight, DollarSign, User } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { cn } from "@/lib/cn";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent } from "@dc-copilot/ui/components/card";
-import { PodMemberBadge } from "./pod-member-badge";
-import { BANTScorecard } from "./bant-scorecard";
 import { callDetailsHref } from "@/lib/dashboard/call-links";
+import { companyStageForCall } from "@/lib/dc-notes/company-stage";
+import { companyRatingForCall, formatCompanyRating } from "@/lib/dc-notes/icp-rating";
 import type { Call } from "@/types";
 
 interface CallCardProps {
@@ -21,22 +21,12 @@ const STATUS_CONFIG = {
   "no-show": { label: "No show",   variant: "destructive" as const, dot: "bg-destructive" },
 };
 
-function Initials({ name }: { name: string }) {
-  const parts = name.trim().split(" ");
-  const letters = parts.length >= 2
-    ? `${parts[0][0]}${parts[parts.length - 1][0]}`
-    : name.slice(0, 2);
-  return (
-    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary font-bold text-sm uppercase select-none">
-      {letters.toUpperCase()}
-    </div>
-  );
-}
-
 export function CallCard({ call }: CallCardProps) {
   const cfg = STATUS_CONFIG[call.status];
   const scheduledDate = new Date(call.scheduledAt);
   const isLive = call.status === "live";
+  const companyStage = companyStageForCall(call);
+  const agentRating = formatCompanyRating(companyRatingForCall(call));
 
   return (
     <Card
@@ -47,13 +37,10 @@ export function CallCard({ call }: CallCardProps) {
     >
       <CardContent className="p-5 space-y-4">
 
-        {/* ── Header: avatar + name + status ─────────────────────────── */}
-        <div className="flex items-start gap-3">
-          <Initials name={call.accountName} />
-
-          <div className="flex-1 min-w-0">
-            {/* Company name — bold and prominent */}
-            <div className="flex items-center gap-2 flex-wrap">
+        {/* ── Header: name + status + link ───────────────────────────── */}
+        <div className="min-w-0">
+          <div className="flex items-start gap-2">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
               <h3 className="text-base font-bold text-foreground leading-tight truncate">
                 {call.accountName}
               </h3>
@@ -65,94 +52,82 @@ export function CallCard({ call }: CallCardProps) {
                 {cfg.label}
               </Badge>
             </div>
+            {call.status !== "no-show" && (
+              <Button asChild size="icon" variant="outline" className="h-8 w-8 shrink-0">
+                <Link href={callDetailsHref(call)} aria-label={`View details for ${call.accountName}`}>
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            )}
+          </div>
 
-            {/* Lead name — secondary, slightly smaller */}
-            {call.leadName && (
-              <p className="text-sm font-semibold text-foreground/80 mt-0.5 truncate">
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            {call.annualRevenue && (
+              <Badge
+                variant="outline"
+                className="gap-1 text-[10px] font-medium border-emerald-300/80 bg-emerald-50/80 text-emerald-900 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-100"
+              >
+                <DollarSign className="h-3 w-3 shrink-0" />
+                {call.annualRevenue}
+                <span className="font-normal opacity-80">rev</span>
+              </Badge>
+            )}
+            <Badge
+              variant="outline"
+              className="gap-1 text-[10px] font-medium tabular-nums border-amber-300/80 bg-amber-50/80 text-amber-950 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100"
+            >
+              Rating {agentRating}
+            </Badge>
+            {call.dealStage && (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-[10px] font-medium",
+                  companyStage === "Enterprise" &&
+                    "border-violet-300/80 bg-violet-50/80 text-violet-900",
+                  companyStage === "Startup" && "border-sky-300/80 bg-sky-50/80 text-sky-900",
+                  companyStage === "Funded Startup" &&
+                    "border-indigo-300/80 bg-indigo-50/90 text-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-100 dark:border-indigo-700/60",
+                  companyStage === "Ideation" && "border-amber-300/80 bg-amber-50/80 text-amber-950",
+                  companyStage === "SMB" &&
+                    "border-teal-300/80 bg-teal-50/90 text-teal-900 dark:bg-teal-950/40 dark:text-teal-100 dark:border-teal-700/60"
+                )}
+              >
+                {companyStage}
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {/* ── Meta row: lead, date, time ──────────────────────────────── */}
+        <div className="space-y-2 border-t pt-3 text-xs text-muted-foreground">
+          {call.leadName && (
+            <div className="flex min-w-0 items-center gap-1.5 truncate border-b border-border/60 pb-2 font-semibold text-foreground/80">
+              <User className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">
                 {call.leadName}
                 {call.leadTitle && (
                   <span className="font-normal text-muted-foreground"> · {call.leadTitle}</span>
                 )}
-              </p>
-            )}
-
-            {/* Industry / deal stage tags */}
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              {call.annualRevenue && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-foreground/90">
-                  <DollarSign className="h-3 w-3 text-primary" />
-                  {call.annualRevenue}
-                  <span className="font-normal text-muted-foreground">rev</span>
-                </span>
-              )}
-              {call.industry && (
-                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                  <Building2 className="h-3 w-3" />
-                  {call.industry}
-                </span>
-              )}
-              {call.dealStage && (
-                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                  <Briefcase className="h-3 w-3" />
-                  {call.dealStage}
-                </span>
-              )}
+              </span>
             </div>
-          </div>
-        </div>
-
-        {/* ── Meta row: date, time, pod size ──────────────────────────── */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground border-t pt-3">
-          <span className="flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5 shrink-0" />
-            {call.discoveryCallDatePkt ?? format(scheduledDate, "EEE, MMM d, yyyy")}
-            {call.discoveryCallDatePkt && (
-              <span className="text-muted-foreground/70">(PKT)</span>
-            )}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5 shrink-0" />
-            {call.discoveryCallTimePkt ?? format(scheduledDate, "h:mm a")}
-            {call.discoveryCallTimePkt && (
-              <span className="text-muted-foreground/70">PKT</span>
-            )}
-          </span>
-          {call.employeeCount && (
+          )}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span className="flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 shrink-0" />
-              {call.employeeCount} employees
+              <Calendar className="h-3.5 w-3.5 shrink-0" />
+              {call.discoveryCallDatePkt ?? format(scheduledDate, "EEE, MMM d, yyyy")}
+              {call.discoveryCallDatePkt && (
+                <span className="text-muted-foreground/70">(PKT)</span>
+              )}
             </span>
-          )}
-        </div>
-
-        {/* ── Pod members ──────────────────────────────────────────────── */}
-        {call.pod?.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {call.pod.map((member) => (
-              <PodMemberBadge key={member.id} member={member} />
-            ))}
+            <span className="flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              {call.discoveryCallTimePkt ?? format(scheduledDate, "h:mm a")}
+              {call.discoveryCallTimePkt && (
+                <span className="text-muted-foreground/70">PKT</span>
+              )}
+            </span>
           </div>
-        )}
-
-        {/* ── BANT mini-scorecard (only when available) ────────────────── */}
-        {call.bant && (
-          <div className="rounded-md bg-muted/50 px-3 py-2">
-            <BANTScorecard bant={call.bant} compact />
-          </div>
-        )}
-
-        {/* ── Actions ──────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-2 border-t pt-3">
-          {call.status === "no-show" ? (
-            <span className="text-xs text-muted-foreground italic">No action required</span>
-          ) : (
-            <Button asChild size="sm" variant="outline" className="gap-1.5">
-              <Link href={callDetailsHref(call)}>
-                View details
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
-            </Button>
-          )}
         </div>
 
       </CardContent>

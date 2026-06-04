@@ -6,8 +6,8 @@ from typing import Any, Dict, List
 
 SUMMARY_SECTION_TITLES: Dict[str, str] = {
     "customer_profile": "Profile Summary",
-    "customer_pain_points": "Pain Points",
-    "suggested_action": "Suggested Action",
+    "customer_pain_points": "Client needs",
+    "suggested_action": "Approach towards client",
     "relevance": "Relevance",
 }
 

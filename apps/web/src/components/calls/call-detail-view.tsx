@@ -3,8 +3,8 @@
 import { CallDetailStickyHeader } from "@/components/calls/call-detail-sticky-header";
 import { CallDetailTabs } from "@/components/calls/call-detail-tabs";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
-import { Skeleton } from "@dc-copilot/ui/components/skeleton";
 import { PageShell } from "@/components/layout/page-shell";
+import { CallDetailPageLoader } from "@/components/layout/page-loaders";
 import { enrichCallBant } from "@/lib/bant/authority-from-lead";
 import { useCall, useCallBrief } from "@/lib/data/hooks";
 import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
@@ -20,21 +20,17 @@ interface CallDetailViewProps {
 }
 
 export function CallDetailView({ callId }: CallDetailViewProps) {
-  const { data: call, isLoading } = useCall(callId);
+  const { data: call, isLoading, isFetching } = useCall(callId);
   const { data: brief } = useCallBrief(callId);
+  const importsHydrated = useDcImportsStore((s) => s.importsHydrated);
   const preRecord = useDcImportsStore((s) =>
     findPreDcRecordForCall(s.preDcRecords, callId, call?.accountName)
   );
   const isEditingLayout = useDashboardLayoutStore((s) => s.isEditing);
   const setEditingLayout = useDashboardLayoutStore((s) => s.setEditing);
 
-  if (isLoading) {
-    return (
-      <PageShell size="wide" className="call-detail-page space-y-6 pb-8">
-        <Skeleton className="h-20 w-full rounded-xl" />
-        <Skeleton className="h-96 w-full rounded-xl" />
-      </PageShell>
-    );
+  if ((!importsHydrated || isLoading) && !call) {
+    return <CallDetailPageLoader />;
   }
 
   if (!call) {
@@ -94,6 +90,11 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
       size="wide"
       className="call-detail-page min-h-0 space-y-4 pb-8 text-[0.9375rem] leading-relaxed"
     >
+      {isFetching && call ? (
+        <p className="text-xs text-muted-foreground" aria-live="polite">
+          Syncing latest call data…
+        </p>
+      ) : null}
       <CallDetailStickyHeader
         call={call}
         scheduleText={scheduleText}

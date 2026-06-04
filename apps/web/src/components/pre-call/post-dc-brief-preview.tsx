@@ -56,7 +56,7 @@ export function PostDcBriefPreviewCard({
         )}
         {preview.engagementModel && (
           <BriefDetailRow>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="text-[10px] font-semibold text-muted-foreground">
               Engagement model
             </p>
             <p className="text-sm text-foreground/90 break-words mt-0.5">{preview.engagementModel}</p>

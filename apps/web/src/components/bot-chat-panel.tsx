@@ -167,7 +167,7 @@ function authorBadge(msg: BotChatMessage | CopilotMessage, copilotMode?: boolean
   return (
     <span className="text-[10px] font-medium text-muted-foreground mb-1 block">
       {authorName}
-      {authorRole ? ` · ${authorRole.toUpperCase()}` : ""}
+      {authorRole ? ` · ${authorRole}` : ""}
       {isPrivate && (
         <span className="ml-1 inline-flex items-center gap-0.5 text-muted-foreground/80">
           <Lock className="h-2.5 w-2.5" aria-hidden />

@@ -87,7 +87,7 @@ export function LiveAssistantCard({
 
       <div className="flex items-center gap-1.5 pr-6">
         <Icon className={cn("h-3.5 w-3.5 shrink-0", cfg.accent)} aria-hidden />
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <span className="text-[10px] font-semibold text-muted-foreground">
           {cfg.label}
         </span>
       </div>

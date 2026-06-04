@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     kb_ingest_sync: bool = False
     kb_shared_mode: bool = False
     kb_shared_tenant_key: str = "dc-copilot-shared"
+    # Legacy env name; prefer OPENAI_API_KEY for all LLM + embedding calls.
     anthropic_api_key: str = ""
     content_templates_bucket: str = "content-templates"
     content_exports_bucket: str = "content-exports"
@@ -65,8 +66,17 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]
 
     @property
+    def llm_api_key(self) -> str:
+        return self.openai_api_key or self.anthropic_api_key
+
+    @property
+    def llm_configured(self) -> bool:
+        return bool(self.llm_api_key)
+
+    @property
     def anthropic_configured(self) -> bool:
-        return bool(self.anthropic_api_key)
+        """LLM availability (OpenAI). Name kept for existing call sites."""
+        return self.llm_configured
 
     @property
     def supabase_configured(self) -> bool:

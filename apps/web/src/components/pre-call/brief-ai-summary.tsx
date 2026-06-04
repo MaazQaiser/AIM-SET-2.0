@@ -262,7 +262,7 @@ function resolveSummarySections(brief: CallBrief): BriefSummarySection[] {
     },
     {
       id: "suggested_action",
-      title: "Suggested Action",
+      title: "Approach towards client",
       content: "No generated suggested action paragraph is available yet.",
     },
     {
@@ -448,17 +448,9 @@ export function BriefAISummary({ brief, call }: BriefAISummaryProps) {
           {summarySections.map((section) => (
             <section
               key={section.id}
-              className={cn(
-                "space-y-2 border-t border-border/60 pt-3 first:border-t-0 first:pt-0",
-                section.id === "customer_pain_points" && "border-l-2 border-l-rose-400 pl-3"
-              )}
+              className="space-y-2 border-t border-border/60 pt-3 first:border-t-0 first:pt-0"
             >
-              <p
-                className={cn(
-                  "text-xs font-semibold uppercase tracking-wide text-muted-foreground",
-                  section.id === "customer_pain_points" && "text-rose-700"
-                )}
-              >
+              <p className="text-xs font-semibold text-muted-foreground">
                 {section.title}
               </p>
               <HighlightedSummary

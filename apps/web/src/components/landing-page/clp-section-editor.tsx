@@ -83,7 +83,7 @@ export function ClpSectionEditor({ draft, onChange }: ClpSectionEditorProps) {
                 <span className="font-medium truncate">
                   {section.title ?? section.headline ?? sectionTypeLabel(section.type)}
                 </span>
-                <span className="text-[10px] uppercase text-muted-foreground shrink-0">
+                <span className="text-[10px] text-muted-foreground shrink-0">
                   {section.type.replace(/_/g, " ")}
                 </span>
                 {expandedId === section.id ? (

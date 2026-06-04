@@ -27,7 +27,7 @@ export function AuthBrandPanel({ className }: { className?: string }) {
       <SummitLogo />
 
       <div className="mt-10 max-w-md">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <p className="text-[11px] font-semibold text-muted-foreground">
           Discovery Call platform
         </p>
         <h1 className="mt-2 text-2xl font-semibold leading-tight text-foreground lg:text-[1.75rem]">

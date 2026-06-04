@@ -362,7 +362,7 @@ def run_studio_turn(
         f"Latest user message: {clean_msg}"
     )
 
-    api_key = settings.anthropic_api_key or None
+    api_key = settings.llm_api_key or None
     completion = LlmClient(api_key=api_key).complete(
         system=system,
         user=user_payload,
@@ -701,7 +701,7 @@ def _missing_brief_fields(brief: Dict[str, Any]) -> List[str]:
     if not str(brief.get("audience", "")).strip():
         missing.append("audience")
     points = brief.get("pain_points_coverage") or brief.get("key_points")
-    if not isinstance(points, list) or len([p for p in points if str(p).strip()]) < 3:
+    if not isinstance(points, list) or len([p for p in points if str(p).strip()]) == 0:
         missing.append("pain_points_coverage")
     if not str(brief.get("content_context", "")).strip():
         missing.append("content_context")
@@ -734,7 +734,7 @@ def _brief_with_defaults(brief: Dict[str, Any]) -> Dict[str, Any]:
     b = dict(brief)
     b["audience"] = str(b.get("audience", "")).strip() or "Executive stakeholders"
     points = b.get("pain_points_coverage") or b.get("key_points")
-    if not isinstance(points, list) or len([p for p in points if str(p).strip()]) < 3:
+    if not isinstance(points, list) or len([p for p in points if str(p).strip()]) == 0:
         b["pain_points_coverage"] = [
             "Current challenge and why it matters",
             "Recommended approach and expected outcomes",
@@ -898,11 +898,39 @@ def _update_brief_from_reply(brief: Dict[str, Any], text: str) -> Dict[str, Any]
         b["pain_points_coverage"] = points or [raw]
         b["key_points"] = b["pain_points_coverage"]
         return b
+    if "pain_points_coverage" in missing and raw and not _looks_like_context_answer(raw):
+        points = _extract_key_points(raw)
+        b["pain_points_coverage"] = points or [raw]
+        b["key_points"] = b["pain_points_coverage"]
+        return b
     if "content_context" in missing:
         b["content_context"] = raw
         b["style"] = raw
         return b
     return b
+
+
+def _looks_like_context_answer(text: str) -> bool:
+    low = text.strip().lower()
+    if not low:
+        return False
+    return any(
+        phrase in low
+        for phrase in (
+            "case study",
+            "customer story",
+            "executive summary",
+            "proposal",
+            "pitch",
+            "portfolio",
+            "overview",
+            "internal",
+            "customer-facing",
+            "sales enablement",
+            "board",
+            "investor",
+        )
+    )
 
 
 def _extract_labeled_sections(text: str) -> Dict[str, str]:

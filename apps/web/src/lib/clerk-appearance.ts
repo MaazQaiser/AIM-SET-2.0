@@ -40,7 +40,7 @@ export const clerkAppearance = {
     footerActionLink: "text-primary font-medium hover:text-primary/80",
     footerActionText: "text-sm text-muted-foreground",
     dividerLine: "bg-border",
-    dividerText: "text-muted-foreground text-xs uppercase tracking-wide",
+    dividerText: "text-muted-foreground text-xs",
     identityPreview: "border border-border rounded-lg bg-muted/20",
     identityPreviewText: "text-sm font-medium text-foreground",
     identityPreviewEditButton: "text-primary text-sm",

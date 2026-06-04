@@ -48,7 +48,7 @@ export function FocusAreasBar({ areas, intentLabel, bantSignals = [] }: FocusAre
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10">
           <Activity className="h-3.5 w-3.5 text-primary" aria-hidden />
         </div>
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <span className="text-[10px] font-semibold text-muted-foreground">
           Live signals
         </span>
         {intentLabel && (

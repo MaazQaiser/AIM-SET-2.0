@@ -1,7 +1,5 @@
 "use client";
 
-import { KbPowerPointIcon } from "@/components/knowledge/kb-powerpoint-icon";
-import { isPowerPointFormat } from "@/lib/kb/format-brand-icons";
 import { resolveKbFileFormat, type KbFileFormat } from "@/lib/kb/file-format";
 import { cn } from "@/lib/cn";
 
@@ -17,6 +15,21 @@ const sizeMap = {
   sm: "h-[18px] w-[18px]",
   md: "h-6 w-6",
 };
+
+function PowerPointIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 40" fill="none" className={className} aria-hidden>
+      <path
+        d="M6 0h14.5L28 7.5V38a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2Z"
+        fill="#D24726"
+      />
+      <path d="M20 0v7.5H28L20 0Z" fill="#fff" fillOpacity="0.35" />
+      <rect x="10" y="17" width="3" height="10" rx="0.5" fill="#fff" fillOpacity="0.95" />
+      <rect x="14.5" y="14" width="3" height="13" rx="0.5" fill="#fff" fillOpacity="0.95" />
+      <rect x="19" y="19" width="3" height="8" rx="0.5" fill="#fff" fillOpacity="0.95" />
+    </svg>
+  );
+}
 
 function PdfIcon({ className }: { className?: string }) {
   return (
@@ -131,7 +144,7 @@ function iconForFormat(format: KbFileFormat) {
       return WordIcon;
     case "ppt":
     case "pptx":
-      return null;
+      return PowerPointIcon;
     case "csv":
       return CsvIcon;
     case "png":
@@ -153,32 +166,16 @@ export function KbFileTypeIcon({
 }: KbFileTypeIconProps) {
   const format = formatOverride ?? resolveKbFileFormat(fileName, mimeType).format;
   const label = resolveKbFileFormat(fileName, mimeType).label;
-
-  if (isPowerPointFormat(format)) {
-    return (
-      <span
-        className={cn("inline-flex shrink-0 items-center justify-center", className)}
-        title={label}
-        aria-hidden
-      >
-        <KbPowerPointIcon
-          size={size === "sm" ? "sm" : "md"}
-          className={cn(sizeMap[size], "drop-shadow-sm")}
-        />
-      </span>
-    );
-  }
-
   const Icon = iconForFormat(format);
   if (!Icon) return null;
 
   return (
     <span
-      className={cn("inline-flex shrink-0 items-center justify-center", className)}
+      className="inline-flex shrink-0 items-center justify-center"
       title={label}
       aria-hidden
     >
-      <Icon className={cn(sizeMap[size], "drop-shadow-sm")} />
+      <Icon className={cn(sizeMap[size], "drop-shadow-sm", className)} />
     </span>
   );
 }

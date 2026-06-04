@@ -97,8 +97,8 @@ export interface BriefSummarySection {
 /** Canonical UI labels for Pre-DC summary sections (single source of truth). */
 export const SUMMARY_SECTION_TITLES: Record<BriefSummarySection["id"], string> = {
   customer_profile: "Profile Summary",
-  customer_pain_points: "Pain Points",
-  suggested_action: "Suggested Action",
+  customer_pain_points: "Client needs",
+  suggested_action: "Approach towards client",
   relevance: "Relevance",
 };
 

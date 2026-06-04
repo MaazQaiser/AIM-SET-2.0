@@ -113,7 +113,7 @@ export function BriefBANTCard({
       <BANTScorecard bant={bant} layout="stack" plain />
       {provenance.length > 0 && (
         <div className="mt-4 pt-3 border-t border-border">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          <p className="text-[10px] font-semibold text-muted-foreground mb-2">
             Based on
           </p>
           <BriefDetailFields rows={provenance} />
@@ -165,7 +165,7 @@ export function BriefSignalsCard({ signals }: { signals: string[] }) {
           "The workflow looks for important notes that could change call prep, like urgency, unusual context, or extra research signals.",
       }}
       headerExtra={
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-warning shrink-0 rounded-full bg-warning/15 px-2 py-0.5">
+        <span className="text-[10px] font-semibold text-warning shrink-0 rounded-full bg-warning/15 px-2 py-0.5">
           {signals.length} new
         </span>
       }
@@ -175,7 +175,7 @@ export function BriefSignalsCard({ signals }: { signals: string[] }) {
           <li key={signal}>
             <BriefDetailRow>
               <div className="flex items-start gap-2 min-w-0">
-                <span className="shrink-0 rounded-md bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-warning">
+                <span className="shrink-0 rounded-md bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold text-warning">
                   Signal {i + 1}
                 </span>
                 <p
@@ -468,7 +468,7 @@ export function BriefPodNotesCard({ notes }: { notes: CallBrief["podNotes"] }) {
               className={cn(
                 briefMainLead,
                 briefMainUnderline,
-                "text-sm uppercase tracking-wide truncate"
+                "text-sm truncate"
               )}
             >
               {note.memberName} · {note.role}

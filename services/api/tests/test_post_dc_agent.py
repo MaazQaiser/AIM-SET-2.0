@@ -17,7 +17,7 @@ client = TestClient(app)
 def _clear_memory(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "")
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     get_settings.cache_clear()
     store = get_memory_store()
     store.calls.clear()
@@ -388,6 +388,17 @@ def test_live_call_inputs_flow_into_post_dc_review(monkeypatch):
 
     post = orchestrator.dispatch_post_call(ctx, call_id)
 
+    handoff = post["call_agent_outputs"]
+    assert handoff["operation"] == "call_end_handoff"
+    assert handoff["transcript"]["event_count"] == 1
+    assert "Budget is approved" in handoff["transcript"]["full_text"]
+    assert handoff["transcript_summary"]["headline"] == "1 transcript segments captured"
+    assert handoff["bant"]["status"]["budget"] in ("partial", "confirmed")
+    assert handoff["sentiment"]["event_counts"]
+    assert handoff["defined_signals"]["signals"]
+    assert handoff["summary"]["transcript_segments"] == 1
+    assert post["agentInputs"]["hasCallAgentHandoff"] is True
+
     live_signals = post["live_signals"]
     assert live_signals["intent"]["label"] == "commercial_discovery"
     assert live_signals["top_keywords"]
@@ -455,7 +466,9 @@ def test_end_live_call_preserves_live_outputs_for_post_dc(monkeypatch):
 
     assert post["live_signals"]["intent"]["label"] == "commercial_discovery"
     assert post["agentInputs"]["hasLiveSignalSnapshot"] is True
+    assert post["agentInputs"]["hasCallAgentHandoff"] is True
     assert post["agentInputs"]["transcriptEventCount"] == 1
+    assert post["call_agent_outputs"]["bant"]["status"]["budget"] in ("partial", "confirmed")
 
 
 def test_jira_route_fails_closed_when_unconfigured(monkeypatch):

@@ -69,12 +69,22 @@ function BackToCallsButton() {
     <HeaderIconTooltip label="Back to calls">
       <Button
         asChild
-        variant="ghost"
+        variant="outline"
         size="icon"
-        className={cn("h-9 w-9 shrink-0", isIntercom && "text-[#111111]")}
+        className={cn(
+          "h-9 w-9 shrink-0 border-slate-300 bg-background shadow-none",
+          "hover:border-slate-400 hover:bg-slate-50",
+          isIntercom && "border-[#d1d1cd] bg-[#f7f5f3] hover:bg-[#ebe7e1] hover:border-[#b8b8b4]"
+        )}
       >
         <Link href="/calls" aria-label="Back to calls">
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft
+            className={cn(
+              "h-4 w-4 text-slate-600",
+              isIntercom && "text-[#626260]"
+            )}
+            strokeWidth={1.75}
+          />
         </Link>
       </Button>
     </HeaderIconTooltip>

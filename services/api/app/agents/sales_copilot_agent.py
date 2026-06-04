@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from dc_core.evidence import AgentEnvelope, Citation, validate_envelope
 from dc_core.tenancy import TenantContext
-from dc_llm.client import LlmClient
+from dc_llm.client import LlmClient, resolve_openai_model
 from dc_tools.retrieve_kb import default_embed_fn, retrieve_kb
 
 from app.config import get_settings
@@ -544,15 +544,15 @@ class SalesCopilotAgent:
         if fast is not None:
             answer, cost = fast
         else:
-            use_anthropic = bool(settings.anthropic_api_key)
-            if use_anthropic:
+            use_openai = settings.llm_configured
+            if use_openai:
                 try:
-                    import anthropic  # type: ignore  # noqa: F401
+                    from openai import OpenAI  # noqa: F401
                 except ModuleNotFoundError:
-                    use_anthropic = False
+                    use_openai = False
 
-            if use_anthropic:
-                answer, cost = self._run_anthropic_tools(
+            if use_openai:
+                answer, cost = self._run_openai_tools(
                     message,
                     history,
                     context_note=context_note,
@@ -834,7 +834,20 @@ class SalesCopilotAgent:
             payload["markdown"] = "\n".join(lines)
         return payload
 
-    def _run_anthropic_tools(
+    def _openai_tool_specs(self) -> List[Dict[str, Any]]:
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool["name"],
+                    "description": tool.get("description", ""),
+                    "parameters": tool.get("input_schema", {"type": "object", "properties": {}}),
+                },
+            }
+            for tool in TOOL_DEFINITIONS
+        ]
+
+    def _run_openai_tools(
         self,
         message: str,
         history: List[Dict[str, str]],
@@ -842,14 +855,14 @@ class SalesCopilotAgent:
         context_note: str = "",
         call_id: Optional[str] = None,
     ) -> Tuple[str, Dict[str, Any]]:
-        import anthropic  # type: ignore
+        from openai import OpenAI
 
         settings = get_settings()
-        client = anthropic.Anthropic(api_key=settings.anthropic_api_key, timeout=120.0)
-        model = "claude-sonnet-4-20250514"
-        fallback_model = "claude-3-haiku-20240307"
+        client = OpenAI(api_key=settings.llm_api_key, timeout=120.0)
+        model = resolve_openai_model("claude-sonnet-4-20250514")
+        fallback_model = resolve_openai_model("claude-3-haiku-20240307")
 
-        messages: List[Dict[str, Any]] = []
+        messages: List[Dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
         for turn in history[-20:]:
             role = turn.get("role")
             content = turn.get("content")
@@ -868,12 +881,11 @@ class SalesCopilotAgent:
         active_model = model
         for _ in range(MAX_TOOL_ITERATIONS):
             try:
-                response = client.messages.create(
+                response = client.chat.completions.create(
                     model=active_model,
                     max_tokens=4096,
-                    system=SYSTEM_PROMPT,
                     messages=messages,
-                    tools=TOOL_DEFINITIONS,
+                    tools=self._openai_tool_specs(),
                 )
             except Exception:
                 if active_model != fallback_model:
@@ -882,16 +894,15 @@ class SalesCopilotAgent:
                 return self._run_fallback(message, call_id=call_id)
             usage = getattr(response, "usage", None)
             if usage:
-                tokens_in += getattr(usage, "input_tokens", 0) or 0
-                tokens_out += getattr(usage, "output_tokens", 0) or 0
+                tokens_in += getattr(usage, "prompt_tokens", 0) or 0
+                tokens_out += getattr(usage, "completion_tokens", 0) or 0
 
-            if response.stop_reason == "end_turn":
-                text_parts = [
-                    block.text
-                    for block in response.content
-                    if hasattr(block, "text") and block.type == "text"
-                ]
-                answer = "\n".join(text_parts).strip() or "Done."
+            choice = response.choices[0] if response.choices else None
+            if not choice:
+                break
+
+            if choice.finish_reason == "stop" and choice.message.content:
+                answer = (choice.message.content or "").strip() or "Done."
                 cost = {
                     "tokens": tokens_in + tokens_out,
                     "usd": 0.0,
@@ -900,28 +911,36 @@ class SalesCopilotAgent:
                 }
                 return answer, cost
 
-            if response.stop_reason != "tool_use":
+            tool_calls = choice.message.tool_calls or []
+            if not tool_calls:
+                if choice.message.content:
+                    return (choice.message.content or "").strip(), {
+                        "tokens": tokens_in + tokens_out,
+                        "usd": 0.0,
+                        "model": active_model,
+                        "trace_id": trace_id,
+                    }
                 break
 
-            tool_blocks = [b for b in response.content if b.type == "tool_use"]
-            if not tool_blocks:
-                break
+            messages.append(choice.message.model_dump(exclude_none=True))
 
-            messages.append({"role": "assistant", "content": response.content})
-
-            tool_results: List[Dict[str, Any]] = []
-            for block in tool_blocks:
-                result_str = self._execute_tool(block.name, block.input or {})
-                tool_results.append(
+            for tool_call in tool_calls:
+                fn = tool_call.function
+                raw_args = fn.arguments if fn else "{}"
+                try:
+                    args = json.loads(raw_args) if raw_args else {}
+                except json.JSONDecodeError:
+                    args = {}
+                result_str = self._execute_tool(fn.name if fn else "", args)
+                messages.append(
                     {
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
                         "content": result_str[:14000],
                     }
                 )
-            messages.append({"role": "user", "content": tool_results})
 
-        llm = LlmClient(settings.anthropic_api_key)
+        llm = LlmClient(settings.llm_api_key)
         completion = llm.complete(
             SYSTEM_PROMPT,
             f"{message}{context_note}\n\nActions so far: {json.dumps(self._actions_taken, default=str)[:2000]}",
@@ -984,7 +1003,7 @@ class SalesCopilotAgent:
             else:
                 answer = (
                     "Sales Co-pilot (offline): I can search KB, list calls, load briefs/transcripts, "
-                    "and run agents when Anthropic is configured. "
+                    "and run agents when OpenAI is configured. "
                     f"Your question: {message[:200]}"
                 )
 

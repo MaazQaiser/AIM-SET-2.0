@@ -16,7 +16,7 @@ interface PageShellProps {
   size?: PageShellSize;
 }
 
-/** Consistent dashboard page padding and max-width. */
+/** Page content shell — transparent; official canvas is `.page-hue` on `<body>`. */
 export function PageShell({ children, className, size = "default" }: PageShellProps) {
   return (
     <div className={cn("mx-auto w-full space-y-6 p-6 sm:p-8", MAX_WIDTH[size], className)}>

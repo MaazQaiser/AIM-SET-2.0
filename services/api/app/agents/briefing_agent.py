@@ -76,7 +76,7 @@ def run_daily_briefing(
     """Generate a daily briefing paragraph; falls back to template when LLM unavailable."""
     settings = get_settings()
     fallback = _fallback_paragraph(context)
-    api_key = settings.anthropic_api_key or None
+    api_key = settings.llm_api_key or None
     if not api_key:
         return {
             "paragraph": fallback,

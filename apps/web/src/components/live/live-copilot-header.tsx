@@ -32,7 +32,7 @@ export function LiveCopilotHeader({ checklist, defaultOpen = false }: LiveCopilo
             aria-hidden
           />
           <Sparkles className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="truncate text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <span className="truncate text-[11px] font-semibold text-muted-foreground">
             Live copilot
           </span>
         </div>

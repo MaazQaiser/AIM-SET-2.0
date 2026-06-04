@@ -196,7 +196,7 @@ export function UnifiedAgenda() {
           ) : (
             grouped.map(({ day, label, items }) => (
               <section key={day.toISOString()}>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <h3 className="mb-2 text-xs font-semibold text-muted-foreground">
                   {label}
                   <span className="font-normal normal-case ml-2">
                     {format(day, "MMM d")}

@@ -96,7 +96,7 @@ function ClientAttendeeDetailDialog({
 
         <div className="space-y-4 pt-2">
           <section>
-            <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+            <h4 className="text-[10px] font-semibold text-muted-foreground mb-1.5">
               Background
             </h4>
             <p className="text-sm text-foreground/90 leading-relaxed">{attendee.background}</p>
@@ -107,7 +107,7 @@ function ClientAttendeeDetailDialog({
               <div className="flex gap-2">
                 <MessageCircle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-[10px] font-semibold uppercase tracking-wide text-primary mb-1">
+                  <h4 className="text-[10px] font-semibold text-primary mb-1">
                     Agent note
                   </h4>
                   <p className="text-sm text-foreground/90 leading-relaxed">

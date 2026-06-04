@@ -112,7 +112,7 @@ export function BANTScorecard({
               title={`${bantLabels[key]}: ${config.label}`}
             >
               <Icon className="h-3 w-3" />
-              <span className="uppercase">{key[0]}</span>
+              <span>{key[0]}</span>
             </span>
           );
         })}

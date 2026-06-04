@@ -67,7 +67,7 @@ Operate the live-call experience: feed the pod with relevant signal in real time
 - Pod member identity (for routing role-specific cues)
 
 ### Outputs
-Three operation types:
+Four operation types:
 
 1. **Proactive nudge**
    ```json
@@ -100,6 +100,68 @@ Three operation types:
        "speaker": "string",
        "transcript_offset_seconds": 0,
        "extracted_value": "string"
+     }
+   }
+   ```
+4. **Call-end handoff** (canonical Post-DC input)
+   ```json
+   {
+     "operation": "call_end_handoff",
+     "result": {
+       "transcript": {
+         "event_count": 0,
+         "events": [
+           {
+             "speaker_name": "string",
+             "speaker_role": "customer | ae | se | designer",
+             "offset_seconds": 0,
+             "text": "string",
+             "keywords": [],
+             "sentiment": "positive | neutral | negative",
+             "signal_type": "string | null"
+           }
+         ],
+         "full_text": "speaker-attributed transcript"
+       },
+       "transcript_summary": {
+         "headline": "string",
+         "bullets": [],
+         "top_keywords": [],
+         "signal_counts": {},
+         "sentiment_counts": {}
+       },
+       "defined_signals": {
+         "signal_counts": {},
+         "signals": []
+       },
+       "bant": {
+         "coverage": 0.0,
+         "status": { "budget": "unknown | partial | confirmed", "authority": "unknown | partial | confirmed", "need": "unknown | partial | confirmed", "timeline": "unknown | partial | confirmed" },
+         "progression": { "before": {}, "after": {}, "delta": 0, "isQualifying": false },
+         "open_gaps": [],
+         "signals": []
+       },
+       "sentiment": {
+         "ae_score": 0.0,
+         "customer_score": 0.0,
+         "sales_rep_tone": {},
+         "customer_sentiment": {},
+         "sentiment_shift": {},
+         "event_counts": {},
+         "signals": []
+       },
+       "summary": {
+         "headline": "string",
+         "bullets": [],
+         "intent_snapshot": {},
+         "focus_areas": [],
+         "pains": [],
+         "suggestion_counts": {},
+         "accepted": 0,
+         "dismissed": 0,
+         "total_suggestions": 0,
+         "transcript_segments": 0
+       }
      }
    }
    ```
@@ -438,6 +500,7 @@ Turn call outcomes into concrete next-step artifacts: follow-up emails, CRM task
 - Scheduled: stale-task sweeps
 
 ### Inputs
+- Live Call Agent `call_end_handoff`: transcript, transcript summary, defined signals, BANT, sentiment, and live summary
 - Call summary and signal annotations
 - Pod identities and CRM mappings
 - AE writing style (learned from prior approved emails)

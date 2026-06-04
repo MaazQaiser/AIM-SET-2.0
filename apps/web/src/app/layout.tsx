@@ -35,13 +35,17 @@ export const metadata: Metadata = {
 };
 
 function AppDocument({ children }: { children: React.ReactNode }) {
+  /* Official app canvas: .page-hue on body (design system — packages/ui utilities.css) */
   return (
     <html
       lang="en"
       className={`${inter.variable} ${urbanist.variable}`}
       suppressHydrationWarning
     >
-      <body className="font-sans antialiased" suppressHydrationWarning>
+      <body
+        className="page-hue min-h-svh font-sans antialiased"
+        suppressHydrationWarning
+      >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <TooltipProvider>
             {children}

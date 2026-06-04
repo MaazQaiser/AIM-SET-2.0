@@ -94,7 +94,7 @@ export function TranscriptViewer({
                 <div className="flex items-center gap-2 mb-1">
                   <span
                     className={cn(
-                      "text-xs font-semibold uppercase tracking-wide",
+                      "text-xs font-semibold",
                       roleColor[event.speakerRole ?? "customer"]
                     )}
                   >

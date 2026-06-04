@@ -4,7 +4,6 @@ import Link from "next/link";
 import { ArrowLeft, FileSpreadsheet } from "lucide-react";
 import { useCall, useCreateJiraTicket, usePostCallReview } from "@/lib/data/hooks";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
-import { Skeleton } from "@dc-copilot/ui/components/skeleton";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { LayoutControls } from "@/components/dashboard-grid/layout-controls";
 import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
@@ -13,6 +12,7 @@ import { POST_DC_WIDGETS } from "@/lib/dashboard/widget-registry";
 import { normalizePostDcWidgetProps } from "@/lib/dashboard/normalize-widget-props";
 import { PostDcSidebar } from "@/components/post-dc/post-dc-sidebar";
 import { PostDcTabbedContent } from "@/components/post-dc/post-dc-tabbed-content";
+import { PostDcPageLoader } from "@/components/layout/page-loaders";
 import { useLandingPage } from "@/lib/data/clp-hooks";
 import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import type { AccountSnapshotRow } from "@/components/calls/account-widget-cards";
@@ -64,6 +64,7 @@ export function PostDcReviewScreen({
   const postDcReady = justWrapped || call?.status === "completed";
   const displayedReview = postDcReady ? (review ?? null) : null;
   const showReview = Boolean(displayedReview);
+  const importsHydrated = useDcImportsStore((s) => s.importsHydrated);
   const displayedEmailDraft = sanitizeClientEmailDraft({
     draft: emailDraft
       ? { ...emailDraft, attachments: emailDraft.attachments ?? postRunMeta?.emailAttachments }
@@ -114,13 +115,13 @@ export function PostDcReviewScreen({
     (displayedEmailDraft?.attachments?.found.length ?? 0) > 0 ||
     (displayedEmailDraft?.attachments?.missing.length ?? 0) > 0;
 
-  if (callLoading || reviewLoading) {
-    return (
+  if ((!importsHydrated || callLoading || reviewLoading) && !call) {
+    return embedded ? (
       <div className={shellClass}>
-        <Skeleton className="h-10 w-72" />
-        <Skeleton className="h-40 w-full rounded-xl" />
-        <Skeleton className="h-96 w-full rounded-xl" />
+        <PostDcPageLoader />
       </div>
+    ) : (
+      <PostDcPageLoader />
     );
   }
 

@@ -132,12 +132,12 @@ export function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistStat
               variant === "neutral" && "border-border bg-muted/20"
             )}
           >
-            <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="text-[9px] font-semibold text-muted-foreground">
               {bantLabels[key]}
             </p>
             <p
               className={cn(
-                "text-[10px] font-bold uppercase mt-0.5",
+                "text-[10px] font-bold mt-0.5",
                 variant === "good" && "text-success",
                 variant === "warn" && "text-destructive",
                 variant === "neutral" && "text-foreground"

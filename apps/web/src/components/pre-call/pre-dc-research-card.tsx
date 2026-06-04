@@ -45,7 +45,7 @@ export function PreDcResearchCard({
             <dl className="space-y-2.5">
               {section.items.map((item) => (
                 <div key={item.label} className="min-w-0">
-                  <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground truncate">
+                  <dt className="text-[10px] font-semibold text-muted-foreground truncate">
                     {item.label}
                   </dt>
                   <dd className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap break-words mt-0.5">

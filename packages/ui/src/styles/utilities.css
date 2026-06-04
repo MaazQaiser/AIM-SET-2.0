@@ -284,8 +284,9 @@
   }
 
   /**
-   * Ambient canvas — #EFF3F6 base with #F6F5EE glow from bottom-left
-   * (main page shell + expanded sidebar panel)
+   * Official app canvas — cool gray base (#EFF3F6) + warm bottom-left glow.
+   * Apply once on <body class="page-hue"> (see apps/web/src/app/layout.tsx).
+   * Route shells (<main>, PageShell) stay transparent so this shows through.
    */
   .page-hue,
   .app-sidebar-panel {
@@ -296,6 +297,16 @@
 
   .page-hue {
     position: relative;
+  }
+
+  body.page-hue {
+    min-height: 100svh;
+    overflow-x: clip;
+    overflow-y: auto;
+  }
+
+  main {
+    background-color: transparent;
   }
 
   .page-hue::before,

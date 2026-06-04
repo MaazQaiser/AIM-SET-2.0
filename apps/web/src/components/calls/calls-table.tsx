@@ -5,7 +5,11 @@ import { format } from "date-fns";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
-import { DataTable } from "@dc-copilot/ui/components/data-table";
+import {
+  DataTablePagination,
+  DataTableView,
+  useDataTableInstance,
+} from "@dc-copilot/ui/components/data-table";
 import { callDetailsHref } from "@/lib/dashboard/call-links";
 import { companyStageForCall } from "@/lib/dc-notes/company-stage";
 import { companyRatingForCall, formatCompanyRating } from "@/lib/dc-notes/icp-rating";
@@ -154,22 +158,37 @@ const columns: ColumnDef<Call>[] = [
   },
 ];
 
+const CALLS_TABLE_VIEW_PROPS = {
+  shellClassName: "overflow-hidden rounded-none border-0 bg-transparent shadow-none",
+  headerClassName: "border-0 border-b border-border/60 bg-transparent sticky top-0 z-10",
+  tableClassName: "bg-transparent",
+  bodyClassName: "bg-transparent",
+  rowClassName: "border-0 border-b border-border/40 bg-transparent hover:bg-muted/20",
+} as const;
+
 interface CallsTableProps {
   calls: Call[];
 }
 
+/** List view with scrollable rows and pinned pagination footer. */
 export function CallsTable({ calls }: CallsTableProps) {
+  const table = useDataTableInstance({ columns, data: calls, pageSize: 10 });
+
   return (
-    <DataTable
-      columns={columns}
-      data={calls}
-      pageSize={10}
-      shellClassName="overflow-hidden rounded-none border-0 bg-transparent shadow-none"
-      headerClassName="border-0 border-b-0 bg-transparent"
-      tableClassName="bg-transparent"
-      bodyClassName="bg-transparent"
-      rowClassName="border-0 border-b-0 bg-transparent hover:bg-muted/20"
-      paginationClassName="pt-2"
-    />
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+        <DataTableView
+          table={table}
+          columns={columns}
+          className="space-y-0"
+          {...CALLS_TABLE_VIEW_PROPS}
+        />
+      </div>
+      <DataTablePagination
+        table={table}
+        iconOnly
+        className="-mx-2 border-0 bg-transparent px-6 py-3"
+      />
+    </div>
   );
 }
