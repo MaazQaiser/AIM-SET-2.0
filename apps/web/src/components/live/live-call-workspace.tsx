@@ -48,12 +48,14 @@ interface AssistantFeedItem {
 }
 
 function buildAssistantFeed({
+  customerSentiment,
   nudges,
   objections,
   unansweredQuestions,
   onAcceptNudge,
   onDismissNudge,
 }: {
+  customerSentiment: CustomerSentimentCue | null;
   nudges: NudgePayload[];
   objections: ObjectionPayload[];
   unansweredQuestions: UnansweredQuestionPayload[];
@@ -61,6 +63,15 @@ function buildAssistantFeed({
   onDismissNudge: (id: string) => void;
 }): AssistantFeedItem[] {
   const items: AssistantFeedItem[] = [];
+
+  if (customerSentiment) {
+    items.push({
+      id: `customer-intent-${customerSentiment.label}`,
+      kind: "insight",
+      message: `Customer intent: ${customerSentiment.label}. ${customerSentiment.guidance}`,
+      contextLabel: "Customer signal",
+    });
+  }
 
   for (const n of nudges) {
     const kind: AssistantCardKind =
@@ -176,13 +187,14 @@ export function LiveCallWorkspace({
   const assistantFeed = useMemo(
     () =>
       buildAssistantFeed({
+        customerSentiment,
         nudges: visibleNudges,
         objections,
         unansweredQuestions,
         onAcceptNudge,
         onDismissNudge,
       }),
-    [visibleNudges, objections, unansweredQuestions, onAcceptNudge, onDismissNudge]
+    [customerSentiment, visibleNudges, objections, unansweredQuestions, onAcceptNudge, onDismissNudge]
   );
 
   const openGaps = checklist?.openGaps ?? [];

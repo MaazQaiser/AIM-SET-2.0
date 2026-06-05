@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/cn";
 import { KeywordHighlight } from "@/components/live/keyword-highlight";
@@ -29,6 +29,7 @@ interface TranscriptViewerProps {
   events: TranscriptEvent[];
   keywords?: string[];
   isLive?: boolean;
+  liveActivityWindowMs?: number;
   onEventClick?: (event: TranscriptEvent) => void;
   className?: string;
 }
@@ -37,10 +38,12 @@ export function TranscriptViewer({
   events,
   keywords = [],
   isLive = false,
+  liveActivityWindowMs = 2500,
   onEventClick,
   className,
 }: TranscriptViewerProps) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const [showLiveCursor, setShowLiveCursor] = useState(false);
 
   const virtualizer = useVirtualizer({
     count: events.length,
@@ -49,6 +52,11 @@ export function TranscriptViewer({
     overscan: 10,
   });
   const eventCount = events.length;
+  const latestEventKey = useMemo(() => {
+    const event = events[events.length - 1];
+    if (!event) return "";
+    return `${event.id}:${event.timestamp}:${event.text}`;
+  }, [events]);
 
   // Auto-scroll to bottom when live
   useEffect(() => {
@@ -56,6 +64,17 @@ export function TranscriptViewer({
       parentRef.current.scrollTop = parentRef.current.scrollHeight;
     }
   }, [eventCount, isLive]);
+
+  useEffect(() => {
+    if (!isLive || !latestEventKey) {
+      setShowLiveCursor(false);
+      return undefined;
+    }
+
+    setShowLiveCursor(true);
+    const timeout = setTimeout(() => setShowLiveCursor(false), liveActivityWindowMs);
+    return () => clearTimeout(timeout);
+  }, [isLive, latestEventKey, liveActivityWindowMs]);
 
   return (
     <div
@@ -70,7 +89,8 @@ export function TranscriptViewer({
       >
         {virtualizer.getVirtualItems().map((virtualRow) => {
           const event = events[virtualRow.index];
-          const isLastLive = isLive && virtualRow.index === events.length - 1;
+          const isLastLive =
+            isLive && showLiveCursor && virtualRow.index === events.length - 1;
 
           return (
             <div

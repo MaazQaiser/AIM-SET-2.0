@@ -240,23 +240,26 @@ function scoreTileClass(score: number, toneOverride?: SentimentTone): string {
 
 function SentimentScoreChip({
   label,
+  dataLabel,
   score,
   value,
   toneOverride,
 }: {
   label: string;
+  dataLabel?: string;
   score: number;
   value?: string;
   toneOverride?: SentimentTone;
 }) {
   const tone = toneOverride ?? scoreToTone(score);
+  const normalizedDataLabel = dataLabel ?? label.toLowerCase().replace(/\s+/g, "-");
   return (
     <span
       className={cn(
         "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border py-0.5 pl-2 pr-2 text-[11px]",
         scoreTileClass(score, tone)
       )}
-      data-sentiment-label={label.toLowerCase()}
+      data-sentiment-label={normalizedDataLabel}
       data-sentiment-tone={tone}
     >
       <span className="font-medium text-muted-foreground">{label}</span>
@@ -265,6 +268,15 @@ function SentimentScoreChip({
       </span>
     </span>
   );
+}
+
+function sentimentDecisionCue(cue: CustomerSentimentCue): {
+  id: "recover" | "advance" | "listen";
+  label: string;
+} {
+  if (cue.tone === "negative") return { id: "recover", label: "Recover trust" };
+  if (cue.tone === "positive") return { id: "advance", label: "Advance next step" };
+  return { id: "listen", label: "Keep discovery open" };
 }
 
 function KeywordPills({ keywords }: { keywords: { term: string; count: number }[] }) {
@@ -398,12 +410,14 @@ function SentimentSection({
     <div className={cn("flex items-center gap-1.5", layout !== "inline" ? "flex-wrap" : "shrink-0 flex-nowrap")}>
       <SentimentScoreChip
         label="Customer"
+        dataLabel="customer"
         score={sentimentCustomer}
         value={customerCue.label}
         toneOverride={customerCue.tone}
       />
       <SentimentScoreChip
-        label="AE"
+        label="Sales rep tone"
+        dataLabel="sales-rep"
         score={sentimentAE}
         value={repToneCue.label}
         toneOverride={repToneCue.tone}
@@ -422,11 +436,25 @@ function SentimentSection({
       </span>
     </p>
   ) : null;
+  const decision = sentimentDecisionCue(customerCue);
+  const decisionCue = (
+    <p
+      className="text-[11px] leading-snug text-muted-foreground"
+      data-testid="sentiment-decision-cue"
+      data-sentiment-decision={decision.id}
+    >
+      Recommended move:{" "}
+      <span className={scoreTextClass(sentimentCustomer, customerCue.tone)}>
+        {decision.label}
+      </span>
+    </p>
+  );
 
   const stackBody = (
     <>
       {chips}
       <SentimentBars compact transcript={transcript} customerScore={sentimentCustomer} />
+      {decisionCue}
       {shiftMessage}
     </>
   );
@@ -461,6 +489,7 @@ function SentimentSection({
           customerScore={sentimentCustomer}
         />
       </div>
+      <div className="mt-1.5">{decisionCue}</div>
       {shiftMessage && <div className="mt-1.5">{shiftMessage}</div>}
     </div>
   );
@@ -487,11 +516,11 @@ export function LiveSentimentBar({
   const customerCue = resolveCustomerSentimentCue(sentimentCustomer, customerSentiment);
 
   return (
-    <div className={cn("shrink-0", className)}>
+    <div className={cn("shrink-0", className)} data-testid="sentiment-section">
       <LiveCollapsibleSection
         flush
         title="Sentiment"
-        summary={`Customer ${customerCue.label} · AE ${repToneCue.label}`}
+        summary={`Customer ${customerCue.label} · Sales rep ${repToneCue.label}`}
         defaultOpen
       >
         <SentimentSection

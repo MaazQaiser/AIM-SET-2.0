@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from dc_core.evidence import AgentEnvelope, validate_envelope
 from dc_core.tenancy import TenantContext
@@ -15,11 +15,12 @@ from app.agents.knowledge_agent import ingest_asset_metadata
 from app.agents.discovery_checklist_agent import finalize_session, handle_segment, seed_checklist
 from app.agents.live_call.handler import handle_call_end, handle_transcript_segment
 from app.agents.post_dc_agent import run_post_dc_pipeline
-from dc_tools.bant import build_next_actions, checklist_from_dict
+from dc_tools.bant import build_next_actions, checklist_from_dict, update_checklist_from_segment
 from app.domain.calls_service import CallsService, call_id_aliases
 from app.domain.dc_notes_repository import get_dc_notes_repository
 from app.domain.content_studio_repository import get_content_studio_repository
 from app.domain.agent_runs_repository import get_agent_runs_repository
+from app.domain.live_call_repository import get_live_call_repository
 from app.domain.memory_store import get_memory_store
 from app.agents.live_call_agent import bot_chat_response, build_call_agent_handoff
 from app.agents.sales_copilot_agent import copilot_chat_response
@@ -27,6 +28,77 @@ from app.services.content_export_service import export_revision
 from app.services.template_ingest_service import process_template_ingest
 
 _logger = logging.getLogger(__name__)
+
+
+def _float_or_zero(value: Any) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _discovery_context_text(events: List[Dict[str, Any]], fallback: str) -> str:
+    if not events:
+        return fallback
+
+    latest = events[-1]
+    latest_role = str(latest.get("speaker_role") or "").lower()
+    if latest_role not in ("customer", "prospect", "guest", ""):
+        return fallback
+
+    latest_offset = _float_or_zero(latest.get("offset_seconds"))
+    latest_speaker = str(latest.get("speaker_id") or latest.get("speaker_name") or "")
+    parts: List[str] = []
+
+    for event in events[-8:]:
+        role = str(event.get("speaker_role") or "").lower()
+        if role not in ("customer", "prospect", "guest", ""):
+            continue
+        if latest_offset and latest_offset - _float_or_zero(event.get("offset_seconds")) > 14:
+            continue
+        speaker = str(event.get("speaker_id") or event.get("speaker_name") or "")
+        if latest_speaker and speaker and speaker != latest_speaker:
+            continue
+        text = str(event.get("text") or "").strip()
+        if text:
+            parts.append(text)
+
+    context = " ".join(parts).strip()
+    return context[-360:] if context else fallback
+
+
+def _event_offset_seconds(event: Dict[str, Any]) -> float:
+    return _float_or_zero(event.get("offset_seconds") or event.get("timestamp"))
+
+
+def _event_speaker_role(event: Dict[str, Any]) -> str:
+    return str(event.get("speaker_role") or event.get("speakerRole") or "").lower()
+
+
+def _replay_discovery_from_transcript(state: Any, transcript_events: List[Dict[str, Any]]) -> Any:
+    """Repair missed live BANT signals at wrap-up from the completed transcript."""
+    if not transcript_events:
+        return state
+
+    replayed = state
+    ordered = sorted(transcript_events, key=_event_offset_seconds)
+    for index, event in enumerate(ordered):
+        text = str(event.get("text") or "").strip()
+        if not text:
+            continue
+        role = _event_speaker_role(event)
+        if role and role not in ("customer", "prospect", "buyer", "guest"):
+            continue
+        context_text = _discovery_context_text(ordered[: index + 1], text)
+        replayed, _, _ = update_checklist_from_segment(
+            replayed,
+            context_text,
+            transcript_offset_seconds=_event_offset_seconds(event),
+            sentiment=event.get("sentiment"),
+            speaker_role=event.get("speaker_role") or event.get("speakerRole"),
+            signal_type=event.get("signal_type") or event.get("signalType"),
+        )
+    return replayed
 
 
 class Orchestrator:
@@ -137,13 +209,17 @@ class Orchestrator:
         if live_snapshot:
             self.calls.save_live_signals(ctx, call_id, live_snapshot)
 
-        discovery_snapshot = self._finalize_discovery_checklist(ctx, call_id)
         call = self.calls.get_call(ctx, call_id) or {}
         brief = self.calls.get_brief(ctx, call_id) or {}
         pre_dc_fields = self._pre_dc_fields_for_call(ctx, call_id)
         post_dc_record = self._post_dc_record_for_call(ctx, call_id)
         live_repo = get_live_call_repository()
         transcript_events = live_repo.list_transcript_events(ctx, call_id, limit=500)
+        discovery_snapshot = self._finalize_discovery_checklist(
+            ctx,
+            call_id,
+            transcript_events=transcript_events,
+        )
         live_suggestions = live_repo.list_suggestions(ctx, call_id, limit=200)
         call_agent_handoff = build_call_agent_handoff(
             ctx,
@@ -310,10 +386,12 @@ class Orchestrator:
 
             stored = self.memory.get_discovery_checklist(ctx.tenant_id, call_id)
             state = checklist_from_dict(stored) if stored else None
+            recent_events = get_live_call_repository().list_transcript_events(ctx, call_id, limit=8)
+            discovery_text = _discovery_context_text(recent_events, text)
 
             discovery_out = handle_segment(
                 call_id,
-                text,
+                discovery_text,
                 state=state,
                 elapsed_seconds=elapsed_seconds,
                 seed_bant=seed_bant,
@@ -364,7 +442,11 @@ class Orchestrator:
         }
 
     def _finalize_discovery_checklist(
-        self, ctx: TenantContext, call_id: str
+        self,
+        ctx: TenantContext,
+        call_id: str,
+        *,
+        transcript_events: Optional[List[Dict[str, Any]]] = None,
     ) -> Optional[Dict[str, Any]]:
         stored = self.memory.pop_discovery_checklist(ctx.tenant_id, call_id)
         if not stored:
@@ -373,6 +455,8 @@ class Orchestrator:
             state = seed_checklist(call_id, seed_bant=seed)
         else:
             state = checklist_from_dict(stored)
+
+        state = _replay_discovery_from_transcript(state, transcript_events or [])
 
         env = finalize_session(call_id, state)
         validate_envelope(env)
@@ -472,16 +556,32 @@ class Orchestrator:
 
     def _log_run(self, ctx: TenantContext, envelope: Any) -> None:
         cost = envelope.cost if isinstance(envelope.cost, dict) else {}
-        get_agent_runs_repository().append_run(
-            ctx,
-            agent_id=envelope.agent,
-            operation=envelope.operation,
-            trace_id=envelope.trace_id,
-            cost_usd=float(cost.get("usd", 0) or 0),
-            tokens_used=int(cost.get("tokens", 0) or 0),
-            model_used=str(cost.get("model", "") or ""),
-        )
-        self._audit(ctx, envelope.agent, envelope.operation, envelope.trace_id)
+        try:
+            get_agent_runs_repository().append_run(
+                ctx,
+                agent_id=envelope.agent,
+                operation=envelope.operation,
+                trace_id=envelope.trace_id,
+                cost_usd=float(cost.get("usd", 0) or 0),
+                tokens_used=int(cost.get("tokens", 0) or 0),
+                model_used=str(cost.get("model", "") or ""),
+            )
+        except Exception:
+            _logger.exception(
+                "agent run log failed agent=%s operation=%s trace_id=%s",
+                envelope.agent,
+                envelope.operation,
+                envelope.trace_id,
+            )
+        try:
+            self._audit(ctx, envelope.agent, envelope.operation, envelope.trace_id)
+        except Exception:
+            _logger.exception(
+                "agent audit log failed agent=%s operation=%s trace_id=%s",
+                envelope.agent,
+                envelope.operation,
+                envelope.trace_id,
+            )
 
     def _audit(self, ctx: TenantContext, agent_id: str, action: str, trace_id: str) -> None:
         from datetime import datetime, timezone

@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from app.agents.post_dc_agent import run_post_dc_pipeline
 from app.config import get_settings
 from app.domain.calls_service import CallsService
+from app.domain.dc_notes_repository import get_dc_notes_repository
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.memory_store import get_memory_store
 from app.main import app
@@ -469,6 +470,133 @@ def test_end_live_call_preserves_live_outputs_for_post_dc(monkeypatch):
     assert post["agentInputs"]["hasCallAgentHandoff"] is True
     assert post["agentInputs"]["transcriptEventCount"] == 1
     assert post["call_agent_outputs"]["bant"]["status"]["budget"] in ("partial", "confirmed")
+
+    saved_session = store.live_sessions["tenant-post-dc"][call_id]
+    assert saved_session["status"] == "ended"
+    assert saved_session["summary"]["operation"] == "call_end_handoff"
+    assert saved_session["summary"]["transcript"]["event_count"] == 1
+    assert saved_session["summary"]["summary"]["transcript_segments"] == 1
+
+
+def test_post_dc_replays_fragmented_live_bant_into_summary_and_follow_up(monkeypatch):
+    _clear_memory(monkeypatch)
+    ctx = TenantContext(tenant_id="tenant-post-dc", user_id="user-post-dc")
+    call_id = "call-fragmented-post-dc"
+    account_name = "Fragmented Post DC Co"
+    store = get_memory_store()
+    store.upsert_calls(
+        "tenant-post-dc",
+        [
+            {
+                "id": call_id,
+                "accountName": account_name,
+                "leadEmail": "buyer@example.com",
+                "status": "live",
+                "briefReady": False,
+                "pod": [],
+                "bant": {
+                    "budget": "unknown",
+                    "authority": "unknown",
+                    "need": "unknown",
+                    "timeline": "unknown",
+                },
+            }
+        ],
+    )
+    get_dc_notes_repository().upsert_pre_dc(
+        ctx,
+        [
+            {
+                "id": "pre-fragmented-post-dc",
+                "fields": {
+                    "Company Name-PreDC": account_name,
+                    "Have they described their needs": "Modernize legacy portal",
+                },
+            }
+        ],
+    )
+
+    orchestrator = Orchestrator()
+    segments = [
+        (
+            "seg-need",
+            "This is a critical priority: we need to replace manual follow-up tracking and automate onboarding.",
+            30,
+        ),
+        ("seg-budget-prefix", "The budget approved is around", 47),
+        ("seg-budget-value", "400k", 51),
+        ("seg-authority", "The CFO owns the decision and can approve it.", 54),
+        (
+            "seg-timeline",
+            "The deadline for our project timeline will be not more than three months.",
+            56,
+        ),
+        (
+            "seg-follow-up",
+            "Please send an implementation plan and schedule the review with our CFO next week.",
+            64,
+        ),
+    ]
+    for segment_id, text, timestamp in segments:
+        orchestrator.dispatch_live_segment(
+            ctx,
+            call_id,
+            {
+                "id": segment_id,
+                "speakerId": "buyer-1",
+                "speakerName": "Buyer",
+                "speakerRole": "customer",
+                "text": text,
+                "timestamp": timestamp,
+            },
+            elapsed_seconds=timestamp,
+        )
+
+    post = orchestrator.dispatch_post_call(ctx, call_id)
+    review = post["review"]
+    review_text = " ".join(
+        [
+            review["headline"],
+            *review["summary"],
+            *[f"{item['label']} {item['note']}" for item in review["learned"]],
+        ]
+    )
+    task_text = " ".join(task["description"] for task in post["task"]["taskList"])
+    client_email_text = " ".join(
+        [
+            post["task"]["clientEmailDraft"]["body_markdown"],
+            *post["task"]["clientEmailDraft"]["commitments_referenced"],
+        ]
+    )
+    internal_email_text = post["task"]["internalEmailDraft"]["body_markdown"]
+    missing_content_text = " ".join(
+        f"{item['name']} {item['requiredData']}"
+        for item in post["emailAttachments"]["missing"]
+    )
+    bant_after = post["coaching"]["bantProgression"]["after"]
+
+    assert bant_after["budget"] == "confirmed"
+    assert bant_after["authority"] == "confirmed"
+    assert bant_after["need"] == "confirmed"
+    assert bant_after["timeline"] == "confirmed"
+    assert review["discoveryBantCoverage"] == 1.0
+    assert review["openDiscoveryGaps"] == []
+    assert "Modernize legacy portal" not in review["summary"][0]
+    assert review_text.lower().find("400k") != -1
+    assert review_text.lower().find("not more than three months") != -1
+    assert review_text.lower().find("cfo") != -1
+    assert review_text.lower().find("manual follow-up tracking") != -1
+    assert client_email_text.lower().find("implementation plan") != -1
+    assert client_email_text.lower().find("cfo next week") != -1
+    assert "BANT" not in client_email_text
+    assert "Open discovery gaps" not in client_email_text
+    assert internal_email_text.lower().find("400k") != -1
+    assert internal_email_text.lower().find("not more than three months") != -1
+    assert task_text.lower().find("implementation plan") != -1
+    assert task_text.lower().find("schedule the review with our cfo next week") != -1
+    assert missing_content_text.lower().find("implementation plan") != -1
+    assert post["jiraTicket"] is not None
+    assert all(post["jiraTicket"]["bantSnapshot"].values())
 
 
 def test_jira_route_fails_closed_when_unconfigured(monkeypatch):

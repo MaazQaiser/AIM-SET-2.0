@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { LiveCollapsibleSection } from "@/components/live/live-collapsible-section";
 import { Badge } from "@dc-copilot/ui/components/badge";
+import { formatChecklistDisplayGaps } from "@/lib/live/bant-display";
 import { scoreEmoji, scoreToTone } from "@/lib/live/sentiment-display";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
 import type { CallIntent, PainSignal, SentimentShift } from "@/types";
@@ -62,6 +63,7 @@ export function LiveCallActionSummary({
 }: LiveCallActionSummaryProps) {
   const bantPct = checklist ? Math.round(checklist.bantCoverage * 100) : null;
   const openGaps = checklist?.openGaps ?? [];
+  const gapSummary = formatChecklistDisplayGaps(checklist);
   const intentDisplay =
     intent?.display ??
     (intent?.label ?? intentLabel ?? "detecting…").replace(/_/g, " ");
@@ -158,9 +160,7 @@ export function LiveCallActionSummary({
             label="Discovery (BANT)"
             value={bantPct != null ? `${bantPct}% covered` : "—"}
             hint={
-              openGaps.length > 0
-                ? `Open: ${openGaps.map((g) => g.replace(/_/g, " ")).join(", ")}`
-                : "BANT complete"
+              gapSummary || "BANT complete"
             }
             variant={bantPct != null && bantPct >= 75 ? "good" : "warn"}
           />
