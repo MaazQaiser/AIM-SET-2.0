@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { LiveCopilotHeader } from "@/components/live/live-copilot-header";
 import {
   LiveAssistantCard,
@@ -51,7 +52,7 @@ interface LiveInsightsPanelProps {
   openGaps: string[];
 }
 
-export function LiveInsightsPanel({
+export const LiveInsightsPanel = memo(function LiveInsightsPanel({
   callId,
   assistantFeed,
   checklist,
@@ -126,4 +127,6 @@ export function LiveInsightsPanel({
       </div>
     </LiveCopilotChatProvider>
   );
-}
+});
+
+LiveInsightsPanel.displayName = "LiveInsightsPanel";

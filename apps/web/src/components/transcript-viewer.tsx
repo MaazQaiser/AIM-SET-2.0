@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/cn";
 import { KeywordHighlight } from "@/components/live/keyword-highlight";
@@ -34,7 +34,7 @@ interface TranscriptViewerProps {
   className?: string;
 }
 
-export function TranscriptViewer({
+export const TranscriptViewer = memo(function TranscriptViewer({
   events,
   keywords = [],
   isLive = false,
@@ -151,4 +151,6 @@ export function TranscriptViewer({
       </div>
     </div>
   );
-}
+});
+
+TranscriptViewer.displayName = "TranscriptViewer";

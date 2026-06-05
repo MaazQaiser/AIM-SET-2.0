@@ -51,7 +51,7 @@ function LiveCallPageContent({ callId, call, brief, hasReview }: LiveCallPageCon
 
   const handleAcceptNudge = useCallback(
     async (id: string) => {
-      const nudge = pendingNudges.find((n) => n.id === id);
+      const nudge = useLiveCall.getState().pendingNudges.find((n) => n.id === id);
       acceptNudge(id);
       const sid = nudge?.suggestionId ?? id;
       try {
@@ -60,12 +60,12 @@ function LiveCallPageContent({ callId, call, brief, hasReview }: LiveCallPageCon
         /* non-blocking */
       }
     },
-    [acceptNudge, callId, pendingNudges]
+    [acceptNudge, callId]
   );
 
   const handleDismissNudge = useCallback(
     async (id: string) => {
-      const nudge = pendingNudges.find((n) => n.id === id);
+      const nudge = useLiveCall.getState().pendingNudges.find((n) => n.id === id);
       dismissNudge(id);
       const sid = nudge?.suggestionId ?? id;
       try {
@@ -74,7 +74,7 @@ function LiveCallPageContent({ callId, call, brief, hasReview }: LiveCallPageCon
         /* non-blocking */
       }
     },
-    [callId, dismissNudge, pendingNudges]
+    [callId, dismissNudge]
   );
 
   const checklistSeed = useMemo(() => seedChecklistFromCall(call), [call]);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Activity, Mic } from "lucide-react";
 import { Card } from "@dc-copilot/ui/components/card";
 import { BotChatPanel } from "@/components/bot-chat-panel";
@@ -184,6 +184,7 @@ export function LiveCallWorkspace({
   onAcceptNudge,
   onDismissNudge,
 }: LiveCallWorkspaceProps) {
+  const [viewportMode, setViewportMode] = useState<"desktop" | "mobile">("desktop");
   const assistantFeed = useMemo(
     () =>
       buildAssistantFeed({
@@ -198,6 +199,14 @@ export function LiveCallWorkspace({
   );
 
   const openGaps = checklist?.openGaps ?? [];
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1280px)");
+    const update = () => setViewportMode(mq.matches ? "desktop" : "mobile");
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   const transcriptColumn = (
     <>
@@ -302,6 +311,15 @@ export function LiveCallWorkspace({
     </div>
   );
 
+  const shouldRenderDesktop = viewportMode === "desktop";
+  const shouldRenderMobile = viewportMode === "mobile";
+  const activeMobilePanel = (activePanel ?? "transcript") as
+    | "transcript"
+    | "signals"
+    | "insights"
+    | "chat"
+    | "wrap-up";
+
   return (
     <div className="live-call-page call-detail-page flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <LiveCallPageHeader
@@ -313,91 +331,105 @@ export function LiveCallWorkspace({
       />
 
       <div className="flex h-0 min-h-0 flex-1 flex-col gap-4 overflow-hidden px-6 pt-4 sm:px-8">
-        <div className="hidden h-0 min-h-0 flex-1 flex-col overflow-hidden xl:flex">
-          <div className="flex h-0 min-h-0 flex-1 gap-4 overflow-hidden">
-            <Card className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-              {transcriptColumn}
-            </Card>
-            {rightInsightsColumn}
+        {shouldRenderDesktop && (
+          <div className="hidden h-0 min-h-0 flex-1 flex-col overflow-hidden xl:flex">
+            <div className="flex h-0 min-h-0 flex-1 gap-4 overflow-hidden">
+              <Card className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                {transcriptColumn}
+              </Card>
+              {rightInsightsColumn}
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="flex h-0 min-h-0 flex-1 flex-col gap-4 overflow-hidden xl:hidden">
-          <Tabs
-            value={activePanel ?? "transcript"}
-            onValueChange={(v) =>
-              onPanelChange(v as "transcript" | "signals" | "insights" | "chat" | "wrap-up")
-            }
-            className="flex min-h-0 flex-1 flex-col overflow-hidden"
-          >
-            <TabsList className="h-10 w-full shrink-0 justify-start overflow-x-auto rounded-none border-b border-border/60 bg-transparent px-0">
-              <TabsTrigger value="transcript" className="text-xs">
-                Transcript
-              </TabsTrigger>
-              <TabsTrigger value="signals" className="text-xs">
-                Signals
-              </TabsTrigger>
-              <TabsTrigger value="insights" className="text-xs">
-                Live copilot
-              </TabsTrigger>
-              <TabsTrigger value="chat" className="text-xs">
-                Pod chat
-              </TabsTrigger>
-              <TabsTrigger value="wrap-up" className="text-xs">
-                Wrap-up
-              </TabsTrigger>
-            </TabsList>
+        {shouldRenderMobile && (
+          <div className="flex h-0 min-h-0 flex-1 flex-col gap-4 overflow-hidden xl:hidden">
+            <Tabs
+              value={activeMobilePanel}
+              onValueChange={(v) =>
+                onPanelChange(v as "transcript" | "signals" | "insights" | "chat" | "wrap-up")
+              }
+              className="flex min-h-0 flex-1 flex-col overflow-hidden"
+            >
+              <TabsList className="h-10 w-full shrink-0 justify-start overflow-x-auto rounded-none border-b border-border/60 bg-transparent px-0">
+                <TabsTrigger value="transcript" className="text-xs">
+                  Transcript
+                </TabsTrigger>
+                <TabsTrigger value="signals" className="text-xs">
+                  Signals
+                </TabsTrigger>
+                <TabsTrigger value="insights" className="text-xs">
+                  Live copilot
+                </TabsTrigger>
+                <TabsTrigger value="chat" className="text-xs">
+                  Pod chat
+                </TabsTrigger>
+                <TabsTrigger value="wrap-up" className="text-xs">
+                  Wrap-up
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent
-              value="transcript"
-              className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
-            >
-              <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">{transcriptColumn}</Card>
-            </TabsContent>
-            <TabsContent
-              value="signals"
-              className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
-            >
-              <Card className="flex min-h-0 flex-1 flex-col overflow-hidden divide-y divide-border/60">
-                {liveInsightsMetrics}
-              </Card>
-            </TabsContent>
-            <TabsContent
-              value="insights"
-              className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
-            >
-              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-                {runningSummary}
-                <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">{insightsPanel}</Card>
-              </div>
-            </TabsContent>
-            <TabsContent
-              value="chat"
-              className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
-            >
-              <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
-                <BotChatPanel
-                  callId={callId}
-                  phase="live"
-                  className="h-full min-h-0"
-                  accountName={accountName}
-                  brief={brief}
-                  intentLabel={intentLabel}
-                  painCount={intentSnapshot?.pains?.length ?? 0}
-                  checklist={checklist}
-                  transcriptLineCount={transcript.length}
-                  hasObjections={objections.length > 0}
-                />
-              </Card>
-            </TabsContent>
-            <TabsContent
-              value="wrap-up"
-              className="m-0 min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden"
-            >
-              <PostDcReviewScreen callId={callId} embedded />
-            </TabsContent>
-          </Tabs>
-        </div>
+              {activeMobilePanel === "transcript" && (
+                <TabsContent
+                  value="transcript"
+                  className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+                >
+                  <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">{transcriptColumn}</Card>
+                </TabsContent>
+              )}
+              {activeMobilePanel === "signals" && (
+                <TabsContent
+                  value="signals"
+                  className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+                >
+                  <Card className="flex min-h-0 flex-1 flex-col overflow-hidden divide-y divide-border/60">
+                    {liveInsightsMetrics}
+                  </Card>
+                </TabsContent>
+              )}
+              {activeMobilePanel === "insights" && (
+                <TabsContent
+                  value="insights"
+                  className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+                >
+                  <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+                    {runningSummary}
+                    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">{insightsPanel}</Card>
+                  </div>
+                </TabsContent>
+              )}
+              {activeMobilePanel === "chat" && (
+                <TabsContent
+                  value="chat"
+                  className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+                >
+                  <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+                    <BotChatPanel
+                      callId={callId}
+                      phase="live"
+                      className="h-full min-h-0"
+                      accountName={accountName}
+                      brief={brief}
+                      intentLabel={intentLabel}
+                      painCount={intentSnapshot?.pains?.length ?? 0}
+                      checklist={checklist}
+                      transcriptLineCount={transcript.length}
+                      hasObjections={objections.length > 0}
+                    />
+                  </Card>
+                </TabsContent>
+              )}
+              {activeMobilePanel === "wrap-up" && (
+                <TabsContent
+                  value="wrap-up"
+                  className="m-0 min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden"
+                >
+                  <PostDcReviewScreen callId={callId} embedded />
+                </TabsContent>
+              )}
+            </Tabs>
+          </div>
+        )}
       </div>
     </div>
   );
