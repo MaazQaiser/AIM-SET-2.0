@@ -15,7 +15,7 @@ from app.agents.knowledge_agent import ingest_asset_metadata
 from app.agents.discovery_checklist_agent import finalize_session, handle_segment, seed_checklist
 from app.agents.live_call.handler import handle_call_end, handle_transcript_segment
 from app.agents.post_dc_agent import run_post_dc_pipeline
-from dc_tools.bant import build_next_actions, checklist_from_dict
+from dc_tools.bant import build_next_actions, checklist_from_dict, update_checklist_from_segment
 from app.domain.calls_service import CallsService, call_id_aliases
 from app.domain.dc_notes_repository import get_dc_notes_repository
 from app.domain.content_studio_repository import get_content_studio_repository
@@ -65,6 +65,40 @@ def _discovery_context_text(events: List[Dict[str, Any]], fallback: str) -> str:
 
     context = " ".join(parts).strip()
     return context[-360:] if context else fallback
+
+
+def _event_offset_seconds(event: Dict[str, Any]) -> float:
+    return _float_or_zero(event.get("offset_seconds") or event.get("timestamp"))
+
+
+def _event_speaker_role(event: Dict[str, Any]) -> str:
+    return str(event.get("speaker_role") or event.get("speakerRole") or "").lower()
+
+
+def _replay_discovery_from_transcript(state: Any, transcript_events: List[Dict[str, Any]]) -> Any:
+    """Repair missed live BANT signals at wrap-up from the completed transcript."""
+    if not transcript_events:
+        return state
+
+    replayed = state
+    ordered = sorted(transcript_events, key=_event_offset_seconds)
+    for index, event in enumerate(ordered):
+        text = str(event.get("text") or "").strip()
+        if not text:
+            continue
+        role = _event_speaker_role(event)
+        if role and role not in ("customer", "prospect", "buyer", "guest"):
+            continue
+        context_text = _discovery_context_text(ordered[: index + 1], text)
+        replayed, _, _ = update_checklist_from_segment(
+            replayed,
+            context_text,
+            transcript_offset_seconds=_event_offset_seconds(event),
+            sentiment=event.get("sentiment"),
+            speaker_role=event.get("speaker_role") or event.get("speakerRole"),
+            signal_type=event.get("signal_type") or event.get("signalType"),
+        )
+    return replayed
 
 
 class Orchestrator:
@@ -175,13 +209,17 @@ class Orchestrator:
         if live_snapshot:
             self.calls.save_live_signals(ctx, call_id, live_snapshot)
 
-        discovery_snapshot = self._finalize_discovery_checklist(ctx, call_id)
         call = self.calls.get_call(ctx, call_id) or {}
         brief = self.calls.get_brief(ctx, call_id) or {}
         pre_dc_fields = self._pre_dc_fields_for_call(ctx, call_id)
         post_dc_record = self._post_dc_record_for_call(ctx, call_id)
         live_repo = get_live_call_repository()
         transcript_events = live_repo.list_transcript_events(ctx, call_id, limit=500)
+        discovery_snapshot = self._finalize_discovery_checklist(
+            ctx,
+            call_id,
+            transcript_events=transcript_events,
+        )
         live_suggestions = live_repo.list_suggestions(ctx, call_id, limit=200)
         call_agent_handoff = build_call_agent_handoff(
             ctx,
@@ -404,7 +442,11 @@ class Orchestrator:
         }
 
     def _finalize_discovery_checklist(
-        self, ctx: TenantContext, call_id: str
+        self,
+        ctx: TenantContext,
+        call_id: str,
+        *,
+        transcript_events: Optional[List[Dict[str, Any]]] = None,
     ) -> Optional[Dict[str, Any]]:
         stored = self.memory.pop_discovery_checklist(ctx.tenant_id, call_id)
         if not stored:
@@ -413,6 +455,8 @@ class Orchestrator:
             state = seed_checklist(call_id, seed_bant=seed)
         else:
             state = checklist_from_dict(stored)
+
+        state = _replay_discovery_from_transcript(state, transcript_events or [])
 
         env = finalize_session(call_id, state)
         validate_envelope(env)

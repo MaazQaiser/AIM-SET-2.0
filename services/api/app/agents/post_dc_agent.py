@@ -101,6 +101,54 @@ def _bant_progression(discovery_snapshot: Optional[Dict[str, Any]]) -> Dict[str,
     return progression if isinstance(progression, dict) else {}
 
 
+def _bant_evidence(discovery_snapshot: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, str]]:
+    result = _snapshot_result(discovery_snapshot)
+    checklist = result.get("checklist") if isinstance(result.get("checklist"), dict) else {}
+    items = checklist.get("items") if isinstance(checklist.get("items"), list) else []
+    bant = checklist.get("bant") if isinstance(checklist.get("bant"), dict) else {}
+    out: Dict[str, Dict[str, str]] = {}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        item_id = str(item.get("id") or "")
+        if item_id not in ("budget", "authority", "need", "timeline"):
+            continue
+        evidence = item.get("evidence") if isinstance(item.get("evidence"), list) else []
+        latest: Dict[str, Any] = {}
+        for candidate in reversed(evidence):
+            if not isinstance(candidate, dict):
+                continue
+            if str(candidate.get("value") or candidate.get("snippet") or "").strip():
+                latest = candidate
+                break
+        value = re.sub(
+            r"\s+",
+            " ",
+            str(latest.get("value") or latest.get("snippet") or "").strip(),
+        )
+        if not value:
+            continue
+        out[item_id] = {
+            "label": BANT_LABELS.get(item_id, item_id.title()),
+            "status": str(item.get("status") or bant.get(item_id) or ""),
+            "value": value[:220],
+            "snippet": re.sub(r"\s+", " ", str(latest.get("snippet") or "").strip())[:220],
+        }
+    return out
+
+
+def _bant_discussion_line(evidence: Dict[str, Dict[str, str]]) -> str:
+    parts: List[str] = []
+    for dim in ("budget", "authority", "need", "timeline"):
+        item = evidence.get(dim)
+        if not item:
+            continue
+        value = item.get("value") or item.get("snippet")
+        if value:
+            parts.append(f"{BANT_LABELS[dim]}: {value}")
+    return "; ".join(parts)
+
+
 def _post_field(post_dc_record: Optional[Dict[str, Any]], key: str) -> str:
     fields = (post_dc_record or {}).get("fields") or {}
     return str(fields.get(key) or "").strip()
@@ -684,11 +732,18 @@ def _summary_fallback(
         for item in (conversation_context or {}).get("needs", [])
         if str(item.get("text") or "").strip()
     ]
+    next_steps = [
+        str(item.get("text") or "").strip()
+        for item in (conversation_context or {}).get("nextSteps", [])
+        if str(item.get("text") or "").strip()
+    ]
     requested_assets = [
         str(item.get("name") or "").strip()
         for item in (conversation_context or {}).get("requestedAssets", [])
         if str(item.get("name") or "").strip()
     ]
+    evidence = _bant_evidence(discovery_snapshot)
+    evidence_line = _bant_discussion_line(evidence)
 
     if is_qualifying:
         headline = f"{account_name} looks qualified for a structured follow-up."
@@ -698,13 +753,20 @@ def _summary_fallback(
         headline = f"{account_name} post-call review is ready."
 
     summary = [
-        bottom_line or needs or (transcript_needs[0] if transcript_needs else f"The call centered on discovery for {account_name}."),
+        (transcript_needs[0] if transcript_needs else "")
+        or bottom_line
+        or needs
+        or f"The call centered on discovery for {account_name}.",
         f"BANT coverage finished at {round((coverage or 0) * 100)}%."
         if coverage is not None
         else "BANT coverage was captured from the discovery checklist.",
     ]
+    if evidence_line:
+        summary.append("Discussion details: " + evidence_line + ".")
     if transcript_needs:
         summary.append("Transcript needs: " + " ".join(transcript_needs[:2]))
+    if next_steps:
+        summary.append("Next steps discussed: " + " ".join(next_steps[:2]))
     if requested_assets:
         summary.append("Requested follow-up materials: " + ", ".join(requested_assets[:4]) + ".")
     if lead_stage:
@@ -716,34 +778,87 @@ def _summary_fallback(
     if gaps:
         summary.append("Open discovery gaps: " + ", ".join(BANT_LABELS.get(g, g) for g in gaps) + ".")
 
+    if requested_assets and next_steps:
+        next_step_proposal = (
+            "Send the requested materials and schedule the discussed follow-up with the right stakeholders."
+        )
+    elif next_steps:
+        next_step_proposal = "Schedule the discussed follow-up with the right stakeholders."
+    elif requested_assets:
+        next_step_proposal = (
+            "Send the requested materials and schedule a focused follow-up with decision stakeholders."
+        )
+    elif is_qualifying:
+        next_step_proposal = "Schedule a focused follow-up with decision stakeholders."
+    else:
+        next_step_proposal = "Clarify the remaining discovery gaps before advancing the deal."
+
     return {
         "headline": headline,
-        "summary": summary[:5],
+        "summary": summary[:7],
         "commitments": [],
-        "nextStepProposal": (
-            "Send the requested materials and schedule a focused follow-up with decision stakeholders."
-            if requested_assets
-            else (
-                "Schedule a focused follow-up with decision stakeholders."
-                if is_qualifying
-                else "Clarify the remaining discovery gaps before advancing the deal."
-            )
-        ),
+        "nextStepProposal": next_step_proposal,
     }
+
+
+def _merge_summary_with_completed_call_evidence(
+    summary_json: Dict[str, Any],
+    fallback_summary: Dict[str, Any],
+) -> Dict[str, Any]:
+    merged = dict(summary_json)
+    existing = [
+        str(item).strip()
+        for item in (summary_json.get("summary") if isinstance(summary_json.get("summary"), list) else [])
+        if str(item).strip()
+    ]
+    existing_markers = {line.split(":", 1)[0].strip().lower() for line in existing if ":" in line}
+    for item in fallback_summary.get("summary") or []:
+        text = str(item or "").strip()
+        if not text:
+            continue
+        marker = text.split(":", 1)[0].strip().lower() if ":" in text else ""
+        should_keep = marker in {
+            "discussion details",
+            "transcript needs",
+            "next steps discussed",
+            "requested follow-up materials",
+            "dominant live-call intent",
+            "focus areas",
+            "open discovery gaps",
+        }
+        if should_keep and marker not in existing_markers:
+            existing.append(text)
+            existing_markers.add(marker)
+    if not existing:
+        existing = [
+            str(item).strip()
+            for item in fallback_summary.get("summary") or []
+            if str(item).strip()
+        ]
+    merged["summary"] = existing[:7]
+    merged["headline"] = str(merged.get("headline") or fallback_summary.get("headline") or "").strip()
+    merged["nextStepProposal"] = str(
+        merged.get("nextStepProposal") or fallback_summary.get("nextStepProposal") or ""
+    ).strip()
+    return merged
 
 
 def _learned(discovery_snapshot: Optional[Dict[str, Any]], post_dc_record: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
     progression = _bant_progression(discovery_snapshot)
     before = progression.get("before") if isinstance(progression.get("before"), dict) else {}
     after = progression.get("after") if isinstance(progression.get("after"), dict) else {}
+    evidence = _bant_evidence(discovery_snapshot)
     out: List[Dict[str, Any]] = []
     for dim in ("budget", "authority", "need", "timeline"):
         label = BANT_LABELS[dim]
         post_note = _post_field(post_dc_record, label)
         before_status = before.get(dim)
         after_status = after.get(dim)
+        evidence_value = (evidence.get(dim) or {}).get("value")
         if before_status or after_status:
             note = f"{label} moved from {before_status or 'unknown'} to {after_status or 'unknown'}."
+            if evidence_value:
+                note = f"{note} Evidence: {evidence_value}"
             if post_note:
                 note = f"{note} Post-DC note: {post_note}"
             out.append({"label": label, "note": note})
@@ -871,15 +986,31 @@ def _client_email_fallback(
         for item in (conversation_context or {}).get("needs", [])
         if str(item.get("text") or "").strip()
     ]
+    next_steps = [
+        str(item.get("text") or "").strip()
+        for item in (conversation_context or {}).get("nextSteps", [])
+        if str(item.get("text") or "").strip()
+    ]
+    discussion_lines = _client_safe_lines([*needs[:3], *next_steps[:2], *bullets[:4]])
+    if discussion_lines:
+        deduped_lines: List[str] = []
+        seen_lines: set[str] = set()
+        for line in discussion_lines:
+            key = re.sub(r"\s+", " ", line).strip().lower()
+            if not key or key in seen_lines:
+                continue
+            seen_lines.add(key)
+            deduped_lines.append(line)
+        discussion_lines = deduped_lines
     body_lines = [
         "Hi,",
         "",
         "Thank you for the time today. I appreciated the discussion and the context your team shared.",
     ]
-    if bullets:
+    if discussion_lines:
         body_lines.append("")
         body_lines.append("Minutes of meeting:")
-        body_lines.extend(f"- {str(item).rstrip('.')}" for item in bullets[:4])
+        body_lines.extend(f"- {str(item).rstrip('.')}" for item in discussion_lines[:5])
     elif needs:
         body_lines.append("")
         body_lines.append("Minutes of meeting:")
@@ -923,6 +1054,7 @@ def _internal_email_fallback(
     coverage = _bant_coverage(discovery_snapshot)
     progression = _bant_progression(discovery_snapshot)
     after = progression.get("after") if isinstance(progression.get("after"), dict) else {}
+    evidence = _bant_evidence(discovery_snapshot)
     gaps = _open_gaps(discovery_snapshot)
     needs = [
         str(item.get("text") or "").strip()
@@ -934,13 +1066,25 @@ def _internal_email_fallback(
         for item in (conversation_context or {}).get("requestedAssets", [])
         if str(item.get("name") or "").strip()
     ]
+    next_steps = [
+        str(item.get("text") or "").strip()
+        for item in (conversation_context or {}).get("nextSteps", [])
+        if str(item.get("text") or "").strip()
+    ]
     body_lines = [
         f"Internal Post-DC summary for {account_name}",
         "",
         f"BANT score: {round((coverage or 0) * 100)}%",
         "BANT details:",
         *[
-            f"- {BANT_LABELS[dim]}: {after.get(dim) or 'unknown'}"
+            (
+                f"- {BANT_LABELS[dim]}: {after.get(dim) or 'unknown'}"
+                + (
+                    f" — {(evidence.get(dim) or {}).get('value')}"
+                    if (evidence.get(dim) or {}).get("value")
+                    else ""
+                )
+            )
             for dim in ("budget", "authority", "need", "timeline")
         ],
     ]
@@ -950,6 +1094,8 @@ def _internal_email_fallback(
         body_lines.extend(["", "Transcript context / buyer needs:", *[f"- {item}" for item in needs[:4]]])
     if requested_assets:
         body_lines.extend(["", "Requested assets:", *[f"- {item}" for item in requested_assets[:4]]])
+    if next_steps:
+        body_lines.extend(["", "Transcript next steps:", *[f"- {item}" for item in next_steps[:4]]])
     body_lines.extend(
         [
             "",
@@ -1340,6 +1486,25 @@ def _task_list(
                 "isInternalAuto": True,
             }
         )
+    for i, next_step in enumerate((conversation_context or {}).get("nextSteps", [])[:3]):
+        text = str(next_step.get("text") or "").strip()
+        if not text:
+            continue
+        tasks.append(
+            {
+                "id": f"task-{call_id}-next-step-{i + 1}",
+                "task_type": (
+                    "schedule_next_meeting"
+                    if re.search(r"\b(schedule|meeting|review|readout|follow up)\b", text, re.I)
+                    else "follow_up"
+                ),
+                "owner": "AE",
+                "due_date": (now + timedelta(days=2)).isoformat(),
+                "description": f"Confirm the discussed next step: {text}",
+                "status": "pending_approval",
+                "isInternalAuto": False,
+            }
+        )
     if is_qualifying:
         tasks.append(
             {
@@ -1703,15 +1868,19 @@ def run_post_dc_pipeline(
         trace_id = completion.trace_id
         model_used = completion.model
 
-    if not summary_json:
-        summary_json = _summary_fallback(
-            account_name,
-            discovery_snapshot=discovery_snapshot,
-            live_snapshot=live_snapshot,
-            pre_dc_fields=pre_dc_fields,
-            post_dc_record=post_dc_record,
-            conversation_context=conversation_context,
-        )
+    fallback_summary = _summary_fallback(
+        account_name,
+        discovery_snapshot=discovery_snapshot,
+        live_snapshot=live_snapshot,
+        pre_dc_fields=pre_dc_fields,
+        post_dc_record=post_dc_record,
+        conversation_context=conversation_context,
+    )
+    summary_json = (
+        _merge_summary_with_completed_call_evidence(summary_json, fallback_summary)
+        if summary_json
+        else fallback_summary
+    )
 
     commitments = _commitments(transcript_events, live_snapshot, summary_json)
     task_list = _task_list(
