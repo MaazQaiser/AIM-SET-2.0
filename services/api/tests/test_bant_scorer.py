@@ -147,6 +147,24 @@ def test_update_checklist_preserves_delivery_month_in_timeline_evidence():
     assert "delivery within 8 weeks" in timeline_evidence.value
 
 
+def test_update_checklist_extracts_deadline_not_more_than_duration():
+    state = initial_checklist_state("call-1")
+
+    updated, changed, dims = update_checklist_from_segment(
+        state,
+        "The deadline for our project timeline will be not more than three months.",
+        elapsed_seconds=62,
+        speaker_role="customer",
+    )
+
+    assert "timeline" in changed
+    assert "timeline" in dims
+    assert updated.bant["timeline"] == "confirmed"
+
+    timeline_item = next(item for item in updated.items if item.id == "timeline")
+    assert "project timeline will be not more than three months" in timeline_item.evidence[-1].value
+
+
 def test_should_nudge_budget_after_threshold():
     state = initial_checklist_state("call-1")
     state.elapsed_seconds = 31 * 60

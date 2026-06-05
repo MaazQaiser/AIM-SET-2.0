@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from dc_core.evidence import AgentEnvelope, validate_envelope
 from dc_core.tenancy import TenantContext
@@ -20,6 +20,7 @@ from app.domain.calls_service import CallsService, call_id_aliases
 from app.domain.dc_notes_repository import get_dc_notes_repository
 from app.domain.content_studio_repository import get_content_studio_repository
 from app.domain.agent_runs_repository import get_agent_runs_repository
+from app.domain.live_call_repository import get_live_call_repository
 from app.domain.memory_store import get_memory_store
 from app.agents.live_call_agent import bot_chat_response, build_call_agent_handoff
 from app.agents.sales_copilot_agent import copilot_chat_response
@@ -27,6 +28,43 @@ from app.services.content_export_service import export_revision
 from app.services.template_ingest_service import process_template_ingest
 
 _logger = logging.getLogger(__name__)
+
+
+def _float_or_zero(value: Any) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _discovery_context_text(events: List[Dict[str, Any]], fallback: str) -> str:
+    if not events:
+        return fallback
+
+    latest = events[-1]
+    latest_role = str(latest.get("speaker_role") or "").lower()
+    if latest_role not in ("customer", "prospect", "guest", ""):
+        return fallback
+
+    latest_offset = _float_or_zero(latest.get("offset_seconds"))
+    latest_speaker = str(latest.get("speaker_id") or latest.get("speaker_name") or "")
+    parts: List[str] = []
+
+    for event in events[-8:]:
+        role = str(event.get("speaker_role") or "").lower()
+        if role not in ("customer", "prospect", "guest", ""):
+            continue
+        if latest_offset and latest_offset - _float_or_zero(event.get("offset_seconds")) > 14:
+            continue
+        speaker = str(event.get("speaker_id") or event.get("speaker_name") or "")
+        if latest_speaker and speaker and speaker != latest_speaker:
+            continue
+        text = str(event.get("text") or "").strip()
+        if text:
+            parts.append(text)
+
+    context = " ".join(parts).strip()
+    return context[-360:] if context else fallback
 
 
 class Orchestrator:
@@ -310,10 +348,12 @@ class Orchestrator:
 
             stored = self.memory.get_discovery_checklist(ctx.tenant_id, call_id)
             state = checklist_from_dict(stored) if stored else None
+            recent_events = get_live_call_repository().list_transcript_events(ctx, call_id, limit=8)
+            discovery_text = _discovery_context_text(recent_events, text)
 
             discovery_out = handle_segment(
                 call_id,
-                text,
+                discovery_text,
                 state=state,
                 elapsed_seconds=elapsed_seconds,
                 seed_bant=seed_bant,

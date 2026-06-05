@@ -36,15 +36,16 @@ const KEY_SEGMENTS = [
 
 async function postDemoSegment(
   request: import("@playwright/test").APIRequestContext,
-  segment: { text: string; speaker_role: string; offset_seconds: number }
+  segment: { text: string; speaker_role: string; offset_seconds: number },
+  callId = CALL_ID
 ) {
-  const url = `${API_BASE}/api/v1/webhooks/recall/demo-segment?call_id=${CALL_ID}&tenant_id=${TENANT}&user_id=${USER}`;
+  const url = `${API_BASE}/api/v1/webhooks/recall/demo-segment?call_id=${callId}&tenant_id=${TENANT}&user_id=${USER}`;
   const res = await request.post(url, {
     data: {
       text: segment.text,
       speaker_role: segment.speaker_role,
       offset_seconds: segment.offset_seconds,
-      provider_event_id: `e2e-${segment.offset_seconds}-${Date.now()}`,
+      provider_event_id: `e2e-${callId}-${segment.offset_seconds}-${Date.now()}`,
     },
   });
   expect(res.ok(), `demo-segment failed: ${res.status()} ${await res.text()}`).toBeTruthy();
@@ -60,7 +61,11 @@ async function postDemoSegment(
   return body;
 }
 
-async function seedE2eCall(request: import("@playwright/test").APIRequestContext) {
+async function seedE2eCall(
+  request: import("@playwright/test").APIRequestContext,
+  callId = CALL_ID,
+  accountName = ACCOUNT_NAME
+) {
   const res = await request.post(`${API_BASE}/dc-notes/ingest`, {
     headers: {
       "X-Internal-Secret": INTERNAL_SECRET,
@@ -71,9 +76,9 @@ async function seedE2eCall(request: import("@playwright/test").APIRequestContext
       kind: "pre-dc",
       records: [
         {
-          id: `pre-${CALL_ID}`,
+          id: `pre-${callId}`,
           fields: {
-            "Company Name-PreDC": ACCOUNT_NAME,
+            "Company Name-PreDC": accountName,
             "Lead Name-PreDC": "Marcus Rivera",
             "Prospect's Persona": "Chief Financial Officer",
             "Industry - PreDC": "Franchise operations",
@@ -252,6 +257,71 @@ test.describe("Live call cockpit — DOM + API", () => {
     });
   });
 
+  test("fragmented live speech updates BANT and clears idle transcript cursor", async ({
+    page,
+    request,
+  }) => {
+    const callId = `fragmented-live-bant-${RUN_ID}`;
+    const accountName = `Fragmented Live BANT ${RUN_ID}`;
+    await seedE2eCall(request, callId, accountName);
+
+    await page.goto(`/calls/${callId}/live`, { waitUntil: "domcontentloaded" });
+    await expect(page.locator(`a[href="/calls/${callId}"]`).first()).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByText("Connecting stream…")).toBeHidden({ timeout: 25_000 });
+
+    await postDemoSegment(
+      request,
+      {
+        text: "I have budget around",
+        speaker_role: "customer",
+        offset_seconds: 47,
+      },
+      callId
+    );
+    await postDemoSegment(
+      request,
+      {
+        text: "400k",
+        speaker_role: "customer",
+        offset_seconds: 51,
+      },
+      callId
+    );
+    const out = await postDemoSegment(
+      request,
+      {
+        text: "The deadline for our project timeline will be not more than three months.",
+        speaker_role: "customer",
+        offset_seconds: 56,
+      },
+      callId
+    );
+
+    const budgetItem = out.checklist?.items?.find((item) => item.id === "budget");
+    const timelineItem = out.checklist?.items?.find((item) => item.id === "timeline");
+    expect(budgetItem?.evidence?.at(-1)?.value?.toLowerCase()).toContain("400k");
+    expect(out.checklist?.bant?.timeline).toBe("confirmed");
+    expect(timelineItem?.evidence?.at(-1)?.value).toContain(
+      "project timeline will be not more than three months"
+    );
+
+    await expect(page.getByText("400k").first()).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByText(/not more than three months/i).first()).toBeVisible({
+      timeout: 25_000,
+    });
+
+    await expect
+      .poll(async () => (await page.locator("body").innerText()).replace(/\s+/g, " "))
+      .toMatch(/Budget Confirmed|Budget Partially qualified|Partially covered: [^.]*Budget/i);
+    const bodyText = (await page.locator("body").innerText()).replace(/\s+/g, " ");
+    expect(bodyText).not.toMatch(/Still to cover: [^.]*Budget/i);
+    expect(bodyText).not.toMatch(/Still to cover: [^.]*Timeline/i);
+
+    await expect(page.locator(".animate-cursor")).toHaveCount(0, { timeout: 6_000 });
+  });
+
   test("API sentiment payloads switch the rail between red and green", async ({
     page,
     request,
@@ -368,6 +438,7 @@ test.describe("Live call cockpit — DOM + API", () => {
         };
         clientEmailDraft?: {
           status?: string;
+          subject?: string;
           body_markdown?: string;
           commitments_referenced?: string[];
         };

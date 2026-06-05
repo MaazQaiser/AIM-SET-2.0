@@ -8,6 +8,7 @@ import {
   liveColumnContentPadding,
 } from "@/components/live/live-column-header";
 import { cn } from "@/lib/cn";
+import { checklistDisplayGaps } from "@/lib/live/bant-display";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
 import type { CallIntent, PainSignal, TranscriptEvent } from "@/types";
 
@@ -54,11 +55,12 @@ function buildSummary({
   if (checklist && typeof checklist.bantCoverage === "number") {
     const bantPct = Math.round(checklist.bantCoverage * 100);
     parts.push(`BANT coverage at ${bantPct}%.`);
-    const openGaps = Array.isArray(checklist.openGaps) ? checklist.openGaps : [];
-    if (openGaps.length > 0) {
-      parts.push(
-        `Still to cover: ${openGaps.map((g) => g.replace(/_/g, " ")).join(", ")}.`
-      );
+    const gaps = checklistDisplayGaps(checklist);
+    if (gaps.missing.length > 0) {
+      parts.push(`Still to cover: ${gaps.missing.join(", ")}.`);
+    }
+    if (gaps.partial.length > 0) {
+      parts.push(`Partially covered: ${gaps.partial.join(", ")} - ask for specifics.`);
     }
   }
 

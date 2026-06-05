@@ -5,6 +5,7 @@ from dc_core.tenancy import TenantContext
 
 from app.agents.live_call.handler import handle_transcript_segment
 from app.domain.live_call_repository import get_live_call_repository
+from app.orchestrator.dispatcher import Orchestrator
 from app.orchestrator.live_broadcast import envelope_to_ws_messages
 
 
@@ -86,6 +87,38 @@ def test_handle_transcript_segment_emits_analyzed_sentiment():
     assert sentiment_signal_messages[-1]["payload"]["snippet"].startswith("I'm not sure")
     events = get_live_call_repository().list_transcript_events(ctx, call_id)
     assert events[-1]["sentiment"] == "negative"
+
+
+def test_dispatch_live_segment_uses_recent_fragments_for_budget_value():
+    ctx = TenantContext(tenant_id="live-test-fragmented-budget", user_id="u1")
+    call_id = "call-live-fragmented-budget"
+    orchestrator = Orchestrator()
+
+    orchestrator.dispatch_live_segment(
+        ctx,
+        call_id,
+        {
+            "text": "I have budget around",
+            "speakerId": "prospect-1",
+            "speakerRole": "customer",
+            "timestamp": 47,
+        },
+    )
+    out = orchestrator.dispatch_live_segment(
+        ctx,
+        call_id,
+        {
+            "text": "400k",
+            "speakerId": "prospect-1",
+            "speakerRole": "customer",
+            "timestamp": 51,
+        },
+    )
+
+    checklist = out["checklist"]
+    assert checklist["bant"]["budget"] in ("partial", "confirmed")
+    budget_item = next(item for item in checklist["items"] if item["id"] == "budget")
+    assert "400k" in budget_item["evidence"][-1]["value"].lower()
 
 
 def test_passive_intent_envelopes_do_not_create_suggestion_logs():

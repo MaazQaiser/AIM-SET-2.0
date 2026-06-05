@@ -372,6 +372,8 @@ _TIMELINE_DURATION_PATTERN = (
 _TIMELINE_RE = re.compile(
     r"\b(?:Q[1-4](?:\s+(?:pilot|kickoff|go-live|production|launch|rollout|readout|approval)){0,3}"
     rf"|(?:project\s+)?ETA\s*(?:is|of|for|:)?\s*(?:about|around|roughly)?\s*{_TIMELINE_DURATION_PATTERN}(?:\s+(?:from|after|before)\s+[A-Za-z][\w-]*)?"
+    rf"|(?:deadline|timeline|project\s+timeline|delivery\s+timeline)\s*(?:is|will\s+be|should\s+be|:)?\s*(?:no|not)?\s*more\s+than\s+{_TIMELINE_DURATION_PATTERN}"
+    rf"|(?:no|not)\s+more\s+than\s+{_TIMELINE_DURATION_PATTERN}"
     rf"|(?:in|within)\s+{_TIMELINE_DURATION_PATTERN}"
     rf"|{_TIMELINE_DURATION_PATTERN}\s+(?:from|after|before)\s+[A-Za-z][\w-]*"
     r"|(?:pilot|production|go-live|go live|launch|rollout|kickoff|readout)\s+"
@@ -384,6 +386,14 @@ _TIMELINE_RE = re.compile(
 )
 _TIMELINE_MILESTONE_RE = re.compile(
     r"\bQ[1-4](?:\s+(?:pilot|kickoff|go-live|production|launch|rollout|readout|approval)){1,3}\b",
+    re.I,
+)
+_TIMELINE_CONTEXT_RE = re.compile(
+    r"\b(?:deadline|timeline|eta|delivery|implementation|complete|go-live|go live|launch|rollout|kickoff|pilot|project)\b",
+    re.I,
+)
+_TIMELINE_BOUND_RE = re.compile(
+    rf"\b(?:(?:no|not)\s+more\s+than\s+{_TIMELINE_DURATION_PATTERN}|(?:in|within)\s+{_TIMELINE_DURATION_PATTERN}|{_TIMELINE_DURATION_PATTERN}\s+(?:from|after|before)\b)",
     re.I,
 )
 _NEED_RE = re.compile(
@@ -595,6 +605,18 @@ def _apply_signals(
 
     if signal_item_id and signal_item_id not in matched_statuses:
         matched_statuses[signal_item_id] = "partial"
+
+    timeline_value = _extract_bant_value("timeline", text, snippet)
+    if timeline_value and (_TIMELINE_CONTEXT_RE.search(text) or _TIMELINE_BOUND_RE.search(text)):
+        timeline_status: ChecklistItemStatus = (
+            "confirmed"
+            if _TIMELINE_CONTEXT_RE.search(text) and _TIMELINE_BOUND_RE.search(text)
+            else "partial"
+        )
+        matched_statuses["timeline"] = _merge_status(
+            matched_statuses.get("timeline", "pending"),
+            timeline_status,
+        )
 
     for item_id, tier_status in matched_statuses.items():
         for it in items:

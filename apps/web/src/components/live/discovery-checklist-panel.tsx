@@ -11,6 +11,10 @@ import {
 } from "@/components/pre-call/brief-detail-card";
 import { cn } from "@/lib/cn";
 import { formatBudgetUsd } from "@/lib/currency-format";
+import {
+  checklistDisplayGaps,
+  formatChecklistDisplayGaps,
+} from "@/lib/live/bant-display";
 import type { BANTScore } from "@/types";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
 
@@ -103,6 +107,7 @@ function DiscoveryChecklistBriefCard({
   const bantItems = state.items.filter((i) => i.tier === "bant");
   const bantComplete = bantPct >= 100;
   const openGapCount = state.openGaps.length;
+  const gapSummary = formatChecklistDisplayGaps(state);
 
   const headerExtra = (
     <div className="flex items-center gap-2 shrink-0">
@@ -158,19 +163,13 @@ function DiscoveryChecklistBriefCard({
           </BriefDetailAccordion>
         )}
 
-        {openGapCount > 0 && (
+        {gapSummary && (
           <BriefDetailAccordion
-            title="Open gaps"
-            summary={state.openGaps.map((g) => g.replace(/_/g, " ")).join(", ")}
+            title="Coverage gaps"
+            summary={gapSummary}
             loud
           >
-            <ul className="space-y-1.5">
-              {state.openGaps.map((gap) => (
-                <li key={gap} className="text-sm text-foreground capitalize">
-                  {gap.replace(/_/g, " ")}
-                </li>
-              ))}
-            </ul>
+            <ChecklistGapList state={state} />
           </BriefDetailAccordion>
         )}
 
@@ -231,6 +230,30 @@ function ChecklistItemList({
   );
 }
 
+function ChecklistGapList({ state }: { state: DiscoveryChecklistState }) {
+  const gaps = checklistDisplayGaps(state);
+  return (
+    <ul className="space-y-1.5">
+      {gaps.missing.map((gap) => (
+        <li key={`missing-${gap}`} className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-foreground">{gap}</span>
+          <Badge variant="outline" className="text-[10px] shrink-0">
+            Open
+          </Badge>
+        </li>
+      ))}
+      {gaps.partial.map((gap) => (
+        <li key={`partial-${gap}`} className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-foreground">{gap}</span>
+          <Badge variant="secondary" className="text-[10px] shrink-0">
+            Partial
+          </Badge>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** Original expanded panel for live call workspace */
 function DiscoveryChecklistFullPanel({
   state,
@@ -244,6 +267,7 @@ function DiscoveryChecklistFullPanel({
   const allPct = Math.round(state.coverage * 100);
   const secondary = state.items.filter((i) => i.tier === "secondary");
   const bantComplete = bantPct >= 100;
+  const gapSummary = formatChecklistDisplayGaps(state);
 
   return (
     <div className={cn("glass-insight-card shadow-none", className)}>
@@ -270,9 +294,9 @@ function DiscoveryChecklistFullPanel({
           layout="row"
         />
 
-        {state.openGaps.length > 0 && (
+        {gapSummary && (
           <p className="text-xs text-muted-foreground">
-            Open: {state.openGaps.map((g) => g.replace(/_/g, " ")).join(", ")}
+            {gapSummary}
           </p>
         )}
 
