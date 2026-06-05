@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from dc_core.tenancy import TenantContext
 
 from app.agents.briefing_agent import run_daily_briefing
 from app.deps import get_tenant_context
+from app.domain.daily_briefings_repository import get_daily_briefings_repository
 
 router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
 
@@ -43,14 +45,13 @@ class DailyBriefingOut(BaseModel):
     paragraph: str
     source: str = "template"
     model: Optional[str] = None
+    cached: bool = False
+    generated_at: Optional[str] = Field(default=None, alias="generatedAt")
+    briefing_date: Optional[str] = Field(default=None, alias="briefingDate")
 
 
-@router.post("/briefing", response_model=DailyBriefingOut)
-def daily_briefing(
-    body: DailyBriefingIn,
-    ctx: TenantContext = Depends(get_tenant_context),
-) -> DailyBriefingOut:
-    context: Dict[str, Any] = {
+def _briefing_context(body: DailyBriefingIn) -> Dict[str, Any]:
+    return {
         "todaysCallCount": body.todays_call_count,
         "pendingApprovalCount": body.pending_approval_count,
         "briefsNotReady": body.briefs_not_ready,
@@ -60,9 +61,56 @@ def daily_briefing(
         ),
         "todos": [t.model_dump() for t in body.todos[:12]],
     }
-    result = run_daily_briefing(ctx, context=context)
+
+
+def _to_out(payload: Dict[str, Any]) -> DailyBriefingOut:
     return DailyBriefingOut(
-        paragraph=result.get("paragraph") or "",
-        source=result.get("source") or "template",
-        model=result.get("model"),
+        paragraph=payload.get("paragraph") or "",
+        source=payload.get("source") or "template",
+        model=payload.get("model"),
+        cached=bool(payload.get("cached")),
+        generatedAt=payload.get("generatedAt"),
+        briefingDate=payload.get("briefingDate"),
     )
+
+
+@router.get("/briefing", response_model=DailyBriefingOut)
+def get_daily_briefing(
+    ctx: TenantContext = Depends(get_tenant_context),
+    briefing_date: Optional[str] = Query(default=None, alias="date"),
+) -> DailyBriefingOut:
+    day = briefing_date or date.today().isoformat()
+    cached = get_daily_briefings_repository().get(ctx, day)
+    if not cached:
+        raise HTTPException(status_code=404, detail="Daily briefing not found for this date")
+    return _to_out(cached)
+
+
+@router.post("/briefing", response_model=DailyBriefingOut)
+def daily_briefing(
+    body: DailyBriefingIn,
+    ctx: TenantContext = Depends(get_tenant_context),
+    refresh: bool = Query(default=False),
+    briefing_date: Optional[str] = Query(default=None, alias="date"),
+) -> DailyBriefingOut:
+    day = briefing_date or date.today().isoformat()
+    repo = get_daily_briefings_repository()
+
+    if not refresh:
+        cached = repo.get(ctx, day)
+        if cached:
+            return _to_out(cached)
+
+    context = _briefing_context(body)
+    result = run_daily_briefing(ctx, context=context)
+    stored = repo.save(
+        ctx,
+        day,
+        {
+            "paragraph": result.get("paragraph") or "",
+            "source": result.get("source") or "template",
+            "model": result.get("model"),
+            "context": context,
+        },
+    )
+    return _to_out(stored)

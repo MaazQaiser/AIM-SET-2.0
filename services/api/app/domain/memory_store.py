@@ -36,6 +36,7 @@ class MemoryStore:
         self.clp_proposals: Dict[str, Dict[str, Dict[str, Any]]] = {}
         self.clp_visitors: Dict[str, List[Dict[str, Any]]] = {}
         self.clp_sessions: Dict[str, List[Dict[str, Any]]] = {}
+        self.daily_briefings: Dict[str, Dict[str, Any]] = {}
         self.clp_events: Dict[str, List[Dict[str, Any]]] = {}
         self.clp_notifications: Dict[str, List[Dict[str, Any]]] = {}
         self.clp_comments: Dict[str, List[Dict[str, Any]]] = {}

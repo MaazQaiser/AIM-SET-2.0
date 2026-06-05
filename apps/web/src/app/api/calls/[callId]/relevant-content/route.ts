@@ -5,14 +5,16 @@ interface Params {
   params: Promise<{ callId: string }>;
 }
 
-export async function GET(_request: NextRequest, { params }: Params) {
+export async function GET(request: NextRequest, { params }: Params) {
   const { userId, orgId } = await auth();
   if (!userId) return new NextResponse("Unauthorized", { status: 401 });
 
   const { callId } = await params;
+  const refresh = request.nextUrl.searchParams.get("refresh") === "true";
+  const apiUrl = process.env.API_URL ?? "http://localhost:8000";
 
   const res = await fetch(
-    `${process.env.API_URL ?? "http://localhost:8000"}/api/v1/calls/${callId}/relevant-content`,
+    `${apiUrl}/api/v1/calls/${callId}/relevant-content?refresh=${refresh ? "true" : "false"}`,
     {
       headers: {
         "x-user-id": userId,

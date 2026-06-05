@@ -28,6 +28,7 @@ def test_fallback_paragraph_with_top_opportunity():
 
 
 def test_run_daily_briefing_without_api_key_uses_template(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
     monkeypatch.setenv("OPENAI_API_KEY", "")
     ctx = TenantContext(tenant_id="t1", user_id="u1")
     result = run_daily_briefing(

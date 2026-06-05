@@ -175,7 +175,22 @@ class Orchestrator:
             **relevant,
         }
         self.calls.save_brief(ctx, call_id, merged)
-        return relevant
+        return {**relevant, "cached": False}
+
+    def get_relevant_content(self, ctx: TenantContext, call_id: str, *, refresh: bool = False) -> Dict[str, Any]:
+        if not refresh:
+            existing = self.calls.get_brief(ctx, call_id) or {}
+            documents = existing.get("relevantDocuments") or []
+            projects = existing.get("relevantProjects") or []
+            deck = existing.get("recommendedDeck")
+            if documents or projects or deck:
+                return {
+                    "relevantDocuments": documents,
+                    "relevantProjects": projects,
+                    "recommendedDeck": deck,
+                    "cached": True,
+                }
+        return self.dispatch_relevant_content(ctx, call_id)
 
     def dispatch_pre_dc_brief(self, ctx: TenantContext, call_id: str) -> Dict[str, Any]:
         fields = self._pre_dc_fields_for_call(ctx, call_id)

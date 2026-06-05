@@ -356,12 +356,14 @@ export function BriefDeckCard({
   const deck = localDeck ?? fetchedDeck;
 
   useEffect(() => {
-    if (localDeck || fetchedDeck || !callId) return;
+    if (localDeck || !callId) return;
     let cancelled = false;
     setLoadingDeck(true);
     void (async () => {
       try {
-        const res = await fetch(`/api/calls/${encodeURIComponent(callId)}/relevant-content`);
+        const res = await fetch(
+          `/api/calls/${encodeURIComponent(callId)}/relevant-content?refresh=false`
+        );
         if (!res.ok || cancelled) return;
         const data = (await res.json()) as { relevantDocuments?: RelevantDocument[] };
         const match = (data.relevantDocuments ?? []).find(isPresentationDocument);
@@ -375,7 +377,7 @@ export function BriefDeckCard({
     return () => {
       cancelled = true;
     };
-  }, [callId, fetchedDeck, localDeck]);
+  }, [callId, localDeck]);
 
   if (loadingDeck) {
     return (

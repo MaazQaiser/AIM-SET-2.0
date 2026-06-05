@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FolderKanban, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { FolderKanban, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import {
   BriefDetailCard,
@@ -15,8 +15,30 @@ import { RelevantProjectDetailDialog } from "@/components/pre-call/relevant-proj
 import { KbFileTypeIcon } from "@/components/knowledge/kb-file-type-icon";
 import type { CallBrief, RelevantDocument, RelevantProject } from "@/lib/brief-types";
 import { cn } from "@/lib/cn";
+import { toast } from "sonner";
 
 export type BriefRelevantContentSection = "all" | "documents" | "projects";
+
+function hasRelevantContent(brief: CallBrief): boolean {
+  return Boolean(
+    brief.relevantDocuments?.length ||
+      brief.relevantProjects?.length ||
+      brief.recommendedDeck
+  );
+}
+
+async function fetchRelevantContent(callId: string, refresh: boolean) {
+  const res = await fetch(
+    `/api/calls/${encodeURIComponent(callId)}/relevant-content?refresh=${refresh ? "true" : "false"}`
+  );
+  if (!res.ok) throw new Error("Failed to load relevant content");
+  return res.json() as Promise<{
+    relevantDocuments?: CallBrief["relevantDocuments"];
+    relevantProjects?: CallBrief["relevantProjects"];
+    recommendedDeck?: CallBrief["recommendedDeck"];
+    cached?: boolean;
+  }>;
+}
 
 interface BriefRelevantContentProps {
   brief: CallBrief;
@@ -226,30 +248,34 @@ export function BriefRelevantContent({
 
 export function useRelevantContentBrief(callId: string, brief: CallBrief) {
   const [merged, setMerged] = useState<CallBrief>(brief);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!hasRelevantContent(brief));
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     setMerged(brief);
+    if (hasRelevantContent(brief)) {
+      setLoading(false);
+    }
   }, [brief]);
 
   useEffect(() => {
+    if (hasRelevantContent(brief)) return;
+
     let cancelled = false;
     setLoading(true);
     void (async () => {
       try {
-        const res = await fetch(`/api/calls/${encodeURIComponent(callId)}/relevant-content`);
-        if (!res.ok || cancelled) return;
-        const data = (await res.json()) as {
-          relevantDocuments?: CallBrief["relevantDocuments"];
-          relevantProjects?: CallBrief["relevantProjects"];
-        };
+        const data = await fetchRelevantContent(callId, false);
         if (cancelled) return;
         setMerged((prev) => ({
           ...prev,
           relevantDocuments: data.relevantDocuments?.length
             ? data.relevantDocuments
             : prev.relevantDocuments,
-          relevantProjects: data.relevantProjects?.length ? data.relevantProjects : prev.relevantProjects,
+          relevantProjects: data.relevantProjects?.length
+            ? data.relevantProjects
+            : prev.relevantProjects,
+          recommendedDeck: data.recommendedDeck ?? prev.recommendedDeck,
         }));
       } catch {
         // Keep the brief usable if the API is temporarily unreachable.
@@ -260,9 +286,27 @@ export function useRelevantContentBrief(callId: string, brief: CallBrief) {
     return () => {
       cancelled = true;
     };
+  }, [callId, brief]);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const data = await fetchRelevantContent(callId, true);
+      setMerged((prev) => ({
+        ...prev,
+        relevantDocuments: data.relevantDocuments ?? prev.relevantDocuments,
+        relevantProjects: data.relevantProjects ?? prev.relevantProjects,
+        recommendedDeck: data.recommendedDeck ?? prev.recommendedDeck,
+      }));
+      toast.success("Relevant content refreshed from knowledge base");
+    } catch {
+      toast.error("Could not refresh relevant content");
+    } finally {
+      setRefreshing(false);
+    }
   }, [callId]);
 
-  return { merged, loading };
+  return { merged, loading, refresh, refreshing };
 }
 
 export function BriefRelevantContentLoader({
@@ -276,7 +320,7 @@ export function BriefRelevantContentLoader({
   embedded?: boolean;
   section?: BriefRelevantContentSection;
 }) {
-  const { merged, loading } = useRelevantContentBrief(callId, brief);
+  const { merged, loading, refresh, refreshing } = useRelevantContentBrief(callId, brief);
 
   if (loading) {
     return (
@@ -287,5 +331,26 @@ export function BriefRelevantContentLoader({
     );
   }
 
-  return <BriefRelevantContent brief={merged} embedded={embedded} section={section} />;
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1.5 text-muted-foreground"
+          disabled={refreshing}
+          onClick={() => void refresh()}
+        >
+          {refreshing ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="h-3.5 w-3.5" />
+          )}
+          Refresh KB matches
+        </Button>
+      </div>
+      <BriefRelevantContent brief={merged} embedded={embedded} section={section} />
+    </div>
+  );
 }

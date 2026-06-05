@@ -1,11 +1,13 @@
 "use client";
 
-import { Sparkles, DollarSign, Target, AlertCircle } from "lucide-react";
+import { Sparkles, DollarSign, Target, AlertCircle, RefreshCw, Loader2 } from "lucide-react";
+import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent } from "@dc-copilot/ui/components/card";
 import { useAiTodos } from "@/hooks/use-ai-todos";
 import { useDailyBriefing } from "@/hooks/use-daily-briefing";
 import { useCalls } from "@/lib/data/hooks";
 import { isSameDay, startOfDay } from "date-fns";
+import { toast } from "sonner";
 
 function buildFallbackParagraph(
   todaysCallsCount: number,
@@ -43,7 +45,7 @@ function buildFallbackParagraph(
 export function DailyBriefingCard({ enabled = true }: { enabled?: boolean }) {
   const { data: calls = [] } = useCalls();
   const { topOpportunityCall, pendingApprovalCount, todos } = useAiTodos();
-  const { data: briefing, isLoading } = useDailyBriefing(enabled);
+  const { data: briefing, isLoading, refresh, isRefreshing } = useDailyBriefing(enabled);
 
   const today = startOfDay(new Date());
   const todaysCalls = calls.filter(
@@ -101,6 +103,25 @@ export function DailyBriefingCard({ enabled = true }: { enabled?: boolean }) {
             <span className="type-title text-foreground">Daily briefing</span>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              aria-label="Refresh daily briefing"
+              disabled={isRefreshing}
+              onClick={() => {
+                void refresh()
+                  .then(() => toast.success("Daily briefing refreshed"))
+                  .catch(() => toast.error("Could not refresh briefing"));
+              }}
+            >
+              {isRefreshing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </Button>
             {statChips}
           </div>
         </div>

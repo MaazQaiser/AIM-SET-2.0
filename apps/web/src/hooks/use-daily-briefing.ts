@@ -1,7 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { isSameDay, startOfDay } from "date-fns";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { format, isSameDay, startOfDay } from "date-fns";
+import { useCallback, useMemo, useState } from "react";
 import { useAiTodos } from "@/hooks/use-ai-todos";
 import { useCalls } from "@/lib/data/hooks";
 import type { Call } from "@/types";
@@ -10,6 +11,9 @@ export interface DailyBriefingResult {
   paragraph: string;
   source: "llm" | "template";
   model?: string | null;
+  cached?: boolean;
+  generatedAt?: string | null;
+  briefingDate?: string | null;
 }
 
 function buildBriefingPayload(
@@ -48,9 +52,36 @@ function buildBriefingPayload(
   };
 }
 
+async function fetchCachedBriefing(date: string): Promise<DailyBriefingResult | null> {
+  const res = await fetch(`/api/agents/briefing?date=${encodeURIComponent(date)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error("Briefing failed");
+  return res.json() as Promise<DailyBriefingResult>;
+}
+
+async function generateBriefing(
+  payload: ReturnType<typeof buildBriefingPayload>,
+  date: string,
+  refresh: boolean
+): Promise<DailyBriefingResult> {
+  const res = await fetch(
+    `/api/agents/briefing?refresh=${refresh ? "true" : "false"}&date=${encodeURIComponent(date)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!res.ok) throw new Error("Briefing failed");
+  return res.json() as Promise<DailyBriefingResult>;
+}
+
 export function useDailyBriefing(enabled = true) {
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
   const { data: calls = [] } = useCalls();
   const { topOpportunityCall, pendingApprovalCount, todos } = useAiTodos();
+  const briefingDate = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
   const payload = buildBriefingPayload(
     calls,
     topOpportunityCall,
@@ -58,21 +89,32 @@ export function useDailyBriefing(enabled = true) {
     todos
   );
 
-  return useQuery({
-    queryKey: ["daily-briefing", payload],
+  const query = useQuery({
+    queryKey: ["daily-briefing", briefingDate],
     queryFn: async () => {
-      const res = await fetch("/api/agents/briefing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        throw new Error("Briefing failed");
-      }
-      return res.json() as Promise<DailyBriefingResult>;
+      const cached = await fetchCachedBriefing(briefingDate);
+      if (cached) return cached;
+      return generateBriefing(payload, briefingDate, false);
     },
     enabled,
-    staleTime: 5 * 60 * 1000,
+    staleTime: Infinity,
     retry: 1,
   });
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const fresh = await generateBriefing(payload, briefingDate, true);
+      queryClient.setQueryData(["daily-briefing", briefingDate], fresh);
+      return fresh;
+    } finally {
+      setRefreshing(false);
+    }
+  }, [briefingDate, payload, queryClient]);
+
+  return {
+    ...query,
+    refresh,
+    isRefreshing: refreshing,
+  };
 }
