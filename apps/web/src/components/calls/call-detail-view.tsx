@@ -6,6 +6,7 @@ import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { PageShell } from "@/components/layout/page-shell";
 import { CallDetailPageLoader } from "@/components/layout/page-loaders";
 import { enrichCallBant } from "@/lib/bant/authority-from-lead";
+import { buildAccountSnapshot } from "@/lib/dc-data/build-account-snapshot";
 import { useCall, useCallBrief } from "@/lib/data/hooks";
 import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
@@ -53,19 +54,7 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
         "Who else should be involved in evaluating a solution?",
       ];
 
-  const accountSnapshot = preRecord
-    ? [
-        { label: "Industry", value: preDcField(preRecord, "industry") },
-        { label: "Employees", value: preDcField(preRecord, "employeeCount") },
-        { label: "Revenue", value: preDcField(preRecord, "annualRevenue") },
-        { label: "ICP bucket", value: preDcField(preRecord, "icpBucket") },
-        { label: "Website", value: preDcField(preRecord, "website") },
-        { label: "Tech stacks", value: preDcField(preRecord, "techStacks") },
-      ].filter((row): row is { label: string; value: string } => Boolean(row.value))
-    : [
-        ...(call.industry ? [{ label: "Industry", value: call.industry }] : []),
-        { label: "Deal stage", value: call.dealStage ?? "Discovery" },
-      ];
+  const accountSnapshot = buildAccountSnapshot({ preRecord, call });
 
   const scheduleText =
     call.discoveryCallDatePkt && call.discoveryCallTimePkt

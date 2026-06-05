@@ -26,9 +26,11 @@ import {
   BriefPodNotesCard,
 } from "@/components/pre-call/brief-widget-cards";
 import {
+  PostBeforeContextCard,
   PostHeadlineCard,
   PostDcContentSuggestionsCard,
   PostLearnedCard,
+  PostNextStepProposalCard,
   PostScorecardCard,
   PostSummaryCard,
 } from "@/components/post-dc/post-dc-widget-cards";
@@ -346,6 +348,25 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     column: "center",
     sortOrder: 0,
     render: ({ review }) => <PostHeadlineCard headline={review.headline} />,
+  },
+  {
+    id: "post.before_context",
+    title: "Pre-call context",
+    category: "content",
+    column: "center",
+    sortOrder: -1,
+    render: ({ callId }) => <PostBeforeContextCard callId={callId} />,
+  },
+  {
+    id: "post.next_step_proposal",
+    title: "Recommended next step",
+    category: "ai",
+    column: "center",
+    sortOrder: 0,
+    isAvailable: ({ review }) => Boolean(review.nextStepProposal?.trim()),
+    render: ({ review }) => (
+      <PostNextStepProposalCard proposal={review.nextStepProposal ?? ""} />
+    ),
   },
   {
     id: "post.summary",

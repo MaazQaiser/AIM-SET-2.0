@@ -523,6 +523,10 @@ export function buildPostReviewFromPostDc(record: PostDCRecord): PostCallReview 
   return {
     headline: [leadStage, potential, serviceLine].filter(Boolean).join(" · ") || "Post-DC summary",
     summary: paragraphs.length > 0 ? paragraphs : [bottomLine || "No summary provided."],
+    nextStepProposal:
+      postDcField(record, "salesStrategy") ||
+      postDcField(record, "engagementModel") ||
+      undefined,
     openDiscoveryGaps,
     researchSections: buildPostDcResearchSections(record),
     podScorecard: [

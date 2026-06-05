@@ -14,6 +14,7 @@ import type {
   KBAsset,
   KBProject,
   QuarterlyPattern,
+  TranscriptEvent,
 } from "@/types";
 import { normalizeSummarySections } from "@dc-copilot/types/brief";
 import type {
@@ -174,6 +175,20 @@ export function useCall(callId: string) {
     },
     placeholderData: localCall,
     staleTime: REFETCH_MS,
+  });
+}
+
+export function useCallTranscript(callId: string) {
+  return useQuery<TranscriptEvent[]>({
+    queryKey: ["call-transcript", callId],
+    queryFn: async () => {
+      const res = await bffFetch<{ events?: TranscriptEvent[] }>(
+        `/api/calls/${callId}/live-session`
+      );
+      return res?.events ?? [];
+    },
+    staleTime: 60_000,
+    enabled: Boolean(callId),
   });
 }
 

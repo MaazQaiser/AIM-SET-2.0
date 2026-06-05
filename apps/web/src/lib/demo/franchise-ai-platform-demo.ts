@@ -160,6 +160,8 @@ export const franchiseDemoPostReview: PostCallReview = {
     "**Pains validated:** (1) spreadsheet + POS fragmentation, (2) no unified COO visibility, (3) manual compliance audits blocking expansion. Intent classified **commercial_discovery** with **timeline_planning** signals after budget/timeline lines.",
     "**Discovery coverage:** BANT **78%** — budget partial (range confirmed, board pending), authority partial (COO sponsor, CFO/board TBD), need & timeline confirmed. **Action:** send proposal outline + pilot SOW template; schedule CFO readout; attach franchise retail reference architecture.",
   ],
+  nextStepProposal:
+    "Send proposal outline and pilot SOW template, then schedule a CFO readout before the May board cycle.",
   discoveryBantCoverage: 0.78,
   openDiscoveryGaps: ["authority", "decision_process"],
   podScorecard: [

@@ -2,21 +2,26 @@
 
 import {
   AccountSnapshotCard,
-  CompanyMetricsCard,
   type AccountSnapshotRow,
 } from "@/components/calls/account-widget-cards";
-import type { Call } from "@/types";
+import { PostDcBantPanel } from "@/components/post-dc/post-dc-bant-panel";
+import type { PostCallReview } from "@/lib/brief-types";
+import type { BANTScore } from "@/types";
 import { cn } from "@/lib/cn";
 
 interface PostDcSidebarProps {
   accountSnapshot: AccountSnapshotRow[];
-  call: Call;
+  review: PostCallReview;
+  bant: BANTScore;
   className?: string;
 }
 
-export function PostDcSidebar({ accountSnapshot, call, className }: PostDcSidebarProps) {
-  const showMetrics = Boolean(call.annualRevenue || call.employeeCount || call.icpBucket);
-
+export function PostDcSidebar({
+  accountSnapshot,
+  review,
+  bant,
+  className,
+}: PostDcSidebarProps) {
   return (
     <aside
       className={cn(
@@ -25,8 +30,8 @@ export function PostDcSidebar({ accountSnapshot, call, className }: PostDcSideba
       )}
       aria-label="Post-DC account context"
     >
-      {accountSnapshot.length > 0 && <AccountSnapshotCard rows={accountSnapshot} />}
-      {showMetrics && <CompanyMetricsCard call={call} />}
+      <AccountSnapshotCard rows={accountSnapshot} />
+      <PostDcBantPanel bant={bant} review={review} />
     </aside>
   );
 }

@@ -230,6 +230,7 @@ export interface CallBrief {
 export interface PostCallReview {
   headline: string;
   summary: string[];
+  nextStepProposal?: string;
   researchSections?: BriefResearchSection[];
   podScorecard: {
     member: string;

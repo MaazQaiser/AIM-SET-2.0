@@ -1,6 +1,7 @@
 "use client";
 
-import { Brain, FilePlus2, FileSearch, Sparkles, Users } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Brain, FilePlus2, FileSearch, ListChecks, Sparkles, Users } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import {
@@ -20,6 +21,35 @@ import type {
   PostCallReview,
 } from "@/lib/brief-types";
 import { KbAttachmentCard } from "@/components/post-dc/kb-attachment-card";
+
+export function PostBeforeContextCard({ callId }: { callId: string }) {
+  return (
+    <BriefDetailCard title="Pre-call context" variant="highlight">
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        This is all that happened before the call — research, artifacts, and discovery questions from
+        the pre-call brief.
+      </p>
+      <Button asChild variant="outline" size="sm" className="mt-3 gap-1.5">
+        <Link href={`/calls/${callId}`}>
+          Open pre-call brief
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </Button>
+    </BriefDetailCard>
+  );
+}
+
+export function PostNextStepProposalCard({ proposal }: { proposal: string }) {
+  if (!proposal.trim()) return null;
+
+  return (
+    <BriefDetailCard title="Recommended next step" icon={ListChecks} variant="highlight">
+      <p className="text-sm font-medium text-foreground leading-relaxed whitespace-pre-wrap break-words">
+        {proposal}
+      </p>
+    </BriefDetailCard>
+  );
+}
 
 export function PostHeadlineCard({ headline }: { headline: string }) {
   return (

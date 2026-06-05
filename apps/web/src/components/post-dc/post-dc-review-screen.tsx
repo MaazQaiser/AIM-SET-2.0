@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, FileSpreadsheet } from "lucide-react";
-import { useCall, useCreateJiraTicket, usePostCallReview } from "@/lib/data/hooks";
+import { useCall, useCallBrief, useCreateJiraTicket, usePostCallReview } from "@/lib/data/hooks";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { LayoutControls } from "@/components/dashboard-grid/layout-controls";
@@ -14,6 +14,10 @@ import { PostDcPageLoader } from "@/components/layout/page-loaders";
 import { useLandingPage } from "@/lib/data/clp-hooks";
 import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import type { AccountSnapshotRow } from "@/components/calls/account-widget-cards";
+import { enrichCallBant } from "@/lib/bant/authority-from-lead";
+import { buildAccountSnapshot } from "@/lib/dc-data/build-account-snapshot";
+import { findPreDcRecordForCall } from "@/lib/dc-notes/build-from-import";
+import { preDcField } from "@/types/dc-notes";
 import { cn } from "@/lib/cn";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { sanitizeClientEmailDraft } from "@/lib/post-dc-client-email-safety";
@@ -48,7 +52,11 @@ export function PostDcReviewScreen({
   accountSnapshot = EMPTY_ACCOUNT_SNAPSHOT,
 }: PostDcReviewScreenProps) {
   const { data: call, isLoading: callLoading } = useCall(callId);
+  const { data: brief } = useCallBrief(callId);
   const { data: review, isLoading: reviewLoading } = usePostCallReview(callId);
+  const preRecord = useDcImportsStore((s) =>
+    findPreDcRecordForCall(s.preDcRecords, callId, call?.accountName)
+  );
   const { data: landingPage } = useLandingPage(callId);
   const createJiraTicket = useCreateJiraTicket(callId);
   const emailDraft = useDcImportsStore((s) => s.emailDraftsByCallId[callId]);
@@ -82,10 +90,13 @@ export function PostDcReviewScreen({
   const snapshot =
     accountSnapshot.length > 0
       ? accountSnapshot
-      : [
-          ...(call?.industry ? [{ label: "Industry", value: call.industry }] : []),
-          { label: "Deal stage", value: call?.dealStage ?? "Discovery" },
-        ];
+      : buildAccountSnapshot({ preRecord, call, includePlaceholder: true });
+
+  const resolvedBant = enrichCallBant(call?.bant, {
+    leadTitle:
+      call?.leadTitle ?? (preRecord ? preDcField(preRecord, "prospectPersona") : undefined),
+    clientAttendees: brief?.clientAttendees,
+  });
 
   const shellClass = embedded
     ? "p-4 space-y-4"
@@ -241,7 +252,11 @@ export function PostDcReviewScreen({
                     "lg:items-start"
                   )}
                 >
-                  <PostDcSidebar accountSnapshot={snapshot} call={call} />
+                  <PostDcSidebar
+                    accountSnapshot={snapshot}
+                    review={displayedReview}
+                    bant={resolvedBant}
+                  />
                   <div className="min-w-0">
                     <PostDcTabbedContent
                       callId={callId}
@@ -251,6 +266,7 @@ export function PostDcReviewScreen({
                       jiraTicket={displayedJiraTicket}
                       onCreateJiraTicket={handleCreateJiraTicket}
                       embedded={embedded}
+                      defaultTab={embedded ? "summary" : "before"}
                     />
                   </div>
                 </div>

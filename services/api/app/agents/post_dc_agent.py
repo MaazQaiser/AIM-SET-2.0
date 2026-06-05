@@ -1999,6 +1999,7 @@ def run_post_dc_pipeline(
     review = {
         "headline": str(summary_json.get("headline") or f"{account_name} post-call review"),
         "summary": summary_json.get("summary") if isinstance(summary_json.get("summary"), list) else [],
+        "nextStepProposal": str(summary_json.get("nextStepProposal") or "").strip(),
         "researchSections": _research_sections(post_dc_record),
         "podScorecard": scorecard,
         "learned": _learned(discovery_snapshot, post_dc_record),
