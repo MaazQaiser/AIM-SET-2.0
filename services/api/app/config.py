@@ -67,16 +67,15 @@ class Settings(BaseSettings):
 
     @property
     def llm_api_key(self) -> str:
-        return self.openai_api_key or self.anthropic_api_key
+        return self.anthropic_api_key
 
     @property
     def llm_configured(self) -> bool:
-        return bool(self.llm_api_key)
+        return bool(self.anthropic_api_key)
 
     @property
     def anthropic_configured(self) -> bool:
-        """LLM availability (OpenAI). Name kept for existing call sites."""
-        return self.llm_configured
+        return bool(self.anthropic_api_key)
 
     @property
     def supabase_configured(self) -> bool:

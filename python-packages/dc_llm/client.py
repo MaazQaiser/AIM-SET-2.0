@@ -4,7 +4,12 @@ import base64
 import os
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
+
+_LEGACY_MODEL_MAP = {
+    "claude-3-haiku-20240307": "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-20250514": "claude-sonnet-4-6",
+}
 
 
 @dataclass
@@ -17,29 +22,32 @@ class LlmCompletion:
     trace_id: str
 
 
-def resolve_openai_model(model: str) -> str:
-    """Map legacy Claude model ids from agent config to OpenAI models."""
+def resolve_llm_model(model: str) -> str:
+    """Map legacy agent model ids to current Anthropic model ids."""
     if model.startswith("gpt-"):
-        return model
-    lower = model.lower()
-    if "haiku" in lower:
-        return "gpt-4o-mini"
-    if "opus" in lower or "sonnet" in lower:
-        return "gpt-4o"
-    return "gpt-4o-mini"
+        lower = model.lower()
+        if "mini" in lower:
+            return "claude-haiku-4-5-20251001"
+        return "claude-sonnet-4-6"
+    return _LEGACY_MODEL_MAP.get(model, model)
+
+
+def resolve_openai_model(model: str) -> str:
+    """Backward-compatible alias; LLM calls now use Anthropic."""
+    return resolve_llm_model(model)
 
 
 class LlmClient:
-    """OpenAI wrapper with deterministic fallback when API key absent."""
+    """Anthropic wrapper with deterministic fallback when API key absent."""
 
     def __init__(self, api_key: Optional[str] = None) -> None:
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY", "")
+        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
 
     def complete(
         self,
         system: str,
         user: str,
-        model: str = "gpt-4o-mini",
+        model: str = "claude-haiku-4-5-20251001",
         max_tokens: int = 2048,
         fallback_model: Optional[str] = None,
     ) -> LlmCompletion:
@@ -54,8 +62,8 @@ class LlmClient:
                 trace_id=trace_id,
             )
 
-        resolved = resolve_openai_model(model)
-        result = self._call_openai(
+        resolved = resolve_llm_model(model)
+        result = self._call_anthropic(
             system=system,
             user=user,
             model=resolved,
@@ -65,11 +73,11 @@ class LlmClient:
         if result is not None:
             return result
 
-        if fallback_model and resolve_openai_model(fallback_model) != resolved:
-            result = self._call_openai(
+        if fallback_model and resolve_llm_model(fallback_model) != resolved:
+            result = self._call_anthropic(
                 system=system,
                 user=user,
-                model=resolve_openai_model(fallback_model),
+                model=resolve_llm_model(fallback_model),
                 max_tokens=max_tokens,
                 trace_id=trace_id,
             )
@@ -85,7 +93,7 @@ class LlmClient:
             trace_id=trace_id,
         )
 
-    def _call_openai(
+    def _call_anthropic(
         self,
         *,
         system: str,
@@ -95,22 +103,21 @@ class LlmClient:
         trace_id: str,
     ) -> Optional[LlmCompletion]:
         try:
-            from openai import OpenAI
+            from anthropic import Anthropic
 
-            client = OpenAI(api_key=self.api_key, timeout=120.0)
-            response = client.chat.completions.create(
+            client = Anthropic(api_key=self.api_key, timeout=120.0)
+            response = client.messages.create(
                 model=model,
                 max_tokens=max_tokens,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
+                system=system,
+                messages=[{"role": "user", "content": user}],
             )
-            choice = response.choices[0] if response.choices else None
-            text = (choice.message.content or "") if choice and choice.message else ""
+            text = "".join(
+                block.text for block in response.content if getattr(block, "type", None) == "text"
+            )
             usage = getattr(response, "usage", None)
-            tokens_in = getattr(usage, "prompt_tokens", 0) if usage else 0
-            tokens_out = getattr(usage, "completion_tokens", 0) if usage else 0
+            tokens_in = getattr(usage, "input_tokens", 0) if usage else 0
+            tokens_out = getattr(usage, "output_tokens", 0) if usage else 0
             return LlmCompletion(
                 text=text,
                 model=model,
@@ -127,7 +134,7 @@ class LlmClient:
         system: str,
         image_png_bytes: bytes,
         user_text: str = "Convert this slide to HTML/CSS.",
-        model: str = "gpt-4o",
+        model: str = "claude-sonnet-4-6",
         max_tokens: int = 4096,
         fallback_model: Optional[str] = None,
     ) -> LlmCompletion:
@@ -143,10 +150,10 @@ class LlmClient:
                 trace_id=trace_id,
             )
 
-        resolved = resolve_openai_model(model)
-        if resolved == "gpt-4o-mini":
-            resolved = "gpt-4o"
-        result = self._call_openai_vision(
+        resolved = resolve_llm_model(model)
+        if "haiku" in resolved.lower():
+            resolved = "claude-sonnet-4-6"
+        result = self._call_anthropic_vision(
             system=system,
             b64=b64,
             user_text=user_text,
@@ -158,11 +165,11 @@ class LlmClient:
             return result
 
         if fallback_model:
-            fb = resolve_openai_model(fallback_model)
-            if fb == "gpt-4o-mini":
-                fb = "gpt-4o"
+            fb = resolve_llm_model(fallback_model)
+            if "haiku" in fb.lower():
+                fb = "claude-sonnet-4-6"
             if fb != resolved:
-                result = self._call_openai_vision(
+                result = self._call_anthropic_vision(
                     system=system,
                     b64=b64,
                     user_text=user_text,
@@ -182,7 +189,7 @@ class LlmClient:
             trace_id=trace_id,
         )
 
-    def _call_openai_vision(
+    def _call_anthropic_vision(
         self,
         *,
         system: str,
@@ -193,31 +200,36 @@ class LlmClient:
         trace_id: str,
     ) -> Optional[LlmCompletion]:
         try:
-            from openai import OpenAI
+            from anthropic import Anthropic
 
-            client = OpenAI(api_key=self.api_key, timeout=120.0)
-            response = client.chat.completions.create(
+            client = Anthropic(api_key=self.api_key, timeout=120.0)
+            response = client.messages.create(
                 model=model,
                 max_tokens=max_tokens,
+                system=system,
                 messages=[
-                    {"role": "system", "content": system},
                     {
                         "role": "user",
                         "content": [
                             {
-                                "type": "image_url",
-                                "image_url": {"url": f"data:image/png;base64,{b64}"},
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": "image/png",
+                                    "data": b64,
+                                },
                             },
                             {"type": "text", "text": user_text},
                         ],
-                    },
+                    }
                 ],
             )
-            choice = response.choices[0] if response.choices else None
-            text = (choice.message.content or "") if choice and choice.message else ""
+            text = "".join(
+                block.text for block in response.content if getattr(block, "type", None) == "text"
+            )
             usage = getattr(response, "usage", None)
-            tokens_in = getattr(usage, "prompt_tokens", 0) if usage else 0
-            tokens_out = getattr(usage, "completion_tokens", 0) if usage else 0
+            tokens_in = getattr(usage, "input_tokens", 0) if usage else 0
+            tokens_out = getattr(usage, "output_tokens", 0) if usage else 0
             return LlmCompletion(
                 text=text,
                 model=model,
@@ -240,10 +252,10 @@ def _fallback_complete(system: str, user: str) -> str:
 
 def _estimate_cost(model: str, tokens_in: int, tokens_out: int) -> float:
     lower = model.lower()
-    if "gpt-4o" in lower and "mini" not in lower:
-        rate_in, rate_out = 2.5, 10.0
-    elif "gpt-4" in lower:
-        rate_in, rate_out = 10.0, 30.0
+    if "opus" in lower:
+        rate_in, rate_out = 15.0, 75.0
+    elif "sonnet" in lower:
+        rate_in, rate_out = 3.0, 15.0
     else:
-        rate_in, rate_out = 0.15, 0.6
+        rate_in, rate_out = 0.8, 4.0
     return (tokens_in * rate_in + tokens_out * rate_out) / 1_000_000

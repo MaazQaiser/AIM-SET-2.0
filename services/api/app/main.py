@@ -69,6 +69,8 @@ def health() -> Dict[str, object]:
         "status": "ok",
         "supabase_configured": settings.supabase_configured,
         "openai_configured": settings.openai_configured,
+        "anthropic_configured": settings.anthropic_configured,
+        "llm_configured": settings.llm_configured,
         "kb_ingest_sync": settings.kb_ingest_sync,
         "kb_shared_mode": settings.kb_shared_mode,
     }
