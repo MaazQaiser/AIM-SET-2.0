@@ -12,11 +12,11 @@ interface LiveCopilotHeaderProps {
   defaultOpen?: boolean;
 }
 
-export function LiveCopilotHeader({ checklist, defaultOpen = false }: LiveCopilotHeaderProps) {
+export function LiveCopilotHeader({ checklist, defaultOpen = true }: LiveCopilotHeaderProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="shrink-0 border-b border-border/60">
+    <div className="shrink-0 border-b border-border/60" data-testid="bant-live-section">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-3 px-5 py-2.5 text-left transition-colors hover:bg-muted/30"
@@ -34,6 +34,9 @@ export function LiveCopilotHeader({ checklist, defaultOpen = false }: LiveCopilo
           <Sparkles className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
           <span className="truncate text-[11px] font-semibold text-muted-foreground">
             Live copilot
+          </span>
+          <span className="truncate text-[11px] font-semibold text-foreground">
+            BANT live
           </span>
         </div>
         <BantLiveStatusBars checklist={checklist} />

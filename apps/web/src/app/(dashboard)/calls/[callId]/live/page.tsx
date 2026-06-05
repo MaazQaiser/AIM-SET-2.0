@@ -29,11 +29,6 @@ export default function LiveCallPage({ params }: LivePageParams) {
   const { data: call, isLoading: callLoading } = useCall(callId);
   const { data: brief } = useCallBrief(callId);
   const { data: postReview } = usePostCallReview(callId);
-
-  if ((!importsHydrated || callLoading) && !call) {
-    return <LiveCallPageLoader />;
-  }
-
   const transcript = useLiveCall((s) => s.transcript);
   const pendingNudges = useLiveCall((s) => s.pendingNudges);
   const elapsedSeconds = useLiveCall((s) => s.elapsedSeconds);
@@ -99,38 +94,42 @@ export default function LiveCallPage({ params }: LivePageParams) {
   const intentLabel =
     intentSnapshot?.intent?.display ?? intentSnapshot?.intent?.label;
 
+  if ((!importsHydrated || callLoading) && !call) {
+    return <LiveCallPageLoader />;
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <LiveCallWorkspace
-      callId={callId}
-      call={call}
-      brief={brief}
-      hasReview={Boolean(postReview)}
-      accountName={accountName}
-      leadName={leadName}
-      transcript={transcript}
-      keywords={keywords}
-      visibleNudges={visibleNudges}
-      objections={objections}
-      unansweredQuestions={unansweredQuestions}
-      suggestionLog={suggestionLog}
-      bantSignals={bantSignals}
-      checklist={checklistDisplay}
-      intentLabel={intentLabel}
-      intentSnapshot={intentSnapshot}
-      keywordStats={keywordStats}
-      sentimentAE={sentimentAE}
-      salesRepTone={salesRepTone}
-      sentimentCustomer={sentimentCustomer}
-      customerSentiment={customerSentiment}
-      sentimentShift={sentimentShift}
-      sentimentSignals={sentimentSignals}
-      elapsedSeconds={elapsedSeconds}
-      isConnected={isConnected}
-      activePanel={activePanel}
-      onPanelChange={setActivePanel}
-      onAcceptNudge={(id) => void handleAcceptNudge(id)}
-      onDismissNudge={(id) => void handleDismissNudge(id)}
+        callId={callId}
+        call={call}
+        brief={brief}
+        hasReview={Boolean(postReview)}
+        accountName={accountName}
+        leadName={leadName}
+        transcript={transcript}
+        keywords={keywords}
+        visibleNudges={visibleNudges}
+        objections={objections}
+        unansweredQuestions={unansweredQuestions}
+        suggestionLog={suggestionLog}
+        bantSignals={bantSignals}
+        checklist={checklistDisplay}
+        intentLabel={intentLabel}
+        intentSnapshot={intentSnapshot}
+        keywordStats={keywordStats}
+        sentimentAE={sentimentAE}
+        salesRepTone={salesRepTone}
+        sentimentCustomer={sentimentCustomer}
+        customerSentiment={customerSentiment}
+        sentimentShift={sentimentShift}
+        sentimentSignals={sentimentSignals}
+        elapsedSeconds={elapsedSeconds}
+        isConnected={isConnected}
+        activePanel={activePanel}
+        onPanelChange={setActivePanel}
+        onAcceptNudge={(id) => void handleAcceptNudge(id)}
+        onDismissNudge={(id) => void handleDismissNudge(id)}
       />
     </div>
   );

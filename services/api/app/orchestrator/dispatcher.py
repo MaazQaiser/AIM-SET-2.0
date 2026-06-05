@@ -472,16 +472,32 @@ class Orchestrator:
 
     def _log_run(self, ctx: TenantContext, envelope: Any) -> None:
         cost = envelope.cost if isinstance(envelope.cost, dict) else {}
-        get_agent_runs_repository().append_run(
-            ctx,
-            agent_id=envelope.agent,
-            operation=envelope.operation,
-            trace_id=envelope.trace_id,
-            cost_usd=float(cost.get("usd", 0) or 0),
-            tokens_used=int(cost.get("tokens", 0) or 0),
-            model_used=str(cost.get("model", "") or ""),
-        )
-        self._audit(ctx, envelope.agent, envelope.operation, envelope.trace_id)
+        try:
+            get_agent_runs_repository().append_run(
+                ctx,
+                agent_id=envelope.agent,
+                operation=envelope.operation,
+                trace_id=envelope.trace_id,
+                cost_usd=float(cost.get("usd", 0) or 0),
+                tokens_used=int(cost.get("tokens", 0) or 0),
+                model_used=str(cost.get("model", "") or ""),
+            )
+        except Exception:
+            _logger.exception(
+                "agent run log failed agent=%s operation=%s trace_id=%s",
+                envelope.agent,
+                envelope.operation,
+                envelope.trace_id,
+            )
+        try:
+            self._audit(ctx, envelope.agent, envelope.operation, envelope.trace_id)
+        except Exception:
+            _logger.exception(
+                "agent audit log failed agent=%s operation=%s trace_id=%s",
+                envelope.agent,
+                envelope.operation,
+                envelope.trace_id,
+            )
 
     def _audit(self, ctx: TenantContext, agent_id: str, action: str, trace_id: str) -> None:
         from datetime import datetime, timezone

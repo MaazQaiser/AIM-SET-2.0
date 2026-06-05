@@ -4,9 +4,17 @@ test.setTimeout(120_000);
 
 const RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const CALL_ID = `frontera-franchise-group-e2e-${RUN_ID}`;
+const ACCOUNT_NAME = `Frontera Franchise Group E2E ${RUN_ID}`;
 const API_BASE = process.env.PLAYWRIGHT_API_URL ?? "http://localhost:8000";
-const TENANT = "e2e-tenant";
-const USER = "e2e-user";
+const INTERNAL_SECRET =
+  process.env.PLAYWRIGHT_INTERNAL_SECRET ??
+  process.env.INTERNAL_SECRET ??
+  "change_me_to_a_long_random_string";
+const TENANT =
+  process.env.PLAYWRIGHT_TENANT_ID ??
+  process.env.NEXT_PUBLIC_AUTH_BYPASS_USER_ID ??
+  "local-dev-user";
+const USER = process.env.PLAYWRIGHT_USER_ID ?? TENANT;
 
 const KEY_SEGMENTS = [
   {
@@ -52,12 +60,44 @@ async function postDemoSegment(
   return body;
 }
 
+async function seedE2eCall(request: import("@playwright/test").APIRequestContext) {
+  const res = await request.post(`${API_BASE}/dc-notes/ingest`, {
+    headers: {
+      "X-Internal-Secret": INTERNAL_SECRET,
+      "x-user-id": USER,
+      "x-tenant-id": TENANT,
+    },
+    data: {
+      kind: "pre-dc",
+      records: [
+        {
+          id: `pre-${CALL_ID}`,
+          fields: {
+            "Company Name-PreDC": ACCOUNT_NAME,
+            "Lead Name-PreDC": "Marcus Rivera",
+            "Prospect's Persona": "Chief Financial Officer",
+            "Industry - PreDC": "Franchise operations",
+            "Campaign Service - PreDC": "AI operations platform",
+            "ICP Bucket": "Enterprise desirable",
+            "Annual Revenue - PreDC": "$180M",
+            "No. of Employees - PreDC": "950",
+            "Have they described their needs":
+              "Reduce manual compliance audits and standardize franchisee operations before a Q3 pilot.",
+          },
+        },
+      ],
+    },
+  });
+  expect(res.ok(), `seed call failed: ${res.status()} ${await res.text()}`).toBeTruthy();
+}
+
 test.describe.configure({ mode: "serial" });
 
 test.describe("Live call cockpit — DOM + API", () => {
   test.beforeAll(async ({ request }) => {
     const health = await request.get(`${API_BASE}/health`);
     expect(health.ok(), "API must be running on :8000 with DEMO_TRANSCRIPT_REPLAY=true").toBeTruthy();
+    await seedE2eCall(request);
   });
 
   test("BANT, checklist, intent, and keywords update in the UI", async ({ page, request }) => {
@@ -269,5 +309,189 @@ test.describe("Live call cockpit — DOM + API", () => {
     await expect(customerTile).toContainText(/Buying confidence|Engaged buyer/i);
     await expect(customerTile).not.toContainText(/[+-]\d+%\s+(concern|upbeat)/i);
     await expect(sentimentSignalsSection).toContainText(/Customer sentiment:\s*(Buying confidence|Engaged buyer)/i);
+  });
+
+  test("End & review saves live call summary for Post-DC analysis", async ({
+    page,
+    request,
+  }) => {
+    await page.goto(`/calls/${CALL_ID}/live`, { waitUntil: "domcontentloaded" });
+    await expect(page.locator(`a[href="/calls/${CALL_ID}"]`).first()).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByText("Connecting stream…")).toBeHidden({ timeout: 25_000 });
+
+    await postDemoSegment(request, {
+      text: "Budget is approved, the CFO owns the decision, and we need the Q3 pilot deadline captured for review.",
+      speaker_role: "customer",
+      offset_seconds: 240,
+    });
+    await postDemoSegment(request, {
+      text: "Please send the security architecture overview and CFO ROI one-pager, then schedule the Q3 pilot review with our CFO next week.",
+      speaker_role: "customer",
+      offset_seconds: 248,
+    });
+
+    const wrapUpResponse = page.waitForResponse(
+      (res) =>
+        res.url().includes(`/api/calls/${CALL_ID}/post-call`) &&
+        res.request().method() === "POST"
+    );
+    await page.getByRole("button", { name: /End & review/i }).click();
+    const res = await wrapUpResponse;
+    expect(res.ok(), `wrap-up failed: ${res.status()} ${await res.text()}`).toBeTruthy();
+
+    const body = (await res.json()) as {
+      agentInputs?: {
+        hasCallAgentHandoff?: boolean;
+        transcriptEventCount?: number;
+      };
+      call_agent_outputs?: {
+        operation?: string;
+        transcript?: { event_count?: number; full_text?: string };
+        transcript_summary?: { headline?: string; bullets?: string[] };
+        summary?: { transcript_segments?: number };
+        bant?: { status?: Record<string, string> };
+      };
+      review?: {
+        summary?: string[];
+        learned?: Array<{ label?: string; note?: string }>;
+        openDiscoveryGaps?: string[];
+        discoveryBantCoverage?: number;
+      };
+      task?: {
+        emailDraft?: {
+          status?: string;
+          subject?: string;
+          body_markdown?: string;
+          commitments_referenced?: string[];
+        };
+        clientEmailDraft?: {
+          status?: string;
+          body_markdown?: string;
+          commitments_referenced?: string[];
+        };
+        internalEmailDraft?: {
+          status?: string;
+          body_markdown?: string;
+          commitments_referenced?: string[];
+        };
+        taskList?: Array<{
+          task_type?: string;
+          owner?: string;
+          description?: string;
+          status?: string;
+        }>;
+      };
+      emailAttachments?: {
+        missing?: Array<{ name?: string; requiredData?: string }>;
+      };
+      jiraTicket?: {
+        summary?: string;
+        labels?: string[];
+        bantSnapshot?: Record<"budget" | "authority" | "need" | "timeline", boolean>;
+      } | null;
+    };
+    const handoff = body.call_agent_outputs;
+    const taskList = body.task?.taskList ?? [];
+    const taskText = taskList.map((task) => task.description ?? "").join(" ");
+    const clientDraft = body.task?.clientEmailDraft ?? body.task?.emailDraft;
+    const clientEmailText = [
+      clientDraft?.subject ?? "",
+      clientDraft?.body_markdown ?? "",
+      ...(clientDraft?.commitments_referenced ?? []),
+    ].join(" ");
+    const internalDraft = body.task?.internalEmailDraft;
+    const internalEmailText = [
+      internalDraft?.body_markdown ?? "",
+      ...(internalDraft?.commitments_referenced ?? []),
+    ].join(" ");
+    const reviewText = [
+      ...(body.review?.summary ?? []),
+      ...((body.review?.learned ?? []).map((item) => `${item.label ?? ""} ${item.note ?? ""}`)),
+    ].join(" ");
+    const missingContentText = (body.emailAttachments?.missing ?? [])
+      .map((item) => `${item.name ?? ""} ${item.requiredData ?? ""}`)
+      .join(" ");
+
+    expect(body.agentInputs?.hasCallAgentHandoff).toBe(true);
+    expect(body.agentInputs?.transcriptEventCount ?? 0).toBeGreaterThan(0);
+    expect(handoff?.operation).toBe("call_end_handoff");
+    expect(handoff?.transcript?.event_count ?? 0).toBeGreaterThan(0);
+    expect(handoff?.transcript?.full_text ?? "").toMatch(
+      /budget is approved|q3 pilot deadline|security architecture|cfo roi one-pager/i
+    );
+    expect(handoff?.transcript_summary?.headline ?? "").toMatch(/transcript segments captured/i);
+    expect(handoff?.summary?.transcript_segments ?? 0).toBeGreaterThan(0);
+    expect(handoff?.bant?.status?.budget).toMatch(/partial|confirmed/i);
+    expect(handoff?.bant?.status?.authority).toMatch(/partial|confirmed/i);
+    expect(handoff?.bant?.status?.timeline).toMatch(/partial|confirmed/i);
+    expect((body.review?.summary ?? []).join(" ")).toMatch(
+      /Dominant live-call intent|Focus areas|Transcript needs|Open discovery gaps/i
+    );
+    expect(reviewText).toMatch(/BANT|Budget|Authority|Need|Timeline|Q3 pilot|CFO/i);
+    expect(typeof body.review?.discoveryBantCoverage).toBe("number");
+
+    expect(clientDraft?.status).toBe("draft_pending_approval");
+    expect(clientEmailText).toMatch(/Minutes of meeting|What we committed to|security architecture|CFO ROI|Q3 pilot/i);
+    expect(clientEmailText).not.toMatch(/\bBANT\b|Open discovery gaps|internal|Jira/i);
+
+    expect(internalDraft?.status).toBe("draft_pending_approval");
+    expect(internalEmailText).toMatch(/BANT score|BANT details|Budget|Authority|Need|Timeline/i);
+    expect(internalEmailText).toMatch(/security architecture|CFO ROI|Q3 pilot|CFO/i);
+
+    expect(taskList.length).toBeGreaterThan(0);
+    expect(taskList.every((task) => task.status === "pending_approval")).toBe(true);
+    expect(taskText).toMatch(/follow-up email draft|security architecture|CFO ROI|Q3 pilot|CFO/i);
+    expect(missingContentText).toMatch(/security architecture|CFO ROI|Q3 pilot|CFO/i);
+
+    await expect(page).toHaveURL(new RegExp(`/calls/${CALL_ID}/post-dc\\?wrapped=1`), {
+      timeout: 30_000,
+    });
+    await expect(page.getByRole("heading", { name: /Post-DC review/i })).toBeVisible({
+      timeout: 30_000,
+    });
+
+    await page.getByRole("tab", { name: /Follow up/i }).click();
+    const followUpPanel = page.locator('[role="tabpanel"]:visible');
+    await expect(followUpPanel).toHaveCount(1);
+    const clientEmailCard = followUpPanel
+      .locator(".glass-insight-card")
+      .filter({ has: page.getByText("Follow-up Email", { exact: true }) });
+    await expect(clientEmailCard).toHaveCount(1);
+    await expect(clientEmailCard).toContainText(/Minutes of meeting/i);
+    await expect(clientEmailCard).toContainText(/What we committed to/i);
+    await expect(clientEmailCard).toContainText(/security architecture|CFO ROI|Q3 pilot/i);
+    await expect(clientEmailCard).not.toContainText(/\bBANT\b|Open discovery gaps|internal|Jira/i);
+
+    const internalEmailCard = followUpPanel
+      .locator(".glass-insight-card")
+      .filter({ has: page.getByText("Internal team email", { exact: true }) });
+    await expect(internalEmailCard).toHaveCount(1);
+    await expect(internalEmailCard).toContainText(/BANT score|BANT details/i);
+    await expect(internalEmailCard).toContainText(/Budget|Authority|Need|Timeline/i);
+    await expect(internalEmailCard).toContainText(/Next action items/i);
+    await expect(internalEmailCard).toContainText(/security architecture|CFO ROI|Q3 pilot|CFO/i);
+
+    await page.getByRole("tab", { name: /Actions/i }).click();
+    const actionsPanel = page.locator('[role="tabpanel"]:visible');
+    await expect(actionsPanel).toHaveCount(1);
+    await expect(actionsPanel).toContainText(/Task list/i);
+    await expect(actionsPanel).toContainText(/Pending/i);
+    await expect(actionsPanel).toContainText(/Follow-up|Content request|Schedule next meeting|Internal review/i);
+    await expect(actionsPanel).toContainText(/security architecture|CFO ROI|Q3 pilot|CFO/i);
+
+    const isBantQualified =
+      body.jiraTicket?.bantSnapshot &&
+      Object.values(body.jiraTicket.bantSnapshot).every((isConfirmed) => isConfirmed);
+    await page.getByRole("tab", { name: /Jira ticket/i }).click();
+    const jiraPanel = page.locator('[role="tabpanel"]:visible');
+    await expect(jiraPanel).toHaveCount(1);
+    await expect(jiraPanel).toContainText(/Jira ticket draft/i);
+    await expect(jiraPanel).toContainText(isBantQualified ? /BANT qualified/i : /BANT review needed/i);
+    await expect(jiraPanel).toContainText(/Budget/i);
+    await expect(jiraPanel).toContainText(/Authority/i);
+    await expect(jiraPanel).toContainText(/Need/i);
+    await expect(jiraPanel).toContainText(/Timeline/i);
   });
 });

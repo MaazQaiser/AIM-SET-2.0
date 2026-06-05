@@ -470,6 +470,12 @@ def test_end_live_call_preserves_live_outputs_for_post_dc(monkeypatch):
     assert post["agentInputs"]["transcriptEventCount"] == 1
     assert post["call_agent_outputs"]["bant"]["status"]["budget"] in ("partial", "confirmed")
 
+    saved_session = store.live_sessions["tenant-post-dc"][call_id]
+    assert saved_session["status"] == "ended"
+    assert saved_session["summary"]["operation"] == "call_end_handoff"
+    assert saved_session["summary"]["transcript"]["event_count"] == 1
+    assert saved_session["summary"]["summary"]["transcript_segments"] == 1
+
 
 def test_jira_route_fails_closed_when_unconfigured(monkeypatch):
     _clear_memory(monkeypatch)
