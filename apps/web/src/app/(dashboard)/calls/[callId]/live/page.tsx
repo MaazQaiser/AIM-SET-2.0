@@ -12,31 +12,26 @@ import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { seedChecklistFromCall } from "@/lib/discovery-checklist-seed";
 import { useCallUI } from "@/stores/use-call-ui";
 import { useLiveCall } from "@/stores/use-live-call";
+import type { CallBrief } from "@/lib/brief-types";
+import type { Call } from "@/types";
 import type { PodRole } from "@/types";
-import { use, useMemo } from "react";
+import { use, useCallback, useMemo } from "react";
 
 interface LivePageParams {
   params: Promise<{ callId: string }>;
 }
 
-export default function LiveCallPage({ params }: LivePageParams) {
-  const { callId } = use(params);
-  useLiveCallInit(callId);
-  useCallStream({ callId, enabled: Boolean(callId) });
+interface LiveCallPageContentProps {
+  callId: string;
+  call: Call;
+  brief?: CallBrief | null;
+  hasReview: boolean;
+}
 
+function LiveCallPageContent({ callId, call, brief, hasReview }: LiveCallPageContentProps) {
   const persona = usePersona();
-  const importsHydrated = useDcImportsStore((s) => s.importsHydrated);
-  const { data: call, isLoading: callLoading } = useCall(callId);
-  const { data: brief } = useCallBrief(callId);
-  const { data: postReview } = usePostCallReview(callId);
-
-  if ((!importsHydrated || callLoading) && !call) {
-    return <LiveCallPageLoader />;
-  }
-
   const transcript = useLiveCall((s) => s.transcript);
   const pendingNudges = useLiveCall((s) => s.pendingNudges);
-  const elapsedSeconds = useLiveCall((s) => s.elapsedSeconds);
   const dismissNudge = useLiveCall((s) => s.dismissNudge);
   const acceptNudge = useLiveCall((s) => s.acceptNudge);
   const intentSnapshot = useLiveCall((s) => s.intentSnapshot);
@@ -47,7 +42,6 @@ export default function LiveCallPage({ params }: LivePageParams) {
   const customerSentiment = useLiveCall((s) => s.customerSentiment);
   const sentimentShift = useLiveCall((s) => s.sentimentShift);
   const sentimentSignals = useLiveCall((s) => s.sentimentSignals);
-  const isConnected = useLiveCall((s) => s.isConnected);
   const objections = useLiveCall((s) => s.objections);
   const unansweredQuestions = useLiveCall((s) => s.unansweredQuestions);
   const suggestionLog = useLiveCall((s) => s.suggestionLog);
@@ -55,29 +49,35 @@ export default function LiveCallPage({ params }: LivePageParams) {
   const checklistState = useLiveCall((s) => s.checklistState);
   const { activePanel, setActivePanel } = useCallUI();
 
-  async function handleAcceptNudge(id: string) {
-    const nudge = pendingNudges.find((n) => n.id === id);
-    acceptNudge(id);
-    const sid = nudge?.suggestionId ?? id;
-    try {
-      await postSuggestionFeedback(callId, sid, "accepted");
-    } catch {
-      /* non-blocking */
-    }
-  }
+  const handleAcceptNudge = useCallback(
+    async (id: string) => {
+      const nudge = pendingNudges.find((n) => n.id === id);
+      acceptNudge(id);
+      const sid = nudge?.suggestionId ?? id;
+      try {
+        await postSuggestionFeedback(callId, sid, "accepted");
+      } catch {
+        /* non-blocking */
+      }
+    },
+    [acceptNudge, callId, pendingNudges]
+  );
 
-  async function handleDismissNudge(id: string) {
-    const nudge = pendingNudges.find((n) => n.id === id);
-    dismissNudge(id);
-    const sid = nudge?.suggestionId ?? id;
-    try {
-      await postSuggestionFeedback(callId, sid, "dismissed");
-    } catch {
-      /* non-blocking */
-    }
-  }
+  const handleDismissNudge = useCallback(
+    async (id: string) => {
+      const nudge = pendingNudges.find((n) => n.id === id);
+      dismissNudge(id);
+      const sid = nudge?.suggestionId ?? id;
+      try {
+        await postSuggestionFeedback(callId, sid, "dismissed");
+      } catch {
+        /* non-blocking */
+      }
+    },
+    [callId, dismissNudge, pendingNudges]
+  );
 
-  const checklistSeed = useMemo(() => (call ? seedChecklistFromCall(call) : null), [call]);
+  const checklistSeed = useMemo(() => seedChecklistFromCall(call), [call]);
   const checklistDisplay = checklistState ?? checklistSeed;
 
   const viewerRole: PodRole | null = persona === "leadership" ? null : "ae";
@@ -94,44 +94,69 @@ export default function LiveCallPage({ params }: LivePageParams) {
     return filterKeywordTerms([...fromTranscript, ...fromGlobal]);
   }, [transcript, keywordStats]);
 
-  const accountName = call?.accountName ?? "Live call";
-  const leadName = call?.leadName;
-  const intentLabel =
-    intentSnapshot?.intent?.display ?? intentSnapshot?.intent?.label;
+  const accountName = call.accountName ?? "Live call";
+  const leadName = call.leadName;
+  const intentLabel = intentSnapshot?.intent?.display ?? intentSnapshot?.intent?.label;
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <LiveCallWorkspace
+        callId={callId}
+        call={call}
+        brief={brief}
+        hasReview={hasReview}
+        accountName={accountName}
+        leadName={leadName}
+        transcript={transcript}
+        keywords={keywords}
+        visibleNudges={visibleNudges}
+        objections={objections}
+        unansweredQuestions={unansweredQuestions}
+        suggestionLog={suggestionLog}
+        bantSignals={bantSignals}
+        checklist={checklistDisplay}
+        intentLabel={intentLabel}
+        intentSnapshot={intentSnapshot}
+        keywordStats={keywordStats}
+        sentimentAE={sentimentAE}
+        salesRepTone={salesRepTone}
+        sentimentCustomer={sentimentCustomer}
+        customerSentiment={customerSentiment}
+        sentimentShift={sentimentShift}
+        sentimentSignals={sentimentSignals}
+        activePanel={activePanel}
+        onPanelChange={setActivePanel}
+        onAcceptNudge={(id) => void handleAcceptNudge(id)}
+        onDismissNudge={(id) => void handleDismissNudge(id)}
+      />
+    </div>
+  );
+}
+
+export default function LiveCallPage({ params }: LivePageParams) {
+  const { callId } = use(params);
+  useLiveCallInit(callId);
+  useCallStream({ callId, enabled: Boolean(callId) });
+
+  const importsHydrated = useDcImportsStore((s) => s.importsHydrated);
+  const { data: call, isLoading: callLoading } = useCall(callId);
+  const { data: brief } = useCallBrief(callId);
+  const { data: postReview } = usePostCallReview(callId);
+
+  if ((!importsHydrated || callLoading) && !call) {
+    return <LiveCallPageLoader />;
+  }
+
+  if (!call) {
+    return <LiveCallPageLoader />;
+  }
+
+  return (
+    <LiveCallPageContent
       callId={callId}
       call={call}
       brief={brief}
       hasReview={Boolean(postReview)}
-      accountName={accountName}
-      leadName={leadName}
-      transcript={transcript}
-      keywords={keywords}
-      visibleNudges={visibleNudges}
-      objections={objections}
-      unansweredQuestions={unansweredQuestions}
-      suggestionLog={suggestionLog}
-      bantSignals={bantSignals}
-      checklist={checklistDisplay}
-      intentLabel={intentLabel}
-      intentSnapshot={intentSnapshot}
-      keywordStats={keywordStats}
-      sentimentAE={sentimentAE}
-      salesRepTone={salesRepTone}
-      sentimentCustomer={sentimentCustomer}
-      customerSentiment={customerSentiment}
-      sentimentShift={sentimentShift}
-      sentimentSignals={sentimentSignals}
-      elapsedSeconds={elapsedSeconds}
-      isConnected={isConnected}
-      activePanel={activePanel}
-      onPanelChange={setActivePanel}
-      onAcceptNudge={(id) => void handleAcceptNudge(id)}
-      onDismissNudge={(id) => void handleDismissNudge(id)}
-      />
-    </div>
+    />
   );
 }

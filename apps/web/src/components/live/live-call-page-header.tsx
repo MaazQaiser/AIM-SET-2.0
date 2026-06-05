@@ -7,7 +7,9 @@ import { Badge } from "@dc-copilot/ui/components/badge";
 import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import { DemoTranscriptPlayer } from "@/components/live/demo-transcript-player";
 import { RecallBotLauncher } from "@/components/live/recall-bot-launcher";
+import { scoreToTone } from "@/lib/live/sentiment-display";
 import { cn } from "@/lib/cn";
+import { useLiveCall } from "@/stores/use-live-call";
 import type { Call } from "@/types";
 
 function formatElapsed(seconds: number) {
@@ -38,11 +40,7 @@ export interface LiveCallPageHeaderProps {
   call?: Call | null;
   accountName: string;
   leadName?: string;
-  elapsedSeconds: number;
-  isConnected: boolean;
   hasReview: boolean;
-  sentimentLabel: string;
-  sentimentTone: "positive" | "neutral" | "negative";
 }
 
 export function LiveCallPageHeader({
@@ -50,12 +48,18 @@ export function LiveCallPageHeader({
   call,
   accountName,
   leadName,
-  elapsedSeconds,
-  isConnected,
   hasReview,
-  sentimentLabel,
-  sentimentTone,
 }: LiveCallPageHeaderProps) {
+  const elapsedSeconds = useLiveCall((s) => s.elapsedSeconds);
+  const isConnected = useLiveCall((s) => s.isConnected);
+  const sentimentCustomer = useLiveCall((s) => s.sentimentCustomer);
+  const sentimentTone = scoreToTone(sentimentCustomer);
+  const sentimentLabel =
+    sentimentTone === "positive"
+      ? "Positive"
+      : sentimentTone === "negative"
+        ? "Cooling"
+        : "Neutral";
   return (
     <header className="sticky top-0 z-30 shrink-0 border-b border-border/50 bg-background/75 px-6 py-4 backdrop-blur-md sm:px-8">
       <div className="flex flex-wrap items-start justify-between gap-4">

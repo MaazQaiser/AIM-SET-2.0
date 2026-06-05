@@ -65,10 +65,7 @@ export function useLiveCallInit(callId: string) {
   const initialized = useRef(false);
   const setCallId = useLiveCall((s) => s.setCallId);
   const reset = useLiveCall((s) => s.reset);
-  const appendTranscriptEvent = useLiveCall((s) => s.appendTranscriptEvent);
-  const appendSuggestionLog = useLiveCall((s) => s.appendSuggestionLog);
-  const updateSentiment = useLiveCall((s) => s.updateSentiment);
-  const transcript = useLiveCall((s) => s.transcript);
+  const hydrateFromStoredSession = useLiveCall((s) => s.hydrateFromStoredSession);
 
   useEffect(() => {
     if (initialized.current) return;
@@ -88,27 +85,34 @@ export function useLiveCallInit(callId: string) {
           events?: Record<string, unknown>[];
           suggestions?: Record<string, unknown>[];
         };
-        for (const row of data.events ?? []) {
-          const event = mapStoredEvent(row);
-          appendTranscriptEvent(event);
-          if (event.sentiment) {
-            const score = sentimentScore(event.sentiment);
-            const current = useLiveCall.getState();
-            if (
-              event.speakerRole === "ae" ||
-              event.speakerRole === "se" ||
-              event.speakerRole === "designer"
-            ) {
-              updateSentiment(score, current.sentimentCustomer);
-            } else {
-              updateSentiment(current.sentimentAE, score);
-            }
+
+        const transcript = (data.events ?? []).map(mapStoredEvent);
+        const suggestionLog = (data.suggestions ?? [])
+          .map(mapSuggestionLog)
+          .filter((entry): entry is SuggestionLogEntry => entry != null);
+
+        let sentimentAE = 0;
+        let sentimentCustomer = 0;
+        for (const event of transcript) {
+          if (!event.sentiment) continue;
+          const score = sentimentScore(event.sentiment);
+          if (
+            event.speakerRole === "ae" ||
+            event.speakerRole === "se" ||
+            event.speakerRole === "designer"
+          ) {
+            sentimentAE = score;
+          } else {
+            sentimentCustomer = score;
           }
         }
-        for (const row of data.suggestions ?? []) {
-          const entry = mapSuggestionLog(row);
-          if (entry) appendSuggestionLog(entry);
-        }
+
+        hydrateFromStoredSession({
+          transcript,
+          suggestionLog,
+          sentimentAE,
+          sentimentCustomer,
+        });
       } catch {
         /* non-blocking — live stream is primary */
       }
@@ -119,7 +123,5 @@ export function useLiveCallInit(callId: string) {
       reset();
       initialized.current = false;
     };
-  }, [callId, reset, setCallId, appendTranscriptEvent, appendSuggestionLog, updateSentiment]);
-
-  return { transcript };
+  }, [callId, reset, setCallId, hydrateFromStoredSession]);
 }

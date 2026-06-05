@@ -60,6 +60,12 @@ interface LiveCallState {
   addObjection: (objection: ObjectionPayload) => void;
   addUnansweredQuestion: (q: UnansweredQuestionPayload) => void;
   appendSuggestionLog: (entry: SuggestionLogEntry) => void;
+  hydrateFromStoredSession: (payload: {
+    transcript: TranscriptEvent[];
+    suggestionLog: SuggestionLogEntry[];
+    sentimentAE: number;
+    sentimentCustomer: number;
+  }) => void;
   tickElapsed: () => void;
   reset: () => void;
 }
@@ -278,6 +284,14 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
       suggestionLog: upsertCapped(s.suggestionLog, entry, (item) => item.id, 50),
     }));
   },
+
+  hydrateFromStoredSession: ({ transcript, suggestionLog, sentimentAE, sentimentCustomer }) =>
+    set({
+      transcript: transcript.slice(-500),
+      suggestionLog: suggestionLog.slice(-50),
+      sentimentAE,
+      sentimentCustomer,
+    }),
 
   tickElapsed: () => set((s) => ({ elapsedSeconds: s.elapsedSeconds + 1 })),
 

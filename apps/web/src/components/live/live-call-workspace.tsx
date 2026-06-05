@@ -17,7 +17,6 @@ import { LiveCallPageHeader } from "@/components/live/live-call-page-header";
 import { LiveRunningSummaryBar } from "@/components/live/live-running-summary-bar";
 import { PostDcReviewScreen } from "@/components/post-dc/post-dc-review-screen";
 import { TranscriptViewer } from "@/components/transcript-viewer";
-import { scoreToTone } from "@/lib/live/sentiment-display";
 import type { CallBrief } from "@/lib/brief-types";
 import type { BantSignal, DiscoveryChecklistState } from "@dc-copilot/types";
 import type {
@@ -139,8 +138,6 @@ export interface LiveCallWorkspaceProps {
   customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
   sentimentSignals: SentimentSignal[];
-  elapsedSeconds: number;
-  isConnected: boolean;
   activePanel: string | null;
   onPanelChange: (panel: "transcript" | "signals" | "insights" | "chat" | "wrap-up") => void;
   onAcceptNudge: (id: string) => void;
@@ -171,21 +168,11 @@ export function LiveCallWorkspace({
   customerSentiment,
   sentimentShift,
   sentimentSignals,
-  elapsedSeconds,
-  isConnected,
   activePanel,
   onPanelChange,
   onAcceptNudge,
   onDismissNudge,
 }: LiveCallWorkspaceProps) {
-  const sentimentTone = scoreToTone(sentimentCustomer);
-  const sentimentLabel =
-    sentimentTone === "positive"
-      ? "Positive"
-      : sentimentTone === "negative"
-        ? "Cooling"
-        : "Neutral";
-
   const assistantFeed = useMemo(
     () =>
       buildAssistantFeed({
@@ -310,11 +297,7 @@ export function LiveCallWorkspace({
         call={call}
         accountName={accountName}
         leadName={leadName}
-        elapsedSeconds={elapsedSeconds}
-        isConnected={isConnected}
         hasReview={hasReview}
-        sentimentLabel={sentimentLabel}
-        sentimentTone={sentimentTone}
       />
 
       <div className="flex h-0 min-h-0 flex-1 flex-col gap-4 overflow-hidden px-6 pt-4 sm:px-8">
