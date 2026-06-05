@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -14,6 +15,8 @@ from app.domain.supabase_utils import execute_with_retry
 from app.domain.bant_authority import infer_authority_from_lead_title
 from app.domain.brief_summary_sections import apply_summary_titles_to_brief
 from app.domain.kb_tenancy import resolve_team_tenant
+
+_logger = logging.getLogger(__name__)
 
 
 def slugify_company(name: str) -> str:
@@ -29,6 +32,13 @@ def call_id_aliases(call_id: str) -> List[str]:
     else:
         aliases.append(f"call-{call_id}")
     return list(dict.fromkeys(aliases))
+
+
+def _fallback_clerk_key(ctx: TenantContext) -> str:
+    settings = get_settings()
+    if settings.kb_shared_mode:
+        return settings.kb_shared_tenant_key.strip() or "dc-copilot-shared"
+    return ctx.clerk_org_id or ctx.tenant_id or ctx.user_id or "local-dev"
 
 
 def _field_text(fields: Dict[str, Any], *keys: str) -> str:
@@ -176,6 +186,41 @@ class CallsService:
     def _read_tenant_keys(self, ctx: TenantContext) -> tuple[str, str]:
         return resolve_team_tenant(ctx, allow_memory_fallback=True)
 
+    def _resolve_post_review_tenant(self, ctx: TenantContext) -> tuple[str | None, str, bool]:
+        try:
+            tenant_uuid, clerk_key = resolve_team_tenant(ctx)
+            return tenant_uuid, clerk_key, True
+        except Exception as exc:
+            clerk_key = _fallback_clerk_key(ctx)
+            _logger.warning(
+                "tenant resolution failed for post-call review persistence; using memory fallback tenant_key=%s error=%s",
+                clerk_key,
+                exc,
+            )
+            return None, clerk_key, False
+
+    def _save_post_review_memory(self, clerk_key: str, call_id: str, payload: Dict[str, Any]) -> None:
+        store = get_memory_store()
+        store.save_post_review(clerk_key, call_id, payload)
+
+        aliases = set(call_id_aliases(call_id))
+        call = next((c for c in store.list_calls(clerk_key) if c.get("id") in aliases), None)
+        if call is None:
+            call = {
+                "id": call_id,
+                "accountName": (payload.get("review") or {}).get("headline") or call_id,
+                "status": "completed",
+                "briefReady": False,
+                "pod": [],
+            }
+        meta = call.get("metadata") or {}
+        if not isinstance(meta, dict):
+            meta = {}
+        meta["post_call"] = payload
+        call["metadata"] = meta
+        call["status"] = "completed"
+        store.upsert_calls(clerk_key, [call])
+
     def sync_from_dc_notes(self, ctx: TenantContext) -> List[Dict[str, Any]]:
         notes = self._dc.get_notes(ctx)
         calls = build_calls_from_pre_dc(notes["pre_dc_records"], notes["post_dc_records"])
@@ -317,16 +362,15 @@ class CallsService:
         supabase.table("calls").update({"brief_ready": True}).eq("tenant_id", tenant_uuid).eq("id", call_id).execute()
 
     def get_post_review(self, ctx: TenantContext, call_id: str) -> Optional[Dict[str, Any]]:
-        clerk_key = self._clerk_key(ctx)
+        tenant_uuid, clerk_key, tenant_resolved = self._resolve_post_review_tenant(ctx)
         for alias in call_id_aliases(call_id):
             cached = get_memory_store().get_post_review(clerk_key, alias)
             if cached:
                 return cached
 
-        if not get_settings().supabase_configured:
+        if not get_settings().supabase_configured or not tenant_resolved or not tenant_uuid:
             return None
 
-        tenant_uuid = self._tenant_uuid(ctx)
         supabase = get_supabase()
         for alias in call_id_aliases(call_id):
             try:
@@ -357,22 +401,12 @@ class CallsService:
         return None
 
     def save_post_review(self, ctx: TenantContext, call_id: str, payload: Dict[str, Any]) -> None:
-        clerk_key = self._clerk_key(ctx)
-        get_memory_store().save_post_review(clerk_key, call_id, payload)
+        tenant_uuid, clerk_key, tenant_resolved = self._resolve_post_review_tenant(ctx)
+        self._save_post_review_memory(clerk_key, call_id, payload)
 
-        if not get_settings().supabase_configured:
-            call = self.get_call(ctx, call_id)
-            if call:
-                meta = call.get("metadata") or {}
-                if not isinstance(meta, dict):
-                    meta = {}
-                meta["post_call"] = payload
-                call["metadata"] = meta
-                call["status"] = "completed"
-                get_memory_store().upsert_calls(clerk_key, [call])
+        if not get_settings().supabase_configured or not tenant_resolved or not tenant_uuid:
             return
 
-        tenant_uuid = self._tenant_uuid(ctx)
         supabase = get_supabase()
         meta: Dict[str, Any] = {}
         try:
@@ -389,13 +423,17 @@ class CallsService:
             rows = result.data or []
             if rows and isinstance(rows[0].get("metadata"), dict):
                 meta = rows[0]["metadata"]
-        except Exception:
-            call = self.get_call(ctx, call_id)
-            meta = (call or {}).get("metadata") or {}
-        if not isinstance(meta, dict):
-            meta = {}
-        meta["post_call"] = payload
-        supabase.table("calls").update({"metadata": meta, "status": "completed"}).eq("tenant_id", tenant_uuid).eq("id", call_id).execute()
+            if not isinstance(meta, dict):
+                meta = {}
+            meta["post_call"] = payload
+            supabase.table("calls").update({"metadata": meta, "status": "completed"}).eq("tenant_id", tenant_uuid).eq("id", call_id).execute()
+        except Exception as exc:
+            _logger.warning(
+                "post-call review Supabase persistence failed; memory copy retained tenant_key=%s call_id=%s error=%s",
+                clerk_key,
+                call_id,
+                exc,
+            )
 
     def save_live_signals(self, ctx: TenantContext, call_id: str, snapshot: Dict[str, Any]) -> None:
         clerk_key = self._clerk_key(ctx)

@@ -112,6 +112,42 @@ def test_dc_notes_shared_tenant_when_kb_shared_mode(monkeypatch):
     assert notes["pre_dc_records"][0]["id"] == "pre-shared"
 
 
+def test_dc_notes_get_notes_uses_memory_when_supabase_tenant_resolution_fails(monkeypatch):
+    from app.domain import dc_notes_repository as repo_module
+    from app.domain.memory_store import get_memory_store
+
+    class _SupabaseEnabledSettings:
+        supabase_configured = True
+        kb_shared_mode = True
+        kb_shared_tenant_key = "dc-copilot-shared"
+
+    def _raise_tenant_resolution(*_args, **_kwargs):
+        raise RuntimeError("tenant lookup unavailable")
+
+    store = get_memory_store()
+    store.pre_dc_records.pop("dc-copilot-shared", None)
+    store.post_dc_records.pop("dc-copilot-shared", None)
+    store.upsert_pre_dc_records(
+        "dc-copilot-shared",
+        [{"id": "pre-cached", "fields": {"Company Name-PreDC": "Cached Co"}}],
+    )
+
+    monkeypatch.setattr(repo_module, "get_settings", lambda: _SupabaseEnabledSettings())
+    monkeypatch.setattr(repo_module, "resolve_team_tenant", _raise_tenant_resolution)
+    monkeypatch.setattr(
+        repo_module,
+        "get_supabase",
+        lambda: (_ for _ in ()).throw(AssertionError("Supabase should not be used after tenant fallback")),
+    )
+
+    notes = get_dc_notes_repository().get_notes(
+        TenantContext(tenant_id="tenant-post-dc", user_id="user-post-dc")
+    )
+
+    assert notes["pre_dc_records"][0]["id"] == "pre-cached"
+    assert notes["post_dc_records"] == []
+
+
 def test_v1_calls_list_memory_fallback(monkeypatch):
     monkeypatch.setenv("INTERNAL_SECRET", SECRET)
     monkeypatch.delenv("SUPABASE_URL", raising=False)

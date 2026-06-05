@@ -6,6 +6,7 @@ from app.config import get_settings
 from app.domain.calls_service import CallsService
 from app.domain.dc_notes_repository import get_dc_notes_repository
 from app.domain.kb_tenancy import resolve_kb_tenant
+from app.domain.live_call_repository import get_live_call_repository
 from app.domain.memory_store import get_memory_store
 from app.main import app
 from app.orchestrator.dispatcher import Orchestrator
@@ -347,6 +348,39 @@ def test_post_call_route_persists_review(monkeypatch):
     assert fetched.json()["review"]["headline"] == body["review"]["headline"]
 
 
+def test_post_call_review_save_uses_memory_when_supabase_tenant_resolution_fails(monkeypatch):
+    _clear_memory(monkeypatch)
+    from app.domain import calls_service as calls_service_module
+
+    class _SupabaseEnabledSettings:
+        supabase_configured = True
+        kb_shared_mode = True
+        kb_shared_tenant_key = "dc-copilot-shared"
+
+    def _raise_tenant_resolution(*_args, **_kwargs):
+        raise RuntimeError("tenant lookup unavailable")
+
+    monkeypatch.setattr(calls_service_module, "get_settings", lambda: _SupabaseEnabledSettings())
+    monkeypatch.setattr(calls_service_module, "resolve_team_tenant", _raise_tenant_resolution)
+    monkeypatch.setattr(
+        calls_service_module,
+        "get_supabase",
+        lambda: (_ for _ in ()).throw(AssertionError("Supabase should not be used after tenant fallback")),
+    )
+
+    ctx = TenantContext(tenant_id="tenant-post-dc", user_id="user-post-dc")
+    payload = {"review": {"headline": "Review ready"}, "task": {"emailDraft": {"status": "draft_pending_approval"}}}
+
+    service = CallsService()
+    service.save_post_review(ctx, "call-post-agent", payload)
+
+    saved = service.get_post_review(ctx, "call-post-agent")
+    assert saved == payload
+    stored_call = get_memory_store().list_calls("dc-copilot-shared")[0]
+    assert stored_call["status"] == "completed"
+    assert stored_call["metadata"]["post_call"] == payload
+
+
 def test_live_call_inputs_flow_into_post_dc_review(monkeypatch):
     _clear_memory(monkeypatch)
     ctx = TenantContext(tenant_id="tenant-post-dc", user_id="user-post-dc")
@@ -597,6 +631,97 @@ def test_post_dc_replays_fragmented_live_bant_into_summary_and_follow_up(monkeyp
     assert missing_content_text.lower().find("implementation plan") != -1
     assert post["jiraTicket"] is not None
     assert all(post["jiraTicket"]["bantSnapshot"].values())
+
+
+def test_post_dc_replays_misattributed_recall_transcript_into_bant(monkeypatch):
+    _clear_memory(monkeypatch)
+    ctx = TenantContext(tenant_id="tenant-post-dc", user_id="user-post-dc")
+    call_id = "call-misattributed-recall"
+    account_name = "Misattributed Recall Co"
+    store = get_memory_store()
+    store.upsert_calls(
+        "tenant-post-dc",
+        [
+            {
+                "id": call_id,
+                "accountName": account_name,
+                "leadEmail": "buyer@example.com",
+                "status": "live",
+                "briefReady": False,
+                "pod": [],
+                "bant": {
+                    "budget": "unknown",
+                    "authority": "unknown",
+                    "need": "unknown",
+                    "timeline": "unknown",
+                },
+            }
+        ],
+    )
+    get_dc_notes_repository().upsert_pre_dc(
+        ctx,
+        [
+            {
+                "id": "pre-misattributed-recall",
+                "fields": {
+                    "Company Name-PreDC": account_name,
+                    "Have they described their needs": "Modernize legacy portal",
+                },
+            }
+        ],
+    )
+
+    repo = get_live_call_repository()
+    for idx, (text, offset) in enumerate(
+        [
+            ("i have budget around", 54),
+            ("400k", 59),
+            (
+                "and the deadline for our project timeline will be not more than three months",
+                62,
+            ),
+        ],
+        start=1,
+    ):
+        repo.append_transcript_event(
+            ctx,
+            call_id,
+            {
+                "id": f"seg-misattributed-{idx}",
+                "speaker_id": "100",
+                "speaker_name": "Sales Rep",
+                "speaker_role": "ae",
+                "text": text,
+                "offset_seconds": offset,
+                "provider": "recall",
+                "provider_event_id": f"seg-misattributed-{idx}",
+            },
+        )
+
+    # Simulate a restart or stale saved review: no live checklist remains, so wrap-up
+    # must repair BANT from the persisted completed transcript.
+    store.discovery_checklists.clear()
+
+    post = Orchestrator().dispatch_post_call(ctx, call_id)
+    review_text = " ".join(
+        [
+            *post["review"]["summary"],
+            *[f"{item['label']} {item['note']}" for item in post["review"]["learned"]],
+        ]
+    ).lower()
+    after = post["coaching"]["bantProgression"]["after"]
+
+    assert after["budget"] in ("partial", "confirmed")
+    assert after["timeline"] == "confirmed"
+    assert post["review"]["discoveryBantCoverage"] > 0
+    assert "Modernize legacy portal" not in post["review"]["summary"][0]
+    assert "400k" in post["review"]["summary"][0]
+    assert "bant coverage finished at 0%" not in review_text
+    assert "400k" in review_text
+    assert "not more than three months" in review_text
+    assert "timeline" not in post["review"]["openDiscoveryGaps"]
+    assert "400k" in post["task"]["internalEmailDraft"]["body_markdown"].lower()
+    assert "not more than three months" in post["task"]["clientEmailDraft"]["body_markdown"].lower()
 
 
 def test_jira_route_fails_closed_when_unconfigured(monkeypatch):

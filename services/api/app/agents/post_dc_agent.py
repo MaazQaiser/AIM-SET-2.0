@@ -752,8 +752,12 @@ def _summary_fallback(
     else:
         headline = f"{account_name} post-call review is ready."
 
+    primary_summary = (transcript_needs[0] if transcript_needs else "")
+    if not primary_summary and evidence_line:
+        primary_summary = f"Live call covered {evidence_line}."
+
     summary = [
-        (transcript_needs[0] if transcript_needs else "")
+        primary_summary
         or bottom_line
         or needs
         or f"The call centered on discovery for {account_name}.",
@@ -761,7 +765,7 @@ def _summary_fallback(
         if coverage is not None
         else "BANT coverage was captured from the discovery checklist.",
     ]
-    if evidence_line:
+    if evidence_line and not primary_summary.startswith("Live call covered "):
         summary.append("Discussion details: " + evidence_line + ".")
     if transcript_needs:
         summary.append("Transcript needs: " + " ".join(transcript_needs[:2]))
