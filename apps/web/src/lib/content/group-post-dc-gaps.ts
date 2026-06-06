@@ -1,6 +1,6 @@
 import type { PlannedArtifactType } from "@dc-copilot/types/brief";
 import type { PostDcContentGenerationGap } from "@/lib/data/hooks";
-import type { PreDcGenerationGroup } from "@/lib/content/group-pre-dc-gaps";
+import type { ContentGenerationLead, PreDcGenerationGroup } from "@/lib/content/group-pre-dc-gaps";
 import { resolveContextualGroupTitle } from "@/lib/content/suggestion-context";
 
 function inferArtifactType(name: string): PlannedArtifactType {
@@ -26,10 +26,24 @@ function buildGroupStudioHref(group: Omit<PreDcGenerationGroup, "studioHref">) {
   return `/content?tab=suggestions&${params.toString()}`;
 }
 
+function toPostDcContentGenerationLead(item: PostDcContentGenerationGap): ContentGenerationLead {
+  return {
+    id: item.id,
+    callId: item.callId,
+    accountName: item.accountName,
+    leadName: item.leadName,
+    industry: item.industry,
+    name: item.name,
+    type: item.type,
+    reason: item.reason,
+    neededFor: item.neededFor,
+  };
+}
+
 export function groupPostDcGaps(items: PostDcContentGenerationGap[]): PreDcGenerationGroup[] {
   const byDocument = new Map<
     string,
-    Omit<PreDcGenerationGroup, "studioHref" | "name"> & { name?: string; leads: PostDcContentGenerationGap[] }
+    Omit<PreDcGenerationGroup, "studioHref" | "name"> & { name?: string; leads: ContentGenerationLead[] }
   >();
 
   for (const item of items) {
@@ -43,14 +57,14 @@ export function groupPostDcGaps(items: PostDcContentGenerationGap[]): PreDcGener
         status: item.status,
         reason: item.reason,
         neededFor: item.neededFor,
-        leads: [item],
+        leads: [toPostDcContentGenerationLead(item)],
       });
       continue;
     }
 
     if (existing.leads.some((lead) => lead.callId === item.callId)) continue;
 
-    existing.leads.push(item);
+    existing.leads.push(toPostDcContentGenerationLead(item));
   }
 
   return [...byDocument.values()]
@@ -60,9 +74,7 @@ export function groupPostDcGaps(items: PostDcContentGenerationGap[]): PreDcGener
         if (accountCompare !== 0) return accountCompare;
         return (a.leadName ?? "").localeCompare(b.leadName ?? "");
       });
-      const resolvedTitle = resolveContextualGroupTitle(
-        leads as Parameters<typeof resolveContextualGroupTitle>[0]
-      );
+      const resolvedTitle = resolveContextualGroupTitle(leads);
       const resolved = {
         ...group,
         name: resolvedTitle.name || leads[0]?.name || "Content asset",

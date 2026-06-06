@@ -8,6 +8,7 @@ export interface ContentGap {
   topic: string;
   sourcedFrom: string;
   callId?: string;
+  studioProjectId?: string;
   status: ContentGapStatus;
   draftType: ContentGapDraftType;
 }

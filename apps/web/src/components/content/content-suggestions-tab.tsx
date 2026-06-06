@@ -35,6 +35,7 @@ import {
 import { groupPostDcGaps } from "@/lib/content/group-post-dc-gaps";
 import { attachKbMatchesToGroups } from "@/lib/content/suggestion-context";
 import { createProjectFromSuggestion } from "@/lib/content/create-project-from-suggestion";
+import { useContentPlan } from "@/lib/data/content-plan-hooks";
 import { useDismissContentGap, useResolveContentGap } from "@/lib/data/content-gaps-hooks";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -137,7 +138,9 @@ export function ContentSuggestionsTab() {
                     </p>
                   </div>
                   <Button asChild size="sm">
-                    <Link href={`/content/${gap.id}`}>Open in studio</Link>
+                    <Link href={gap.studioProjectId ? `/content/studio/${gap.studioProjectId}` : `/content/${gap.id}`}>
+                      Open in studio
+                    </Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -270,11 +273,31 @@ function ContentGenerationCard({
 }) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const dismissGap = useDismissContentGap();
   const resolveGap = useResolveContentGap();
   const primaryLead = group.leads[0];
   const gapKey = buildGapKey(group, primaryLead, source);
   const leadCount = group.leads.length;
+  const sourceArtifactId = group.id.startsWith("artifact:") ? group.id.slice("artifact:".length) : undefined;
+
+  const planInput = {
+    suggestionId: group.id,
+    title: group.name,
+    artifactType: group.type,
+    source,
+    generationReason: group.reason,
+    neededFor: group.neededFor,
+    industry: group.industryLabel,
+    leads: group.leads.map((lead) => ({
+      callId: lead.callId,
+      accountName: lead.accountName,
+      leadName: lead.leadName,
+      industry: lead.industry ?? group.industryLabel,
+    })),
+    kbAssetIds: (group.kbMatches ?? []).map((m) => m.id),
+  };
+  const { data: planPreview } = useContentPlan(expanded ? planInput : null);
 
   async function handleDismiss() {
     try {
@@ -298,6 +321,7 @@ function ContentGenerationCard({
       const projectId = await createProjectFromSuggestion({
         title: group.name,
         artifactType: group.type,
+        suggestionId: group.id,
         callId: primaryLead?.callId,
         gapId: gapKey,
         accountName: primaryLead?.accountName,
@@ -306,6 +330,9 @@ function ContentGenerationCard({
         neededFor: group.neededFor,
         industry: group.industryLabel,
         source,
+        leads: group.leads,
+        kbMatches: group.kbMatches,
+        sourceArtifactId,
       });
       router.push(`/content/studio/${projectId}?suggestionId=${encodeURIComponent(group.id)}`);
     } catch (err) {
@@ -402,6 +429,20 @@ function ContentGenerationCard({
           <span className="font-medium text-foreground">Needed for: </span>
           {group.neededFor}
         </p>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-xs text-muted-foreground"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? "Hide plan preview" : "Preview AI slide plan"}
+        </Button>
+
+        {expanded && planPreview?.suggestion_plan && (
+          <SuggestionPlanPreview plan={planPreview.suggestion_plan} />
+        )}
       </CardContent>
     </Card>
   );
@@ -425,6 +466,59 @@ function SuggestionKbMatches({
           </Button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function SuggestionPlanPreview({
+  plan,
+}: {
+  plan: import("@/types/content_studio").SuggestionPlan;
+}) {
+  const projects = plan.evidence?.projects ?? [];
+  const slides = plan.slide_plan ?? [];
+
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-muted/30 p-3">
+      {plan.plan_summary && (
+        <p className="text-xs leading-relaxed text-muted-foreground">{plan.plan_summary}</p>
+      )}
+      {projects.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-foreground">Matching projects</p>
+          <div className="flex flex-wrap gap-1.5">
+            {projects.map((proj) => (
+              <Badge key={proj.asset_id} variant="secondary" className="text-[10px] font-normal">
+                {proj.title}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+      {plan.template?.name && (
+        <p className="text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Default template: </span>
+          {plan.template.name}
+        </p>
+      )}
+      {slides.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-foreground">Proposed slides</p>
+          <ol className="space-y-1 text-xs text-muted-foreground">
+            {slides.map((slide) => (
+              <li key={slide.slide} className="flex flex-wrap items-center gap-1.5">
+                <span className="font-medium text-foreground">{slide.slide}. {slide.heading}</span>
+                {slide.mode === "reuse" && (
+                  <Badge variant="outline" className="h-5 text-[10px]">Reuse</Badge>
+                )}
+                {slide.mode === "hybrid" && (
+                  <Badge variant="outline" className="h-5 text-[10px]">Hybrid</Badge>
+                )}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
     </div>
   );
 }

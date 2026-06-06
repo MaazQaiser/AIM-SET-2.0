@@ -351,12 +351,14 @@ function messageText(message: Message): string {
   if (directText) return directText;
 
   const outline = slideOutlineText(content);
-  if (outline) {
+  const slidePlan = arrayField(content, "slide_plan").filter(isRecord);
+  const planOutline = slidePlan.length > 0 ? slideOutlineText({ slide_outline: slidePlan }) : "";
+  if (outline || planOutline) {
     const intro =
       stringField(content, "message") ||
       "Here is the proposed slide plan. Tell me what to change on any slide, or click Generate when it looks right.";
     const kbLines = kbMatchesText(content);
-    return [intro, kbLines, outline].filter(Boolean).join("\n\n");
+    return [intro, kbLines, planOutline || outline].filter(Boolean).join("\n\n");
   }
 
   const turnType = stringField(content, "turn_type") || message.turnType || "";
@@ -431,10 +433,15 @@ function slideOutlineText(content: Record<string, unknown>): string {
       const heading = stringField(item, "heading") || "Untitled";
       const body = stringField(item, "body");
       const visual = stringField(item, "visual");
+      const mode = stringField(item, "mode");
+      const evidence = stringField(item, "evidence") || stringField(item, "citation_source");
+      const modeLabel =
+        mode === "reuse" ? "[Reuse]" : mode === "hybrid" ? "[Hybrid]" : mode === "generate" ? "[Generate]" : "";
       return [
-        `${label}: ${heading}`,
+        `${label}${modeLabel ? ` ${modeLabel}` : ""}: ${heading}`,
         body ? `Body: ${body}` : "",
         visual ? `Visual: ${visual}` : "",
+        evidence ? `Evidence: ${evidence}` : "",
       ]
         .filter(Boolean)
         .join("\n");

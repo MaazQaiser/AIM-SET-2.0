@@ -2,6 +2,7 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { BookOpenCheck, ChevronLeft, Download, Eye, Plus, RotateCcw, Send, Sparkles } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
@@ -34,6 +35,8 @@ import type { StudioKbSaveFormat, StudioTurnResult } from "@/types/content_studi
 
 export default function StudioProjectPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = use(params);
+  const searchParams = useSearchParams();
+  void searchParams.get("suggestionId");
   const { data, refetch } = useStudioProject(projectId);
   const project = data?.project;
   const templates = useContentTemplates(project?.artifactType);
@@ -58,7 +61,15 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
   const latestHtml = previewHtml ?? data?.latestRevision?.html;
   const revisionId = previewRevisionId ?? data?.latestRevision?.id;
   const brief = (project?.brief ?? {}) as Record<string, unknown>;
-  const hasSuggestionContext = Boolean(brief.generation_reason || brief.needed_for || brief.asset_name);
+  const suggestionPlan = brief.suggestion_plan as import("@/types/content_studio").SuggestionPlan | undefined;
+  const planSlideCount =
+    suggestionPlan?.slide_plan?.length ??
+    (Array.isArray(brief.slide_outline) ? brief.slide_outline.length : 0);
+  const canGenerateDeck =
+    project?.artifactType !== "deck" || planSlideCount > 0 || Boolean(data?.messages?.length);
+  const hasSuggestionContext = Boolean(
+    brief.generation_reason || brief.needed_for || brief.asset_name || suggestionPlan
+  );
   const artifactLabel =
     project?.artifactType === "one_pager"
       ? "one-pager"
@@ -194,7 +205,7 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
         Knowledge Base
       </Link>
 
-      {!hideSuggestion && Boolean(brief.generation_reason || brief.asset_name) ? (
+      {!hideSuggestion && Boolean(brief.generation_reason || brief.asset_name || suggestionPlan) ? (
         <SuggestionContextBar brief={brief} onDismiss={() => setHideSuggestion(true)} />
       ) : null}
 
@@ -208,7 +219,7 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
         <div className="flex gap-2">
           <Button
             size="sm"
-            disabled={generateMut.isPending}
+            disabled={generateMut.isPending || !canGenerateDeck}
             onClick={() => void handleGenerateSlides()}
           >
             <Sparkles className="h-3 w-3 mr-1" />

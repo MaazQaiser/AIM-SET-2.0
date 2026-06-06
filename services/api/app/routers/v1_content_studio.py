@@ -46,6 +46,28 @@ class StudioMessageBody(BaseModel):
     generate: bool = False
 
 
+class ContentPlanLead(BaseModel):
+    callId: Optional[str] = None
+    call_id: Optional[str] = None
+    accountName: Optional[str] = None
+    account_name: Optional[str] = None
+    leadName: Optional[str] = None
+    lead_name: Optional[str] = None
+    industry: Optional[str] = None
+
+
+class ContentPlanBody(BaseModel):
+    suggestionId: str
+    title: str
+    artifactType: str = "deck"
+    source: str = "pre-dc"
+    generationReason: str = ""
+    neededFor: str = ""
+    industry: str = ""
+    leads: List[ContentPlanLead] = Field(default_factory=list)
+    kbAssetIds: List[str] = Field(default_factory=list)
+
+
 class ExportBody(BaseModel):
     revisionId: str
     format: str
@@ -314,6 +336,38 @@ def list_projects(ctx: TenantContext = Depends(get_tenant_context)) -> List[Dict
     return get_content_studio_repository().list_projects(ctx)
 
 
+@router.post("/plan")
+def build_content_plan(
+    body: ContentPlanBody,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    from app.agents.content_plan_agent import run_content_plan
+
+    artifact = body.artifactType.lower().replace("-", "_")
+    if artifact == "case_study":
+        artifact = "deck"
+    if artifact not in ARTIFACT_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid artifactType")
+
+    leads_payload = [lead.model_dump(exclude_none=True) for lead in body.leads]
+    try:
+        envelope = run_content_plan(
+            ctx,
+            suggestion_id=body.suggestionId,
+            title=body.title,
+            artifact_type=artifact,
+            source=body.source,
+            generation_reason=body.generationReason,
+            needed_for=body.neededFor,
+            industry=body.industry,
+            leads=leads_payload,
+            kb_asset_ids=body.kbAssetIds,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return envelope.model_dump()
+
+
 @router.post("/studio/projects")
 def create_project(
     body: CreateProjectBody,
@@ -482,6 +536,27 @@ def save_revision_to_kb(
         },
         kb_repo,
     )
+    from app.services.deck_assembly_service import store_revision_slide_sections
+
+    store_revision_slide_sections(ctx, str(result["asset"]["id"]), str(revision.get("html") or ""))
+
+    gap_id = (project.get("brief") or {}).get("gap_id")
+    if gap_id:
+        from app.domain.content_gaps_repository import get_content_gaps_repository
+
+        gap_repo = get_content_gaps_repository()
+        gap = gap_repo.get_gap(ctx, str(gap_id))
+        if gap:
+            gap_repo.patch_gap(
+                ctx,
+                str(gap["id"]),
+                {
+                    "status": "resolved",
+                    "kbAssetId": str(result["asset"]["id"]),
+                    "studioProjectId": project_id,
+                },
+            )
+
     result["format"] = fmt
     return result
 

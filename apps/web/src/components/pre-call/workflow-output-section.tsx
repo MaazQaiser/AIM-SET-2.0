@@ -49,7 +49,11 @@ export function WorkflowOutputSection({ brief }: WorkflowOutputSectionProps) {
       )}
 
       <BriefAISummary brief={brief} />
-      <BriefPreDeckPanel deck={brief.preDeck} />
+      <BriefPreDeckPanel
+        deck={brief.preDeck}
+        callId={brief.callId}
+        accountName={brief.accountName}
+      />
       <BriefArtifactsPanel brief={brief} />
       <BriefContentToGeneratePanel items={brief.contentToGenerate} />
     </section>

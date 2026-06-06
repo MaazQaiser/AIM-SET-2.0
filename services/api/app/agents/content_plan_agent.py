@@ -1,0 +1,401 @@
+from __future__ import annotations
+
+import json
+import re
+import uuid
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from dc_core.evidence import AgentEnvelope, Citation, validate_envelope
+from dc_core.tenancy import TenantContext
+from dc_llm.client import LlmClient
+
+from app.agents.content_generation_agent import (
+    _pick_default_templates,
+    _retrieve_studio_kb_hits,
+    load_prompt,
+)
+from app.agents.relevant_content import build_relevant_content
+from app.config import get_settings
+from app.domain.content_studio_repository import ContentStudioRepository, get_content_studio_repository
+from app.domain.kb_repository import get_kb_repository
+from app.domain.kb_tenancy import resolve_kb_tenant
+from app.services.deck_assembly_service import slide_plan_to_outline
+
+PROMPTS_ROOT = Path(__file__).resolve().parents[4] / "prompts"
+
+
+def _normalize_leads(leads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for lead in leads:
+        if not isinstance(lead, dict):
+            continue
+        out.append(
+            {
+                "call_id": str(lead.get("call_id") or lead.get("callId") or "").strip(),
+                "account_name": str(lead.get("account_name") or lead.get("accountName") or "").strip(),
+                "lead_name": str(lead.get("lead_name") or lead.get("leadName") or "").strip(),
+                "industry": str(lead.get("industry") or "").strip(),
+            }
+        )
+    return out
+
+
+def _dedupe_evidence_projects(projects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen: set[str] = set()
+    out: List[Dict[str, Any]] = []
+    for item in projects:
+        asset_id = str(item.get("assetId") or item.get("asset_id") or item.get("id") or "")
+        key = asset_id or str(item.get("title") or "")
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(
+            {
+                "asset_id": asset_id or key,
+                "title": str(item.get("title") or "Project"),
+                "source": str(item.get("source") or "project_database"),
+                "snippet": str(item.get("summary") or item.get("snippet") or "")[:280],
+                "score": float(item.get("relevanceScore") or item.get("score") or 0),
+            }
+        )
+    return out[:8]
+
+
+def _kb_assets_payload(hits: List[Dict[str, Any]], ctx: TenantContext) -> List[Dict[str, Any]]:
+    kb_repo = get_kb_repository()
+    tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+    out: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for hit in hits:
+        asset_id = str(hit.get("asset_id") or "").strip()
+        if not asset_id or asset_id in seen:
+            continue
+        seen.add(asset_id)
+        row = kb_repo.get_asset_row(tenant_uuid, asset_id, clerk_key)
+        out.append(
+            {
+                "asset_id": asset_id,
+                "title": str(hit.get("title") or hit.get("asset_title") or (row or {}).get("title") or "KB document"),
+                "snippet": str(hit.get("chunk_text") or hit.get("snippet") or "")[:280],
+                "slide_count": int((row or {}).get("preview_slide_count") or 0),
+                "score": float(hit.get("score") or 0),
+            }
+        )
+    return out[:8]
+
+
+def _heuristic_slide_plan(
+    *,
+    title: str,
+    artifact_type: str,
+    generation_reason: str,
+    needed_for: str,
+    leads: List[Dict[str, Any]],
+    evidence_projects: List[Dict[str, Any]],
+    evidence_kb: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    lead_count = len(leads) or 1
+    industries = sorted({l.get("industry") for l in leads if l.get("industry")})
+    industry_label = industries[0] if len(industries) == 1 else (industries[0] if industries else "")
+
+    data_points: List[str] = []
+    if generation_reason:
+        data_points.append(generation_reason)
+    if needed_for:
+        data_points.append(needed_for)
+    for lead in leads[:4]:
+        account = lead.get("account_name") or ""
+        if account:
+            data_points.append(f"{account} needs this asset")
+
+    evidence_refs: List[str] = []
+    for proj in evidence_projects[:2]:
+        evidence_refs.append(f"project:{proj['asset_id']}")
+    for kb in evidence_kb[:2]:
+        evidence_refs.append(f"kb:{kb['asset_id']}")
+
+    plan: List[Dict[str, Any]] = [
+        {
+            "slide": 1,
+            "heading": title,
+            "body": f"Frame why this {artifact_type.replace('_', ' ')} matters for {lead_count} lead{'s' if lead_count != 1 else ''}.",
+            "intent": needed_for or generation_reason or "Set context for the buyer conversation",
+            "visual": "Account or industry hero visual",
+            "mode": "generate",
+            "evidence_refs": evidence_refs[:2],
+            "data_points": data_points[:3],
+        }
+    ]
+
+    slot = 2
+    for idx, proj in enumerate(evidence_projects[:2]):
+        plan.append(
+            {
+                "slide": slot,
+                "heading": str(proj.get("title") or "Relevant project proof")[:72],
+                "body": str(proj.get("snippet") or "Show measurable outcomes from a similar engagement."),
+                "intent": "Ground the story in project database evidence",
+                "visual": "Case metrics or customer logo",
+                "mode": "generate",
+                "evidence_refs": [f"project:{proj['asset_id']}"],
+                "data_points": [str(proj.get("snippet") or "")[:120]],
+            }
+        )
+        slot += 1
+
+    reuse_candidate = next((kb for kb in evidence_kb if int(kb.get("slide_count") or 0) >= 3), None)
+    if reuse_candidate and artifact_type == "deck":
+        plan.append(
+            {
+                "slide": slot,
+                "heading": str(reuse_candidate.get("title") or "Proven vertical slide")[:72],
+                "body": "Reuse an approved slide from the knowledge base.",
+                "intent": "Leverage existing vertical content",
+                "visual": "Existing deck slide",
+                "mode": "reuse",
+                "evidence_refs": [f"kb:{reuse_candidate['asset_id']}"],
+                "data_points": [str(reuse_candidate.get("snippet") or "")[:120]],
+                "reuse": {
+                    "source_asset_id": reuse_candidate["asset_id"],
+                    "source_slide_index": 3,
+                    "source_vertical": industry_label or "Knowledge base",
+                    "rationale": "Strong existing slide matches the suggested topic",
+                },
+            }
+        )
+        slot += 1
+    elif evidence_kb:
+        kb = evidence_kb[0]
+        plan.append(
+            {
+                "slide": slot,
+                "heading": "Knowledge base proof point",
+                "body": str(kb.get("snippet") or "Supporting evidence from the content library."),
+                "intent": "Cite approved internal content",
+                "visual": "Proof chart or quote",
+                "mode": "generate",
+                "evidence_refs": [f"kb:{kb['asset_id']}"],
+                "data_points": [str(kb.get("snippet") or "")[:120]],
+            }
+        )
+        slot += 1
+
+    plan.append(
+        {
+            "slide": slot,
+            "heading": "Recommended next steps",
+            "body": "Summarize the path forward and the decision the buyer should make.",
+            "intent": "Close with clear next actions",
+            "visual": "Timeline or checklist",
+            "mode": "generate",
+            "evidence_refs": evidence_refs[:1],
+            "data_points": [f"Prepared for {lead_count} upcoming conversation{'s' if lead_count != 1 else ''}"],
+        }
+    )
+    return plan
+
+
+def _parse_llm_plan(raw: str) -> Optional[Dict[str, Any]]:
+    text = raw.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if not match:
+            return None
+        try:
+            data = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(data, dict):
+        return None
+    slides = data.get("slide_plan")
+    if not isinstance(slides, list) or not slides:
+        return None
+    return data
+
+
+def run_content_plan(
+    ctx: TenantContext,
+    *,
+    suggestion_id: str,
+    title: str,
+    artifact_type: str,
+    source: str,
+    generation_reason: str,
+    needed_for: str,
+    industry: str = "",
+    leads: Optional[List[Dict[str, Any]]] = None,
+    kb_asset_ids: Optional[List[str]] = None,
+    repo: Optional[ContentStudioRepository] = None,
+) -> AgentEnvelope:
+    """Build a proactive SuggestionPlan from leads, project DB, KB, and templates."""
+    repo = repo or get_content_studio_repository()
+    settings = get_settings()
+    normalized_leads = _normalize_leads(leads or [])
+    lead_count = len(normalized_leads) or 1
+
+    query_parts = [title, generation_reason, needed_for, industry]
+    for lead in normalized_leads[:6]:
+        query_parts.extend([lead.get("account_name", ""), lead.get("industry", "")])
+    query = " ".join(p for p in query_parts if p).strip()
+
+    evidence_projects: List[Dict[str, Any]] = []
+    for lead in normalized_leads[:4]:
+        research = {
+            "needs": generation_reason,
+            "industry": lead.get("industry") or industry,
+            "intersection": needed_for,
+            "campaign_service": title,
+        }
+        bundle = build_relevant_content(ctx, lead.get("account_name") or title, research, limit=10)
+        evidence_projects.extend(_dedupe_evidence_projects(bundle.get("relevantProjects") or []))
+    evidence_projects = _dedupe_evidence_projects(evidence_projects)
+
+    kb_hits = _retrieve_studio_kb_hits(ctx, query)
+    if kb_asset_ids:
+        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+        kb_repo = get_kb_repository()
+        existing_ids = {str(h.get("asset_id")) for h in kb_hits}
+        for asset_id in kb_asset_ids:
+            if asset_id in existing_ids:
+                continue
+            row = kb_repo.get_asset_row(tenant_uuid, asset_id, clerk_key)
+            if row:
+                kb_hits.insert(
+                    0,
+                    {
+                        "asset_id": asset_id,
+                        "title": row.get("title"),
+                        "chunk_text": "",
+                        "score": 0.95,
+                    },
+                )
+
+    evidence_kb = _kb_assets_payload(kb_hits, ctx)
+
+    brief_stub = {
+        "needed_for": needed_for,
+        "generation_reason": generation_reason,
+        "asset_name": title,
+        "industry": industry,
+        "content_context": needed_for or generation_reason,
+    }
+    project_stub = {"artifactType": artifact_type, "title": title}
+    best_template, recommendations = _pick_default_templates(ctx, repo, project_stub, brief_stub, title)
+
+    slide_plan = _heuristic_slide_plan(
+        title=title,
+        artifact_type=artifact_type,
+        generation_reason=generation_reason,
+        needed_for=needed_for,
+        leads=normalized_leads,
+        evidence_projects=evidence_projects,
+        evidence_kb=evidence_kb,
+    )
+    plan_summary = (
+        f"Planned {len(slide_plan)} slides for {lead_count} lead{'s' if lead_count != 1 else ''}. "
+        f"Grounded in {len(evidence_projects)} project record{'s' if len(evidence_projects) != 1 else ''} "
+        f"and {len(evidence_kb)} KB asset{'s' if len(evidence_kb) != 1 else ''}."
+    )
+
+    model_name = "rule-based-plan"
+    cost_usd = 0.0
+    tokens = 0
+
+    if settings.llm_api_key or settings.openai_configured:
+        system = load_prompt("content/plan/v1.0.0.md")
+        user_payload = json.dumps(
+            {
+                "title": title,
+                "artifact_type": artifact_type,
+                "generation_reason": generation_reason,
+                "needed_for": needed_for,
+                "industry": industry,
+                "lead_count": lead_count,
+                "leads": normalized_leads,
+                "evidence_projects": evidence_projects,
+                "evidence_kb": evidence_kb,
+                "template": {
+                    "template_id": (best_template or {}).get("id"),
+                    "name": (best_template or {}).get("name"),
+                },
+            },
+            indent=2,
+        )
+        try:
+            completion = LlmClient(api_key=settings.llm_api_key or None).complete(
+                system=system,
+                user=user_payload,
+                max_tokens=2048,
+            )
+            parsed = _parse_llm_plan(completion.text)
+            if parsed and isinstance(parsed.get("slide_plan"), list):
+                slide_plan = parsed["slide_plan"]
+                plan_summary = str(parsed.get("plan_summary") or plan_summary)
+            model_name = completion.model
+            cost_usd = completion.cost_usd
+            tokens = completion.tokens_in + completion.tokens_out
+        except Exception:
+            pass
+
+    suggestion_plan: Dict[str, Any] = {
+        "suggestion_id": suggestion_id,
+        "source": source,
+        "generation_reason": generation_reason,
+        "needed_for": needed_for,
+        "lead_count": lead_count,
+        "leads": normalized_leads,
+        "industry": industry,
+        "artifact_type": artifact_type,
+        "title": title,
+        "plan_summary": plan_summary,
+        "evidence": {
+            "projects": evidence_projects,
+            "kb_assets": evidence_kb,
+        },
+        "template": {
+            "template_id": str((best_template or {}).get("id") or ""),
+            "name": str((best_template or {}).get("name") or ""),
+            "rationale": recommendations[0]["rationale"] if recommendations else "",
+        },
+        "recommended_templates": recommendations,
+        "slide_plan": slide_plan,
+    }
+
+    citations: List[Citation] = []
+    for proj in evidence_projects[:3]:
+        citations.append(
+            Citation(
+                source_type="project_database",
+                source_id=str(proj["asset_id"]),
+                snippet=str(proj.get("snippet") or "")[:200],
+                confidence=float(proj.get("score") or 0.8),
+            )
+        )
+    for kb in evidence_kb[:3]:
+        citations.append(
+            Citation(
+                source_type="kb_document",
+                source_id=str(kb["asset_id"]),
+                snippet=str(kb.get("snippet") or "")[:200],
+                confidence=float(kb.get("score") or 0.85),
+            )
+        )
+
+    envelope = AgentEnvelope(
+        agent="content_plan",
+        operation="content_plan",
+        result={"suggestion_plan": suggestion_plan, "slide_outline": slide_plan_to_outline(slide_plan)},
+        citations=citations,
+        confidence=0.88 if evidence_projects or evidence_kb else 0.72,
+        cost={"tokens": tokens, "usd": cost_usd, "model": model_name},
+        trace_id=str(uuid.uuid4()),
+        creative=True,
+    )
+    validate_envelope(envelope)
+    return envelope

@@ -481,6 +481,29 @@ class KbRepository:
                     if chunk_count is not None:
                         asset["chunkCount"] = chunk_count
 
+    def update_asset_metadata(
+        self,
+        tenant_id: str,
+        asset_id: str,
+        metadata: Dict[str, Any],
+        *,
+        clerk_key: Optional[str] = None,
+    ) -> None:
+        settings = get_settings()
+        if settings.supabase_configured:
+            try:
+                supabase = get_supabase()
+                supabase.table("kb_assets").update({"metadata": metadata}).eq("tenant_id", tenant_id).eq("id", asset_id).execute()
+                return
+            except Exception:
+                pass
+
+        if clerk_key:
+            for asset in get_memory_store().kb_assets.get(clerk_key, []):
+                if asset["id"] == asset_id:
+                    asset["metadata"] = metadata
+                    return
+
     def delete_chunks_for_asset(self, tenant_id: str, asset_id: str, clerk_key: Optional[str] = None) -> None:
         settings = get_settings()
         if settings.supabase_configured:
@@ -661,6 +684,7 @@ class KbRepository:
                     "file_name": fname,
                     "mime_type": asset.get("mimeType"),
                     "status": asset.get("status", "ready"),
+                    "metadata": asset.get("metadata") or {},
                 }
         return None
 
