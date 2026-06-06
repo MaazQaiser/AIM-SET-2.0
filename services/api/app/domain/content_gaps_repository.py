@@ -46,7 +46,7 @@ class ContentGapsRepository:
         *,
         status: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        tenant_uuid, clerk_key = self._tenants.resolve(ctx)
+        tenant_uuid, clerk_key = self._tenants.resolve(ctx, allow_memory_fallback=True)
         settings = get_settings()
         if settings.supabase_configured:
             try:
@@ -85,7 +85,7 @@ class ContentGapsRepository:
         needed_for: Optional[str] = None,
         priority: int = 2,
     ) -> Dict[str, Any]:
-        tenant_uuid, clerk_key = self._tenants.resolve(ctx)
+        tenant_uuid, clerk_key = self._tenants.resolve(ctx, allow_memory_fallback=True)
         existing = self._find_by_key(ctx, gap_key)
         if existing and existing.get("status") in ("resolved", "dismissed"):
             return existing
@@ -138,7 +138,7 @@ class ContentGapsRepository:
         if not resolved:
             return None
         gap_id = str(resolved["id"])
-        tenant_uuid, clerk_key = self._tenants.resolve(ctx)
+        tenant_uuid, clerk_key = self._tenants.resolve(ctx, allow_memory_fallback=True)
         db_patch: Dict[str, Any] = {"updated_at": _now_iso()}
         if "status" in patch:
             db_patch["status"] = patch["status"]

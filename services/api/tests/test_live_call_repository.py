@@ -167,6 +167,98 @@ def test_live_call_repository_writes_supabase_rows_against_call(monkeypatch):
     assert transcript_update["payload"]["signal_type"] == "objection_raised"
 
 
+def test_list_transcript_events_merges_supabase_rows_with_memory(monkeypatch):
+    from app.domain import live_call_repository as repo_module
+
+    fake_supabase = _FakeSupabase()
+    tenant_uuid = "00000000-0000-0000-0000-000000000789"
+    clerk_key = "clerk-live-merge-test"
+    call_id = "call-live-merge"
+    ctx = TenantContext(tenant_id="org-live", user_id="u1", clerk_org_id="org-live")
+
+    store = get_memory_store()
+    store.transcript_events.pop(clerk_key, None)
+
+    fake_supabase.select_rows["call_transcript_events"] = [
+        {
+            "id": "segment-need",
+            "call_id": call_id,
+            "speaker_id": "prospect",
+            "speaker_name": "prospect",
+            "speaker_role": "ae",
+            "text": "we need a custom ERP for onboarding automation",
+            "offset_seconds": 49,
+            "provider": "demo",
+            "provider_event_id": "event-need",
+            "created_at": "2026-06-06T18:23:07+00:00",
+        },
+        {
+            "id": "segment-authority",
+            "call_id": call_id,
+            "speaker_id": "prospect",
+            "speaker_name": "prospect",
+            "speaker_role": "ae",
+            "text": "the CFO owns approval and can approve it",
+            "offset_seconds": 66,
+            "provider": "demo",
+            "provider_event_id": "event-authority",
+            "created_at": "2026-06-06T18:23:50+00:00",
+        },
+        {
+            "id": "segment-next-step",
+            "call_id": call_id,
+            "speaker_id": "prospect",
+            "speaker_name": "prospect",
+            "speaker_role": "ae",
+            "text": "please send the implementation proposal and schedule the review next week",
+            "offset_seconds": 74,
+            "provider": "demo",
+            "provider_event_id": "event-next-step",
+            "created_at": "2026-06-06T18:24:09+00:00",
+        },
+    ]
+    store.transcript_events[clerk_key] = {
+        call_id: [
+            {
+                "id": "segment-need-local",
+                "call_id": call_id,
+                "speaker_id": "prospect",
+                "speaker_name": "prospect",
+                "speaker_role": "ae",
+                "text": "we need a custom ERP for onboarding automation",
+                "offset_seconds": 49,
+                "provider": "demo",
+                "provider_event_id": "event-need",
+                "created_at": "2026-06-06T18:23:07+00:00",
+            },
+            {
+                "id": "segment-engagement",
+                "call_id": call_id,
+                "speaker_id": "prospect",
+                "speaker_name": "prospect",
+                "speaker_role": "ae",
+                "text": "we want a fixed cost software engineering engagement",
+                "offset_seconds": 70,
+                "keywords": ["fixed", "software", "engineering"],
+                "provider": "demo",
+                "provider_event_id": "event-engagement",
+                "created_at": "2026-06-06T18:24:00+00:00",
+            },
+        ],
+    }
+
+    monkeypatch.setattr(repo_module, "get_settings", lambda: _SupabaseEnabledSettings())
+    monkeypatch.setattr(repo_module, "get_supabase", lambda: fake_supabase)
+    monkeypatch.setattr(repo_module, "resolve_kb_tenant", lambda _ctx: (tenant_uuid, clerk_key))
+
+    events = LiveCallRepository().list_transcript_events(ctx, call_id, limit=20)
+    event_text = " ".join(event["text"] for event in events)
+
+    assert len(events) == 4
+    assert event_text.count("we need a custom ERP") == 1
+    assert "fixed cost software engineering engagement" in event_text
+
+
 def test_link_provider_meeting_updates_existing_session_without_recursion(monkeypatch):
     from app.domain import live_call_repository as repo_module
 

@@ -326,6 +326,7 @@ class LiveCallRepository:
         self, ctx: TenantContext, call_id: str, *, limit: int = 200
     ) -> List[Dict[str, Any]]:
         tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
+        memory_events = list(get_memory_store().transcript_events.get(clerk_key, {}).get(call_id, []))
         if tenant_resolved and get_settings().supabase_configured:
             try:
                 res = (
@@ -338,10 +339,13 @@ class LiveCallRepository:
                     .limit(limit)
                     .execute()
                 )
-                return [_event_from_row(r) for r in (res.data or [])]
+                remote_events = [_event_from_row(r) for r in (res.data or [])]
+                if memory_events:
+                    return _merge_transcript_events(remote_events, memory_events)[-limit:]
+                return remote_events[-limit:]
             except Exception:
                 pass
-        return list(get_memory_store().transcript_events.get(clerk_key, {}).get(call_id, []))[-limit:]
+        return memory_events[-limit:]
 
     def append_suggestion(
         self,
@@ -483,6 +487,53 @@ def _event_from_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "provider_event_id": row.get("provider_event_id"),
         "created_at": row.get("created_at"),
     }
+
+
+def _transcript_event_key(event: Dict[str, Any]) -> str:
+    provider_event_id = str(event.get("provider_event_id") or "").strip()
+    if provider_event_id:
+        return f"provider:{provider_event_id}"
+    event_id = str(event.get("id") or "").strip()
+    if event_id:
+        return f"id:{event_id}"
+    text = _compact_whitespace(str(event.get("text") or "").strip().lower())[:160]
+    speaker = str(event.get("speaker_id") or event.get("speaker_name") or "").strip().lower()
+    offset = float(event.get("offset_seconds") or 0)
+    return f"fallback:{speaker}:{offset:.2f}:{text}"
+
+
+def _transcript_event_score(event: Dict[str, Any]) -> int:
+    return sum(
+        1
+        for key in ("keywords", "sentiment", "signal_type", "created_at")
+        if event.get(key)
+    )
+
+
+def _transcript_event_sort_key(event: Dict[str, Any]) -> tuple[str, float, str]:
+    return (
+        str(event.get("created_at") or ""),
+        float(event.get("offset_seconds") or 0),
+        str(event.get("id") or event.get("provider_event_id") or ""),
+    )
+
+
+def _merge_transcript_events(*event_groups: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    by_key: Dict[str, Dict[str, Any]] = {}
+    for group in event_groups:
+        for raw_event in group:
+            event = _event_from_row(raw_event)
+            if not str(event.get("text") or "").strip():
+                continue
+            key = _transcript_event_key(event)
+            existing = by_key.get(key)
+            if not existing or _transcript_event_score(event) >= _transcript_event_score(existing):
+                by_key[key] = event
+    return sorted(by_key.values(), key=_transcript_event_sort_key)
+
+
+def _compact_whitespace(value: str) -> str:
+    return " ".join(value.split())
 
 
 def _suggestion_from_row(row: Dict[str, Any]) -> Dict[str, Any]:
