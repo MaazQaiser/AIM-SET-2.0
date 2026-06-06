@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 
 from dc_core.tenancy import TenantContext
@@ -11,6 +11,10 @@ from dc_core.tenancy import TenantContext
 from app.deps import get_tenant_context
 from app.domain.content_studio_repository import ARTIFACT_TYPES, TEMPLATE_EXTENSIONS, get_content_studio_repository
 from app.orchestrator.dispatcher import Orchestrator
+from app.domain.kb_repository import get_kb_repository
+from app.domain.kb_tenancy import resolve_kb_tenant
+from app.services.content_export_service import render_html_export
+from app.services.kb_ingest_service import process_ingest_job
 from app.services.template_editor_service import (
     assist_template_edit,
     build_template_document,
@@ -27,6 +31,9 @@ _orch = Orchestrator()
 class CreateProjectBody(BaseModel):
     title: str
     artifactType: str
+    templateId: Optional[str] = None
+    brief: Dict[str, Any] = Field(default_factory=dict)
+    recommendedTemplateIds: List[str] = Field(default_factory=list)
 
 
 class StudioMessageBody(BaseModel):
@@ -38,6 +45,12 @@ class StudioMessageBody(BaseModel):
 class ExportBody(BaseModel):
     revisionId: str
     format: str
+
+
+class SaveRevisionToKbBody(BaseModel):
+    title: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+    format: str = "pdf"
 
 
 class TemplateBody(BaseModel):
@@ -230,6 +243,9 @@ def create_project(
         ctx,
         title=body.title,
         artifact_type=body.artifactType,
+        template_id=body.templateId,
+        brief=body.brief,
+        recommended_template_ids=body.recommendedTemplateIds,
     )
 
 
@@ -288,6 +304,83 @@ def get_revision(
     return rev
 
 
+@router.post("/studio/projects/{project_id}/revisions/{revision_id}/restore")
+def restore_revision(
+    project_id: str,
+    revision_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    restored = get_content_studio_repository().restore_revision(ctx, project_id, revision_id)
+    if not restored:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Revision not found")
+    return restored
+
+
+@router.post("/studio/projects/{project_id}/revisions/{revision_id}/save-to-kb")
+def save_revision_to_kb(
+    project_id: str,
+    revision_id: str,
+    body: SaveRevisionToKbBody,
+    background_tasks: BackgroundTasks,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    repo = get_content_studio_repository()
+    project = repo.get_project(ctx, project_id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    revision = repo.get_revision(ctx, revision_id)
+    if not revision or revision.get("projectId") != project_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Revision not found")
+
+    artifact_type = str(project.get("artifactType") or "deck")
+    title = (body.title or project.get("title") or "Generated Studio Asset").strip()
+    fmt = body.format.lower().strip()
+    if fmt == "ppt":
+        fmt = "pptx"
+    if fmt not in {"pdf", "pptx", "csv"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid format. Allowed: pdf, pptx, csv",
+        )
+
+    file_bytes = render_html_export(str(revision.get("html") or ""), fmt)
+    ext = f".{fmt}"
+    file_name = f"{_safe_file_stem(title)}{ext}"
+    asset_type = "image" if artifact_type == "image" else "one-pager" if artifact_type == "one_pager" else "deck"
+
+    kb_repo = get_kb_repository()
+    result = kb_repo.create_upload(
+        ctx,
+        file_name=file_name,
+        file_bytes=file_bytes,
+        ext=ext,
+        title=title,
+        tags=[*body.tags, "content-studio", artifact_type],
+        asset_type=asset_type,
+    )
+    tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+    background_tasks.add_task(
+        process_ingest_job,
+        {
+            "id": result["job"]["id"],
+            "tenant_id": tenant_uuid,
+            "asset_id": result["asset"]["id"],
+            "_clerk_key": clerk_key,
+            "_uploaded_by": ctx.user_id,
+        },
+        kb_repo,
+    )
+    result["format"] = fmt
+    return result
+
+
+def _safe_file_stem(value: str) -> str:
+    import re
+
+    clean = re.sub(r"[^\w.\- ]+", "", value).strip(" ._-")
+    return clean[:96] or "Generated Studio Asset"
+
+
 @router.post("/studio/projects/{project_id}/export")
 def export_project(
     project_id: str,
@@ -297,6 +390,9 @@ def export_project(
     project = get_content_studio_repository().get_project(ctx, project_id)
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    revision = get_content_studio_repository().get_revision(ctx, body.revisionId)
+    if not revision or revision.get("projectId") != project_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Revision not found")
     try:
         return _orch.dispatch_studio_export(ctx, body.revisionId, body.format)
     except ValueError as exc:

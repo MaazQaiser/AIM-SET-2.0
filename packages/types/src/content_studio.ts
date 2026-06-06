@@ -8,6 +8,8 @@ export type StudioTurnType = "ask" | "recommend" | "html" | "patch" | "refuse" |
 
 export type ExportFormat = "pdf" | "png" | "pptx";
 
+export type StudioKbSaveFormat = "pdf" | "pptx" | "csv";
+
 export interface ContentTemplate {
   id: string;
   name: string;
@@ -49,6 +51,14 @@ export interface StudioProject {
   costUsd: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateStudioProjectInput {
+  title: string;
+  artifactType: StudioArtifactType;
+  templateId?: string | null;
+  brief?: Record<string, unknown>;
+  recommendedTemplateIds?: string[];
 }
 
 export interface StudioMessage {
@@ -96,4 +106,31 @@ export interface ContentExportResult {
   format: ExportFormat;
   downloadUrl: string;
   byteSize: number;
+}
+
+export interface StudioRevisionRestoreResult {
+  revision: StudioRevision;
+  project: StudioProject;
+}
+
+export interface StudioRevisionKbSaveResult {
+  asset: {
+    id: string;
+    title: string;
+    type: string;
+    tags: string[];
+    uploadedAt: string;
+    version: number;
+    status?: string;
+    fileName?: string;
+    mimeType?: string;
+  };
+  job?: {
+    id: string;
+    assetId: string;
+    status: string;
+    stage: string;
+    progressPct: number;
+  };
+  format?: StudioKbSaveFormat;
 }

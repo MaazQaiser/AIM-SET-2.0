@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import io
+import csv
+import html as html_lib
 import re
 import tempfile
 import zipfile
@@ -26,14 +28,42 @@ def export_revision(
         raise ValueError(f"Revision not found: {revision_id}")
 
     html = revision["html"]
-    if fmt == "pdf":
-        data = _export_pdf(html)
-    elif fmt == "png":
-        data = _export_png_zip(html)
-    else:
-        data = _export_pptx(html)
+    data = render_html_export(html, fmt)
 
-    return repo.create_export(ctx, revision_id, fmt=fmt, file_bytes=data)
+    result = repo.create_export(ctx, revision_id, fmt=fmt, file_bytes=data)
+    project_id = revision.get("projectId")
+    if project_id:
+        repo.update_project(ctx, str(project_id), {"status": "exported"})
+    return result
+
+
+def render_html_export(html: str, fmt: str) -> bytes:
+    if fmt not in ("pdf", "png", "pptx", "csv"):
+        raise ValueError(f"Unsupported format: {fmt}")
+    if fmt == "pdf":
+        return _export_pdf(html)
+    if fmt == "png":
+        return _export_png_zip(html)
+    if fmt == "csv":
+        return _export_csv(html)
+    return _export_pptx(html)
+
+
+def render_html_png(html: str) -> bytes:
+    sections = _split_sections(html)
+    section = sections[0] if sections else html
+    try:
+        from playwright.sync_api import sync_playwright  # type: ignore
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1280, "height": 720})
+            page.set_content(_wrap_section_page(section), wait_until="networkidle")
+            png = page.screenshot(full_page=False)
+            browser.close()
+            return png
+    except Exception:
+        return _export_png_fallback([section])[0][1]
 
 
 def _export_pdf(html: str) -> bytes:
@@ -149,6 +179,32 @@ def _export_pptx(html: str) -> bytes:
     buf = io.BytesIO()
     prs.save(buf)
     return buf.getvalue()
+
+
+def _export_csv(html: str) -> bytes:
+    sections = _split_sections(html)
+    if not sections:
+        sections = [html]
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["page", "heading", "content"])
+    for index, section in enumerate(sections, start=1):
+        slide_match = re.search(r'data-slide=["\']?(\d+)["\']?', section, re.IGNORECASE)
+        page = slide_match.group(1) if slide_match else str(index)
+        heading_match = re.search(r"<h[1-6][^>]*>(.*?)</h[1-6]>", section, re.DOTALL | re.IGNORECASE)
+        heading = _html_fragment_to_text(heading_match.group(1)) if heading_match else ""
+        content = _html_fragment_to_text(section)
+        writer.writerow([page, heading, content])
+    return buf.getvalue().encode("utf-8")
+
+
+def _html_fragment_to_text(fragment: str) -> str:
+    text = re.sub(r"<style[^>]*>.*?</style>", " ", fragment, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<script[^>]*>.*?</script>", " ", text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = html_lib.unescape(text)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def _split_sections(html: str) -> List[str]:

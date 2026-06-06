@@ -103,6 +103,79 @@ def _hits_to_citations(hits: List[Dict[str, Any]]) -> List[Citation]:
     return citations
 
 
+def _retrieve_studio_evidence(
+    ctx: TenantContext,
+    *,
+    project: Dict[str, Any],
+    brief: Dict[str, Any],
+    user_message: str,
+    settings: Any,
+) -> Tuple[List[Dict[str, Any]], List[Citation]]:
+    kb_repo = get_kb_repository()
+    tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+    query = f"{project.get('title', '')} {user_message} {json.dumps(brief)}"
+
+    def vector_search(_tid: str, embedding: List[float], limit: int) -> List[Dict[str, Any]]:
+        return kb_repo.match_chunks(tenant_uuid, embedding, limit=limit, clerk_key=clerk_key)
+
+    embed_fn = default_embed_fn if settings.openai_configured or settings.openai_api_key else None
+    from app.domain.memory_store import get_memory_store
+
+    hits = retrieve_kb(
+        tenant_uuid,
+        query,
+        limit=5,
+        chunks=get_memory_store().kb_chunks.get(clerk_key, []),
+        embed_fn=embed_fn,
+        vector_search_fn=vector_search if embed_fn else None,
+    )
+    return hits, _hits_to_citations(hits)
+
+
+def _attach_outline_sources(
+    outline: List[Dict[str, Any]],
+    *,
+    project_id: str,
+    kb_hits: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    if not outline:
+        return outline
+    out: List[Dict[str, Any]] = []
+    kb_sources = [f"kb:{hit.get('asset_id')}" for hit in kb_hits if hit.get("asset_id")]
+    for index, item in enumerate(outline):
+        if not isinstance(item, dict):
+            continue
+        next_item = dict(item)
+        if kb_sources:
+            next_item["citation_source"] = kb_sources[index % len(kb_sources)]
+            snippet = str(kb_hits[index % len(kb_hits)].get("chunk_text") or "").strip()
+            if snippet:
+                next_item["evidence"] = snippet[:180]
+        else:
+            next_item["citation_source"] = f"session:{project_id}"
+        out.append(next_item)
+    return out
+
+
+def _brief_citations(project_id: str, brief: Dict[str, Any]) -> List[Citation]:
+    snippets = []
+    for key in ("audience", "content_context", "style"):
+        value = str(brief.get(key) or "").strip()
+        if value:
+            snippets.append(f"{key}: {value}")
+    points = brief.get("pain_points_coverage") or brief.get("key_points")
+    if isinstance(points, list):
+        snippets.extend(str(point).strip() for point in points if str(point).strip())
+    return [
+        Citation(
+            source_type="studio_brief",
+            source_id=project_id,
+            snippet="; ".join(snippets)[:200],
+            confidence=0.7,
+        )
+    ]
+
+
 def run_studio_turn(
     ctx: TenantContext,
     *,
@@ -184,6 +257,7 @@ def run_studio_turn(
         if _is_slide_outline_edit(clean_msg, brief):
             latest = repo.latest_revision(ctx, project_id)
             if latest:
+                patch_citations = latest.get("citations") or [c.model_dump() for c in _brief_citations(project_id, brief)]
                 full_html = _build_slide_preview_html(
                     title=str(project.get("title") or "Generated Deck"),
                     brief=brief,
@@ -198,7 +272,7 @@ def run_studio_turn(
                     ctx,
                     project_id,
                     html=full_html,
-                    citations=[],
+                    citations=patch_citations,
                     template_id=project.get("templateId"),
                 )
                 repo.update_project(ctx, project_id, {"brief": brief, "status": "preview"})
@@ -219,11 +293,11 @@ def run_studio_turn(
                         "patch": {"slide": slide_num} if slide_num else {},
                         "slide_outline": brief.get("slide_outline") or [],
                     },
-                    citations=[],
+                    citations=[Citation(**c) if isinstance(c, dict) else c for c in patch_citations],
                     confidence=0.85,
                     cost={"tokens": 0, "usd": 0.0, "model": "rule-based-slide-editor"},
                     trace_id=str(uuid.uuid4()),
-                    creative=True,
+                    creative=False,
                 )
                 validate_envelope(envelope)
                 return envelope
@@ -271,6 +345,21 @@ def run_studio_turn(
     if str(project.get("artifactType") or "deck") == "deck":
         tpl_id = template_id or project.get("templateId")
         chosen_template = repo.get_template(ctx, tpl_id) if tpl_id else None
+        kb_hits, citations = _retrieve_studio_evidence(
+            ctx,
+            project=project,
+            brief=brief,
+            user_message=clean_msg,
+            settings=settings,
+        )
+        if not citations:
+            citations = _brief_citations(project_id, brief)
+        if isinstance(brief.get("slide_outline"), list):
+            brief["slide_outline"] = _attach_outline_sources(
+                brief["slide_outline"],
+                project_id=project_id,
+                kb_hits=kb_hits,
+            )
         full_html = _build_slide_preview_html(
             title=str(project.get("title") or "Generated Deck"),
             brief=brief,
@@ -286,7 +375,7 @@ def run_studio_turn(
             ctx,
             project_id,
             html=full_html,
-            citations=[],
+            citations=[c.model_dump() for c in citations],
             template_id=tpl_id,
         )
         patch: Dict[str, Any] = {"brief": brief, "status": "preview"}
@@ -304,11 +393,11 @@ def run_studio_turn(
                 "html": full_html,
                 "template_id": tpl_id,
             },
-            citations=[],
-            confidence=0.85,
+            citations=citations,
+            confidence=0.9 if kb_hits else 0.78,
             cost={"tokens": 0, "usd": 0.0, "model": "rule-based-slide-preview"},
             trace_id=str(uuid.uuid4()),
-            creative=True,
+            creative=not bool(kb_hits),
         )
         validate_envelope(envelope)
         return envelope
@@ -618,10 +707,26 @@ def _template_context(template: Optional[Dict[str, Any]]) -> str:
         "name": template.get("name"),
         "artifact_type": template.get("artifactType"),
         "css_variables": template.get("cssVariables") or {},
+        "slots": _extract_template_slots(tpl_html),
         "css_excerpt": _extract_template_style(template)[:5000],
         "html_excerpt": body.strip()[:4000],
     }
     return json.dumps(context)
+
+
+def _extract_template_slots(html: str) -> List[str]:
+    slots: List[str] = []
+    for pattern in (r'data-slot=["\']([^"\']+)["\']', r'data-role=["\']([^"\']+)["\']'):
+        for value in re.findall(pattern, html, flags=re.IGNORECASE):
+            clean = str(value).strip()
+            if clean and clean not in slots:
+                slots.append(clean)
+    for class_attr in re.findall(r'class=["\']([^"\']+)["\']', html, flags=re.IGNORECASE):
+        for token in str(class_attr).split():
+            if any(key in token.lower() for key in ("title", "heading", "body", "visual", "metric", "cta")):
+                if token not in slots:
+                    slots.append(token)
+    return slots[:20]
 
 
 def _apply_patch(html: str, patch: Dict[str, Any]) -> str:
@@ -1073,19 +1178,24 @@ def _build_slide_preview_html(
         heading = html_lib.escape(str(item.get("heading") or f"Slide {slide_num}").strip())
         body = html_lib.escape(str(item.get("body") or "").strip())
         visual = html_lib.escape(str(item.get("visual") or "").strip())
+        evidence = html_lib.escape(str(item.get("evidence") or "").strip())
+        citation_source = html_lib.escape(str(item.get("citation_source") or "").strip())
+        cite = f'<span class="cite" data-source="{citation_source}"></span>' if citation_source else ""
         title_tag = "h1" if slide_num == 1 else "h2"
         visual_block = (
             f'<div class="visual"><strong>Visual:</strong><span>{visual}</span></div>'
             if visual
             else ""
         )
+        evidence_block = f'<p class="evidence-note">Evidence: {evidence} {cite}</p>' if evidence else ""
         slides.append(
             f"""
-            <section class="slide dc-slide template-root" data-slide="{slide_num}">
+            <section class="slide dc-slide template-root" data-slide="{slide_num}" data-role="studio-slide">
               <div class="slide-kicker">Slide {slide_num:02d}</div>
-              <{title_tag}>{heading}</{title_tag}>
-              <p>{body}</p>
+              <{title_tag} data-role="heading">{heading} {cite}</{title_tag}>
+              <p data-role="body">{body} {cite}</p>
               {visual_block}
+              {evidence_block}
             </section>
             """
         )
@@ -1178,6 +1288,19 @@ def _build_slide_preview_html(
             color: var(--accent, #1d4ed8);
             white-space: nowrap;
           }}
+          .evidence-note {{
+            margin-top: 22px;
+            max-width: 760px;
+            font-size: 15px;
+            line-height: 1.4;
+            color: var(--muted, #64748b);
+          }}
+          .cite {{
+            display: inline-block;
+            width: 0;
+            height: 0;
+            overflow: hidden;
+          }}
           @media (max-width: 760px) {{
             .deck-preview {{
               padding: 14px;
@@ -1242,10 +1365,41 @@ def _apply_slide_outline_edit(brief: Dict[str, Any], text: str) -> bool:
 
     if not changed:
         remainder = re.sub(r"(?i).*?\bslide\s*\d{1,2}\b\s*[:,-]?", "", text, count=1).strip()
-        if remainder:
+        if remainder and _apply_tone_instruction(target, remainder):
+            changed = True
+        elif remainder:
             target["body"] = remainder
             changed = True
 
     if changed:
         brief["slide_outline"] = outline
     return changed
+
+
+def _apply_tone_instruction(target: Dict[str, Any], instruction: str) -> bool:
+    low = instruction.lower()
+    body = str(target.get("body") or target.get("heading") or "").strip()
+    heading = str(target.get("heading") or "").strip()
+    if not body and not heading:
+        return False
+
+    if any(word in low for word in ("punchier", "sharper", "stronger", "more direct")):
+        target["body"] = _tighten_sentence(body, prefix="Lead with the business impact: ")
+        return True
+    if any(word in low for word in ("shorter", "concise", "tighten", "trim")):
+        target["body"] = _tighten_sentence(body)
+        return True
+    if any(word in low for word in ("executive", "board", "c-level", "c level")):
+        target["body"] = _tighten_sentence(body, prefix="Frame the decision, risk, and upside for executives: ")
+        return True
+    if any(word in low for word in ("customer", "buyer", "client-facing", "client facing")):
+        target["body"] = _tighten_sentence(body, prefix="Use customer-facing language: ")
+        return True
+    return False
+
+
+def _tighten_sentence(text: str, *, prefix: str = "") -> str:
+    clean = re.sub(r"\s+", " ", text).strip()
+    if len(clean) > 180:
+        clean = clean[:177].rstrip(" ,.;:") + "..."
+    return f"{prefix}{clean}" if prefix and not clean.lower().startswith(prefix.lower()) else clean

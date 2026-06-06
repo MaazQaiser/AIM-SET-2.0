@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Plus, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
@@ -29,13 +30,89 @@ const ARTIFACT_TYPES = [
 ] as const;
 
 export default function ContentStudioPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading studio...</div>}>
+      <ContentStudioPageInner />
+    </Suspense>
+  );
+}
+
+function ContentStudioPageInner() {
+  const searchParams = useSearchParams();
   const { data: projects = [], isLoading } = useStudioProjects();
   const create = useCreateStudioProject();
   const del = useDeleteStudioProject();
+  const deepLinkStartedRef = useRef(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [title, setTitle] = useState("New deck");
   const [artifactType, setArtifactType] = useState<(typeof ARTIFACT_TYPES)[number]["value"]>("deck");
   const [createError, setCreateError] = useState<string>("");
+  const [deepLinkStatus, setDeepLinkStatus] = useState<string>("");
+
+  useEffect(() => {
+    const source = searchParams.get("source");
+    const asset = searchParams.get("asset");
+    const account = searchParams.get("account");
+    const template = searchParams.get("template");
+    const callId = searchParams.get("callId");
+    if (!source && !asset && !account && !template && !callId) return;
+    if (deepLinkStartedRef.current) return;
+
+    const signature = searchParams.toString();
+    const sessionKey = `content-studio:auto-create:${signature}`;
+    const existingProjectId = window.sessionStorage.getItem(sessionKey);
+    if (existingProjectId && existingProjectId !== "started") {
+      window.location.href = `/content/studio/${existingProjectId}`;
+      return;
+    }
+    if (existingProjectId === "started") return;
+    deepLinkStartedRef.current = true;
+    window.sessionStorage.setItem(sessionKey, "started");
+
+    const resolvedType = artifactTypeFromDeepLink(template, asset);
+    const resolvedTitle = projectTitleFromDeepLink({ asset, account, artifactType: resolvedType });
+    const brief = buildBriefFromDeepLink({
+      artifactType: resolvedType,
+      template,
+      source,
+      asset,
+      account,
+      callId,
+      lead: searchParams.get("lead"),
+      leadCount: searchParams.get("leadCount"),
+    });
+
+    async function createFromDeepLink() {
+      try {
+        setDeepLinkStatus("Creating project from content gap...");
+        const project = await create.mutateAsync({
+          title: resolvedTitle,
+          artifactType: resolvedType,
+          brief,
+        });
+        const message = seedMessageFromDeepLink({
+          title: resolvedTitle,
+          artifactType: resolvedType,
+          source,
+          asset,
+          account,
+          leadCount: searchParams.get("leadCount"),
+        });
+        await fetch(`/api/content/studio/projects/${project.id}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message, generate: false }),
+        });
+        window.sessionStorage.setItem(sessionKey, project.id);
+        window.location.href = `/content/studio/${project.id}`;
+      } catch (err) {
+        window.sessionStorage.removeItem(sessionKey);
+        setDeepLinkStatus(err instanceof Error ? err.message : "Failed to create project from link");
+      }
+    }
+
+    void createFromDeepLink();
+  }, [create, searchParams]);
 
   function openCreateDialog() {
     setCreateError("");
@@ -92,6 +169,10 @@ export default function ContentStudioPage() {
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading projects…</p>
+      ) : deepLinkStatus ? (
+        <div className="rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+          {deepLinkStatus}
+        </div>
       ) : projects.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((p) => (
@@ -194,4 +275,94 @@ export default function ContentStudioPage() {
       </Dialog>
     </div>
   );
+}
+
+function artifactTypeFromDeepLink(
+  template: string | null,
+  asset: string | null
+): (typeof ARTIFACT_TYPES)[number]["value"] {
+  const value = `${template ?? ""} ${asset ?? ""}`.toLowerCase();
+  if (value.includes("image") || value.includes("visual") || value.includes("social")) return "image";
+  if (
+    value.includes("one_pager") ||
+    value.includes("one-pager") ||
+    value.includes("one pager") ||
+    value.includes("case") ||
+    value.includes("battlecard") ||
+    value.includes("architecture")
+  ) {
+    return "one_pager";
+  }
+  return "deck";
+}
+
+function projectTitleFromDeepLink({
+  asset,
+  account,
+  artifactType,
+}: {
+  asset: string | null;
+  account: string | null;
+  artifactType: (typeof ARTIFACT_TYPES)[number]["value"];
+}) {
+  const label =
+    artifactType === "one_pager" ? "One-pager" : artifactType === "image" ? "Image" : "Deck";
+  if (asset && account) return `${account} - ${asset}`;
+  if (asset) return asset;
+  if (account) return `${account} ${label}`;
+  return `New ${label.toLowerCase()}`;
+}
+
+function buildBriefFromDeepLink(options: {
+  artifactType: (typeof ARTIFACT_TYPES)[number]["value"];
+  template: string | null;
+  source: string | null;
+  asset: string | null;
+  account: string | null;
+  callId: string | null;
+  lead: string | null;
+  leadCount: string | null;
+}) {
+  const sourceLabel = options.source === "post-dc" ? "post-call" : options.source === "pre-dc" ? "pre-call" : "workflow";
+  const points = [
+    options.asset ? `Create the missing asset: ${options.asset}` : "",
+    options.account ? `Tailor the content for ${options.account}` : "",
+    options.leadCount ? `Reusable for ${options.leadCount} lead(s)` : "",
+  ].filter(Boolean);
+
+  return {
+    artifact_type: options.artifactType,
+    source: options.source,
+    source_template: options.template,
+    source_asset: options.asset,
+    source_call_id: options.callId,
+    source_lead: options.lead,
+    source_lead_count: options.leadCount,
+    audience: options.account ? `${options.account} buying committee` : "",
+    pain_points_coverage: points,
+    key_points: points,
+    content_context: `${sourceLabel} content gap${options.asset ? `: ${options.asset}` : ""}`,
+    style: "sales enablement draft",
+  };
+}
+
+function seedMessageFromDeepLink(options: {
+  title: string;
+  artifactType: (typeof ARTIFACT_TYPES)[number]["value"];
+  source: string | null;
+  asset: string | null;
+  account: string | null;
+  leadCount: string | null;
+}) {
+  const artifact = options.artifactType === "one_pager" ? "one-pager" : options.artifactType;
+  return [
+    `Create a ${artifact} project called "${options.title}".`,
+    options.source ? `Source workflow: ${options.source}.` : "",
+    options.asset ? `Missing asset: ${options.asset}.` : "",
+    options.account ? `Account context: ${options.account}.` : "",
+    options.leadCount ? `Make it reusable across ${options.leadCount} lead(s).` : "",
+    "Use this context to ask only for the next missing decision before drafting.",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }

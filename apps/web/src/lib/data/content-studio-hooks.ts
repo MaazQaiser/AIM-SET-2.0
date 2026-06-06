@@ -6,6 +6,11 @@ import type {
   ContentExportResult,
   ContentTemplate,
   ContentTemplateDraft,
+  CreateStudioProjectInput,
+  StudioRevision,
+  StudioRevisionKbSaveResult,
+  StudioRevisionRestoreResult,
+  StudioKbSaveFormat,
   StudioProject,
   StudioTurnResult,
   TemplateAssistResult,
@@ -86,7 +91,7 @@ export function useContentTemplate(templateId?: string) {
 export function useCreateStudioProject() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (body: { title: string; artifactType: string }) => {
+    mutationFn: async (body: CreateStudioProjectInput) => {
       const res = await fetch("/api/content/studio/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -96,6 +101,20 @@ export function useCreateStudioProject() {
       return res.json() as Promise<StudioProject>;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["studio-projects"] }),
+  });
+}
+
+export function useStudioRevision(projectId: string, revisionId?: string) {
+  return useQuery({
+    queryKey: ["studio-revision", projectId, revisionId],
+    queryFn: async () => {
+      const api = await bffFetch<StudioRevision>(
+        `/api/content/studio/projects/${projectId}/revisions/${revisionId}`
+      );
+      if (!api) throw new Error("Revision not found");
+      return api;
+    },
+    enabled: Boolean(projectId && revisionId),
   });
 }
 
@@ -138,6 +157,7 @@ export function useStudioMessage(projectId: string) {
 }
 
 export function useStudioExport(projectId: string) {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: { revisionId: string; format: string }) => {
       const res = await fetch(`/api/content/studio/projects/${projectId}/export`, {
@@ -147,6 +167,50 @@ export function useStudioExport(projectId: string) {
       });
       if (!res.ok) throw new Error(await res.text());
       return res.json() as Promise<ContentExportResult>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["studio-project", projectId] });
+      qc.invalidateQueries({ queryKey: ["studio-projects"] });
+    },
+  });
+}
+
+export function useRestoreStudioRevision(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (revisionId: string) => {
+      const res = await fetch(
+        `/api/content/studio/projects/${projectId}/revisions/${revisionId}/restore`,
+        { method: "POST" }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      return res.json() as Promise<StudioRevisionRestoreResult>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["studio-project", projectId] });
+      qc.invalidateQueries({ queryKey: ["studio-projects"] });
+    },
+  });
+}
+
+export function useSaveRevisionToKb(projectId: string) {
+  return useMutation({
+    mutationFn: async (body: {
+      revisionId: string;
+      title?: string;
+      tags?: string[];
+      format: StudioKbSaveFormat;
+    }) => {
+      const res = await fetch(
+        `/api/content/studio/projects/${projectId}/revisions/${body.revisionId}/save-to-kb`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: body.title, tags: body.tags ?? [], format: body.format }),
+        }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      return res.json() as Promise<StudioRevisionKbSaveResult>;
     },
   });
 }

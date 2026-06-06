@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import logging
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
@@ -14,6 +15,7 @@ from app.domain.tenant_service import get_tenant_service
 
 TEMPLATE_EXTENSIONS = {".pptx", ".ppt", ".pdf", ".png", ".jpg", ".jpeg"}
 ARTIFACT_TYPES = frozenset({"deck", "one_pager", "image"})
+_logger = logging.getLogger(__name__)
 
 
 def _now_iso() -> str:
@@ -52,6 +54,10 @@ def _project_row_to_api(row: Dict[str, Any]) -> Dict[str, Any]:
         "createdAt": (row.get("created_at") or _now_iso())[:19],
         "updatedAt": (row.get("updated_at") or _now_iso())[:19],
     }
+
+
+def _warn_memory_fallback(operation: str, exc: Exception) -> None:
+    _logger.warning("content_studio.%s falling back to memory store: %s", operation, exc)
 
 
 class ContentStudioRepository:
@@ -401,6 +407,9 @@ class ContentStudioRepository:
         *,
         title: str,
         artifact_type: str,
+        template_id: Optional[str] = None,
+        brief: Optional[Dict[str, Any]] = None,
+        recommended_template_ids: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         if artifact_type not in ARTIFACT_TYPES:
             raise ValueError(f"Invalid artifact_type: {artifact_type}")
@@ -411,8 +420,10 @@ class ContentStudioRepository:
             "tenant_id": tenant_uuid,
             "title": title,
             "artifact_type": artifact_type,
+            "template_id": template_id,
             "status": "drafting",
-            "brief": {},
+            "brief": brief or {},
+            "recommended_template_ids": recommended_template_ids or [],
             "created_by": ctx.user_id,
             "created_at": _now_iso(),
             "updated_at": _now_iso(),
@@ -421,7 +432,8 @@ class ContentStudioRepository:
         if get_settings().supabase_configured:
             try:
                 get_supabase().table("content_studio_projects").insert(row).execute()
-            except Exception:
+            except Exception as exc:
+                _warn_memory_fallback("create_project", exc)
                 use_memory = True
         if use_memory:
             api = _project_row_to_api(row)
@@ -454,7 +466,8 @@ class ContentStudioRepository:
                 get_supabase().table("content_studio_projects").update(db_patch).eq("id", project_id).eq(
                     "tenant_id", tenant_uuid
                 ).execute()
-            except Exception:
+            except Exception as exc:
+                _warn_memory_fallback("update_project", exc)
                 use_memory = True
         if use_memory:
             for p in get_memory_store().content_projects.get(clerk_key, []):
@@ -486,7 +499,8 @@ class ContentStudioRepository:
         if get_settings().supabase_configured:
             try:
                 get_supabase().table("content_studio_messages").insert(row).execute()
-            except Exception:
+            except Exception as exc:
+                _warn_memory_fallback("add_message", exc)
                 use_memory = True
         if use_memory:
             get_memory_store().content_messages.setdefault(project_id, []).append(
@@ -550,7 +564,8 @@ class ContentStudioRepository:
         if get_settings().supabase_configured:
             try:
                 get_supabase().table("content_studio_revisions").insert(row).execute()
-            except Exception:
+            except Exception as exc:
+                _warn_memory_fallback("create_revision", exc)
                 use_memory = True
         if use_memory:
             get_memory_store().content_revisions.setdefault(project_id, []).append(
@@ -563,6 +578,28 @@ class ContentStudioRepository:
                 }
             )
         return {"id": rev_id, "projectId": project_id, "createdAt": row["created_at"][:19]}
+
+    def restore_revision(self, ctx: TenantContext, project_id: str, revision_id: str) -> Optional[Dict[str, Any]]:
+        revision = self.get_revision(ctx, revision_id)
+        if not revision or revision.get("projectId") != project_id:
+            return None
+        restored = self.create_revision(
+            ctx,
+            project_id,
+            html=str(revision.get("html") or ""),
+            citations=revision.get("citations") or [],
+            template_id=revision.get("templateId"),
+        )
+        self.update_project(
+            ctx,
+            project_id,
+            {
+                "status": "preview",
+                "templateId": revision.get("templateId"),
+            },
+        )
+        full = self.get_revision(ctx, restored["id"]) or restored
+        return {"revision": full, "project": self.get_project(ctx, project_id)}
 
     def get_revision(self, ctx: TenantContext, revision_id: str) -> Optional[Dict[str, Any]]:
         if get_settings().supabase_configured:
@@ -657,7 +694,8 @@ class ContentStudioRepository:
                     }
                 ).execute()
                 signed = self._signed_url(settings.content_exports_bucket, storage_path)
-            except Exception:
+            except Exception as exc:
+                _warn_memory_fallback("create_export", exc)
                 use_memory = True
                 signed = ""
         else:

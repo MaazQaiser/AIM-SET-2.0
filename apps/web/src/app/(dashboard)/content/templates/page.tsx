@@ -26,94 +26,98 @@ export default function ContentTemplatesPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Content Templates</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Upload PPT, PDF, or images — vision converts each page to reusable HTML/CSS.
-          </p>
+    <>
+      <header className="sticky top-0 z-30 border-b border-border/50 bg-background/95 px-6 pb-5 pt-6 backdrop-blur-md supports-[backdrop-filter]:bg-background/90">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold">Content Templates</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Upload PPT, PDF, or images — vision converts each page to reusable HTML/CSS.
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/content/studio">Studio</Link>
+            </Button>
+            <Button variant="secondary" asChild>
+              <Link href="/content/templates/new">
+                <Plus className="h-4 w-4 mr-1" />
+                New template
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/content/templates/upload">
+                <Upload className="h-4 w-4 mr-1" />
+                Upload template
+              </Link>
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/content/studio">Studio</Link>
-          </Button>
-          <Button variant="secondary" asChild>
-            <Link href="/content/templates/new">
-              <Plus className="h-4 w-4 mr-1" />
-              New template
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/content/templates/upload">
-              <Upload className="h-4 w-4 mr-1" />
-              Upload template
-            </Link>
-          </Button>
-        </div>
-      </div>
+      </header>
 
-      {templates.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {templates.map((t) => (
-            <Card key={t.id}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <LayoutTemplate className="h-4 w-4" />
-                  {t.name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex gap-1 flex-wrap">
-                  <Badge variant="outline">{t.artifactType}</Badge>
-                  <Badge variant={t.status === "ready" ? "success" : "warning"}>{t.status}</Badge>
-                  <Badge variant="secondary">{t.pageCount} pages</Badge>
-                </div>
-                {t.ingestError && <p className="text-xs text-destructive">{t.ingestError}</p>}
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={t.status !== "ready"}
-                    onClick={() => setViewTemplateId(t.id)}
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    View template
-                  </Button>
-                  <Button size="sm" variant="outline" asChild>
-                    <Link href={`/content/templates/${t.id}/edit`}>
-                      <Code2 className="h-4 w-4 mr-1" />
-                      Edit
-                    </Link>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={del.isPending}
-                    onClick={() => void handleDeleteTemplate(t.id)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Delete
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <EmptyState
-          icon={LayoutTemplate}
-          title="No templates"
-          description="Create an HTML/CSS template or upload a deck/PDF to build your template library."
-          action={{ label: "Create template", href: "/content/templates/new" }}
-        />
-      )}
+      <div className="p-6">
+        {templates.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {templates.map((t) => (
+              <Card key={t.id}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <LayoutTemplate className="h-4 w-4" />
+                    {t.name}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex gap-1 flex-wrap">
+                    <Badge variant="outline">{t.artifactType}</Badge>
+                    <Badge variant={t.status === "ready" ? "success" : "warning"}>{t.status}</Badge>
+                    <Badge variant="secondary">{t.pageCount} pages</Badge>
+                  </div>
+                  {t.ingestError && <p className="text-xs text-destructive">{t.ingestError}</p>}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={t.status !== "ready"}
+                      onClick={() => setViewTemplateId(t.id)}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View template
+                    </Button>
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href={`/content/templates/${t.id}/edit`}>
+                        <Code2 className="h-4 w-4 mr-1" />
+                        Edit
+                      </Link>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={del.isPending}
+                      onClick={() => void handleDeleteTemplate(t.id)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={LayoutTemplate}
+            title="No templates"
+            description="Create an HTML/CSS template or upload a deck/PDF to build your template library."
+            action={{ label: "Create template", href: "/content/templates/new" }}
+          />
+        )}
+      </div>
 
       <TemplateDetailDialog
         templateId={viewTemplateId}
         open={Boolean(viewTemplateId)}
         onOpenChange={(open) => !open && setViewTemplateId(null)}
       />
-    </div>
+    </>
   );
 }
