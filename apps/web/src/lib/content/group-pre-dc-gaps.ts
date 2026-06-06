@@ -13,6 +13,10 @@ export interface ContentGenerationLead {
   accountName: string;
   leadName?: string;
   industry?: string;
+  sourceItemId?: string;
+  sourcePath?: string;
+  contentRequirements?: string;
+  context?: Record<string, unknown>;
   name: string;
   sourceArtifactId?: string;
   type: PreDcContentGenerationGap["type"];
@@ -32,6 +36,10 @@ function toContentGenerationLead(item: PreDcContentGenerationGap): ContentGenera
     accountName: item.accountName,
     leadName: item.leadName,
     industry: item.industry,
+    sourceItemId: item.sourceItemId,
+    sourcePath: item.sourcePath,
+    contentRequirements: item.contentRequirements,
+    context: item.context,
     name: item.name,
     sourceArtifactId: item.sourceArtifactId,
     type: item.type,

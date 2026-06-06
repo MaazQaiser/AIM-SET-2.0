@@ -638,6 +638,7 @@ class Orchestrator:
         name: Optional[str] = None,
         artifact_type: Optional[str] = None,
         tags: Optional[list] = None,
+        process: bool = True,
     ) -> Dict[str, Any]:
         repo = get_content_studio_repository()
         upload = repo.create_template_upload(
@@ -651,9 +652,31 @@ class Orchestrator:
         )
         template_id = upload["template"]["id"]
         storage_path = upload["storagePath"]
+        if process:
+            tpl = self.complete_template_ingest(ctx, template_id, storage_path)
+        else:
+            repo.update_template_progress(
+                ctx,
+                template_id,
+                progress=8,
+                stage="queued",
+                message="Queued for PowerPoint extraction",
+            )
+            tpl = repo.get_template(ctx, template_id) or upload["template"]
+        return {"template": tpl, "storagePath": storage_path}
+
+    def complete_template_ingest(self, ctx: TenantContext, template_id: str, storage_path: str) -> Dict[str, Any]:
+        repo = get_content_studio_repository()
         try:
             tpl = process_template_ingest(ctx, template_id, storage_path)
-        except Exception:
+        except Exception as exc:
+            repo.update_template_progress(
+                ctx,
+                template_id,
+                progress=100,
+                stage="failed",
+                message=str(exc)[:180] or "Template extraction failed",
+            )
             tpl = repo.get_template(ctx, template_id)
         trace = str(uuid.uuid4())
         get_agent_runs_repository().append_run(
@@ -663,7 +686,7 @@ class Orchestrator:
             trace_id=trace,
         )
         self._audit(ctx, "content_generation", "template_ingest", trace)
-        return {"template": tpl, "storagePath": storage_path}
+        return tpl or {"id": template_id, "status": "failed"}
 
     def dispatch_studio_export(
         self,

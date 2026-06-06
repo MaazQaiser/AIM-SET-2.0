@@ -59,6 +59,10 @@ export interface PreDcContentGenerationGap extends ContentToGenerate {
   leadTitle?: string;
   industry?: string;
   scheduledAt?: string;
+  sourceItemId?: string;
+  sourcePath?: string;
+  contentRequirements?: string;
+  context?: Record<string, unknown>;
   studioHref: string;
 }
 
@@ -76,6 +80,9 @@ export interface PostDcContentGenerationGap {
   status: "missing";
   reason: string;
   neededFor: string;
+  sourcePath?: string;
+  contentRequirements?: string;
+  context?: Record<string, unknown>;
   studioHref: string;
 }
 
@@ -563,6 +570,23 @@ function contentStudioHref(item: ContentToGenerate, call: Call, accountName: str
   });
 }
 
+export function preDcContentGapKey(item: Pick<PreDcContentGenerationGap, "callId" | "sourceArtifactId" | "sourceItemId" | "name">) {
+  return `pre_dc:${item.callId}:${item.sourceArtifactId?.trim() || item.sourceItemId?.trim() || item.name}`;
+}
+
+export function postDcContentGapKey(item: Pick<PostDcContentGenerationGap, "callId" | "name">) {
+  return `post_dc:${item.callId}:${item.name.trim().toLowerCase()}`;
+}
+
+function nonOpenGapKeys(gaps: ContentGap[]) {
+  return new Set(
+    gaps
+      .filter((gap) => gap.workflowStatus && gap.workflowStatus !== "open")
+      .map((gap) => gap.gapKey)
+      .filter((key): key is string => typeof key === "string" && key.length > 0)
+  );
+}
+
 /** Sidebar + Knowledge Base: count unique content assets to generate (grouped by document, not by lead). */
 export function useContentManagerSidebarStats() {
   const { data: preDcGaps = [], isLoading: preLoading, isFetching: preFetching } =
@@ -572,10 +596,15 @@ export function useContentManagerSidebarStats() {
   const { data: draftGaps = [] } = useContentGaps();
 
   return useMemo(() => {
-    const preDcAssetCount = groupPreDcGaps(preDcGaps).length;
-    const postDcAssetCount = groupPostDcGaps(postDcGaps).length;
+    const hidden = nonOpenGapKeys(draftGaps);
+    const preDcAssetCount = groupPreDcGaps(
+      preDcGaps.filter((gap) => !hidden.has(preDcContentGapKey(gap)))
+    ).length;
+    const postDcAssetCount = groupPostDcGaps(
+      postDcGaps.filter((gap) => !hidden.has(postDcContentGapKey(gap)))
+    ).length;
     const toGenerateCount = preDcAssetCount + postDcAssetCount;
-    const draftReviewCount = draftGaps.filter((g) => g.status !== "approved").length;
+    const draftReviewCount = draftGaps.filter((g) => g.workflowStatus === "in_progress").length;
 
     return {
       toGenerateCount,
@@ -615,6 +644,19 @@ export function usePreDcContentGenerationGaps() {
             leadTitle: call.leadTitle,
             industry: call.industry?.trim() || undefined,
             scheduledAt: call.scheduledAt,
+            sourceItemId: item.id,
+            sourcePath: item.sourcePath || `/calls/${call.id}`,
+            contentRequirements: item.contentRequirements || item.reason,
+            context: {
+              ...(item.context ?? {}),
+              source: "pre_dc",
+              sourcePath: item.sourcePath || `/calls/${call.id}`,
+              callId: call.id,
+              accountName,
+              leadName: call.leadName,
+              industry: call.industry?.trim() || undefined,
+              whatToCreate: item.contentRequirements || item.reason,
+            },
             studioHref: contentStudioHref(item, call, accountName),
           }));
         })
@@ -660,6 +702,17 @@ function collectPostDcMissingGaps(
       status: "missing",
       reason: formatPostDcMissingReason(item.requiredData),
       neededFor: "Post-call follow-up and email attachments",
+      sourcePath: `/calls/${callId}/post-dc`,
+      contentRequirements: item.requiredData,
+      context: {
+        source: "post_dc",
+        sourcePath: `/calls/${callId}/post-dc`,
+        callId,
+        accountName: call?.accountName ?? callId,
+        leadName: call?.leadName,
+        industry: call?.industry?.trim() || undefined,
+        whatToCreate: item.requiredData,
+      },
       studioHref: item.contentStudioLink || "/content?tab=suggestions",
     });
   };

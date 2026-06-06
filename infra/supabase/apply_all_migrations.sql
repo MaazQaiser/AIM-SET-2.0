@@ -400,3 +400,11 @@ CREATE INDEX IF NOT EXISTS content_gaps_tenant_status_idx
 
 CREATE INDEX IF NOT EXISTS content_gaps_call_idx
   ON content_gaps (tenant_id, call_id);
+
+-- Content gap source trace + generation context (015)
+ALTER TABLE content_gaps
+  ADD COLUMN IF NOT EXISTS source_path TEXT,
+  ADD COLUMN IF NOT EXISTS context JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+CREATE INDEX IF NOT EXISTS content_gaps_source_path_idx
+  ON content_gaps (tenant_id, source_path);

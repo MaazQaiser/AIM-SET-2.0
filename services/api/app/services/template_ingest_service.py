@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import tempfile
 from collections import Counter
+from html import escape
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -41,13 +42,34 @@ def process_template_ingest(
     repo = get_content_studio_repository()
     settings = get_settings()
     tenant_uuid = repo.template_storage_tenant_uuid(ctx, template_id)
+    repo.update_template_progress(
+        ctx,
+        template_id,
+        progress=12,
+        stage="reading_source",
+        message="Reading uploaded PowerPoint",
+    )
     file_bytes = repo.download_template_source(ctx, storage_path)
     ext = Path(storage_path).suffix.lower()
 
+    repo.update_template_progress(
+        ctx,
+        template_id,
+        progress=24,
+        stage="rendering_original",
+        message="Rendering original slide previews",
+    )
     page_images, preview_pdf, preview_pdf_bytes = _prepare_visual_assets(
         repo, tenant_uuid, template_id, file_bytes, ext
     )
     page_count = len(page_images) if page_images else _pdf_page_count(preview_pdf_bytes) or 1
+    repo.update_template_progress(
+        ctx,
+        template_id,
+        progress=42,
+        stage="extracting_structure",
+        message="Extracting slide titles, text, colors, and layouts",
+    )
     metadata = _extract_template_metadata(
         file_bytes=file_bytes,
         ext=ext,
@@ -65,12 +87,24 @@ def process_template_ingest(
             css_variables={},
             page_count=0,
             error="No pages could be rasterized from the uploaded file",
-            metadata=metadata,
+            metadata=_with_processing_metadata(
+                metadata,
+                progress=100,
+                stage="failed",
+                message="No pages could be rasterized from the uploaded file",
+            ),
         )
         raise ValueError("No pages could be rasterized")
 
     if page_images:
         repo.save_template_preview_slides(ctx, template_id, page_images)
+    repo.update_template_progress(
+        ctx,
+        template_id,
+        progress=58,
+        stage="preview_ready",
+        message="Original preview is ready",
+    )
     thumb = page_images[0] if page_images else None
 
     try:
@@ -84,6 +118,13 @@ def process_template_ingest(
         all_vars: Dict[str, str] = {}
 
         for i, png in enumerate(page_images, start=1):
+            repo.update_template_progress(
+                ctx,
+                template_id,
+                progress=64 + round((i - 1) * 24 / max(1, len(page_images))),
+                stage="generating_html",
+                message=f"Generating HTML/CSS for slide {i} of {len(page_images)}",
+            )
             completion = client.complete_vision(
                 system=system,
                 image_png_bytes=png,
@@ -97,11 +138,21 @@ def process_template_ingest(
             all_vars.update(_extract_css_vars(section_html))
 
         merged = _merge_template_html(sections, all_vars)
+        if _is_placeholder_template_html(merged) and _metadata_has_slide_text(metadata):
+            all_vars = _metadata_css_vars(metadata)
+            merged = _metadata_to_template_html(metadata, css_variables=all_vars)
+            metadata.setdefault("conversion", {})["fallbackGenerated"] = True
         metadata = _with_conversion_metadata(
             metadata,
             html_generated=True,
             section_count=len(sections),
             css_variables=all_vars,
+        )
+        metadata = _with_processing_metadata(
+            metadata,
+            progress=100,
+            stage="ready",
+            message="Template HTML/CSS is ready",
         )
         return repo.finalize_template(
             ctx,
@@ -113,18 +164,27 @@ def process_template_ingest(
             metadata=metadata,
         )
     except Exception as exc:
+        fallback_vars = _metadata_css_vars(metadata)
+        fallback_html = _metadata_to_template_html(metadata, css_variables=fallback_vars)
         metadata = _with_conversion_metadata(
             metadata,
-            html_generated=False,
-            section_count=0,
-            css_variables={},
+            html_generated=bool(fallback_html),
+            section_count=len(metadata.get("slides") or []),
+            css_variables=fallback_vars,
             error=str(exc)[:500],
+        )
+        metadata.setdefault("conversion", {})["fallbackGenerated"] = bool(fallback_html)
+        metadata = _with_processing_metadata(
+            metadata,
+            progress=100,
+            stage="ready",
+            message="Original preview and extracted HTML/CSS fallback are ready",
         )
         return repo.finalize_template(
             ctx,
             template_id,
-            html="",
-            css_variables={},
+            html=fallback_html,
+            css_variables=fallback_vars,
             page_count=page_count,
             thumbnail_bytes=thumb,
             error=str(exc)[:500],
@@ -157,6 +217,84 @@ def ensure_template_preview_slides(ctx: TenantContext, template_id: str) -> int:
 
     saved = repo.save_template_preview_slides(ctx, template_id, page_images)
     return saved
+
+
+def ensure_template_metadata(ctx: TenantContext, template_id: str) -> Dict[str, Any]:
+    """Populate slide structure metadata for old templates that still have an empty analysis."""
+    repo = get_content_studio_repository()
+    row = repo.get_template_row(ctx, template_id) or {}
+    current = row.get("metadata") or {}
+    if isinstance(current, dict) and current.get("slides"):
+        return current
+
+    storage_path = repo.resolve_template_source_path(ctx, template_id)
+    if not storage_path:
+        return current if isinstance(current, dict) else {}
+
+    file_bytes = repo.download_template_source(ctx, storage_path)
+    ext = Path(storage_path).suffix.lower()
+    page_count = int(row.get("page_count") or 0) or 1
+    preview_pdf_bytes: Optional[bytes] = None
+    has_preview_pdf = False
+    if ext == ".pdf":
+        preview_pdf_bytes = file_bytes
+        has_preview_pdf = True
+    elif ext == ".ppt":
+        preview_pdf_bytes = repo.get_template_preview_pdf(ctx, template_id)
+        has_preview_pdf = bool(preview_pdf_bytes)
+        if not preview_pdf_bytes:
+            try:
+                preview_pdf_bytes = convert_office_bytes_to_pdf(file_bytes, ext, allow_text_fallback=True)
+                has_preview_pdf = True
+            except Exception:
+                preview_pdf_bytes = None
+
+    metadata = _extract_template_metadata(
+        file_bytes=file_bytes,
+        ext=ext,
+        storage_path=storage_path,
+        page_count=page_count,
+        preview_image_count=page_count,
+        has_preview_pdf=has_preview_pdf,
+        preview_pdf_bytes=preview_pdf_bytes,
+    )
+    css_vars = row.get("css_variables") if isinstance(row.get("css_variables"), dict) else {}
+    has_html = bool(row.get("html"))
+    metadata = _with_conversion_metadata(
+        metadata,
+        html_generated=has_html,
+        section_count=_count_html_slides(str(row.get("html") or "")),
+        css_variables=css_vars,
+    )
+    metadata = _with_processing_metadata(
+        metadata,
+        progress=100,
+        stage="ready",
+        message="Slide structure extracted",
+    )
+
+    patch: Dict[str, Any] = {"metadata": metadata}
+    if (not has_html or _is_placeholder_template_html(str(row.get("html") or ""))) and _metadata_has_slide_text(metadata):
+        fallback_vars = _metadata_css_vars(metadata)
+        fallback_html = _metadata_to_template_html(metadata, css_variables=fallback_vars)
+        if fallback_html:
+            metadata = _with_conversion_metadata(
+                metadata,
+                html_generated=True,
+                section_count=len(metadata.get("slides") or []),
+                css_variables=fallback_vars,
+            )
+            metadata.setdefault("conversion", {})["fallbackGenerated"] = True
+            patch.update(
+                {
+                    "html": fallback_html,
+                    "cssVariables": fallback_vars,
+                    "pageCount": len(metadata.get("slides") or []) or page_count,
+                    "metadata": metadata,
+                }
+            )
+    repo.update_template(ctx, template_id, patch)
+    return metadata
 
 
 def _prepare_visual_assets(
@@ -424,6 +562,183 @@ def _with_conversion_metadata(
         conversion["error"] = error
     out["conversion"] = conversion
     return out
+
+
+def _with_processing_metadata(
+    metadata: Dict[str, Any],
+    *,
+    progress: int,
+    stage: str,
+    message: str,
+) -> Dict[str, Any]:
+    out = dict(metadata)
+    out["processing"] = {
+        "progress": max(0, min(100, int(progress))),
+        "stage": stage,
+        "message": message,
+    }
+    return out
+
+
+def _metadata_has_slide_text(metadata: Dict[str, Any]) -> bool:
+    for slide in metadata.get("slides") or []:
+        if str(slide.get("title") or "").strip() and str(slide.get("title")) != f"Slide {slide.get('slide')}":
+            return True
+        if str(slide.get("text") or "").strip():
+            return True
+    return False
+
+
+def _metadata_css_vars(metadata: Dict[str, Any]) -> Dict[str, str]:
+    colors = ((metadata.get("design") or {}).get("colors") or []) if isinstance(metadata.get("design"), dict) else []
+    primary = str(colors[0]) if colors else "#2563eb"
+    accent = str(colors[1]) if len(colors) > 1 else primary
+    return {
+        "--template-primary": primary,
+        "--template-accent": accent,
+        "--template-bg": "#ffffff",
+        "--template-text": "#111827",
+        "--template-muted": "#6b7280",
+    }
+
+
+def _metadata_to_template_html(metadata: Dict[str, Any], *, css_variables: Dict[str, str]) -> str:
+    slides = metadata.get("slides") or []
+    if not slides:
+        return ""
+    root_vars = "\n".join(f"  {key}: {value};" for key, value in css_variables.items())
+    sections: List[str] = []
+    for slide in slides:
+        slide_no = int(slide.get("slide") or len(sections) + 1)
+        title = str(slide.get("title") or slide.get("name") or f"Slide {slide_no}").strip()
+        layout = str(slide.get("layout") or "").strip()
+        text_blocks = [str(block).strip() for block in (slide.get("textBlocks") or []) if str(block).strip()]
+        if not text_blocks and str(slide.get("text") or "").strip():
+            text_blocks = [line.strip() for line in str(slide.get("text")).splitlines() if line.strip()]
+        # Skip the title if it already appears as the first text block to avoid duplication.
+        body_blocks = [b for b in text_blocks[:8] if b.lower() != title.lower()]
+        body = "\n".join(f"<p>{escape(block)}</p>" for block in body_blocks)
+        color_chips = "\n".join(
+            f'<span class="color-chip" style="background:{escape(str(color))}"></span>'
+            for color in (slide.get("colors") or [])[:8]
+            if str(color).strip()
+        )
+        sections.append(
+            "\n".join(
+                [
+                    f'<section class="slide" data-slide="{slide_no}">',
+                    f"<h1>{escape(title)}</h1>",
+                    f'<p class="slide-layout">{escape(layout)}</p>' if layout else "",
+                    f'<div class="slide-body">{body}</div>' if body else "",
+                    f'<div class="slide-colors">{color_chips}</div>' if color_chips else "",
+                    f'<div class="slide-number">{slide_no}</div>',
+                    "</section>",
+                ]
+            )
+        )
+    return (
+        '<!DOCTYPE html>'
+        '<html lang="en">'
+        '<head>'
+        '<meta charset="utf-8" />'
+        '<meta name="viewport" content="width=1280, initial-scale=1" />'
+        '<link rel="preconnect" href="https://fonts.googleapis.com" />'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />'
+        '<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />'
+        "<style>"
+        f":root {{\n{root_vars}\n}}\n"
+        "*, *::before, *::after { box-sizing: border-box; }"
+        "html, body { margin: 0; padding: 0; background: #1c1c1e; }"
+        # Slide canvas: 1280×720, scaled to fit via viewport meta.
+        # Background is driven by the extracted --template-primary variable so it
+        # matches the actual deck colors rather than a hardcoded blue.
+        ".slide {"
+        "  position: relative;"
+        "  width: 1280px;"
+        "  height: 720px;"
+        "  overflow: hidden;"
+        "  margin: 0 auto;"
+        "  padding: 80px 96px;"
+        "  font-family: 'Urbanist', Arial, sans-serif;"
+        "  color: var(--template-text, #111827);"
+        "  background: var(--template-bg, var(--template-primary, #ffffff));"
+        "}"
+        ".slide h1 {"
+        "  margin: 0 0 20px;"
+        "  font-size: 64px;"
+        "  font-weight: 800;"
+        "  line-height: 1.05;"
+        "  letter-spacing: -0.02em;"
+        "  color: #ffffff;"
+        "  max-width: 840px;"
+        "}"
+        ".slide-layout {"
+        "  display: inline-block;"
+        "  margin: 0 0 24px;"
+        "  padding: 4px 12px;"
+        "  border: 1px solid rgba(255,255,255,.35);"
+        "  border-radius: 4px;"
+        "  font-size: 13px;"
+        "  font-weight: 500;"
+        "  color: rgba(255,255,255,.7);"
+        "  letter-spacing: 0.06em;"
+        "  text-transform: uppercase;"
+        "}"
+        ".slide-body {"
+        "  max-width: 800px;"
+        "  display: grid;"
+        "  gap: 14px;"
+        "  font-size: 22px;"
+        "  line-height: 1.55;"
+        "  color: rgba(255,255,255,.85);"
+        "}"
+        ".slide-body p { margin: 0; }"
+        ".slide-colors {"
+        "  position: absolute;"
+        "  left: 96px;"
+        "  bottom: 56px;"
+        "  display: flex;"
+        "  gap: 8px;"
+        "}"
+        ".color-chip {"
+        "  width: 24px;"
+        "  height: 24px;"
+        "  border-radius: 50%;"
+        "  border: 2px solid rgba(255,255,255,.3);"
+        "}"
+        ".slide-number {"
+        "  position: absolute;"
+        "  right: 48px;"
+        "  bottom: 40px;"
+        "  color: rgba(255,255,255,.4);"
+        "  font-size: 16px;"
+        "  font-weight: 500;"
+        "}"
+        "</style>"
+        "</head>"
+        "<body>"
+        + "\n".join(sections)
+        + "</body></html>"
+    )
+
+
+def _is_placeholder_template_html(html: str) -> bool:
+    visible = re.sub(r"<style[\s\S]*?</style>", "", html, flags=re.IGNORECASE)
+    visible = re.sub(r"<[^>]+>", " ", visible)
+    words = [word.lower() for word in re.findall(r"[A-Za-z0-9]+", visible)]
+    if not words:
+        return True
+    meaningful = [word for word in words if word not in {"slide", "template"} and not word.isdigit()]
+    return len(meaningful) <= 2 and len(words) <= 30
+
+
+def _count_html_slides(html: str) -> int:
+    if not html:
+        return 0
+    sections = re.findall(r"<section\b", html, flags=re.IGNORECASE)
+    if sections:
+        return len(sections)
+    return len(re.findall(r"data-slide=", html, flags=re.IGNORECASE))
 
 
 def _merge_metadata(base: Dict[str, Any], extracted: Dict[str, Any]) -> Dict[str, Any]:
@@ -717,8 +1032,37 @@ def _merge_template_html(sections: List[str], css_variables: Dict[str, str]) -> 
     root_vars = "\n".join(f"  {k}: {v};" for k, v in css_variables.items())
     body = "\n".join(sections)
     return (
-        '<!DOCTYPE html><html><head><meta charset="utf-8">'
-        f"<style>:root {{\n{root_vars}\n}}\n"
-        "section.slide { aspect-ratio: 16/9; max-width: 1280px; margin: 0 auto; }</style>"
-        f"</head><body>{body}</body></html>"
+        '<!DOCTYPE html>'
+        '<html lang="en">'
+        '<head>'
+        '<meta charset="utf-8" />'
+        # Treat the iframe as 1280px wide so absolute pixel sizes in generated slides
+        # render proportionally and scale down automatically on smaller viewports.
+        '<meta name="viewport" content="width=1280, initial-scale=1" />'
+        '<link rel="preconnect" href="https://fonts.googleapis.com" />'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />'
+        '<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />'
+        "<style>"
+        f":root {{\n{root_vars}\n}}\n"
+        # Reset browser defaults so nothing bleeds into the slide canvas.
+        "*, *::before, *::after { box-sizing: border-box; }"
+        # Neutral dark background so the slide canvas itself (which carries its own background) floats cleanly.
+        "html, body { margin: 0; padding: 0; background: #1c1c1e; }"
+        # Each section fills the 1280-wide viewport exactly (16:9 = 720px tall).
+        # The viewport meta makes the iframe browser scale this down to fit smaller containers.
+        "section.slide {"
+        "  display: block;"
+        "  position: relative;"
+        "  width: 1280px;"
+        "  height: 720px;"
+        "  overflow: hidden;"
+        "  margin: 0 auto;"
+        "  font-family: var(--body-font, 'Urbanist', Arial, sans-serif);"
+        "}"
+        # Utility: hide placeholder outlines in preview.
+        ".placeholder { display: block; }"
+        "</style>"
+        "</head>"
+        f"<body>{body}</body>"
+        "</html>"
     )

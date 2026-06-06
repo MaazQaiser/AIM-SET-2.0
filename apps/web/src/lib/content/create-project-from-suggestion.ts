@@ -12,6 +12,9 @@ export interface SuggestionProjectInput {
   leadName?: string;
   reason?: string;
   neededFor?: string;
+  sourcePath?: string;
+  contentRequirements?: string;
+  context?: Record<string, unknown>;
   industry?: string;
   source?: "pre-dc" | "post-dc";
   leads?: ContentGenerationLead[];
@@ -52,10 +55,38 @@ export async function createProjectFromSuggestion(input: SuggestionProjectInput)
     accountName: lead.accountName,
     leadName: lead.leadName,
     industry: lead.industry ?? input.industry,
+    sourcePath: lead.sourcePath,
+    contentRequirements: lead.contentRequirements,
+    context: lead.context,
     relevantProjects: lead.relevantProjects,
     relevantDocuments: lead.relevantDocuments,
     recommendedDeck: lead.recommendedDeck,
   }));
+  const sourcePath =
+    input.sourcePath || input.leads?.find((lead) => lead.sourcePath)?.sourcePath || "/content?tab=suggestions";
+  const contentRequirements =
+    input.contentRequirements ||
+    input.leads?.find((lead) => lead.contentRequirements)?.contentRequirements ||
+    input.reason ||
+    input.neededFor ||
+    "";
+  const suggestionContext = {
+    ...(input.context ?? {}),
+    source: input.source,
+    sourcePath,
+    suggestionId: input.suggestionId,
+    gapId: input.gapId,
+    title: input.title,
+    artifactType,
+    accountName: input.accountName,
+    leadName: input.leadName,
+    industry: input.industry,
+    reason: input.reason,
+    neededFor: input.neededFor,
+    contentRequirements,
+    kbMatches: input.kbMatches ?? [],
+    leads,
+  };
 
   let suggestionPlan: SuggestionPlan | undefined;
   try {
@@ -66,6 +97,9 @@ export async function createProjectFromSuggestion(input: SuggestionProjectInput)
       source: input.source,
       generationReason: input.reason,
       neededFor: input.neededFor,
+      sourcePath,
+      contentRequirements,
+      context: suggestionContext,
       industry: input.industry,
       leads,
       kbAssetIds: (input.kbMatches ?? []).map((m) => m.id),
@@ -83,6 +117,15 @@ export async function createProjectFromSuggestion(input: SuggestionProjectInput)
     source: input.source,
     generation_reason: input.reason,
     needed_for: input.neededFor,
+    source_path: sourcePath,
+    content_requirements: contentRequirements,
+    what_to_create: contentRequirements,
+    needed_at: {
+      source: input.source,
+      path: sourcePath,
+      call_id: input.callId,
+    },
+    suggestion_context: suggestionContext,
     asset_name: input.title,
     industry: input.industry,
     lead_count: leads.length || 1,

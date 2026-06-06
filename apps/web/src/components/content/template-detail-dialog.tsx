@@ -102,12 +102,12 @@ export function TemplateDetailDialog({
                       {showSourcePreview ? (
                         <TemplateSourcePreview template={template} />
                       ) : compiledPreviewHtml ? (
-                        <div className="h-[62vh] overflow-hidden rounded-md border bg-white">
+                        <div className="h-[62vh] overflow-hidden rounded-md border bg-neutral-900">
                           <iframe
                             title="Template preview"
                             srcDoc={compiledPreviewHtml}
                             className="h-full w-full"
-                            sandbox="allow-same-origin"
+                            sandbox="allow-same-origin allow-scripts"
                           />
                         </div>
                       ) : template.thumbnailUrl ? (
@@ -264,12 +264,12 @@ function GeneratedTemplatePreview({
   }
 
   return (
-    <div className="h-[62vh] overflow-hidden rounded-md border bg-white">
+    <div className="h-[62vh] overflow-hidden rounded-md border bg-neutral-900">
       <iframe
         title="Generated HTML/CSS template preview"
         srcDoc={html}
         className="h-full w-full"
-        sandbox="allow-same-origin"
+        sandbox="allow-same-origin allow-scripts"
       />
     </div>
   );
@@ -533,16 +533,24 @@ function extractCssFromHtml(html: string): string {
 function compileTemplateForPreview(rawHtml: string): string {
   const normalized = normalizeTemplateHtml(rawHtml);
   if (!normalized) return "";
+  // Already a full document — return as-is; the backend sets the correct viewport meta.
   if (/<!doctype html>|<html[\s>]/i.test(normalized)) return normalized;
 
+  // Partial HTML (bare <section> snippets): wrap with a proper shell that
+  // matches the backend's _merge_template_html output styling.
   return [
     "<!DOCTYPE html>",
-    "<html>",
+    '<html lang="en">',
     "<head>",
     '<meta charset="utf-8" />',
+    '<meta name="viewport" content="width=1280, initial-scale=1" />',
+    '<link rel="preconnect" href="https://fonts.googleapis.com" />',
+    '<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />',
     "<style>",
-    "html, body { margin: 0; padding: 0; background: #fff; }",
-    "body { min-height: 100vh; }",
+    "*, *::before, *::after { box-sizing: border-box; }",
+    "html, body { margin: 0; padding: 0; background: #1c1c1e; }",
+    "section.slide { display: block; position: relative; width: 1280px; height: 720px; overflow: hidden; margin: 0 auto; font-family: 'Urbanist', Arial, sans-serif; }",
+    ".placeholder { display: block; }",
     "</style>",
     "</head>",
     `<body>${normalized}</body>`,

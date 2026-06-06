@@ -26,6 +26,8 @@ import {
   useKbAssets,
   usePostDcContentGenerationGaps,
   usePreDcContentGenerationGaps,
+  postDcContentGapKey,
+  preDcContentGapKey,
 } from "@/lib/data/hooks";
 import {
   groupPreDcGaps,
@@ -54,14 +56,17 @@ function formatArtifactType(value: string) {
 
 function buildGapKey(
   group: { id: string; name: string },
-  lead: { callId: string } | undefined,
+  lead: { callId: string; sourceArtifactId?: string; sourceItemId?: string } | undefined,
   source: "pre-dc" | "post-dc"
 ) {
   if (!lead) return group.id;
   if (source === "post-dc") {
     return `post_dc:${lead.callId}:${group.name.trim().toLowerCase()}`;
   }
-  const artifactPart = group.id.startsWith("artifact:") ? group.id.slice("artifact:".length) : group.id;
+  const artifactPart =
+    lead.sourceArtifactId?.trim() ||
+    lead.sourceItemId?.trim() ||
+    (group.id.startsWith("artifact:") ? group.id.slice("artifact:".length) : group.name);
   return `pre_dc:${lead.callId}:${artifactPart}`;
 }
 
@@ -70,16 +75,38 @@ export function ContentSuggestionsTab() {
   const { data: kbAssets = [] } = useKbAssets();
   const { data: preDcGaps = [] } = usePreDcContentGenerationGaps();
   const { data: postDcGaps = [] } = usePostDcContentGenerationGaps();
+  const hiddenAgentGapKeys = useMemo(
+    () =>
+      new Set(
+        gaps
+          .filter((gap) => gap.workflowStatus && gap.workflowStatus !== "open")
+          .map((gap) => gap.gapKey)
+          .filter((key): key is string => typeof key === "string" && key.length > 0)
+      ),
+    [gaps]
+  );
+  const visiblePreDcGaps = useMemo(
+    () => preDcGaps.filter((gap) => !hiddenAgentGapKeys.has(preDcContentGapKey(gap))),
+    [hiddenAgentGapKeys, preDcGaps]
+  );
+  const visiblePostDcGaps = useMemo(
+    () => postDcGaps.filter((gap) => !hiddenAgentGapKeys.has(postDcContentGapKey(gap))),
+    [hiddenAgentGapKeys, postDcGaps]
+  );
   const preDcGroups = useMemo(
-    () => attachKbMatchesToGroups(groupPreDcGaps(preDcGaps), kbAssets),
-    [preDcGaps, kbAssets]
+    () => attachKbMatchesToGroups(groupPreDcGaps(visiblePreDcGaps), kbAssets),
+    [visiblePreDcGaps, kbAssets]
   );
   const postDcGroups = useMemo(
-    () => attachKbMatchesToGroups(groupPostDcGaps(postDcGaps), kbAssets),
-    [postDcGaps, kbAssets]
+    () => attachKbMatchesToGroups(groupPostDcGaps(visiblePostDcGaps), kbAssets),
+    [visiblePostDcGaps, kbAssets]
   );
-  const hasAgentInputs = preDcGaps.length > 0 || postDcGaps.length > 0;
-  const hasAnyGaps = hasAgentInputs || gaps.length > 0;
+  const trackedGaps = useMemo(
+    () => gaps.filter((gap) => gap.workflowStatus === "in_progress"),
+    [gaps]
+  );
+  const hasAgentInputs = preDcGroups.length > 0 || postDcGroups.length > 0;
+  const hasAnyGaps = hasAgentInputs || trackedGaps.length > 0;
 
   if (!hasAnyGaps) {
     return (
@@ -98,7 +125,7 @@ export function ContentSuggestionsTab() {
         postDcGroups={postDcGroups}
       />
 
-      {gaps.length > 0 && (
+      {trackedGaps.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -107,9 +134,9 @@ export function ContentSuggestionsTab() {
                 Gaps persisted in the content workflow with linked drafts.
               </p>
             </div>
-            <Badge variant="outline">{gaps.length} item{gaps.length === 1 ? "" : "s"}</Badge>
+            <Badge variant="outline">{trackedGaps.length} item{trackedGaps.length === 1 ? "" : "s"}</Badge>
           </div>
-          {gaps.map((gap) => {
+          {trackedGaps.map((gap) => {
             const config = statusConfig[gap.status];
             return (
               <Card key={gap.id}>
@@ -127,6 +154,19 @@ export function ContentSuggestionsTab() {
                     <CalendarClock className="h-3 w-3" />
                     Detected from: {gap.sourcedFrom}
                   </span>
+                  {gap.sourcePath && (
+                    <Button asChild variant="ghost" size="sm" className="h-7 w-fit px-2 text-xs">
+                      <Link href={gap.sourcePath}>
+                        Needed at
+                        <ArrowUpRight className="h-3 w-3" />
+                      </Link>
+                    </Button>
+                  )}
+                  {(gap.reason || gap.neededFor) && (
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      {[gap.reason, gap.neededFor].filter(Boolean).join(" ")}
+                    </p>
+                  )}
                   <div className="rounded-md border border-border bg-muted/40 p-3">
                     <div className="flex items-center gap-2 mb-2">
                       <FileText className="h-3.5 w-3.5 text-muted-foreground" />
@@ -279,7 +319,33 @@ function ContentGenerationCard({
   const primaryLead = group.leads[0];
   const gapKey = buildGapKey(group, primaryLead, source);
   const leadCount = group.leads.length;
-  const sourceArtifactId = group.id.startsWith("artifact:") ? group.id.slice("artifact:".length) : undefined;
+  const sourceArtifactId =
+    primaryLead?.sourceArtifactId || (group.id.startsWith("artifact:") ? group.id.slice("artifact:".length) : undefined);
+  const sourcePath =
+    primaryLead?.sourcePath ||
+    (primaryLead?.callId
+      ? source === "post-dc"
+        ? `/calls/${primaryLead.callId}/post-dc`
+        : `/calls/${primaryLead.callId}`
+      : "/content?tab=suggestions");
+  const contentRequirements =
+    group.leads.find((lead) => lead.contentRequirements)?.contentRequirements ||
+    group.reason ||
+    group.neededFor;
+  const suggestionContext = {
+    ...(primaryLead?.context ?? {}),
+    source: source === "post-dc" ? "post_dc" : "pre_dc",
+    sourcePath,
+    gapKey,
+    assetName: group.name,
+    artifactType: group.type,
+    reason: group.reason,
+    neededFor: group.neededFor,
+    contentRequirements,
+    whatToCreate: contentRequirements,
+    leads: group.leads,
+    kbMatches: group.kbMatches ?? [],
+  };
 
   const planInput = {
     suggestionId: group.id,
@@ -288,6 +354,9 @@ function ContentGenerationCard({
     source,
     generationReason: group.reason,
     neededFor: group.neededFor,
+    sourcePath,
+    contentRequirements,
+    context: suggestionContext,
     industry: group.industryLabel,
     leads: group.leads.map((lead) => ({
       callId: lead.callId,
@@ -304,7 +373,19 @@ function ContentGenerationCard({
 
   async function handleDismiss() {
     try {
-      await dismissGap.mutateAsync(gapKey);
+      await dismissGap.mutateAsync({
+        gapKey,
+        source,
+        name: group.name,
+        artifactType: group.type,
+        callId: primaryLead?.callId,
+        reason: group.reason,
+        neededFor: group.neededFor,
+        sourcePath,
+        contentRequirements,
+        context: suggestionContext,
+        priority: group.priority,
+      });
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Failed to dismiss suggestion");
     }
@@ -312,7 +393,20 @@ function ContentGenerationCard({
 
   async function handleUploadResolved(asset: { id: string }) {
     try {
-      await resolveGap.mutateAsync({ gapKey, kbAssetId: asset.id });
+      await resolveGap.mutateAsync({
+        gapKey,
+        kbAssetId: asset.id,
+        source,
+        name: group.name,
+        artifactType: group.type,
+        callId: primaryLead?.callId,
+        reason: group.reason,
+        neededFor: group.neededFor,
+        sourcePath,
+        contentRequirements,
+        context: suggestionContext,
+        priority: group.priority,
+      });
     } catch {
       // Gap may not exist in backend yet; upload still succeeded.
     }
@@ -331,6 +425,9 @@ function ContentGenerationCard({
         leadName: primaryLead?.leadName,
         reason: group.reason,
         neededFor: group.neededFor,
+        sourcePath,
+        contentRequirements,
+        context: suggestionContext,
         industry: group.industryLabel,
         source,
         leads: group.leads,
@@ -432,6 +529,21 @@ function ContentGenerationCard({
           <span className="font-medium text-foreground">Needed for: </span>
           {group.neededFor}
         </p>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Needed at:</span>
+          <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs">
+            <Link href={sourcePath}>
+              {source === "post-dc" ? "Post-DC follow-up" : "Pre-DC call brief"}
+              <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </Button>
+        </div>
+        {contentRequirements && contentRequirements !== group.reason && (
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">What to create: </span>
+            {contentRequirements}
+          </p>
+        )}
 
         <Button
           type="button"

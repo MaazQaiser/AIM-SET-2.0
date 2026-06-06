@@ -48,6 +48,13 @@ export interface ContentTemplateMetadata {
     sectionCount?: number;
     cssVariables?: string[];
     error?: string;
+    fallbackGenerated?: boolean;
+  };
+  processing?: {
+    progress?: number;
+    stage?: string;
+    message?: string;
+    updatedAt?: string;
   };
   extractionError?: string;
   sourceFormatNote?: string;
@@ -232,6 +239,9 @@ export interface ContentPlanInput {
   source?: "pre-dc" | "post-dc";
   generationReason?: string;
   neededFor?: string;
+  sourcePath?: string;
+  contentRequirements?: string;
+  context?: Record<string, unknown>;
   industry?: string;
   leads?: Array<{
     callId?: string;

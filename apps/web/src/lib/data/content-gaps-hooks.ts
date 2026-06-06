@@ -15,7 +15,29 @@ async function patchContentGap(gapKey: string, body: Record<string, unknown>) {
 export function useDismissContentGap() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (gapKey: string) => patchContentGap(gapKey, { status: "dismissed" }),
+    mutationFn: (
+      input:
+        | string
+        | {
+            gapKey: string;
+            source?: "pre-dc" | "post-dc";
+            name?: string;
+            artifactType?: string;
+            callId?: string;
+            reason?: string;
+            neededFor?: string;
+            sourcePath?: string;
+            contentRequirements?: string;
+            context?: Record<string, unknown>;
+            priority?: number;
+          }
+    ) => {
+      if (typeof input === "string") {
+        return patchContentGap(input, { status: "dismissed" });
+      }
+      const { gapKey, ...context } = input;
+      return patchContentGap(gapKey, { ...context, status: "dismissed" });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["content-gaps"] });
       qc.invalidateQueries({ queryKey: ["pre-dc-content-generation-gaps"] });
@@ -27,8 +49,29 @@ export function useDismissContentGap() {
 export function useResolveContentGap() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ gapKey, kbAssetId }: { gapKey: string; kbAssetId: string }) =>
-      patchContentGap(gapKey, { status: "resolved", kbAssetId }),
+    mutationFn: ({
+      gapKey,
+      kbAssetId,
+      ...context
+    }: {
+      gapKey: string;
+      kbAssetId: string;
+      source?: "pre-dc" | "post-dc";
+      name?: string;
+      artifactType?: string;
+      callId?: string;
+      reason?: string;
+      neededFor?: string;
+      sourcePath?: string;
+      contentRequirements?: string;
+      context?: Record<string, unknown>;
+      priority?: number;
+    }) =>
+      patchContentGap(gapKey, {
+        ...context,
+        status: "resolved",
+        kbAssetId,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["content-gaps"] });
       qc.invalidateQueries({ queryKey: ["pre-dc-content-generation-gaps"] });

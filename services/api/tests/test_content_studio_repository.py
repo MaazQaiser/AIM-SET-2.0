@@ -134,3 +134,29 @@ def test_pptx_template_metadata_extraction_reads_title_text_and_design() -> None
     assert "Pipeline proof points" in metadata["slides"][0]["text"]
     assert "#123456" in metadata["slides"][0]["colors"]
     assert "Aptos" in metadata["design"]["fonts"]
+
+
+def test_pptx_metadata_can_generate_html_fallback() -> None:
+    from app.services.template_ingest_service import _metadata_css_vars, _metadata_to_template_html
+
+    metadata = {
+        "slideCount": 1,
+        "slides": [
+            {
+                "slide": 1,
+                "title": "AI Sales Deck",
+                "layout": "Title Slide",
+                "textBlocks": ["Pipeline proof points and customer outcomes"],
+                "colors": ["#123456"],
+            }
+        ],
+        "design": {"colors": ["#123456"], "fonts": ["Aptos"], "layouts": ["Title Slide"]},
+    }
+
+    css_vars = _metadata_css_vars(metadata)
+    html = _metadata_to_template_html(metadata, css_variables=css_vars)
+
+    assert "--template-primary" in html
+    assert "AI Sales Deck" in html
+    assert "Pipeline proof points and customer outcomes" in html
+    assert "#123456" in html

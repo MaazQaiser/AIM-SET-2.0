@@ -1,14 +1,23 @@
 /** Domain types for UI surfaces (no mock payloads). */
 
 export type ContentGapStatus = "draft" | "pending-review" | "approved";
+export type ContentGapWorkflowStatus = "open" | "in_progress" | "resolved" | "dismissed";
 export type ContentGapDraftType = "deck" | "one-pager" | "case-study";
 
 export interface ContentGap {
   id: string;
+  gapKey?: string;
   topic: string;
   sourcedFrom: string;
   callId?: string;
   studioProjectId?: string;
+  kbAssetId?: string;
+  sourcePath?: string;
+  reason?: string;
+  neededFor?: string;
+  artifactType?: string;
+  workflowStatus?: ContentGapWorkflowStatus;
+  context?: Record<string, unknown>;
   status: ContentGapStatus;
   draftType: ContentGapDraftType;
 }

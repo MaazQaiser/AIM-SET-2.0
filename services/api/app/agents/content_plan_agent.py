@@ -152,6 +152,7 @@ def _heuristic_slide_plan(
     artifact_type: str,
     generation_reason: str,
     needed_for: str,
+    content_requirements: str = "",
     leads: List[Dict[str, Any]],
     evidence_projects: List[Dict[str, Any]],
     evidence_kb: List[Dict[str, Any]],
@@ -165,6 +166,8 @@ def _heuristic_slide_plan(
         data_points.append(generation_reason)
     if needed_for:
         data_points.append(needed_for)
+    if content_requirements and content_requirements not in data_points:
+        data_points.append(content_requirements)
     for lead in leads[:4]:
         account = lead.get("account_name") or ""
         if account:
@@ -289,6 +292,9 @@ def run_content_plan(
     source: str,
     generation_reason: str,
     needed_for: str,
+    source_path: str = "",
+    content_requirements: str = "",
+    extra_context: Optional[Dict[str, Any]] = None,
     industry: str = "",
     leads: Optional[List[Dict[str, Any]]] = None,
     kb_asset_ids: Optional[List[str]] = None,
@@ -300,7 +306,8 @@ def run_content_plan(
     normalized_leads = _normalize_leads(leads or [])
     lead_count = len(normalized_leads) or 1
 
-    query_parts = [title, generation_reason, needed_for, industry]
+    extra_context = extra_context or {}
+    query_parts = [title, generation_reason, needed_for, content_requirements, industry]
     for lead in normalized_leads[:6]:
         query_parts.extend([lead.get("account_name", ""), lead.get("industry", "")])
     query = " ".join(p for p in query_parts if p).strip()
@@ -360,6 +367,7 @@ def run_content_plan(
         artifact_type=artifact_type,
         generation_reason=generation_reason,
         needed_for=needed_for,
+        content_requirements=content_requirements,
         leads=normalized_leads,
         evidence_projects=evidence_projects,
         evidence_kb=evidence_kb,
@@ -382,6 +390,9 @@ def run_content_plan(
                 "artifact_type": artifact_type,
                 "generation_reason": generation_reason,
                 "needed_for": needed_for,
+                "source_path": source_path,
+                "content_requirements": content_requirements,
+                "context": extra_context,
                 "industry": industry,
                 "lead_count": lead_count,
                 "leads": normalized_leads,
@@ -415,6 +426,9 @@ def run_content_plan(
         "source": source,
         "generation_reason": generation_reason,
         "needed_for": needed_for,
+        "source_path": source_path,
+        "content_requirements": content_requirements,
+        "context": extra_context,
         "lead_count": lead_count,
         "leads": normalized_leads,
         "industry": industry,

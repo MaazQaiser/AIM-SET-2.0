@@ -216,6 +216,9 @@ export interface ContentToGenerate {
   status: "missing" | "partial";
   reason: string;
   neededFor: string;
+  sourcePath?: string;
+  contentRequirements?: string;
+  context?: Record<string, unknown>;
   relevantProjects?: RelevantProject[];
   relevantDocuments?: RelevantDocument[];
   recommendedDeck?: RelevantDocument | null;

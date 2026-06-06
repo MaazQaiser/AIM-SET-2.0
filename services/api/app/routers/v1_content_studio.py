@@ -24,7 +24,9 @@ from app.services.template_editor_service import (
     split_template_parts,
     validate_template_html,
 )
-from app.services.template_ingest_service import ensure_template_preview_slides
+from app.services.template_ingest_service import ensure_template_metadata, ensure_template_preview_slides
+
+TEMPLATE_UPLOAD_EXTENSIONS = {".ppt", ".pptx"}
 
 router = APIRouter(prefix="/api/v1/content", tags=["content-studio"])
 _orch = Orchestrator()
@@ -69,6 +71,9 @@ class ContentPlanBody(BaseModel):
     source: str = "pre-dc"
     generationReason: str = ""
     neededFor: str = ""
+    sourcePath: str = ""
+    contentRequirements: str = ""
+    context: Dict[str, Any] = Field(default_factory=dict)
     industry: str = ""
     leads: List[ContentPlanLead] = Field(default_factory=list)
     kbAssetIds: List[str] = Field(default_factory=list)
@@ -122,27 +127,10 @@ def create_template(
     body: TemplateBody,
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> Dict[str, Any]:
-    if body.artifactType not in ARTIFACT_TYPES:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid artifactType")
-    name = body.name.strip()
-    if not name:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Template name is required")
-    try:
-        validate_template_html(body.html, body.css)
-        document = build_template_document(body.html, body.css)
-        _, extracted_css = split_template_parts(body.html)
-        css_text = body.css or extracted_css
-        return get_content_studio_repository().create_manual_template(
-            ctx,
-            name=name,
-            artifact_type=body.artifactType,
-            tags=body.tags,
-            html=document,
-            css_variables=extract_css_variables(css_text),
-            page_count=count_template_pages(document, body.artifactType),
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Templates must be created by uploading a PPT or PPTX file. Edit HTML/CSS after extraction.",
+    )
 
 
 @router.post("/templates/assist")
@@ -170,9 +158,17 @@ def get_template(
     template_id: str,
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> Dict[str, Any]:
-    tpl = get_content_studio_repository().get_template(ctx, template_id)
+    repo = get_content_studio_repository()
+    tpl = repo.get_template(ctx, template_id)
     if not tpl:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+    metadata = tpl.get("metadata") if isinstance(tpl.get("metadata"), dict) else {}
+    if tpl.get("hasSourceFile") and tpl.get("status") == "ready" and not (metadata.get("slides") if metadata else None):
+        try:
+            ensure_template_metadata(ctx, template_id)
+            tpl = repo.get_template(ctx, template_id) or tpl
+        except Exception:
+            pass
     return tpl
 
 
@@ -310,6 +306,7 @@ def delete_template(
 
 @router.post("/templates/upload")
 async def upload_template(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     name: Optional[str] = Form(None),
     artifact_type: Optional[str] = Form(None),
@@ -318,10 +315,10 @@ async def upload_template(
 ) -> Dict[str, Any]:
     file_name = file.filename or "upload.bin"
     ext = Path(file_name).suffix.lower()
-    if ext not in TEMPLATE_EXTENSIONS:
+    if ext not in TEMPLATE_UPLOAD_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file type. Allowed: {', '.join(sorted(TEMPLATE_EXTENSIONS))}",
+            detail=f"Unsupported file type. Allowed: {', '.join(sorted(TEMPLATE_UPLOAD_EXTENSIONS))}",
         )
     content = await file.read()
     tag_list = [t.strip() for t in (tags or "").split(",") if t.strip()]
@@ -333,6 +330,13 @@ async def upload_template(
         name=name,
         artifact_type=artifact_type,
         tags=tag_list,
+        process=False,
+    )
+    background_tasks.add_task(
+        _orch.complete_template_ingest,
+        ctx,
+        result["template"]["id"],
+        result["storagePath"],
     )
     return result
 
@@ -365,6 +369,9 @@ def build_content_plan(
             source=body.source,
             generation_reason=body.generationReason,
             needed_for=body.neededFor,
+            source_path=body.sourcePath,
+            content_requirements=body.contentRequirements,
+            extra_context=body.context,
             industry=body.industry,
             leads=leads_payload,
             kb_asset_ids=body.kbAssetIds,
@@ -391,23 +398,29 @@ def create_project(
         call_id=body.callId,
         source_gap_id=body.gapId,
     )
-    _link_gap_to_project(ctx, body.gapId, str(project["id"]))
+    _link_gap_to_project(ctx, body.gapId, str(project["id"]), body)
     return project
 
 
-def _link_gap_to_project(ctx: TenantContext, gap_ref: Optional[str], project_id: str) -> None:
+def _link_gap_to_project(
+    ctx: TenantContext,
+    gap_ref: Optional[str],
+    project_id: str,
+    body: CreateProjectBody,
+) -> None:
     if not gap_ref:
         return
-    from app.domain.content_gaps_repository import get_content_gaps_repository
+    from app.services.content_gaps_service import upsert_gap_from_studio_brief
 
-    repo = get_content_gaps_repository()
-    gap = repo.get_gap(ctx, gap_ref)
-    if gap:
-        repo.patch_gap(
-            ctx,
-            str(gap["id"]),
-            {"status": "in_progress", "studioProjectId": project_id},
-        )
+    upsert_gap_from_studio_brief(
+        ctx,
+        gap_key=gap_ref,
+        project_id=project_id,
+        title=body.title,
+        artifact_type=body.artifactType,
+        brief=body.brief,
+        call_id=body.callId,
+    )
 
 
 @router.get("/studio/projects/{project_id}")

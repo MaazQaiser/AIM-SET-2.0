@@ -27,6 +27,8 @@ def _row_to_api(row: Dict[str, Any]) -> Dict[str, Any]:
         "artifactType": row.get("artifact_type") or "deck",
         "reason": row.get("reason"),
         "neededFor": row.get("needed_for"),
+        "sourcePath": row.get("source_path") or row.get("sourcePath"),
+        "context": row.get("context") if isinstance(row.get("context"), dict) else {},
         "priority": int(row.get("priority") or 2),
         "status": row.get("status") or "open",
         "studioProjectId": str(row["studio_project_id"]) if row.get("studio_project_id") else None,
@@ -83,6 +85,8 @@ class ContentGapsRepository:
         call_id: Optional[str] = None,
         reason: Optional[str] = None,
         needed_for: Optional[str] = None,
+        source_path: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
         priority: int = 2,
     ) -> Dict[str, Any]:
         tenant_uuid, clerk_key = self._tenants.resolve(ctx, allow_memory_fallback=True)
@@ -91,6 +95,11 @@ class ContentGapsRepository:
             return existing
 
         gap_id = existing["id"] if existing else str(uuid.uuid4())
+        existing_context = existing.get("context") if isinstance((existing or {}).get("context"), dict) else {}
+        merged_context = {
+            **existing_context,
+            **(context or {}),
+        }
         row = {
             "id": gap_id,
             "tenant_id": tenant_uuid,
@@ -101,6 +110,8 @@ class ContentGapsRepository:
             "artifact_type": artifact_type,
             "reason": reason,
             "needed_for": needed_for,
+            "source_path": source_path or (existing or {}).get("sourcePath"),
+            "context": merged_context,
             "priority": priority,
             "status": existing.get("status") if existing else "open",
             "updated_at": _now_iso(),
@@ -146,6 +157,11 @@ class ContentGapsRepository:
             db_patch["studio_project_id"] = patch["studioProjectId"]
         if "kbAssetId" in patch:
             db_patch["kb_asset_id"] = patch["kbAssetId"]
+        if "sourcePath" in patch:
+            db_patch["source_path"] = patch["sourcePath"]
+        if "context" in patch and isinstance(patch["context"], dict):
+            current = resolved.get("context") if isinstance(resolved.get("context"), dict) else {}
+            db_patch["context"] = {**current, **patch["context"]}
 
         use_memory = not get_settings().supabase_configured
         if get_settings().supabase_configured:
@@ -166,6 +182,10 @@ class ContentGapsRepository:
                 g["studioProjectId"] = patch["studioProjectId"]
             if "kbAssetId" in patch:
                 g["kbAssetId"] = patch["kbAssetId"]
+            if "sourcePath" in patch:
+                g["sourcePath"] = patch["sourcePath"]
+            if "context" in db_patch:
+                g["context"] = db_patch["context"]
             g["updatedAt"] = db_patch["updated_at"][:19]
             return g
         if use_memory:

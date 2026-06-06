@@ -246,6 +246,15 @@ class ContentStudioRepository:
             "source_file_name": file_name,
             "source_storage_path": storage_path,
             "tags": tags or [],
+            "metadata": {
+                "source": {"fileName": file_name, "extension": ext.lstrip(".")},
+                "processing": {
+                    "progress": 5,
+                    "stage": "uploaded",
+                    "message": "Upload received",
+                    "updatedAt": _now_iso(),
+                },
+            },
             "created_by": ctx.user_id,
             "created_at": _now_iso(),
         }
@@ -259,7 +268,11 @@ class ContentStudioRepository:
                     file_bytes,
                     {"content-type": _mime_for_ext(ext), "upsert": "true"},
                 )
-                supabase.table("content_templates").insert(row).execute()
+                try:
+                    supabase.table("content_templates").insert(row).execute()
+                except Exception:
+                    legacy_row = {key: value for key, value in row.items() if key != "metadata"}
+                    supabase.table("content_templates").insert(legacy_row).execute()
             except Exception:
                 use_memory = True
         if use_memory:
@@ -270,6 +283,39 @@ class ContentStudioRepository:
             store.content_templates.setdefault(clerk_key, []).append(api)
 
         return {"template": _tpl_row_to_api(row), "storagePath": storage_path}
+
+    def update_template_progress(
+        self,
+        ctx: TenantContext,
+        template_id: str,
+        *,
+        progress: int,
+        stage: str,
+        message: str,
+    ) -> None:
+        row = self.get_template_row(ctx, template_id) or {}
+        metadata = row.get("metadata") or {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+        metadata["processing"] = {
+            "progress": max(0, min(100, int(progress))),
+            "stage": stage,
+            "message": message,
+            "updatedAt": _now_iso(),
+        }
+
+        use_memory = not get_settings().supabase_configured
+        if get_settings().supabase_configured:
+            try:
+                get_supabase().table("content_templates").update({"metadata": metadata}).eq("id", template_id).execute()
+                return
+            except Exception:
+                use_memory = True
+
+        if use_memory:
+            for _clerk_key, template in self._all_memory_templates():
+                if template.get("id") == template_id:
+                    template["metadata"] = metadata
 
     def create_manual_template(
         self,
@@ -413,7 +459,7 @@ class ContentStudioRepository:
 
         patch = {
             "status": status,
-            "html": html if not error else None,
+            "html": html if html else None,
             "css_variables": css_variables,
             "page_count": page_count,
             "ingest_error": ingest_error,

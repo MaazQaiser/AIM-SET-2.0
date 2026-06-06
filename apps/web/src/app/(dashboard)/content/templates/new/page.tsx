@@ -1,5 +1,5 @@
-import { TemplateEditor } from "@/components/content/template-editor";
+import { redirect } from "next/navigation";
 
 export default function NewTemplatePage() {
-  return <TemplateEditor />;
+  redirect("/content/templates/upload");
 }

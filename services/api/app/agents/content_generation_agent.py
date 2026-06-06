@@ -164,7 +164,7 @@ def _attach_outline_sources(
 
 def _brief_citations(project_id: str, brief: Dict[str, Any]) -> List[Citation]:
     snippets = []
-    for key in ("audience", "content_context", "style"):
+    for key in ("audience", "content_context", "style", "content_requirements", "source_path"):
         value = str(brief.get(key) or "").strip()
         if value:
             snippets.append(f"{key}: {value}")
@@ -1199,6 +1199,7 @@ def _enrich_brief_from_suggestion(brief: Dict[str, Any], title: str, artifact_ty
     b = dict(brief)
     needed_for = str(b.get("needed_for") or "").strip()
     reason = str(b.get("generation_reason") or "").strip()
+    requirements = str(b.get("content_requirements") or b.get("what_to_create") or "").strip()
     asset_name = str(b.get("asset_name") or title).strip()
     account = str(b.get("account_name") or "").strip()
     industry = str(b.get("industry") or "").strip() or _extract_industry_from_needed_for(needed_for) or ""
@@ -1218,6 +1219,8 @@ def _enrich_brief_from_suggestion(brief: Dict[str, Any], title: str, artifact_ty
         derived: List[str] = []
         if needed_for:
             derived.append(needed_for)
+        if requirements and requirements.lower() not in needed_for.lower():
+            derived.append(requirements)
         if reason and reason.lower() not in needed_for.lower():
             derived.append(reason)
         lowered = asset_name.lower()
@@ -1343,6 +1346,8 @@ def _bootstrap_message(
 ) -> str:
     account = str(brief.get("account_name") or "").strip()
     needed_for = str(brief.get("needed_for") or "").strip()
+    requirements = str(brief.get("content_requirements") or brief.get("what_to_create") or "").strip()
+    source_path = str(brief.get("source_path") or "").strip()
     lines = ["I pulled context from your content suggestion and drafted a starting plan."]
 
     if suggestion_plan:
@@ -1379,6 +1384,10 @@ def _bootstrap_message(
         lines.append(f"Needed for: {needed_for}.")
     elif account:
         lines.append(f"Account: {account}.")
+    if requirements and requirements.lower() not in needed_for.lower():
+        lines.append(f"What to create: {requirements}.")
+    if source_path:
+        lines.append(f"This maps back to {source_path} when saved to the KB.")
 
     if artifact_type == "deck":
         lines.append("Review each slide below and tell me what to change on any slide.")

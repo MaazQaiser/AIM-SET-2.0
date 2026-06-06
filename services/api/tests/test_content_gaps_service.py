@@ -3,7 +3,11 @@ from __future__ import annotations
 from app.domain.content_gaps_repository import ContentGapsRepository
 from app.domain.memory_store import get_memory_store
 from app.services import content_gaps_service
-from app.services.content_gaps_service import sync_gaps_from_brief, sync_gaps_from_post_call
+from app.services.content_gaps_service import (
+    sync_gaps_from_brief,
+    sync_gaps_from_post_call,
+    upsert_gap_from_studio_brief,
+)
 from dc_core.tenancy import TenantContext
 
 
@@ -31,6 +35,9 @@ def test_sync_gaps_from_brief_upserts_missing_items():
     assert gaps[0]["gapKey"] == "pre_dc:call-123:art-deck"
     assert gaps[0]["status"] == "open"
     assert gaps[0]["name"] == "Services overview deck"
+    assert gaps[0]["sourcePath"] == "/calls/call-123"
+    assert gaps[0]["context"]["sourcePath"] == "/calls/call-123"
+    assert gaps[0]["context"]["whatToCreate"] == "No KB match"
 
 
 def test_sync_gaps_from_post_call_upserts_missing_attachments():
@@ -49,6 +56,8 @@ def test_sync_gaps_from_post_call_upserts_missing_attachments():
     assert len(gaps) == 1
     assert gaps[0]["gapKey"] == "post_dc:call-456:fintech case study"
     assert gaps[0]["source"] == "post_dc"
+    assert gaps[0]["sourcePath"] == "/calls/call-456/post-dc"
+    assert gaps[0]["context"]["neededFor"] == "Post-call follow-up and email attachments"
 
 
 def test_sync_gaps_from_post_call_uses_memory_tenant_fallback(monkeypatch):
@@ -91,3 +100,33 @@ def test_sync_gaps_from_post_call_uses_memory_tenant_fallback(monkeypatch):
     assert tenant_service.allow_values
     assert all(tenant_service.allow_values)
     assert gaps[0]["gapKey"] == "post_dc:call-fallback:security architecture overview"
+
+
+def test_upsert_gap_from_studio_brief_links_project_and_context():
+    from app.domain import content_gaps_repository as repo_module
+
+    repo_module.get_content_gaps_repository.cache_clear()
+    repo = repo_module.get_content_gaps_repository()
+    ctx = TenantContext(tenant_id="test-tenant-3", user_id="user-1")
+    gap = upsert_gap_from_studio_brief(
+        ctx,
+        gap_key="pre_dc:call-789:art-case",
+        project_id="11111111-1111-1111-1111-111111111111",
+        title="Healthcare case study",
+        artifact_type="deck",
+        call_id="call-789",
+        brief={
+            "source": "pre-dc",
+            "account_name": "Acme Health",
+            "generation_reason": "No strong healthcare proof point exists.",
+            "needed_for": "Pre-call prep",
+            "content_requirements": "Create a healthcare proof deck with project evidence.",
+            "industry": "Healthcare",
+        },
+    )
+
+    assert gap["status"] == "in_progress"
+    assert gap["studioProjectId"] == "11111111-1111-1111-1111-111111111111"
+    assert gap["sourcePath"] == "/calls/call-789"
+    assert gap["context"]["whatToCreate"] == "Create a healthcare proof deck with project evidence."
+    assert repo.get_gap(ctx, "pre_dc:call-789:art-case")["id"] == gap["id"]
