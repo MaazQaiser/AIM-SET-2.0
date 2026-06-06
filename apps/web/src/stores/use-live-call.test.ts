@@ -228,6 +228,44 @@ describe("useLiveCall live page state regressions", () => {
     expect(state.bantSignals[0].value).toBe("$450K to $600K");
   });
 
+  it("dedupes generic BANT signal annotations when checklist evidence arrives", () => {
+    const store = useLiveCall.getState();
+    store.addBantSignal({
+      id: "generic-budget",
+      dimension: "budget",
+      label: "Budget Signal",
+      timestamp: 54,
+    });
+    store.addBantSignal({
+      id: "rich-budget",
+      dimension: "budget",
+      label: "Budget signal: i have budget around",
+      value: "i have budget around",
+      snippet: "i have budget around",
+      timestamp: 54,
+    });
+    store.addBantSignal({
+      id: "generic-timeline",
+      dimension: "timeline",
+      label: "Timeline Signal",
+      timestamp: 62,
+    });
+    store.addBantSignal({
+      id: "rich-timeline",
+      dimension: "timeline",
+      label: "Timeline signal: not more than three months",
+      value: "not more than three months",
+      snippet: "the deadline will be not more than three months",
+      timestamp: 62,
+    });
+
+    const state = useLiveCall.getState();
+    expect(state.bantSignals).toHaveLength(2);
+    expect(state.bantSignals.map((signal) => signal.dimension)).toEqual(["budget", "timeline"]);
+    expect(state.bantSignals[0].label).toContain("i have budget around");
+    expect(state.bantSignals[1].label).toContain("not more than three months");
+  });
+
   it("ignores malformed checklist payloads from partial API demo fallback results", () => {
     applyApiDemoResult({
       checklist: {},

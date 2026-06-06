@@ -189,6 +189,9 @@ test.describe("Live call cockpit — DOM + API", () => {
     await expect(page.getByText(/budget|four hundred|six hundred|carved/i).first()).toBeVisible({
       timeout: 90_000,
     });
+    await expect(page.getByText(/Timeline-wise|Q3 pilot|production-grade by Q1/i).first()).toBeVisible({
+      timeout: 90_000,
+    });
 
     await expect(page.getByText(/BANT live/i).first()).toBeVisible();
     await expect
@@ -213,6 +216,8 @@ test.describe("Live call cockpit — DOM + API", () => {
 
     const bodyText = await page.locator("body").innerText();
     expect(bodyText).not.toMatch(/\bif\s*×|\bso\s*×|\bthey\s*×/i);
+    expect(bodyText).not.toMatch(/\bBudget Signal\b/);
+    expect(bodyText).not.toMatch(/\bTimeline Signal\b/);
     expect(bodyText).toMatch(/budget|franchise|pilot|q3|platform|compliance/i);
 
     const lastSegment = await postDemoSegment(request, {
@@ -327,6 +332,8 @@ test.describe("Live call cockpit — DOM + API", () => {
     const bodyText = (await page.locator("body").innerText()).replace(/\s+/g, " ");
     expect(bodyText).not.toMatch(/Still to cover: [^.]*Budget/i);
     expect(bodyText).not.toMatch(/Still to cover: [^.]*Timeline/i);
+    expect(bodyText).not.toMatch(/\bBudget Signal\b/);
+    expect(bodyText).not.toMatch(/\bTimeline Signal\b/);
 
     await expect(page.locator(".animate-cursor")).toHaveCount(0, { timeout: 6_000 });
   });

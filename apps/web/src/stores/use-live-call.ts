@@ -166,6 +166,36 @@ function mergeTranscriptEvent(
   };
 }
 
+function bantSignalKey(signal: BantSignal): string | null {
+  const dimension = stableKey(signal.dimension);
+  const timestamp = stableKey(signal.timestamp);
+  if (dimension && timestamp) return `${dimension}:${timestamp}`;
+  return stableKey(signal.id);
+}
+
+function bantSignalWeight(signal: BantSignal): number {
+  let weight = 0;
+  if (signal.value?.trim()) weight += 4;
+  if (signal.snippet?.trim()) weight += 2;
+  if ((signal.label || "").includes(":")) weight += 1;
+  return weight;
+}
+
+function mergeBantSignal(existing: BantSignal, incoming: BantSignal): BantSignal {
+  if (bantSignalWeight(incoming) < bantSignalWeight(existing)) return existing;
+  return {
+    ...existing,
+    ...incoming,
+    id: incoming.id || existing.id,
+    dimension: incoming.dimension || existing.dimension,
+    timestamp: Number.isFinite(incoming.timestamp) ? incoming.timestamp : existing.timestamp,
+    label: incoming.label || existing.label,
+    value: incoming.value || existing.value,
+    snippet: incoming.snippet || existing.snippet,
+    sentiment: incoming.sentiment ?? existing.sentiment,
+  };
+}
+
 export const useLiveCall = create<LiveCallState>((set, get) => ({
   ...initialState,
 
@@ -195,9 +225,19 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
     })),
 
   addBantSignal: (signal) =>
-    set((s) => ({
-      bantSignals: upsertCapped(s.bantSignals, signal, (item) => item.id, 20),
-    })),
+    set((s) => {
+      const key = bantSignalKey(signal);
+      if (!key) {
+        return { bantSignals: [...s.bantSignals.slice(-19), signal] };
+      }
+      const existingIndex = s.bantSignals.findIndex((item) => bantSignalKey(item) === key);
+      if (existingIndex === -1) {
+        return { bantSignals: [...s.bantSignals.slice(-19), signal] };
+      }
+      const next = [...s.bantSignals];
+      next[existingIndex] = mergeBantSignal(next[existingIndex], signal);
+      return { bantSignals: next };
+    }),
 
   addSentimentSignal: (signal) =>
     set((s) => ({
