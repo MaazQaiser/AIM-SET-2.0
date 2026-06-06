@@ -174,6 +174,46 @@ export interface ArtifactFulfillment {
   requiredData?: string;
 }
 
+export type ContentSuggestionEvidenceSourceType =
+  | "project_database"
+  | "knowledge_base"
+  | "dc_notes"
+  | "crm_record"
+  | "content_library"
+  | "suggestion";
+
+export interface ContentSuggestionEvidenceSource {
+  sourceType: ContentSuggestionEvidenceSourceType;
+  sourceId?: string;
+  title: string;
+  summary?: string;
+  details?: string;
+  snippet?: string;
+  assetId?: string;
+  relevanceScore?: number;
+}
+
+export interface ContentSuggestionKbMatch {
+  assetId?: string;
+  id?: string;
+  title: string;
+  type?: string;
+  fileName?: string;
+  snippet?: string;
+}
+
+export interface ContentSuggestionSlidePlan {
+  slide: number;
+  heading: string;
+  body: string;
+  visual?: string;
+  evidence?: string;
+  sourceType?: ContentSuggestionEvidenceSourceType;
+  sourceId?: string;
+  sourceAssetId?: string;
+  reuseHint?: string;
+}
+
 export interface ContentToGenerate {
   id: string;
   sourceArtifactId?: string;
@@ -183,6 +223,12 @@ export interface ContentToGenerate {
   status: "missing" | "partial";
   reason: string;
   neededFor: string;
+  relevantProjects?: RelevantProject[];
+  relevantDocuments?: RelevantDocument[];
+  recommendedDeck?: RelevantDocument | null;
+  kbMatches?: ContentSuggestionKbMatch[];
+  evidence?: ContentSuggestionEvidenceSource[];
+  slidePlan?: ContentSuggestionSlidePlan[];
 }
 
 export type PreDcAgentStatus = "pending" | "running" | "success" | "failed";
