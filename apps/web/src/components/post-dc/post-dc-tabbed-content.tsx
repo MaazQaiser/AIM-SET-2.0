@@ -8,14 +8,17 @@ import { PostDcClpActivityCard } from "@/components/post-dc/post-dc-clp-activity
 import { PostDcClpStatusCard } from "@/components/post-dc/post-dc-clp-status-card";
 import { PostDcTranscriptPanel } from "@/components/post-dc/post-dc-transcript-panel";
 import {
+  POST_DC_DEFAULT_TAB,
   POST_DC_TAB_GROUP_LABELS,
   POST_DC_TAB_ITEMS,
   POST_DC_TAB_JOURNEY,
   POST_DC_TAB_WIDGET_IDS,
+  visiblePostDcTabs,
   type PostDcTabId,
 } from "@/components/post-dc/post-dc-tab-config";
 import type { PostDcWidgetProps, WidgetSpec } from "@/lib/dashboard/widget-registry";
 import type { PostCallJiraTicket } from "@/lib/brief-types";
+import { resolveLeadStage } from "@/lib/post-dc/deal-signals";
 import { cn } from "@/lib/cn";
 import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
 import type { CustomerLandingPage } from "@dc-copilot/types";
@@ -45,30 +48,37 @@ export function PostDcTabbedContent({
   defaultTab,
   onTabChange,
 }: PostDcTabbedContentProps) {
-  const initialTab = defaultTab ?? (embedded ? "summary" : "before");
+  const leadStage = resolveLeadStage(widgetProps.review);
+  const tabItems = useMemo(() => visiblePostDcTabs(leadStage), [leadStage]);
+  const initialTab = defaultTab ?? POST_DC_DEFAULT_TAB;
   const [activeTab, setActiveTab] = useState<PostDcTabId>(initialTab);
   const hidden = useDashboardLayoutStore((s) => s.hidden["post-dc"] ?? EMPTY_HIDDEN);
   const hideWidget = useDashboardLayoutStore((s) => s.hideWidget);
 
-  const openEmailDraft = useCallback(() => {
-    setActiveTab("follow-up");
-    window.setTimeout(() => {
-      document.getElementById("post-email-draft")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 0);
-  }, []);
+  const handleTabChange = useCallback(
+    (tab: PostDcTabId) => {
+      setActiveTab(tab);
+      onTabChange?.(tab);
+    },
+    [onTabChange]
+  );
 
-  const widgetPropsWithActions = useMemo(
-    () => ({ ...widgetProps, onOpenEmailDraft: openEmailDraft }),
-    [openEmailDraft, widgetProps]
+  const widgetPropsWithNav = useMemo(
+    () => ({
+      ...widgetProps,
+      onNavigateToTab: (tab: PostDcTabId) => {
+        if (tabItems.some((item) => item.id === tab)) {
+          handleTabChange(tab);
+        }
+      },
+    }),
+    [widgetProps, tabItems, handleTabChange]
   );
 
   const visibleByTab = useMemo(() => {
     const available = widgets.filter((w) => {
       if (hidden.includes(w.id)) return false;
-      if (w.isAvailable && !w.isAvailable(widgetPropsWithActions)) return false;
+      if (w.isAvailable && !w.isAvailable(widgetPropsWithNav)) return false;
       return true;
     });
     const byId = new Map(available.map((w) => [w.id, w]));
@@ -82,32 +92,31 @@ export function PostDcTabbedContent({
       },
       {} as Record<PostDcTabId, WidgetSpec<PostDcWidgetProps>[]>
     );
-  }, [widgets, hidden, widgetPropsWithActions]);
+  }, [widgets, hidden, widgetPropsWithNav]);
 
   const tabHasContent = (tabId: PostDcTabId) => {
-    if (tabId === "transcript") {
-      return true;
+    if (tabId === "transcript") return true;
+    if (tabId === "proposal") return true;
+    if (tabId === "actions") {
+      return (
+        visibleByTab.actions.length > 0 ||
+        Boolean(widgetProps.review.nextStepProposal?.trim())
+      );
     }
-    if (tabId === "proposal") {
-      return true;
-    }
-    if (tabId === "jira") {
-      return Boolean(jiraTicket);
-    }
+    if (tabId === "jira") return Boolean(jiraTicket);
     if (tabId === "landing") {
       return visibleByTab.landing.length > 0 || Boolean(landingPage);
     }
     return visibleByTab[tabId].length > 0;
   };
 
-  function handleTabChange(tab: PostDcTabId) {
-    setActiveTab(tab);
-    onTabChange?.(tab);
-  }
+  const resolvedTab = tabItems.some((t) => t.id === activeTab)
+    ? activeTab
+    : (tabItems[0]?.id ?? POST_DC_DEFAULT_TAB);
 
   return (
     <Tabs
-      value={activeTab}
+      value={resolvedTab}
       onValueChange={(v) => handleTabChange(v as PostDcTabId)}
       className="min-w-0 space-y-4"
     >
@@ -117,8 +126,8 @@ export function PostDcTabbedContent({
           embedded && "h-9"
         )}
       >
-        {POST_DC_TAB_ITEMS.map((tab, index) => {
-          const previous = POST_DC_TAB_ITEMS[index - 1];
+        {tabItems.map((tab, index) => {
+          const previous = tabItems[index - 1];
           const showGroupLabel = tab.group !== previous?.group;
 
           return (
@@ -142,32 +151,23 @@ export function PostDcTabbedContent({
         })}
       </TabsList>
 
-      <p className="text-xs text-muted-foreground">{POST_DC_TAB_JOURNEY[activeTab]}</p>
-
-      <TabsContent value="before" className="m-0 space-y-4 focus-visible:outline-none">
-        <PostDcWidgetRail
-          widgets={visibleByTab.before}
-          widgetProps={widgetPropsWithActions}
-          onHide={(id) => hideWidget("post-dc", id)}
-          emptyMessage="Import post-DC notes or run wrap-up to populate pre-call context."
-        />
-      </TabsContent>
+      <p className="text-xs text-muted-foreground">{POST_DC_TAB_JOURNEY[resolvedTab]}</p>
 
       <TabsContent value="summary" className="m-0 space-y-4 focus-visible:outline-none">
         <PostDcWidgetRail
           widgets={visibleByTab.summary}
-          widgetProps={widgetPropsWithActions}
+          widgetProps={widgetPropsWithNav}
           onHide={(id) => hideWidget("post-dc", id)}
           emptyMessage="Run wrap-up to generate the call summary."
         />
       </TabsContent>
 
-      <TabsContent value="next-steps" className="m-0 space-y-4 focus-visible:outline-none">
+      <TabsContent value="actions" className="m-0 space-y-4 focus-visible:outline-none">
         <PostDcWidgetRail
-          widgets={visibleByTab["next-steps"]}
-          widgetProps={widgetPropsWithActions}
+          widgets={visibleByTab.actions}
+          widgetProps={widgetPropsWithNav}
           onHide={(id) => hideWidget("post-dc", id)}
-          emptyMessage="Recommended next steps and CRM tasks appear here after wrap-up."
+          emptyMessage="Recommended next steps and follow-up drafts appear here after wrap-up."
         />
       </TabsContent>
 
@@ -178,25 +178,25 @@ export function PostDcTabbedContent({
       <TabsContent value="coaching" className="m-0 space-y-4 focus-visible:outline-none">
         <PostDcWidgetRail
           widgets={visibleByTab.coaching}
-          widgetProps={widgetPropsWithActions}
+          widgetProps={widgetPropsWithNav}
           onHide={(id) => hideWidget("post-dc", id)}
           emptyMessage="Pod member coaching scorecards appear here after wrap-up."
         />
       </TabsContent>
 
-      <TabsContent value="follow-up" className="m-0 space-y-4 focus-visible:outline-none">
+      <TabsContent value="before" className="m-0 space-y-4 focus-visible:outline-none">
         <PostDcWidgetRail
-          widgets={visibleByTab["follow-up"]}
-          widgetProps={widgetPropsWithActions}
+          widgets={visibleByTab.before}
+          widgetProps={widgetPropsWithNav}
           onHide={(id) => hideWidget("post-dc", id)}
-          emptyMessage="Follow-up emails appear here after wrap-up."
+          emptyMessage="Import post-DC notes or run wrap-up to populate pre-call context."
         />
       </TabsContent>
 
       <TabsContent value="content" className="m-0 space-y-4 focus-visible:outline-none">
         <PostDcWidgetRail
           widgets={visibleByTab.content}
-          widgetProps={widgetPropsWithActions}
+          widgetProps={widgetPropsWithNav}
           onHide={(id) => hideWidget("post-dc", id)}
           emptyMessage="Suggest Content and Missing content sections appear here after wrap-up."
         />
@@ -224,7 +224,7 @@ export function PostDcTabbedContent({
         />
         <PostDcWidgetRail
           widgets={visibleByTab.landing}
-          widgetProps={widgetPropsWithActions}
+          widgetProps={widgetPropsWithNav}
           onHide={(id) => hideWidget("post-dc", id)}
         />
       </TabsContent>

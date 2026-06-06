@@ -33,12 +33,14 @@ import {
   mergeFranchiseDemoCalls,
 } from "@/lib/demo/franchise-ai-platform-demo";
 import { mergeCallsWithImport } from "@/lib/dc-data/merge-calls-with-import";
+import { getPostDcTranscriptForCall } from "@/lib/demo/build-post-dc-transcript";
 import {
   getImportVersion,
   resolveCall,
   resolveCallBrief,
   resolveCalls,
   resolvePostCallReview,
+  resolvePostDcRecordForCall,
 } from "@/lib/dc-data/resolvers";
 import { hasClientUnsafeEmailText, sanitizeClientEmailDraft } from "@/lib/post-dc-client-email-safety";
 import type { TaskItem } from "@/components/post-dc/crm-task-list";
@@ -169,6 +171,9 @@ export function useCall(callId: string) {
     queryFn: async () => {
       const local = resolveCall(callId);
       const api = await bffFetch<Call>(`/api/calls/${callId}`);
+      if (api && local) {
+        return mergeCallsWithImport([api], [local])[0] ?? api;
+      }
       if (api) return api;
       if (local) return local;
       throw new Error(`Call not found: ${callId}`);
@@ -180,12 +185,16 @@ export function useCall(callId: string) {
 
 export function useCallTranscript(callId: string) {
   return useQuery<TranscriptEvent[]>({
-    queryKey: ["call-transcript", callId],
+    queryKey: ["call-transcript", callId, getImportVersion()],
     queryFn: async () => {
       const res = await bffFetch<{ events?: TranscriptEvent[] }>(
         `/api/calls/${callId}/live-session`
       );
-      return res?.events ?? [];
+      const apiEvents = res?.events ?? [];
+      if (apiEvents.length > 0) return apiEvents;
+
+      const postDcRecord = resolvePostDcRecordForCall(callId);
+      return getPostDcTranscriptForCall(callId, postDcRecord);
     },
     staleTime: 60_000,
     enabled: Boolean(callId),

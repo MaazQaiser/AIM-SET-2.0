@@ -13,10 +13,7 @@ import {
   type PreDCRecord,
   type PostDCRecord,
 } from "@/types/dc-notes";
-import {
-  isDiscoveryCallUpcoming,
-  parseDiscoveryDateTime,
-} from "@/lib/dc-notes/parse-discovery";
+import { parseDiscoveryDateTime } from "@/lib/dc-notes/parse-discovery";
 import { formatCompanyRevenue } from "@/lib/dc-notes/format";
 import { normalizeCompanyStage } from "@/lib/dc-notes/company-stage";
 import { icpScoreFromBucket } from "@/lib/dc-notes/icp-rating";
@@ -235,7 +232,8 @@ export function buildCallFromPreDc(record: PreDCRecord): Call {
     discoveryCallDatePkt: discoveryCallDatePkt || undefined,
     discoveryCallTimePkt: discoveryCallTimePkt || undefined,
     scheduledAt,
-    status: isDiscoveryCallUpcoming(scheduledAt) ? "upcoming" : "completed",
+    // Only Post-DC import (or manual live wrap-up) marks a call completed.
+    status: "upcoming",
     briefReady: true,
     pod: internalAttendees.map((m) => ({
       id: m.id,
@@ -535,6 +533,16 @@ export function buildPostReviewFromPostDc(record: PostDCRecord): PostCallReview 
       postDcField(record, "salesStrategy") ||
       postDcField(record, "engagementModel") ||
       undefined,
+    dealSignals: {
+      leadStage: leadStage || undefined,
+      engagementModel: postDcField(record, "engagementModel") || undefined,
+      accountsAnnualPotential: potential || undefined,
+      serviceLine: serviceLine || undefined,
+      icpBucketCorrect: postDcField(record, "icpBucketCorrect") || undefined,
+      reasonNotFit: postDcField(record, "reasonNotFit") || undefined,
+      additionalInfo: postDcField(record, "additionalInfo") || undefined,
+      attendees: postDcField(record, "attendees") || undefined,
+    },
     openDiscoveryGaps,
     bantScore: {
       budget: {

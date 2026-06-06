@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Download, Loader2 } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { kbFileUrl, kbSlideMetaUrl, kbSlideUrl } from "@/lib/kb/file-format";
 import { cn } from "@/lib/cn";
+import { briefMainNestedSurfaceClass } from "@/components/pre-call/brief-detail-card";
 import type { KBAsset } from "@/types";
 
 interface KbSlidePreviewProps {
@@ -90,6 +91,7 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
       <div
         className={cn(
           "flex items-center justify-center gap-2 text-sm text-muted-foreground rounded-lg border bg-muted/20",
+          briefMainNestedSurfaceClass,
           compact ? "min-h-[200px]" : "min-h-[420px]",
           className
         )}
@@ -105,6 +107,7 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
       <div
         className={cn(
           "flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground",
+          briefMainNestedSurfaceClass,
           className
         )}
       >
@@ -117,6 +120,7 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
     <div
       className={cn(
         "flex flex-col rounded-lg border overflow-hidden bg-muted/10",
+        briefMainNestedSurfaceClass,
         compact ? "min-h-0 max-h-80" : "min-h-[70vh]",
         className
       )}

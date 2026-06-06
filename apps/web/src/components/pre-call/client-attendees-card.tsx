@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Linkedin, Clock, MessageCircle, ExternalLink } from "lucide-react";
 import { BriefDetailCard, briefDetailDialogClass } from "@/components/pre-call/brief-detail-card";
+import { ParticipantAvatar } from "@/components/participant-avatar";
 import { Button } from "@dc-copilot/ui/components/button";
 import {
   Dialog,
@@ -34,15 +35,6 @@ function formatRelativeDays(iso: string) {
   return `${days}d ago`;
 }
 
-function initialsFor(name: string) {
-  return name
-    .split(" ")
-    .map((p) => p[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
 function ClientAttendeeDetailDialog({
   attendee,
   open,
@@ -63,9 +55,7 @@ function ClientAttendeeDetailDialog({
       >
         <DialogHeader className="pr-8">
           <div className="flex items-start gap-3">
-            <div className="h-12 w-12 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-              {initialsFor(attendee.name)}
-            </div>
+            <ParticipantAvatar name={attendee.name} kind="external" size="lg" />
             <div className="min-w-0 flex-1">
               <DialogTitle className="text-left">{attendee.name}</DialogTitle>
               <DialogDescription className="text-left mt-1">
@@ -191,9 +181,7 @@ export function ClientAttendeesCard({
             const influence = INFLUENCE_CONFIG[attendee.influenceLevel];
             return (
               <li key={attendee.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                <div className="h-9 w-9 shrink-0 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-foreground">
-                  {initialsFor(attendee.name)}
-                </div>
+                <ParticipantAvatar name={attendee.name} kind="external" size="md" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-foreground truncate">{attendee.name}</p>
                   <p className="text-xs text-muted-foreground truncate">

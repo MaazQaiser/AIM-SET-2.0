@@ -82,6 +82,9 @@ export function resolveCallBrief(callId: string): CallBrief | null {
 
 export function resolvePostCallReview(callId: string): PostCallReview | null {
   const state = useDcImportsStore.getState();
+  const cached = state.postReviewsByCallId?.[callId];
+  if (cached) return cached;
+
   const preDcRecords = state.preDcRecords ?? [];
   const postDcRecords = state.postDcRecords ?? [];
   if (preDcRecords.length === 0) {
@@ -96,6 +99,31 @@ export function resolvePostCallReview(callId: string): PostCallReview | null {
   if (!record) return null;
 
   return buildPostReviewFromPostDc(record);
+}
+
+export function resolvePostDcRecordForCall(callId: string) {
+  const state = useDcImportsStore.getState();
+  const preDcRecords = state.preDcRecords ?? [];
+  const postDcRecords = state.postDcRecords ?? [];
+  if (postDcRecords.length === 0) return undefined;
+
+  const direct = postDcRecords.find((r) => r.matchedCallId === callId);
+  if (direct) return direct;
+
+  const call = resolveCall(callId);
+  const preRecord = findPreDcRecordForCall(
+    preDcRecords,
+    callId,
+    call?.accountName
+  );
+  if (!preRecord) return undefined;
+
+  const canonicalId = slugifyCompany(preDcField(preRecord, "companyName"));
+  return postDcRecords.find(
+    (r) =>
+      r.matchedCallId === canonicalId ||
+      r.matchedCallId === callId
+  );
 }
 
 export function hasCsvData(): boolean {

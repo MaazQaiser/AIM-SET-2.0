@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, Check, CheckCircle2, Clock, Loader2, Mail } from "lucide-react";
-import { Button } from "@dc-copilot/ui/components/button";
+import { Check, Loader2, Mail } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
 import { cn } from "@/lib/cn";
@@ -26,6 +25,9 @@ interface TaskListProps {
   onApprove?: (ids: string[]) => void;
   onReject?: (id: string) => void;
   onOpenEmailDraft?: () => void;
+  /** Render list only — no outer card (nested inside Tasks panel) */
+  bare?: boolean;
+  title?: string;
 }
 
 const TYPE_LABELS: Record<TaskType, string> = {
@@ -33,13 +35,6 @@ const TYPE_LABELS: Record<TaskType, string> = {
   internal_review: "Internal review",
   content_request: "Content request",
   schedule_next_meeting: "Schedule next meeting",
-};
-
-const STATUS_CONFIG: Record<TaskStatus, { label: string; className: string; icon: React.ElementType }> = {
-  pending_approval: { label: "Pending",  className: "text-warning border-warning/30 bg-warning/10",     icon: Clock },
-  approved:         { label: "Approved", className: "text-primary border-primary/30 bg-primary/10",      icon: Check },
-  created:          { label: "Done",     className: "text-success border-success/30 bg-success/10",      icon: CheckCircle2 },
-  failed:           { label: "Failed",   className: "text-destructive border-destructive/30 bg-destructive/10", icon: AlertCircle },
 };
 
 function isFollowUpEmailTask(task: TaskItem) {
@@ -54,7 +49,14 @@ function taskDisplayLabel(task: TaskItem) {
   return TYPE_LABELS[task.task_type];
 }
 
-export function TaskList({ tasks, onApprove, onReject, onOpenEmailDraft }: TaskListProps) {
+export function TaskList({
+  tasks,
+  onApprove,
+  onReject,
+  onOpenEmailDraft,
+  bare = false,
+  title = "Task list",
+}: TaskListProps) {
   const [completingId, setCompletingId] = useState<string | null>(null);
 
   async function handleCompleteTask(id: string) {
@@ -64,94 +66,116 @@ export function TaskList({ tasks, onApprove, onReject, onOpenEmailDraft }: TaskL
     setCompletingId(null);
   }
 
-  return (
-    <BriefDetailCard title="Task list" className="w-full">
-      <div className="flex w-full min-w-0 flex-col divide-y divide-border">
-        {tasks.length === 0 && (
-          <div className="py-6 text-center text-sm text-muted-foreground">No tasks generated</div>
-        )}
+  const body = (
+    <div className="flex w-full min-w-0 flex-col divide-y divide-border/60">
+      {tasks.length === 0 && (
+        <div className="py-6 text-center text-sm text-muted-foreground">No CRM tasks generated</div>
+      )}
 
-        {tasks.map((task) => {
-          const cfg = STATUS_CONFIG[task.status];
-          const Icon = cfg.icon;
-          const isPending = task.status === "pending_approval";
-          const isCompleting = completingId === task.id;
-          const opensEmailDraft = isFollowUpEmailTask(task) && Boolean(onOpenEmailDraft);
-          const label = taskDisplayLabel(task);
+      {tasks.map((task) => {
+        const isPending = task.status === "pending_approval";
+        const isDone = task.status === "created";
+        const isCompleting = completingId === task.id;
+        const opensEmailDraft = isFollowUpEmailTask(task) && Boolean(onOpenEmailDraft);
+        const label = taskDisplayLabel(task);
 
-          return (
-            <div key={task.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-              <div className="flex-1 min-w-0 space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {opensEmailDraft ? (
-                    <button
-                      type="button"
-                      onClick={onOpenEmailDraft}
-                      className="inline-flex min-w-0 items-center gap-1.5 text-left text-xs font-medium text-primary transition-colors hover:text-primary/80"
-                    >
-                      <Mail className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">{label}</span>
-                    </button>
-                  ) : (
-                    <span className="text-xs font-medium">{label}</span>
-                  )}
-                  <span className="text-[10px] text-muted-foreground">→ {task.owner}</span>
-                  {task.isInternalAuto && (
-                    <Badge variant="secondary" className="text-[10px] h-4">
-                      Auto · internal
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>
-              </div>
+        return (
+          <div key={task.id} className="group py-3 first:pt-0 last:pb-0">
+            <div className="flex items-start gap-3">
+              <button
+                type="button"
+                disabled={!isPending || !onApprove || isCompleting}
+                onClick={() => void handleCompleteTask(task.id)}
+                className={cn(
+                  "mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 transition-colors",
+                  isDone
+                    ? "border-success bg-success text-success-foreground"
+                    : isPending
+                      ? "border-border bg-background hover:border-primary/50"
+                      : "border-border/50 bg-muted/40 cursor-default"
+                )}
+                aria-label={isDone ? `${task.description} completed` : `Complete ${task.description}`}
+              >
+                {isCompleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                ) : isDone ? (
+                  <Check className="h-4 w-4" strokeWidth={3} aria-hidden />
+                ) : null}
+              </button>
 
-              <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
-                <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium", cfg.className)}>
-                  <Icon className="h-3 w-3" />
-                  {cfg.label}
-                </span>
-                {isPending && onApprove && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs"
-                    disabled={isCompleting}
-                    onClick={() => handleCompleteTask(task.id)}
-                  >
-                    {isCompleting ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    {opensEmailDraft ? (
+                      <button
+                        type="button"
+                        onClick={onOpenEmailDraft}
+                        className="inline-flex min-w-0 items-center gap-1.5 text-left text-xs font-semibold text-primary transition-colors hover:text-primary/80"
+                      >
+                        <Mail className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{label}</span>
+                      </button>
                     ) : (
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      <span className="text-xs font-semibold text-foreground">{label}</span>
                     )}
-                    Complete task
-                  </Button>
-                )}
-                {opensEmailDraft && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    className="h-7 gap-1.5 text-xs"
-                    onClick={onOpenEmailDraft}
+                    <span className="text-[10px] text-muted-foreground">→ {task.owner}</span>
+                    {task.isInternalAuto ? (
+                      <Badge variant="secondary" className="text-[10px]">
+                        Auto · internal
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <p
+                    className={cn(
+                      "text-xs leading-relaxed text-muted-foreground break-words",
+                      isDone && "line-through decoration-muted-foreground/50"
+                    )}
                   >
-                    <Mail className="h-3.5 w-3.5" />
-                    Review draft
-                  </Button>
-                )}
-                {isPending && onReject && (
-                  <button
-                    type="button"
-                    onClick={() => onReject(task.id)}
-                    className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                    {task.description}
+                  </p>
+                </div>
+
+                {isPending && (onReject || opensEmailDraft) ? (
+                  <div
+                    className={cn(
+                      "flex flex-wrap items-center gap-x-3 gap-y-1",
+                      "opacity-100 lg:opacity-0 lg:transition-opacity lg:duration-150",
+                      "lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
+                    )}
                   >
-                    Skip
-                  </button>
-                )}
+                    {opensEmailDraft ? (
+                      <button
+                        type="button"
+                        onClick={onOpenEmailDraft}
+                        className="text-xs text-primary hover:text-primary/80"
+                      >
+                        Review draft
+                      </button>
+                    ) : null}
+                    {onReject ? (
+                      <button
+                        type="button"
+                        onClick={() => onReject(task.id)}
+                        className="text-xs text-muted-foreground hover:text-destructive"
+                      >
+                        Skip
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  if (bare) return body;
+
+  return (
+    <BriefDetailCard title={title} className="w-full">
+      {body}
     </BriefDetailCard>
   );
 }

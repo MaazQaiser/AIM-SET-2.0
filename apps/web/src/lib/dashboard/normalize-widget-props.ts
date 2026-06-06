@@ -45,6 +45,7 @@ export function normalizePostCallReview(review: PostCallReview): PostCallReview 
     bantScore: review.bantScore ?? {},
     dealSignals: review.dealSignals ?? {},
     researchSections: review.researchSections ?? [],
+    dealSignals: review.dealSignals,
     openDiscoveryGaps: review.openDiscoveryGaps ?? [],
   };
 }

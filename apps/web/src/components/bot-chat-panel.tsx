@@ -56,6 +56,12 @@ interface BotChatPanelProps {
   checklist?: DiscoveryChecklistState | null;
   transcriptLineCount?: number;
   hasObjections?: boolean;
+  /** Post-DC wrap-up — discovery gaps from review */
+  openGaps?: string[];
+  /** Post-DC wrap-up — BANT coverage percentage for suggested actions */
+  bantCoveragePct?: number;
+  /** Post-DC: AE ↔ AI Copilot only — no pod/direct mode tabs */
+  copilotOnly?: boolean;
 }
 
 function downloadExport(exportPayload: CopilotCallExport, format: "json" | "markdown") {
@@ -190,6 +196,9 @@ export function BotChatPanel({
   checklist,
   transcriptLineCount = 0,
   hasObjections = false,
+  openGaps: openGapsProp,
+  bantCoveragePct: bantCoveragePctProp,
+  copilotOnly = false,
 }: BotChatPanelProps) {
   const { isIntercom } = useThemePreview();
   const persona = usePersona();
@@ -251,6 +260,10 @@ export function BotChatPanel({
     if (mode === "copilot") seedCopilotWelcome();
   }, [callId, accountName, mode, seedGroupWelcome, seedCopilotWelcome]);
 
+  useEffect(() => {
+    if (copilotOnly) setMode(callId, "copilot");
+  }, [copilotOnly, callId, setMode]);
+
   const suggestedCtx: SuggestedActionsContext = useMemo(
     () => ({
       phase,
@@ -260,8 +273,8 @@ export function BotChatPanel({
       brief,
       intentLabel,
       painCount,
-      openGaps: checklist?.openGaps,
-      bantCoveragePct: checklistBantPct(checklist ?? null),
+      openGaps: openGapsProp ?? checklist?.openGaps,
+      bantCoveragePct: bantCoveragePctProp ?? checklistBantPct(checklist ?? null),
       transcriptLineCount,
       hasObjections,
     }),
@@ -274,6 +287,8 @@ export function BotChatPanel({
       intentLabel,
       painCount,
       checklist,
+      openGapsProp,
+      bantCoveragePctProp,
       transcriptLineCount,
       hasObjections,
     ]
@@ -478,20 +493,22 @@ export function BotChatPanel({
     void sendMessage(action.prompt);
   }
 
-  const inputPlaceholder = isCopilotMode
-    ? isFloating
-      ? "Ask Sales Co-pilot anything…"
-      : "Search KB, run agents, inspect calls…"
-    : mode === "group"
+  const inputPlaceholder = copilotOnly
+    ? "Ask AI Copilot about follow-up, email, or next steps…"
+    : isCopilotMode
       ? isFloating
-        ? "Ask me anything…"
-        : "Message the pod or ask Copilot…"
-      : isFloating
-        ? "Ask Copilot privately…"
-        : "Private question for Copilot…";
+        ? "Ask Sales Co-pilot anything…"
+        : "Search KB, run agents, inspect calls…"
+      : mode === "group"
+        ? isFloating
+          ? "Ask me anything…"
+          : "Message the pod or ask Copilot…"
+        : isFloating
+          ? "Ask Copilot privately…"
+          : "Private question for Copilot…";
 
   const attachmentChip =
-    isCopilotMode && pendingFile ? (
+    isCopilotMode && !copilotOnly && pendingFile ? (
       <div className="flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-1 text-[11px] shrink-0 mb-2">
         <Paperclip className="h-3 w-3" aria-hidden />
         <span className="truncate max-w-[12rem]">{pendingFile.name}</span>
@@ -508,7 +525,7 @@ export function BotChatPanel({
 
   const floatingInputRow = (
     <>
-      {isCopilotMode && (
+      {isCopilotMode && !copilotOnly && (
         <>
           <input
             ref={fileInputRef}
@@ -585,7 +602,7 @@ export function BotChatPanel({
     >
       {attachmentChip}
       <div className="flex gap-2 w-full">
-        {isCopilotMode && (
+        {isCopilotMode && !copilotOnly && (
           <>
             <input
               ref={fileInputRef}
@@ -640,6 +657,7 @@ export function BotChatPanel({
       <div
         className={cn(
           "flex items-center gap-2 border-b px-3 py-2 shrink-0",
+          copilotOnly && "px-4 py-3",
           isFloating
             ? "call-detail-copilot-divider px-4 py-2.5"
             : isIntercom
@@ -647,12 +665,14 @@ export function BotChatPanel({
               : "border-border"
         )}
       >
-        <Bot
-          className={cn("h-4 w-4 shrink-0", isIntercom ? "text-[#ff5600]" : "text-primary")}
-          aria-hidden
-        />
+        {!copilotOnly && (
+          <Bot
+            className={cn("h-4 w-4 shrink-0", isIntercom ? "text-[#ff5600]" : "text-primary")}
+            aria-hidden
+          />
+        )}
         <span className={cn("text-sm font-medium truncate text-[#111111]")}>
-          {isCopilotMode ? "Sales Co-pilot" : "DC Copilot Pod"}
+          {copilotOnly ? "AI Copilot" : isCopilotMode ? "Sales Co-pilot" : "DC Copilot Pod"}
         </span>
         <div className="ml-auto flex items-center gap-1 shrink-0">
           {isFloating && floatingExpanded && (
@@ -670,116 +690,122 @@ export function BotChatPanel({
               <ChevronDown className="h-4 w-4" />
             </Button>
           )}
-          <div
-            className={cn(
-              "inline-flex rounded-md border p-0.5",
-              isFloating ? "call-detail-copilot-tab-rail rounded-full" : "border-border bg-muted/30"
-            )}
-            role="tablist"
-            aria-label="Chat mode"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "group"}
-              className={cn(
-                "inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-colors",
-                mode === "group"
-                  ? isFloating
-                    ? "call-detail-copilot-tab-active rounded-full"
-                    : "bg-background text-foreground shadow-sm"
-                  : isFloating
-                    ? "call-detail-copilot-tab-inactive rounded-full"
-                    : "text-muted-foreground hover:text-foreground"
-              )}
-              onClick={() => setMode(callId, "group")}
-            >
-              <Users className="h-3 w-3" aria-hidden />
-              Pod
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "direct"}
-              className={cn(
-                "inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-colors",
-                mode === "direct"
-                  ? isFloating
-                    ? "call-detail-copilot-tab-active rounded-full"
-                    : "bg-background text-foreground shadow-sm"
-                  : isFloating
-                    ? "call-detail-copilot-tab-inactive rounded-full"
-                    : "text-muted-foreground hover:text-foreground"
-              )}
-              onClick={() => setMode(callId, "direct")}
-            >
-              <Lock className="h-3 w-3" aria-hidden />
-              Direct
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "copilot"}
-              className={cn(
-                "inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-colors",
-                mode === "copilot"
-                  ? isFloating
-                    ? "call-detail-copilot-tab-active rounded-full"
-                    : "bg-background text-foreground shadow-sm"
-                  : isFloating
-                    ? "call-detail-copilot-tab-inactive rounded-full"
-                    : "text-muted-foreground hover:text-foreground"
-              )}
-              onClick={() => setMode(callId, "copilot")}
-            >
-              <Sparkles className="h-3 w-3" aria-hidden />
-              Co-pilot
-            </button>
-          </div>
-          <AIGeneratedBadge />
+          {!copilotOnly ? (
+            <>
+              <div
+                className={cn(
+                  "inline-flex rounded-md border p-0.5",
+                  isFloating ? "call-detail-copilot-tab-rail rounded-full" : "border-border bg-muted/30"
+                )}
+                role="tablist"
+                aria-label="Chat mode"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === "group"}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-colors",
+                    mode === "group"
+                      ? isFloating
+                        ? "call-detail-copilot-tab-active rounded-full"
+                        : "bg-background text-foreground shadow-sm"
+                      : isFloating
+                        ? "call-detail-copilot-tab-inactive rounded-full"
+                        : "text-muted-foreground hover:text-foreground"
+                  )}
+                  onClick={() => setMode(callId, "group")}
+                >
+                  <Users className="h-3 w-3" aria-hidden />
+                  Pod
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === "direct"}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-colors",
+                    mode === "direct"
+                      ? isFloating
+                        ? "call-detail-copilot-tab-active rounded-full"
+                        : "bg-background text-foreground shadow-sm"
+                      : isFloating
+                        ? "call-detail-copilot-tab-inactive rounded-full"
+                        : "text-muted-foreground hover:text-foreground"
+                  )}
+                  onClick={() => setMode(callId, "direct")}
+                >
+                  <Lock className="h-3 w-3" aria-hidden />
+                  Direct
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === "copilot"}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium transition-colors",
+                    mode === "copilot"
+                      ? isFloating
+                        ? "call-detail-copilot-tab-active rounded-full"
+                        : "bg-background text-foreground shadow-sm"
+                      : isFloating
+                        ? "call-detail-copilot-tab-inactive rounded-full"
+                        : "text-muted-foreground hover:text-foreground"
+                  )}
+                  onClick={() => setMode(callId, "copilot")}
+                >
+                  <Sparkles className="h-3 w-3" aria-hidden />
+                  Co-pilot
+                </button>
+              </div>
+              <AIGeneratedBadge />
+            </>
+          ) : null}
         </div>
       </div>
 
-      {isCopilotMode ? (
-        <p
-          className={cn(
-            "text-[10px] px-3 py-1.5 border-b shrink-0",
-            isFloating
-              ? "call-detail-copilot-muted call-detail-copilot-divider px-4"
-              : "text-muted-foreground border-border/60"
-          )}
-        >
-          Global assistant — search KB (vector store), inspect any call, run agents, or upload
-          files.
-        </p>
-      ) : mode === "group" ? (
-        <p
-          className={cn(
-            "text-[10px] px-3 py-1.5 border-b shrink-0",
-            isFloating
-              ? "call-detail-copilot-muted call-detail-copilot-divider px-4"
-              : "text-muted-foreground border-border/60"
-          )}
-        >
-          Shared with everyone on this call. Copilot replies appear for the whole pod.
-        </p>
-      ) : (
-        <p
-          className={cn(
-            "text-[10px] px-3 py-1.5 border-b shrink-0",
-            isFloating
-              ? "call-detail-copilot-muted call-detail-copilot-divider px-4"
-              : "text-muted-foreground border-border/60"
-          )}
-        >
-          Private to you — teammates do not see direct messages or replies.
-        </p>
-      )}
+      {!copilotOnly &&
+        (isCopilotMode ? (
+          <p
+            className={cn(
+              "text-[10px] px-3 py-1.5 border-b shrink-0",
+              isFloating
+                ? "call-detail-copilot-muted call-detail-copilot-divider px-4"
+                : "text-muted-foreground border-border/60"
+            )}
+          >
+            Global assistant — search KB (vector store), inspect any call, run agents, or upload
+            files.
+          </p>
+        ) : mode === "group" ? (
+          <p
+            className={cn(
+              "text-[10px] px-3 py-1.5 border-b shrink-0",
+              isFloating
+                ? "call-detail-copilot-muted call-detail-copilot-divider px-4"
+                : "text-muted-foreground border-border/60"
+            )}
+          >
+            Shared with everyone on this call. Copilot replies appear for the whole pod.
+          </p>
+        ) : (
+          <p
+            className={cn(
+              "text-[10px] px-3 py-1.5 border-b shrink-0",
+              isFloating
+                ? "call-detail-copilot-muted call-detail-copilot-divider px-4"
+                : "text-muted-foreground border-border/60"
+            )}
+          >
+            Private to you — teammates do not see direct messages or replies.
+          </p>
+        ))}
 
       <BotChatSuggestedActions
         actions={suggestedActions}
         onSelect={handleSuggestedAction}
         disabled={isLoading}
+        variant={copilotOnly ? "list" : "chips"}
         className={cn(isFloating && "call-detail-copilot-divider border-b px-4")}
         buttonClassName={isFloating ? "call-detail-copilot-suggested-btn" : undefined}
       />
@@ -797,15 +823,16 @@ export function BotChatPanel({
           userScrolledRef.current = !atBottom;
         }}
       >
-        {messages.length === 0 && !error && mode === "direct" && (
+        {messages.length === 0 && !error && (copilotOnly || mode === "direct") && (
           <p
             className={cn(
               "text-sm text-center py-6 px-2",
               isFloating ? "call-detail-copilot-muted" : "text-muted-foreground"
             )}
           >
-            Ask DC Copilot privately about this call — prep questions, talk tracks, or live
-            coaching.
+            {phase === "wrapup"
+              ? "Ask about follow-up email, next steps, Jira handoff, or how to close open gaps."
+              : "Ask DC Copilot privately about this call — prep questions, talk tracks, or live coaching."}
           </p>
         )}
         {error && (

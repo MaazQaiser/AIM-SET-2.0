@@ -14,6 +14,7 @@ import type {
 } from "@/lib/brief-types";
 import { buildCallsFromPreDc } from "@/lib/dc-data/build-calls-from-pre-dc";
 import type { PostDCRecord, PreDCRecord } from "@/types/dc-notes";
+import type { PostDcWorkflowTaskStatus } from "@/lib/post-dc/workflow-tasks";
 
 interface DcImportsState {
   preDcRecords: PreDCRecord[];
@@ -24,6 +25,7 @@ interface DcImportsState {
   emailDraftsByCallId: Record<string, PostCallEmailDraft>;
   internalEmailDraftsByCallId: Record<string, PostCallEmailDraft>;
   crmTasksByCallId: Record<string, PostCallTask[]>;
+  workflowTaskStatusByCallId: Record<string, Record<string, PostDcWorkflowTaskStatus>>;
   jiraTicketsByCallId: Record<string, PostCallJiraTicket>;
   postRunMetaByCallId: Record<
     string,
@@ -48,7 +50,13 @@ interface DcImportsState {
       envelope?: PostCallAgentEnvelope;
       coaching?: Record<string, unknown>;
       discoverySnapshot?: { openGaps: string[]; bantCoverage?: number };
+      workflowTaskStatus?: Record<string, PostDcWorkflowTaskStatus>;
     }
+  ) => void;
+  setWorkflowTaskStatus: (
+    callId: string,
+    taskId: string,
+    status: PostDcWorkflowTaskStatus
   ) => void;
   setDiscoverySnapshot: (callId: string, snapshot: { openGaps: string[]; bantCoverage?: number }) => void;
   preDcFileName: string | null;
@@ -70,6 +78,7 @@ const emptyState = {
   emailDraftsByCallId: {} as Record<string, PostCallEmailDraft>,
   internalEmailDraftsByCallId: {} as Record<string, PostCallEmailDraft>,
   crmTasksByCallId: {} as Record<string, PostCallTask[]>,
+  workflowTaskStatusByCallId: {} as Record<string, Record<string, PostDcWorkflowTaskStatus>>,
   jiraTicketsByCallId: {} as Record<string, PostCallJiraTicket>,
   postRunMetaByCallId: {} as DcImportsState["postRunMetaByCallId"],
   discoverySnapshotsByCallId: {} as Record<string, { openGaps: string[]; bantCoverage?: number }>,
@@ -134,6 +143,25 @@ export const useDcImportsStore = create<DcImportsState>()((set, get) => ({
       discoverySnapshotsByCallId: artifacts.discoverySnapshot
         ? { ...s.discoverySnapshotsByCallId, [callId]: artifacts.discoverySnapshot }
         : s.discoverySnapshotsByCallId,
+      workflowTaskStatusByCallId: artifacts.workflowTaskStatus
+        ? {
+            ...s.workflowTaskStatusByCallId,
+            [callId]: {
+              ...(s.workflowTaskStatusByCallId[callId] ?? {}),
+              ...artifacts.workflowTaskStatus,
+            },
+          }
+        : s.workflowTaskStatusByCallId,
+    })),
+  setWorkflowTaskStatus: (callId, taskId, status) =>
+    set((s) => ({
+      workflowTaskStatusByCallId: {
+        ...s.workflowTaskStatusByCallId,
+        [callId]: {
+          ...(s.workflowTaskStatusByCallId[callId] ?? {}),
+          [taskId]: status,
+        },
+      },
     })),
   setDiscoverySnapshot: (callId, snapshot) =>
     set((s) => ({

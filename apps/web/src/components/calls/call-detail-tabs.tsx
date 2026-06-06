@@ -12,6 +12,7 @@ import { normalizeBriefWidgetProps } from "@/lib/dashboard/normalize-widget-prop
 import { BotChatPanel } from "@/components/bot-chat-panel";
 import { useThemePreview } from "@/hooks/use-theme-preview";
 import { useCallBrief, usePostCallReview } from "@/lib/data/hooks";
+import { resolvePostCallReview } from "@/lib/dc-data/resolvers";
 import { seedChecklistFromCall } from "@/lib/discovery-checklist-seed";
 import { usePersona } from "@/hooks/use-persona";
 import { Button } from "@dc-copilot/ui/components/button";
@@ -45,7 +46,10 @@ export function CallDetailTabs({
   const persona = usePersona();
 
   const leadershipPreview = persona === "leadership";
-  const postDcReady = call.status === "completed" && Boolean(review);
+  const importedReview = resolvePostCallReview(callId);
+  const postDcReady =
+    (call.status === "completed" || Boolean(importedReview)) &&
+    Boolean(review ?? importedReview);
 
   const runPreDcWorkflow = async () => {
     setRunningWorkflow(true);

@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, ExternalLink, Loader2, TicketCheck } from "lucide-react";
+import { AlertCircle, Check, Copy, ExternalLink, Loader2, TicketCheck } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { copyTextToClipboard } from "@/lib/clipboard";
+import { formatJiraTicketForCopy } from "@/lib/post-dc/format-jira-ticket-copy";
 import { cn } from "@/lib/cn";
 import type { PostCallJiraTicket } from "@/lib/brief-types";
 
@@ -22,6 +25,7 @@ const BANT_LABELS = [
 
 export function JiraTicketCard({ ticket, onCreate }: JiraTicketCardProps) {
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const allBantConfirmed = BANT_LABELS.every(({ key }) => ticket.bantSnapshot[key]);
 
   async function handleCreate() {
@@ -33,10 +37,19 @@ export function JiraTicketCard({ ticket, onCreate }: JiraTicketCardProps) {
     }
   }
 
+  async function handleCopy() {
+    const ok = await copyTextToClipboard(formatJiraTicketForCopy(ticket));
+    if (ok) {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    }
+  }
+
   return (
     <BriefDetailCard title="Jira ticket draft" icon={TicketCheck} className="w-full">
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
           <Badge variant={ticket.status === "created" ? "success" : ticket.status === "failed" ? "destructive" : "secondary"}>
             {ticket.status === "created" ? "Created" : ticket.status === "failed" ? "Failed" : "Draft"}
           </Badge>
@@ -52,6 +65,22 @@ export function JiraTicketCard({ ticket, onCreate }: JiraTicketCardProps) {
               BANT qualified
             </Badge>
           )}
+          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+                onClick={() => void handleCopy()}
+              >
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? "Copied" : "Copy ticket"}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Copy ticket text</TooltipContent>
+          </Tooltip>
         </div>
 
         <div className="flex flex-wrap gap-2">

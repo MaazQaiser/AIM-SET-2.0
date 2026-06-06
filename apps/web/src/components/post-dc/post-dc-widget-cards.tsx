@@ -21,7 +21,14 @@ import {
 import {
   BriefDetailCard,
   BriefDetailRow,
+  briefBodyClass,
+  briefBodyForegroundClass,
+  briefBodyMutedClass,
 } from "@/components/pre-call/brief-detail-card";
+import { PostDcExpandableCard } from "@/components/post-dc/post-dc-expandable-card";
+import { PostDcAiNextSteps } from "@/components/post-dc/post-dc-ai-next-steps";
+import { PostDcDeadlineNote } from "@/components/post-dc/post-dc-deadline-note";
+import { PostDcModalSection } from "@/components/post-dc/post-dc-modal-section";
 import type {
   PostCallEmailAttachmentFound,
   PostCallEmailAttachmentMissing,
@@ -30,11 +37,12 @@ import type {
   PostCallReview,
 } from "@/lib/brief-types";
 import { KbAttachmentCard } from "@/components/post-dc/kb-attachment-card";
+import { cn } from "@/lib/cn";
 
 export function PostBeforeContextCard({ callId }: { callId: string }) {
   return (
     <BriefDetailCard title="Pre-call context" variant="highlight">
-      <p className="text-sm text-muted-foreground leading-relaxed">
+      <p className={briefBodyMutedClass}>
         This is all that happened before the call — research, artifacts, and discovery questions from
         the pre-call brief.
       </p>
@@ -53,7 +61,7 @@ export function PostNextStepProposalCard({ proposal }: { proposal: string }) {
 
   return (
     <BriefDetailCard title="Recommended next step" icon={ListChecks} variant="highlight">
-      <p className="text-sm font-medium text-foreground leading-relaxed whitespace-pre-wrap break-words">
+      <p className={cn(briefBodyForegroundClass, "font-medium whitespace-pre-wrap break-words")}>
         {proposal}
       </p>
     </BriefDetailCard>
@@ -63,22 +71,108 @@ export function PostNextStepProposalCard({ proposal }: { proposal: string }) {
 export function PostHeadlineCard({ headline }: { headline: string }) {
   return (
     <BriefDetailCard title="Headline" icon={Sparkles} variant="highlight">
-      <p className="text-sm font-medium text-foreground leading-relaxed break-words">{headline}</p>
+      <p className={cn(briefBodyForegroundClass, "font-medium break-words")}>{headline}</p>
     </BriefDetailCard>
   );
 }
 
-export function PostSummaryCard({ summary }: { summary: string[] }) {
+export function PostSummaryCard({
+  summary,
+  recommendation,
+  review,
+  deadlineNote,
+}: {
+  summary: string[];
+  recommendation?: string;
+  review?: PostCallReview;
+  /** Important deadline / note from deal signals (Additional Info) */
+  deadlineNote?: string;
+}) {
+  const trimmedRecommendation = recommendation?.trim();
+  const trimmedDeadline = deadlineNote?.trim();
+  const openGaps = review?.openDiscoveryGaps ?? [];
+  const headline = review?.headline?.trim();
+
+  const summaryList = (
+    <ul className="divide-y divide-border w-full">
+      {summary.map((p) => (
+        <li
+          key={p}
+          className={cn(briefBodyClass, "py-2.5 text-muted-foreground whitespace-pre-wrap break-words first:pt-0 last:pb-0 w-full")}
+        >
+          {p}
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
-    <BriefDetailCard title="Call summary" icon={Brain}>
-      <ul className="divide-y divide-border">
-        {summary.map((p) => (
-          <li key={p} className="py-2.5 text-sm text-muted-foreground whitespace-pre-wrap break-words first:pt-0 last:pb-0">
-            {p}
-          </li>
-        ))}
-      </ul>
-    </BriefDetailCard>
+    <PostDcExpandableCard
+      title="Call summary"
+      icon={Brain}
+      expandLabel="Expand call summary"
+      modalContent={
+        <div className="space-y-6">
+          {headline ? (
+            <PostDcModalSection title="Headline">
+              <p className="text-base font-medium text-foreground leading-relaxed break-words">
+                {headline}
+              </p>
+            </PostDcModalSection>
+          ) : null}
+
+          <PostDcModalSection title="What happened on the call">
+            <ul className="divide-y divide-border/60">
+              {summary.map((p) => (
+                <li
+                  key={p}
+                  className={cn(briefBodyClass, "py-3 text-foreground/90 whitespace-pre-wrap break-words first:pt-0 last:pb-0")}
+                >
+                  {p}
+                </li>
+              ))}
+            </ul>
+          </PostDcModalSection>
+
+          {trimmedDeadline ? (
+            <PostDcModalSection
+              title="Deadline / key note"
+              description="Time-sensitive follow-up from the discovery call."
+            >
+              <PostDcDeadlineNote text={trimmedDeadline} showLabel={false} className="pt-0 mt-0 border-0" />
+            </PostDcModalSection>
+          ) : null}
+
+          {trimmedRecommendation ? (
+            <PostDcModalSection
+              title="AI recommended next steps"
+              description="Suggested follow-up based on discovery outcomes, BANT, and deal signals."
+            >
+              <PostDcAiNextSteps text={trimmedRecommendation} showLabel={false} className="pt-0 mt-0 border-0" />
+            </PostDcModalSection>
+          ) : null}
+
+          {openGaps.length > 0 ? (
+            <PostDcModalSection
+              title="Reasoning — open gaps"
+              description="Why these next steps matter: unresolved discovery areas from the call."
+            >
+              <ul className={cn("list-disc pl-5 space-y-2", briefBodyMutedClass)}>
+                {openGaps.map((gap) => (
+                  <li key={gap} className="leading-relaxed break-words">
+                    {gap}
+                  </li>
+                ))}
+              </ul>
+            </PostDcModalSection>
+          ) : null}
+        </div>
+      }
+    >
+      {summaryList}
+      {trimmedDeadline ? <PostDcDeadlineNote text={trimmedDeadline} /> : null}
+      {trimmedRecommendation ? <PostDcAiNextSteps text={trimmedRecommendation} /> : null}
+    </PostDcExpandableCard>
   );
 }
 

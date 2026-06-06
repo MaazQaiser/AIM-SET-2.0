@@ -23,6 +23,8 @@ import type {
 } from "@/types";
 import { LiveCollapsibleSection } from "@/components/live/live-collapsible-section";
 import { LiveSubsectionHeader } from "@/components/live/live-column-header";
+import { ParticipantAvatar } from "@/components/participant-avatar";
+import { participantKindFromRole } from "@/lib/attendees/participant-display";
 import { cn } from "@/lib/cn";
 
 const BANT_KEYS = ["budget", "authority", "need", "timeline"] as const;
@@ -585,11 +587,24 @@ function SentimentSignalLog({
             data-sentiment-tone={signal.tone}
           >
             <div className="flex min-w-0 items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="truncate font-semibold text-foreground">{signal.label}</p>
-                <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
-                  {signal.speakerName ?? signal.speakerRole}
-                </p>
+              <div className="flex min-w-0 items-start gap-2">
+                <ParticipantAvatar
+                  name={signal.speakerName ?? signal.speakerRole ?? "Speaker"}
+                  kind={participantKindFromRole(signal.speakerRole)}
+                  role={
+                    signal.speakerRole === "customer" || !signal.speakerRole
+                      ? "customer"
+                      : signal.speakerRole
+                  }
+                  size="xs"
+                  className="mt-0.5"
+                />
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-foreground">{signal.label}</p>
+                  <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
+                    {signal.speakerName ?? signal.speakerRole}
+                  </p>
+                </div>
               </div>
               <span
                 className={cn(

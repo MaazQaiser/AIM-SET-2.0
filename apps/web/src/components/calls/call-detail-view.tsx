@@ -4,6 +4,7 @@ import { CallDetailStickyHeader } from "@/components/calls/call-detail-sticky-he
 import { CallDetailTabs } from "@/components/calls/call-detail-tabs";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { PageShell } from "@/components/layout/page-shell";
+import { briefBodyClass } from "@/components/pre-call/brief-detail-card";
 import { CallDetailPageLoader } from "@/components/layout/page-loaders";
 import { enrichCallBant } from "@/lib/bant/authority-from-lead";
 import { buildAccountSnapshot } from "@/lib/dc-data/build-account-snapshot";
@@ -15,6 +16,7 @@ import {
   findPreDcRecordForCall,
 } from "@/lib/dc-notes/build-from-import";
 import { preDcField } from "@/types/dc-notes";
+import { cn } from "@/lib/cn";
 
 interface CallDetailViewProps {
   callId: string;
@@ -77,7 +79,7 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
   return (
     <PageShell
       size="wide"
-      className="call-detail-page min-h-0 space-y-4 pb-8 text-[0.9375rem] leading-relaxed"
+      className={cn("call-detail-page min-h-0 space-y-4 pb-8", briefBodyClass)}
     >
       {isFetching && call ? (
         <p className="text-xs text-muted-foreground" aria-live="polite">

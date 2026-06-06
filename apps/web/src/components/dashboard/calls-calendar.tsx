@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/compone
 import { Button } from "@dc-copilot/ui/components/button";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Card, CardContent } from "@dc-copilot/ui/components/card";
+import { ParticipantAvatar } from "@/components/participant-avatar";
 import { cn } from "@/lib/cn";
 import type { Call } from "@/types";
 
@@ -75,7 +76,10 @@ function CompactCallBlock({ call }: { call: Call }) {
         <p className="text-[10px] font-medium text-primary/90">{call.annualRevenue} revenue</p>
       )}
       {call.leadName && (
-        <p className="text-[10px] text-muted-foreground truncate">{call.leadName}</p>
+        <p className="text-[10px] text-muted-foreground truncate inline-flex items-center gap-1 mt-0.5">
+          <ParticipantAvatar name={call.leadName} kind="external" size="xs" />
+          {call.leadName}
+        </p>
       )}
     </Link>
   );

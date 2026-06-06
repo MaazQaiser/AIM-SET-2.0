@@ -21,9 +21,11 @@ import type { ClpSection, ClpSectionType, CustomerLandingPage } from "@dc-copilo
 interface ClpSectionEditorProps {
   draft: CustomerLandingPage;
   onChange: (page: CustomerLandingPage) => void;
+  /** When nested inside a parent planning card */
+  embedded?: boolean;
 }
 
-export function ClpSectionEditor({ draft, onChange }: ClpSectionEditorProps) {
+export function ClpSectionEditor({ draft, onChange, embedded = false }: ClpSectionEditorProps) {
   const [addType, setAddType] = useState<ClpSectionType>("summary");
   const [expandedId, setExpandedId] = useState<string | null>(draft.sections[0]?.id ?? null);
 
@@ -47,9 +49,16 @@ export function ClpSectionEditor({ draft, onChange }: ClpSectionEditorProps) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className={cn("space-y-3", embedded && "border-t border-border/60 pt-4")}>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">Sections</h2>
+        <h2
+          className={cn(
+            "font-semibold",
+            embedded ? "text-xs text-muted-foreground uppercase tracking-wide" : "text-sm"
+          )}
+        >
+          Sections
+        </h2>
         <div className="flex items-center gap-1.5">
           <select
             value={addType}
@@ -185,7 +194,10 @@ function SectionFields({
             value={bulletsToText(section.bullets)}
             onChange={(e) => onPatch({ bullets: textToBullets(e.target.value) })}
             rows={5}
-            className="text-sm font-mono"
+            className={cn(
+              "text-sm leading-relaxed",
+              section.type === "summary" ? "text-foreground" : "font-mono"
+            )}
           />
         </Field>
       </>

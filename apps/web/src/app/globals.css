@@ -121,6 +121,22 @@ main:has(.live-call-page) > * {
   font-family: var(--font-sans);
 }
 
+/* Post-DC body copy matches Pre-DC brief cards (15px / relaxed). */
+.call-detail-page .post-dc-body {
+  font-size: 0.9375rem;
+  line-height: 1.625;
+}
+
+.call-detail-page .post-dc-body :is(p, li, dd, blockquote, td, th, .post-dc-copy) {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.call-detail-page .post-dc-body .text-sm:not([class*="text-xs"]):not([class*="text-[10px]"]):not([class*="text-[11px]"]) {
+  font-size: 0.9375rem;
+  line-height: 1.625;
+}
+
 /* Call detail: glass cards — slightly tighter radius */
 .call-detail-page .glass-insight-card,
 .call-detail-page .app-card {

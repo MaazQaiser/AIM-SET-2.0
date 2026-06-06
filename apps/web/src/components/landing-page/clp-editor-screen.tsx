@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Send } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
@@ -43,18 +43,19 @@ export function ClpEditorScreen({ callId }: ClpEditorScreenProps) {
   const [draft, setDraft] = useState<CustomerLandingPage | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
   const [password, setPassword] = useState("");
+  const autoGenerateAttempted = useRef(false);
 
   useEffect(() => {
     if (page) setDraft(syncAssetSections(page));
   }, [page]);
 
   useEffect(() => {
-    if (!isLoading && !page && !generate.isPending) {
-      generate.mutate(undefined, {
-        onSuccess: (p) => setDraft(syncAssetSections(p)),
-        onError: () => toast.error("Could not generate landing page draft"),
-      });
-    }
+    if (isLoading || page || generate.isPending || autoGenerateAttempted.current) return;
+    autoGenerateAttempted.current = true;
+    generate.mutate(undefined, {
+      onSuccess: (p) => setDraft(syncAssetSections(p)),
+      onError: () => toast.error("Could not generate landing page draft"),
+    });
   }, [isLoading, page, generate.isPending]);
 
   function saveDraft(next: CustomerLandingPage) {

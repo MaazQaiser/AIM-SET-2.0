@@ -8,12 +8,15 @@ import { Button } from "@dc-copilot/ui/components/button";
 import { Input } from "@dc-copilot/ui/components/input";
 import { Textarea } from "@dc-copilot/ui/components/textarea";
 import { KbFileTypeIcon } from "@/components/knowledge/kb-file-type-icon";
+import { briefBodyClass, briefBodyForegroundClass } from "@/components/pre-call/brief-detail-card";
 
 interface ClpPublicViewProps {
   page: CustomerLandingPage;
   proposal?: ClpProposal | null;
   comments?: ClpComment[];
   preview?: boolean;
+  /** When false, preview fills its container (e.g. fullscreen dialog) without inline chrome. */
+  embedded?: boolean;
   onDocumentOpen?: (assetId: string) => void;
   onProposalOpen?: () => void;
   onSendChat?: (body: string) => void;
@@ -26,6 +29,7 @@ export function ClpPublicView({
   proposal,
   comments = [],
   preview = false,
+  embedded = true,
   onDocumentOpen,
   onProposalOpen,
   onSendChat,
@@ -40,7 +44,7 @@ export function ClpPublicView({
   const sections = (page.sections ?? []).filter((s) => s.visible !== false);
 
   return (
-    <div className={cn("min-h-screen", preview && "rounded-xl border")}>
+    <div className={cn("min-h-screen", preview && embedded && "rounded-xl border")}>
       <header className="border-b bg-card px-6 py-8">
         <p className="text-xs text-muted-foreground">Lead hub</p>
         <h1 className="text-2xl font-semibold mt-1">{branding.accountName}</h1>
@@ -229,10 +233,18 @@ function renderSection(
   }
 
   if (section.bullets?.length) {
+    const isSummary = section.type === "summary";
     return (
-      <ul className="mt-3 list-disc pl-5 text-sm text-muted-foreground space-y-1">
+      <ul
+        className={cn(
+          "mt-3 list-disc pl-5 space-y-2",
+          isSummary ? briefBodyForegroundClass : cn(briefBodyClass, "text-muted-foreground")
+        )}
+      >
         {section.bullets.map((b, i) => (
-          <li key={i}>{b}</li>
+          <li key={i} className="break-words">
+            {b}
+          </li>
         ))}
       </ul>
     );
