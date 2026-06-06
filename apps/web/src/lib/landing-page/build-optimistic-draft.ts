@@ -118,8 +118,6 @@ export function buildOptimisticLandingDraft({
     branding: {
       accountName: account,
       leadName: lead || undefined,
-      aeName: call?.ownerName,
-      aeEmail: call?.ownerEmail,
     },
     sections,
     selectedAssets,

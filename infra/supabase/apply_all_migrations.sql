@@ -239,6 +239,7 @@ CREATE TABLE IF NOT EXISTS content_templates (
   thumbnail_storage_path TEXT,
   html TEXT,
   css_variables JSONB NOT NULL DEFAULT '{}'::jsonb,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   page_count INT NOT NULL DEFAULT 1,
   ingest_error TEXT,
   tags TEXT[] NOT NULL DEFAULT '{}',

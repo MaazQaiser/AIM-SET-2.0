@@ -24,6 +24,7 @@ interface TemplateSourcePreviewProps {
     | "previewSlideCount"
     | "thumbnailUrl"
     | "artifactType"
+    | "metadata"
   >;
   className?: string;
 }
@@ -39,6 +40,8 @@ export function TemplateSourcePreview({ template, className }: TemplateSourcePre
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [usingPdfFallback, setUsingPdfFallback] = useState(false);
+  const slideMetadata = template.metadata?.slides ?? [];
+  const currentSlideMetadata = slideMetadata.find((slide) => slide.slide === currentSlide);
 
   const loadSlide = useCallback(
     async (slideIndex: number) => {
@@ -247,6 +250,12 @@ export function TemplateSourcePreview({ template, className }: TemplateSourcePre
             <span className="min-w-[5rem] text-center text-sm tabular-nums">
               Slide {currentSlide} / {slideCount}
             </span>
+            {currentSlideMetadata?.title ? (
+              <span className="hidden max-w-[18rem] truncate text-xs text-muted-foreground md:inline">
+                {currentSlideMetadata.title}
+                {currentSlideMetadata.layout ? ` / ${currentSlideMetadata.layout}` : ""}
+              </span>
+            ) : null}
             <Button
               variant="outline"
               size="icon"

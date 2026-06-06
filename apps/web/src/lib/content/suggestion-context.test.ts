@@ -123,6 +123,7 @@ describe("attachKbMatchesToGroups", () => {
           type: "deck",
           tags: [],
           uploadedAt: "2026-01-01",
+          version: 1,
         } as KBAsset,
       ]
     );

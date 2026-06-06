@@ -45,9 +45,10 @@ export function KbAssetStatistics({ asset, className }: KbAssetStatisticsProps) 
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Statistics</p>
         <div className="mt-3 space-y-2.5 rounded-lg border border-border bg-muted/20 p-3">
-          <StatRow label="Format">
-            <KbFileFormatBadge fileName={asset.fileName} mimeType={asset.mimeType} />
-          </StatRow>
+          <StatRow
+            label="Format"
+            value={<KbFileFormatBadge fileName={asset.fileName} mimeType={asset.mimeType} />}
+          />
           <StatRow label="Type" value={<span className="capitalize">{formatAssetType(asset.type)}</span>} icon={Layers} />
           <StatRow label="Version" value={`v${asset.version}`} />
           <StatRow

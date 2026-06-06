@@ -570,14 +570,6 @@ export function buildPostReviewFromPostDc(record: PostDCRecord): PostCallReview 
         value: bantNotes.timeline || undefined,
       },
     },
-    dealSignals: {
-      leadStage: leadStage || undefined,
-      annualPotential: potential || undefined,
-      engagementModel: engagementModel || undefined,
-      serviceLine: serviceLine || undefined,
-      preDcIcpCorrect: icpBucketCorrect || undefined,
-      nextStep: postDcField(record, "salesStrategy") || undefined,
-    },
     researchSections: buildPostDcResearchSections(record),
     podScorecard: [
       {

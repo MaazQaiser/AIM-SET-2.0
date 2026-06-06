@@ -340,11 +340,11 @@ const DEAL_SIGNAL_FIELDS: Array<{
   label: string;
 }> = [
   { key: "leadStage", label: "Lead stage" },
-  { key: "annualPotential", label: "Annual potential" },
+  { key: "accountsAnnualPotential", label: "Annual potential" },
   { key: "engagementModel", label: "Engagement model" },
   { key: "serviceLine", label: "Service line" },
-  { key: "preDcIcpCorrect", label: "Pre-DC ICP correct" },
-  { key: "nextStep", label: "Next step" },
+  { key: "icpBucketCorrect", label: "Pre-DC ICP correct" },
+  { key: "additionalInfo", label: "Additional info" },
 ];
 
 export function PostDealSignalsCard({ signals }: { signals?: PostCallReview["dealSignals"] }) {

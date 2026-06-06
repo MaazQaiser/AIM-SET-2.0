@@ -27,6 +27,17 @@ def _tenant_keys(ctx: TenantContext) -> Tuple[str, str]:
     return get_tenant_service().resolve(ctx)
 
 
+def _public_template_keys(ctx: TenantContext) -> Tuple[str, str]:
+    settings = get_settings()
+    clerk_key = (settings.kb_shared_tenant_key or "dc-copilot-shared").strip()
+    public_ctx = TenantContext(
+        tenant_id=clerk_key,
+        user_id=ctx.user_id or "template-public",
+        clerk_org_id=clerk_key,
+    )
+    return get_tenant_service().resolve(public_ctx, allow_memory_fallback=True)
+
+
 def _template_slide_path(tenant_uuid: str, template_id: str, slide_index: int) -> str:
     return f"{tenant_uuid}/{template_id}/slides/{slide_index}.png"
 
@@ -35,6 +46,9 @@ def _tpl_row_to_api(row: Dict[str, Any]) -> Dict[str, Any]:
     source_file_name = row.get("source_file_name") or row.get("sourceFileName")
     source_storage_path = row.get("source_storage_path") or row.get("sourceStoragePath")
     page_count = int(row.get("page_count") or row.get("pageCount") or 1)
+    metadata = row.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        metadata = {}
     return {
         "id": str(row["id"]),
         "name": row["name"],
@@ -49,6 +63,7 @@ def _tpl_row_to_api(row: Dict[str, Any]) -> Dict[str, Any]:
         "sourceFileName": source_file_name,
         "hasSourceFile": bool(source_storage_path),
         "previewSlideCount": page_count if source_storage_path else 0,
+        "metadata": metadata,
     }
 
 
@@ -74,6 +89,22 @@ def _warn_memory_fallback(operation: str, exc: Exception) -> None:
 class ContentStudioRepository:
     def __init__(self) -> None:
         self._tenants = get_tenant_service()
+
+    def template_tenant_keys(self, ctx: TenantContext) -> Tuple[str, str]:
+        return _public_template_keys(ctx)
+
+    def template_storage_tenant_uuid(self, ctx: TenantContext, template_id: str) -> str:
+        row = self.get_template_row(ctx, template_id)
+        if row and row.get("tenant_id"):
+            return str(row["tenant_id"])
+        tenant_uuid, _ = self.template_tenant_keys(ctx)
+        return tenant_uuid
+
+    def _all_memory_templates(self) -> List[Tuple[str, Dict[str, Any]]]:
+        out: List[Tuple[str, Dict[str, Any]]] = []
+        for clerk_key, items in get_memory_store().content_templates.items():
+            out.extend((clerk_key, item) for item in items)
+        return out
 
     def _enrich_template_api(self, api: Dict[str, Any], row: Dict[str, Any]) -> Dict[str, Any]:
         settings = get_settings()
@@ -101,15 +132,16 @@ class ContentStudioRepository:
             if path:
                 return path
 
-        tenant_uuid, _ = _tenant_keys(ctx)
+        tenant_uuid, _ = self.template_tenant_keys(ctx)
         prefix = f"{tenant_uuid}/{template_id}/"
         candidates = []
         for path in get_memory_store().content_template_files.keys():
-            if not str(path).startswith(prefix):
+            path_str = str(path)
+            if not path_str.startswith(prefix) and f"/{template_id}/" not in path_str:
                 continue
-            if "/slides/" in str(path) or str(path).endswith("thumb.png"):
+            if "/slides/" in path_str or path_str.endswith("thumb.png"):
                 continue
-            candidates.append(str(path))
+            candidates.append(path_str)
         if not candidates:
             return None
         candidates.sort(key=lambda p: (0 if p.lower().endswith((".ppt", ".pptx")) else 1, p))
@@ -121,15 +153,13 @@ class ContentStudioRepository:
         *,
         artifact_type: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        tenant_uuid, clerk_key = _tenant_keys(ctx)
         settings = get_settings()
         if settings.supabase_configured:
             try:
                 q = (
                     get_supabase()
                     .table("content_templates")
-                    .select("id,name,artifact_type,status,page_count,tags,thumbnail_storage_path,css_variables,created_at,ingest_error,source_file_name,source_storage_path")
-                    .eq("tenant_id", tenant_uuid)
+                    .select("*")
                     .order("created_at", desc=True)
                 )
                 if artifact_type:
@@ -143,13 +173,12 @@ class ContentStudioRepository:
             except Exception:
                 pass
         store = get_memory_store()
-        items = store.content_templates.get(clerk_key, [])
+        items = [template for _, template in self._all_memory_templates()]
         if artifact_type:
             items = [t for t in items if t.get("artifactType") == artifact_type]
-        return items
+        return sorted(items, key=lambda t: str(t.get("createdAt") or ""), reverse=True)
 
     def get_template(self, ctx: TenantContext, template_id: str) -> Optional[Dict[str, Any]]:
-        tenant_uuid, clerk_key = _tenant_keys(ctx)
         settings = get_settings()
         if settings.supabase_configured:
             try:
@@ -157,7 +186,6 @@ class ContentStudioRepository:
                     get_supabase()
                     .table("content_templates")
                     .select("*")
-                    .eq("tenant_id", tenant_uuid)
                     .eq("id", template_id)
                     .limit(1)
                     .execute()
@@ -175,7 +203,7 @@ class ContentStudioRepository:
                 return api
             except Exception:
                 pass
-        for t in get_memory_store().content_templates.get(clerk_key, []):
+        for clerk_key, t in self._all_memory_templates():
             if t["id"] == template_id:
                 full = get_memory_store().content_template_html.get(f"{clerk_key}:{template_id}")
                 api = {**t, "html": full or ""}
@@ -184,6 +212,7 @@ class ContentStudioRepository:
                     api["hasSourceFile"] = True
                     api.setdefault("sourceFileName", Path(source_path).name)
                     api["previewSlideCount"] = int(api.get("pageCount") or 0)
+                tenant_uuid = self.template_storage_tenant_uuid(ctx, template_id)
                 thumb_path = f"{tenant_uuid}/{template_id}/thumb.png"
                 if not api.get("thumbnailUrl") and thumb_path in get_memory_store().content_template_files:
                     api["thumbnailUrl"] = f"/api/content/templates/{template_id}/slides/1"
@@ -201,7 +230,7 @@ class ContentStudioRepository:
         artifact_type: Optional[str] = None,
         tags: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        tenant_uuid, clerk_key = _tenant_keys(ctx)
+        tenant_uuid, clerk_key = self.template_tenant_keys(ctx)
         settings = get_settings()
         template_id = str(uuid.uuid4())
         resolved_type = artifact_type if artifact_type in ARTIFACT_TYPES else _ext_to_artifact(ext)
@@ -255,7 +284,7 @@ class ContentStudioRepository:
     ) -> Dict[str, Any]:
         if artifact_type not in ARTIFACT_TYPES:
             raise ValueError(f"Invalid artifact_type: {artifact_type}")
-        tenant_uuid, clerk_key = _tenant_keys(ctx)
+        tenant_uuid, clerk_key = self.template_tenant_keys(ctx)
         settings = get_settings()
         template_id = str(uuid.uuid4())
         row = {
@@ -295,7 +324,6 @@ class ContentStudioRepository:
         template_id: str,
         patch: Dict[str, Any],
     ) -> Optional[Dict[str, Any]]:
-        tenant_uuid, clerk_key = _tenant_keys(ctx)
         db_patch: Dict[str, Any] = {}
         if "name" in patch:
             db_patch["name"] = patch["name"]
@@ -311,6 +339,8 @@ class ContentStudioRepository:
             db_patch["css_variables"] = patch["cssVariables"]
         if "pageCount" in patch:
             db_patch["page_count"] = max(1, int(patch["pageCount"] or 1))
+        if "metadata" in patch:
+            db_patch["metadata"] = patch["metadata"] if isinstance(patch["metadata"], dict) else {}
 
         if db_patch.get("artifact_type") and db_patch["artifact_type"] not in ARTIFACT_TYPES:
             raise ValueError(f"Invalid artifact_type: {db_patch['artifact_type']}")
@@ -318,16 +348,14 @@ class ContentStudioRepository:
         use_memory = not get_settings().supabase_configured
         if get_settings().supabase_configured:
             try:
-                get_supabase().table("content_templates").update(db_patch).eq("id", template_id).eq(
-                    "tenant_id", tenant_uuid
-                ).execute()
+                get_supabase().table("content_templates").update(db_patch).eq("id", template_id).execute()
             except Exception:
                 use_memory = True
 
         if use_memory:
             store = get_memory_store()
             found = False
-            for t in store.content_templates.get(clerk_key, []):
+            for clerk_key, t in self._all_memory_templates():
                 if t.get("id") != template_id:
                     continue
                 found = True
@@ -341,6 +369,8 @@ class ContentStudioRepository:
                     t["cssVariables"] = patch["cssVariables"]
                 if "pageCount" in patch:
                     t["pageCount"] = max(1, int(patch["pageCount"] or 1))
+                if "metadata" in patch:
+                    t["metadata"] = patch["metadata"] if isinstance(patch["metadata"], dict) else {}
                 if "html" in patch:
                     t["status"] = "ready"
                     t["ingestError"] = None
@@ -360,8 +390,9 @@ class ContentStudioRepository:
         page_count: int,
         thumbnail_bytes: Optional[bytes] = None,
         error: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        tenant_uuid, clerk_key = _tenant_keys(ctx)
+        tenant_uuid = self.template_storage_tenant_uuid(ctx, template_id)
         settings = get_settings()
         status = "failed" if error and page_count <= 0 else "ready"
         ingest_error = error
@@ -388,17 +419,25 @@ class ContentStudioRepository:
             "ingest_error": ingest_error,
             "thumbnail_storage_path": thumb_path,
         }
+        if metadata is not None:
+            patch["metadata"] = metadata
 
         if settings.supabase_configured and not use_memory:
             try:
-                get_supabase().table("content_templates").update(patch).eq("id", template_id).eq(
-                    "tenant_id", tenant_uuid
-                ).execute()
+                get_supabase().table("content_templates").update(patch).eq("id", template_id).execute()
             except Exception:
-                use_memory = True
+                if "metadata" in patch:
+                    try:
+                        legacy_patch = {key: value for key, value in patch.items() if key != "metadata"}
+                        get_supabase().table("content_templates").update(legacy_patch).eq("id", template_id).execute()
+                        patch = legacy_patch
+                    except Exception:
+                        use_memory = True
+                else:
+                    use_memory = True
         if use_memory:
             store = get_memory_store()
-            for t in store.content_templates.get(clerk_key, []):
+            for clerk_key, t in self._all_memory_templates():
                 if t["id"] == template_id:
                     merged = {
                         "id": template_id,
@@ -407,6 +446,7 @@ class ContentStudioRepository:
                         "source_file_name": t.get("sourceFileName") or t.get("source_file_name"),
                         "source_storage_path": t.get("sourceStoragePath") or t.get("source_storage_path"),
                         "tags": t.get("tags") or [],
+                        "metadata": t.get("metadata") or {},
                         "created_at": t.get("createdAt"),
                         **patch,
                     }
@@ -437,7 +477,6 @@ class ContentStudioRepository:
         return data
 
     def get_template_row(self, ctx: TenantContext, template_id: str) -> Optional[Dict[str, Any]]:
-        tenant_uuid, clerk_key = _tenant_keys(ctx)
         settings = get_settings()
         if settings.supabase_configured:
             try:
@@ -445,7 +484,6 @@ class ContentStudioRepository:
                     get_supabase()
                     .table("content_templates")
                     .select("*")
-                    .eq("tenant_id", tenant_uuid)
                     .eq("id", template_id)
                     .limit(1)
                     .execute()
@@ -455,11 +493,9 @@ class ContentStudioRepository:
                     return data
             except Exception:
                 pass
-        for template in get_memory_store().content_templates.get(clerk_key, []):
+        for _clerk_key, template in self._all_memory_templates():
             if template.get("id") == template_id:
                 source_path = template.get("sourceStoragePath") or template.get("source_storage_path")
-                if not source_path:
-                    source_path = self.resolve_template_source_path(ctx, template_id)
                 return {
                     "id": template_id,
                     "name": template.get("name"),
@@ -468,6 +504,7 @@ class ContentStudioRepository:
                     "page_count": template.get("pageCount", 1),
                     "source_file_name": template.get("sourceFileName") or template.get("source_file_name"),
                     "source_storage_path": source_path,
+                    "metadata": template.get("metadata") or {},
                 }
         return None
 
@@ -497,7 +534,7 @@ class ContentStudioRepository:
         template_id: str,
         slide_pngs: List[bytes],
     ) -> int:
-        tenant_uuid, _ = _tenant_keys(ctx)
+        tenant_uuid = self.template_storage_tenant_uuid(ctx, template_id)
         for index, png in enumerate(slide_pngs, start=1):
             path = _template_slide_path(tenant_uuid, template_id, index)
             self.upload_template_blob(path, png, content_type="image/png")
@@ -509,7 +546,7 @@ class ContentStudioRepository:
         template_id: str,
         slide_index: int,
     ) -> bytes:
-        tenant_uuid, _ = _tenant_keys(ctx)
+        tenant_uuid = self.template_storage_tenant_uuid(ctx, template_id)
         path = _template_slide_path(tenant_uuid, template_id, slide_index)
         return self.download_template_source(ctx, path)
 
@@ -530,7 +567,7 @@ class ContentStudioRepository:
         return data, file_name, _mime_for_ext(ext)
 
     def get_template_preview_pdf(self, ctx: TenantContext, template_id: str) -> Optional[bytes]:
-        tenant_uuid, _ = _tenant_keys(ctx)
+        tenant_uuid = self.template_storage_tenant_uuid(ctx, template_id)
         path = f"{tenant_uuid}/{template_id}/preview.pdf"
         try:
             return self.download_template_source(ctx, path)
@@ -939,7 +976,6 @@ class ContentStudioRepository:
         return deleted
 
     def delete_template(self, ctx: TenantContext, template_id: str) -> bool:
-        tenant_uuid, clerk_key = _tenant_keys(ctx)
         settings = get_settings()
         deleted = False
         if settings.supabase_configured:
@@ -948,7 +984,6 @@ class ContentStudioRepository:
                     get_supabase()
                     .table("content_templates")
                     .select("source_storage_path,thumbnail_storage_path")
-                    .eq("tenant_id", tenant_uuid)
                     .eq("id", template_id)
                     .limit(1)
                     .execute()
@@ -959,7 +994,6 @@ class ContentStudioRepository:
                     get_supabase()
                     .table("content_templates")
                     .delete()
-                    .eq("tenant_id", tenant_uuid)
                     .eq("id", template_id)
                     .execute()
                 )
@@ -978,15 +1012,16 @@ class ContentStudioRepository:
 
         if not deleted:
             store = get_memory_store()
-            before = len(store.content_templates.get(clerk_key, []))
-            kept = []
-            for t in store.content_templates.get(clerk_key, []):
-                if t.get("id") == template_id:
-                    store.content_template_html.pop(f"{clerk_key}:{template_id}", None)
-                else:
-                    kept.append(t)
-            store.content_templates[clerk_key] = kept
-            deleted = len(kept) < before
+            for clerk_key, items in list(store.content_templates.items()):
+                before = len(items)
+                kept = []
+                for t in items:
+                    if t.get("id") == template_id:
+                        store.content_template_html.pop(f"{clerk_key}:{template_id}", None)
+                    else:
+                        kept.append(t)
+                store.content_templates[clerk_key] = kept
+                deleted = deleted or len(kept) < before
         return deleted
 
 

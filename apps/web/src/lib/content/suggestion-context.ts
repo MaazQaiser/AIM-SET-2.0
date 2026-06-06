@@ -190,7 +190,6 @@ function assetMatchesGroupType(asset: KBAsset, groupType: PreDcGenerationGroup["
   if (groupType === "case_study") return asset.type === "case-study";
   if (groupType === "one_pager") return asset.type === "one-pager" || asset.type === "battlecard";
   if (groupType === "deck") return asset.type === "deck";
-  if (groupType === "image") return asset.type === "image";
   if (groupType === "architecture") return asset.type === "architecture";
   return asset.type === groupType.replace(/_/g, "-");
 }

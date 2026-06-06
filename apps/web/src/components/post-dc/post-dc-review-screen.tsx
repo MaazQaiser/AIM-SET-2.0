@@ -120,8 +120,9 @@ export function PostDcReviewScreen({
   const [screenTab, setScreenTab] = useState<PostDcScreenTab>("overview");
   const importedReview = resolvePostCallReview(callId);
   const displayedReview = review ?? importedReview ?? null;
-  const landingPrefetchEnabled =
-    Boolean(displayedReview) && isPostDcLandingVisible(resolveLeadStage(displayedReview ?? {}));
+  const landingPrefetchEnabled = displayedReview
+    ? isPostDcLandingVisible(resolveLeadStage(displayedReview))
+    : false;
   const { page: landingPage } = useEnsureLandingPage(callId, landingPrefetchEnabled);
   const showReview = Boolean(displayedReview);
   const waitingForReview =

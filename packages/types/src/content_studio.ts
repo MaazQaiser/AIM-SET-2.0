@@ -10,6 +10,49 @@ export type ExportFormat = "pdf" | "png" | "pptx";
 
 export type StudioKbSaveFormat = "pdf" | "pptx" | "csv";
 
+export interface ContentTemplateSlideMetadata {
+  slide: number;
+  name?: string;
+  title?: string;
+  layout?: string;
+  text?: string;
+  textBlocks?: string[];
+  colors?: string[];
+  fonts?: string[];
+  shapeCount?: number;
+  imageCount?: number;
+  tableCount?: number;
+  chartCount?: number;
+}
+
+export interface ContentTemplateMetadata {
+  source?: {
+    fileName?: string;
+    extension?: string;
+  };
+  slideCount?: number;
+  slides?: ContentTemplateSlideMetadata[];
+  design?: {
+    colors?: string[];
+    fonts?: string[];
+    layouts?: string[];
+    slideSize?: {
+      widthEmu?: number;
+      heightEmu?: number;
+    };
+  };
+  conversion?: {
+    previewImageCount?: number;
+    hasPreviewPdf?: boolean;
+    htmlGenerated?: boolean;
+    sectionCount?: number;
+    cssVariables?: string[];
+    error?: string;
+  };
+  extractionError?: string;
+  sourceFormatNote?: string;
+}
+
 export interface ContentTemplate {
   id: string;
   name: string;
@@ -25,6 +68,7 @@ export interface ContentTemplate {
   sourceFileName?: string;
   hasSourceFile?: boolean;
   previewSlideCount?: number;
+  metadata?: ContentTemplateMetadata;
 }
 
 export interface ContentTemplateDraft {
