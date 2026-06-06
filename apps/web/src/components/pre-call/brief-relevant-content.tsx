@@ -8,6 +8,7 @@ import {
   BRIEF_RELEVANT_CONTENT_SCROLL_MAX,
   briefMainLead,
   briefMainMuted,
+  briefMainNestedSurfaceClass,
   briefMainUnderline,
 } from "@/components/pre-call/brief-detail-card";
 import { KbDocumentViewerDialog } from "@/components/pre-call/kb-document-viewer-dialog";
@@ -114,11 +115,11 @@ export function BriefRelevantContent({
             {section === "all" ? (
               <p className="text-xs font-medium text-muted-foreground">Documents</p>
             ) : null}
-            <ul className="space-y-0">
+            <ul className={cn("space-y-0 rounded-lg border border-border/40 overflow-hidden", briefMainNestedSurfaceClass)}>
               {visibleDocuments.map((doc) => (
                 <li
                   key={doc.assetId}
-                  className="border-b border-border/40 px-6 py-3 last:border-b-0"
+                  className="border-b border-border/40 px-4 py-3 last:border-b-0"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -161,13 +162,13 @@ export function BriefRelevantContent({
             {section === "all" ? (
               <p className="text-xs font-medium text-muted-foreground">Relevant projects</p>
             ) : null}
-            <ul className="divide-y divide-border/40">
+            <ul className={cn("divide-y divide-border/40 rounded-lg border border-border/40 overflow-hidden", briefMainNestedSurfaceClass)}>
               {visibleProjects.map((project) => (
                 <li key={project.id}>
                   <button
                     type="button"
                     onClick={() => setActiveProject(project)}
-                    className="w-full border-0 bg-transparent px-6 py-2.5 text-left transition-opacity hover:opacity-80"
+                    className="w-full border-0 bg-transparent px-4 py-2.5 text-left transition-opacity hover:opacity-80"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span

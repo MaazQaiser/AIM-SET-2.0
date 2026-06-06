@@ -1,10 +1,11 @@
-import { Calendar, Clock, ArrowUpRight, DollarSign, User } from "lucide-react";
+import { Calendar, Clock, ArrowUpRight, DollarSign } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { cn } from "@/lib/cn";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent } from "@dc-copilot/ui/components/card";
+import { ParticipantAvatar } from "@/components/participant-avatar";
 import { callDetailsHref } from "@/lib/dashboard/call-links";
 import { companyStageForCall } from "@/lib/dc-notes/company-stage";
 import { companyRatingForCall, formatCompanyRating } from "@/lib/dc-notes/icp-rating";
@@ -103,7 +104,7 @@ export function CallCard({ call }: CallCardProps) {
         <div className="space-y-2 border-t pt-3 text-xs text-muted-foreground">
           {call.leadName && (
             <div className="flex min-w-0 items-center gap-1.5 truncate border-b border-border/60 pb-2 font-semibold text-foreground/80">
-              <User className="h-3.5 w-3.5 shrink-0" />
+              <ParticipantAvatar name={call.leadName} kind="external" size="xs" />
               <span className="truncate">
                 {call.leadName}
                 {call.leadTitle && (

@@ -19,7 +19,7 @@ export function AccountSnapshotCard({
   return (
     <BriefDetailCard
       title="Account snapshot"
-      scrollMaxHeight="14rem"
+      scrollMaxHeight={embedded ? "14rem" : undefined}
       embedded={embedded}
       hideEmbeddedTitle={embedded}
     >

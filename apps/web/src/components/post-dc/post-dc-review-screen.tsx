@@ -1,26 +1,47 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowLeft, FileSpreadsheet } from "lucide-react";
+import { useCallback, useState } from "react";
+import { FileSpreadsheet } from "lucide-react";
 import { useCall, useCallBrief, useCreateJiraTicket, usePostCallReview } from "@/lib/data/hooks";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
-import { Badge } from "@dc-copilot/ui/components/badge";
+import { CallDetailColumnLayout } from "@/components/calls/call-detail-column-layout";
+import { CallDetailStickyHeader } from "@/components/calls/call-detail-sticky-header";
+import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import { LayoutControls } from "@/components/dashboard-grid/layout-controls";
-import { POST_DC_WIDGETS } from "@/lib/dashboard/widget-registry";
+import { PageShell } from "@/components/layout/page-shell";
+import { PostDcActionStrip } from "@/components/post-dc/post-dc-action-strip";
+import { PostDcTasksColumn } from "@/components/post-dc/post-dc-tasks-column";
+import {
+  PostDcScreenTabs,
+  type PostDcScreenTab,
+} from "@/components/post-dc/post-dc-screen-tabs";
 import { normalizePostDcWidgetProps } from "@/lib/dashboard/normalize-widget-props";
-import { PostDcSidebar } from "@/components/post-dc/post-dc-sidebar";
-import { PostDcTabbedContent } from "@/components/post-dc/post-dc-tabbed-content";
+import { POST_DC_WIDGETS } from "@/lib/dashboard/widget-registry";
 import { PostDcPageLoader } from "@/components/layout/page-loaders";
 import { useLandingPage } from "@/lib/data/clp-hooks";
-import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import type { AccountSnapshotRow } from "@/components/calls/account-widget-cards";
 import { enrichCallBant } from "@/lib/bant/authority-from-lead";
 import { buildAccountSnapshot } from "@/lib/dc-data/build-account-snapshot";
 import { findPreDcRecordForCall } from "@/lib/dc-notes/build-from-import";
+import { resolvePostCallReview } from "@/lib/dc-data/resolvers";
+import { resolveLeadStage } from "@/lib/post-dc/deal-signals";
+import {
+  buildPostDcWorkflowTasks,
+  countWorkflowTasksDone,
+  type PostDcWorkflowTaskStatus,
+} from "@/lib/post-dc/workflow-tasks";
 import { preDcField } from "@/types/dc-notes";
-import { cn } from "@/lib/cn";
+import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
+import { PostDcCloseDealAction } from "@/components/post-dc/post-dc-close-deal-action";
+import { FloatingAiChatBar } from "@/components/floating-ai-chat-bar";
+import { briefBodyClass } from "@/components/pre-call/brief-detail-card";
 import { sanitizeClientEmailDraft } from "@/lib/post-dc-client-email-safety";
+import { cn } from "@/lib/cn";
+import {
+  buildClientEmailDraftFromReview,
+  buildInternalEmailDraftFromReview,
+} from "@/lib/post-dc/build-email-drafts-from-review";
 import type {
   PostCallJiraTicket,
   PostCallReview,
@@ -30,6 +51,7 @@ import type { Call } from "@/types";
 
 const EMPTY_ACCOUNT_SNAPSHOT: AccountSnapshotRow[] = [];
 const EMPTY_TASKS: PostCallTask[] = [];
+const EMPTY_WORKFLOW_STATUS: Record<string, PostDcWorkflowTaskStatus> = {};
 const BANT_TICKET_KEYS = ["budget", "authority", "need", "timeline"] as const;
 const JIRA_FINANCIAL_RE =
   /(\$|€|£|\b(?:budget|financial|finance|financing|revenue|roi|pricing|price|cost|investment|unit economics|cfo|economic buyer|board approval|approval path|annual potential|year-one|year one|bant|open discovery gap|open discovery gaps|discovery gaps|discovery coverage)\b)/i;
@@ -62,14 +84,23 @@ export function PostDcReviewScreen({
   const emailDraft = useDcImportsStore((s) => s.emailDraftsByCallId[callId]);
   const internalEmailDraft = useDcImportsStore((s) => s.internalEmailDraftsByCallId[callId]);
   const taskList = useDcImportsStore((s) => s.crmTasksByCallId[callId] ?? EMPTY_TASKS);
+  const workflowTaskStatus = useDcImportsStore(
+    (s) => s.workflowTaskStatusByCallId[callId] ?? EMPTY_WORKFLOW_STATUS
+  );
+  const setWorkflowTaskStatus = useDcImportsStore((s) => s.setWorkflowTaskStatus);
   const jiraTicket = useDcImportsStore((s) => s.jiraTicketsByCallId[callId]);
   const postRunMeta = useDcImportsStore((s) => s.postRunMetaByCallId[callId] ?? null);
   const setPostCallArtifacts = useDcImportsStore((s) => s.setPostCallArtifacts);
-  const postDcReady = justWrapped || call?.status === "completed";
-  const displayedReview = postDcReady ? (review ?? null) : null;
-  const showReview = Boolean(displayedReview);
   const importsHydrated = useDcImportsStore((s) => s.importsHydrated);
-  const displayedEmailDraft = sanitizeClientEmailDraft({
+  const isEditingLayout = useDashboardLayoutStore((s) => s.isEditing);
+  const setEditingLayout = useDashboardLayoutStore((s) => s.setEditing);
+  const [screenTab, setScreenTab] = useState<PostDcScreenTab>("overview");
+  const importedReview = resolvePostCallReview(callId);
+  const displayedReview = review ?? importedReview ?? null;
+  const showReview = Boolean(displayedReview);
+  const waitingForReview =
+    !importsHydrated || callLoading || (reviewLoading && !displayedReview);
+  const pipelineClientDraft = sanitizeClientEmailDraft({
     draft: emailDraft
       ? { ...emailDraft, attachments: emailDraft.attachments ?? postRunMeta?.emailAttachments }
       : undefined,
@@ -77,7 +108,25 @@ export function PostDcReviewScreen({
     review: displayedReview,
     attachments: postRunMeta?.emailAttachments,
   }) ?? null;
-  const displayedInternalEmailDraft = internalEmailDraft ?? null;
+  const fallbackClientDraft =
+    displayedReview && call
+      ? buildClientEmailDraftFromReview({
+          callId,
+          accountName: call.accountName,
+          review: displayedReview,
+        })
+      : null;
+  const displayedEmailDraft = pipelineClientDraft ?? fallbackClientDraft ?? null;
+  const fallbackInternalDraft =
+    displayedReview && call
+      ? buildInternalEmailDraftFromReview({
+          callId,
+          accountName: call.accountName,
+          review: displayedReview,
+          crmTasks: taskList,
+        })
+      : null;
+  const displayedInternalEmailDraft = internalEmailDraft ?? fallbackInternalDraft ?? null;
   const displayedJiraTicket =
     jiraTicket ??
     buildJiraTicketDraft({
@@ -98,10 +147,6 @@ export function PostDcReviewScreen({
     clientAttendees: brief?.clientAttendees,
   });
 
-  const shellClass = embedded
-    ? "p-4 space-y-4"
-    : "p-6 space-y-6 max-w-[1400px] mx-auto w-full";
-
   function handleApproveTasks(ids: string[]) {
     const approved = taskList.map((task) =>
       ids.includes(task.id) ? ({ ...task, status: "created" } satisfies PostCallTask) : task
@@ -117,9 +162,24 @@ export function PostDcReviewScreen({
     await createJiraTicket.mutateAsync(ticket);
   }
 
-  if ((!importsHydrated || callLoading || reviewLoading) && !call) {
+  const scrollToWidget = useCallback((widgetId: string) => {
+    if (widgetId === "post.clp_status" || widgetId === "post.clp_analytics") {
+      setScreenTab("client-landing");
+      return;
+    }
+    document.getElementById(`post-dc-widget-${widgetId}`)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, []);
+
+  function handleWorkflowTaskStatus(taskId: string, status: PostDcWorkflowTaskStatus) {
+    setWorkflowTaskStatus(callId, taskId, status);
+  }
+
+  if (waitingForReview && !showReview) {
     return embedded ? (
-      <div className={shellClass}>
+      <div className="p-4">
         <PostDcPageLoader />
       </div>
     ) : (
@@ -129,153 +189,197 @@ export function PostDcReviewScreen({
 
   if (!call) {
     return (
-      <div className={embedded ? "p-4" : "p-6 max-w-5xl mx-auto"}>
+      <PageShell size={embedded ? "default" : "wide"} className={embedded ? "p-4" : undefined}>
         <EmptyState title="Call not found" action={{ label: "Back to calls", href: "/calls" }} />
+      </PageShell>
+    );
+  }
+
+  const scheduleText =
+    call.discoveryCallDatePkt && call.discoveryCallTimePkt
+      ? `${call.discoveryCallDatePkt} · ${call.discoveryCallTimePkt} PKT`
+      : new Date(call.scheduledAt).toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        });
+
+  const emptyState = (
+    <EmptyState
+      icon={FileSpreadsheet}
+      title={
+        justWrapped
+          ? "Generating Post-DC review…"
+          : call.status === "completed"
+            ? "No Post-DC review yet"
+            : "Post-DC starts after wrap-up"
+      }
+      description={
+        justWrapped
+          ? "The wrap-up pipeline is still running. Refresh in a moment if this screen stays empty."
+          : call.status === "completed"
+            ? "Run wrap-up from the live cockpit to generate a review for this call."
+            : "End and wrap the call from the live cockpit to generate the after-call review. Imported Post-DC accounts open here automatically once post_dc_notes_data.csv is linked."
+      }
+      action={{
+        label:
+          call.status === "completed" || justWrapped
+            ? "Back to brief"
+            : "Open live cockpit",
+        href:
+          call.status === "completed" || justWrapped
+            ? `/calls/${callId}`
+            : `/calls/${callId}/live`,
+      }}
+    />
+  );
+
+  if (!showReview) {
+    if (embedded) {
+      return <div className="p-4">{emptyState}</div>;
+    }
+    return (
+      <PageShell size="wide" className="min-h-0 space-y-4 pb-8">
+        <CallDetailStickyHeader
+          call={call}
+          scheduleText={scheduleText}
+          showJoinCall={false}
+          isEditingLayout={isEditingLayout}
+          onToggleLayout={() => setEditingLayout(!isEditingLayout)}
+          phase="post-dc"
+        />
+        {emptyState}
+      </PageShell>
+    );
+  }
+
+  if (!displayedReview) return null;
+
+  const leadStage = resolveLeadStage(displayedReview);
+  const workflowTasks = buildPostDcWorkflowTasks({
+    review: displayedReview,
+    leadStage,
+    hasEmailDraft: Boolean(displayedEmailDraft),
+    hasJiraTicket: Boolean(displayedJiraTicket),
+    landingPage: landingPage ?? null,
+    statusOverrides: workflowTaskStatus,
+  });
+  const workflowTasksDone = countWorkflowTasksDone(workflowTasks);
+  const crmTasksDone = taskList.filter((t) => t.status === "created").length;
+  const postDcWorkflow = {
+    hasNextSteps: workflowTasks.length > 0,
+    workflowTasksTotal: workflowTasks.length,
+    workflowTasksDone,
+    crmTasksTotal: taskList.length,
+    crmTasksDone,
+    clientEmailReady: Boolean(displayedEmailDraft),
+    internalEmailReady: Boolean(displayedInternalEmailDraft),
+  };
+
+  const widgetProps = normalizePostDcWidgetProps({
+    review: displayedReview,
+    call,
+    callId,
+    accountSnapshot: snapshot,
+    bant: resolvedBant,
+    emailDraft: displayedEmailDraft,
+    internalEmailDraft: displayedInternalEmailDraft,
+    crmTasks: taskList,
+    jiraTicket: displayedJiraTicket,
+    kbSuggestions: postRunMeta?.kbSuggestions ?? [],
+    emailAttachments: displayedEmailDraft?.attachments,
+    landingPage: landingPage ?? null,
+    leadStage,
+    workflowTaskStatus,
+    onWorkflowTaskStatusChange: handleWorkflowTaskStatus,
+    onScrollToWidget: scrollToWidget,
+    onApproveCrmTasks: handleApproveTasks,
+    onRejectCrmTask: handleRejectTask,
+    onCreateJiraTicket: handleCreateJiraTicket,
+  });
+
+  const layoutBody = (
+    <div className={cn(briefBodyClass, "post-dc-body min-w-0 text-foreground/90")}>
+      <LayoutControls layoutKey="post-dc" widgets={POST_DC_WIDGETS} widgetProps={widgetProps} />
+      {!isEditingLayout ? (
+        <PostDcScreenTabs
+          value={screenTab}
+          onChange={setScreenTab}
+          embedded={embedded}
+          className="mb-1"
+        />
+      ) : null}
+      <CallDetailColumnLayout
+        layoutKey="post-dc"
+        widgets={POST_DC_WIDGETS}
+        widgetProps={widgetProps}
+        contextEmbedded={embedded}
+        postDcScreenTab={isEditingLayout ? "overview" : screenTab}
+        postDcBrief={brief ?? null}
+        tasksColumn={<PostDcTasksColumn widgetProps={widgetProps} embedded={embedded} />}
+      />
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <div className="relative min-w-0 space-y-4 p-4 pb-28 post-dc-body">
+        <div className="flex flex-col gap-2 border-b border-border/60 pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate">{call.accountName}</p>
+              <p className="text-xs text-muted-foreground">Post-DC wrap-up</p>
+            </div>
+            <CallWrapUpActions
+              callId={callId}
+              hasReview={showReview}
+              variant="compact"
+              showLiveLink={false}
+              showPostDcLink={false}
+              showCreateDeck={false}
+              showEndReview={false}
+            />
+            <PostDcCloseDealAction callId={callId} />
+          </div>
+          <PostDcActionStrip {...postDcWorkflow} />
+        </div>
+        {layoutBody}
+        <FloatingAiChatBar phase="wrapup" />
       </div>
     );
   }
 
   return (
-    <div className={shellClass}>
-      {!embedded && (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-start gap-3 min-w-0">
-            <Link
-              href={`/calls/${callId}`}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border hover:bg-muted"
-              aria-label="Back to call brief"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-semibold text-foreground truncate">
-                  Post-DC review
-                </h1>
-                <Badge variant="secondary" className="text-[10px]">
-                  Call wrap-up
-                </Badge>
-                {call.status === "completed" && (
-                  <Badge variant="success" className="text-[10px]">
-                    Completed
-                  </Badge>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground mt-0.5 truncate">
-                {call.accountName}
-                {call.leadName ? ` · ${call.leadName}` : ""}
-              </p>
-            </div>
-          </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <CallWrapUpActions
-              callId={callId}
-              hasReview={showReview}
-              showLiveLink={false}
-              showPostDcLink={false}
-              showCreateDeck={false}
-              showEndReview={false}
-              className="shrink-0"
-            />
-          </div>
-        </div>
-      )}
-      {embedded && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs font-medium text-foreground">Post-DC wrap-up</p>
+    <PageShell
+      size="wide"
+      className={cn("call-detail-page min-h-0 space-y-4 pb-28 post-dc-body", briefBodyClass)}
+    >
+      <CallDetailStickyHeader
+        call={call}
+        scheduleText={scheduleText}
+        showJoinCall={false}
+        isEditingLayout={isEditingLayout}
+        onToggleLayout={() => setEditingLayout(!isEditingLayout)}
+        phase="post-dc"
+        leadStage={leadStage}
+        postDcWorkflow={postDcWorkflow}
+        trailingActions={
           <CallWrapUpActions
             callId={callId}
             hasReview={showReview}
             variant="compact"
+            showLiveLink={false}
             showPostDcLink={false}
             showCreateDeck={false}
             showEndReview={false}
           />
-        </div>
-      )}
-
-      {!displayedReview ? (
-        <div className="space-y-4">
-          <EmptyState
-            icon={FileSpreadsheet}
-            title={postDcReady ? "No Post-DC review yet" : "Post-DC starts after wrap-up"}
-            description={
-              postDcReady
-                ? "Run wrap-up to generate a review, or import post_dc_notes_data.csv in Settings for imported accounts."
-                : "End and wrap the call from the live cockpit to generate the after-call review."
-            }
-            action={{
-              label: postDcReady ? "Back to brief" : "Open live cockpit",
-              href: postDcReady ? `/calls/${callId}` : `/calls/${callId}/live`,
-            }}
-          />
-          {postDcReady && (
-            <div className="flex justify-center">
-              <CallWrapUpActions
-                callId={callId}
-                hasReview={false}
-                showLiveLink={false}
-                showPostDcLink={false}
-                showCreateDeck={false}
-                endReviewLabel="Run wrap-up"
-              />
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {(() => {
-            const widgetProps = normalizePostDcWidgetProps({
-              review: displayedReview,
-              call,
-              callId,
-              accountSnapshot: snapshot,
-              emailDraft: displayedEmailDraft,
-              internalEmailDraft: displayedInternalEmailDraft,
-              crmTasks: taskList,
-              jiraTicket: displayedJiraTicket,
-              kbSuggestions: postRunMeta?.kbSuggestions ?? [],
-              emailAttachments: displayedEmailDraft?.attachments,
-              landingPage: landingPage ?? null,
-              onApproveCrmTasks: handleApproveTasks,
-              onRejectCrmTask: handleRejectTask,
-              onCreateJiraTicket: handleCreateJiraTicket,
-            });
-            return (
-              <>
-                <LayoutControls layoutKey="post-dc" widgets={POST_DC_WIDGETS} widgetProps={widgetProps} />
-                <div
-                  className={cn(
-                    "grid gap-8",
-                    "grid-cols-1",
-                    "lg:grid-cols-[minmax(300px,0.34fr)_minmax(0,1fr)]",
-                    "lg:items-start"
-                  )}
-                >
-                  <PostDcSidebar
-                    accountSnapshot={snapshot}
-                    review={displayedReview}
-                    bant={resolvedBant}
-                  />
-                  <div className="min-w-0">
-                    <PostDcTabbedContent
-                      callId={callId}
-                      widgets={POST_DC_WIDGETS}
-                      widgetProps={widgetProps}
-                      landingPage={landingPage ?? null}
-                      jiraTicket={displayedJiraTicket}
-                      onCreateJiraTicket={handleCreateJiraTicket}
-                      embedded={embedded}
-                      defaultTab={embedded ? "summary" : "before"}
-                    />
-                  </div>
-                </div>
-              </>
-            );
-          })()}
-        </div>
-      )}
-    </div>
+        }
+      />
+      {layoutBody}
+      <FloatingAiChatBar phase="wrapup" />
+    </PageShell>
   );
 }
 

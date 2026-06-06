@@ -227,10 +227,22 @@ export interface CallBrief {
   agentRunId?: string;
 }
 
+export interface PostDcDealSignals {
+  leadStage?: string;
+  engagementModel?: string;
+  accountsAnnualPotential?: string;
+  serviceLine?: string;
+  icpBucketCorrect?: string;
+  reasonNotFit?: string;
+  additionalInfo?: string;
+  attendees?: string;
+}
+
 export interface PostCallReview {
   headline: string;
   summary: string[];
   nextStepProposal?: string;
+  dealSignals?: PostDcDealSignals;
   researchSections?: BriefResearchSection[];
   podScorecard: {
     member: string;

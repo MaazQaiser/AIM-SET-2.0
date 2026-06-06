@@ -33,6 +33,11 @@ export const briefMainUnderline =
   "font-semibold underline decoration-foreground/40 underline-offset-[3px]";
 export const briefMainMuted = appMutedClass;
 
+/** Default brief / post-DC body copy — matches Pre-DC sidebar cards. */
+export const briefBodyClass = "text-[0.9375rem] leading-relaxed";
+export const briefBodyMutedClass = cn(briefBodyClass, "text-muted-foreground");
+export const briefBodyForegroundClass = cn(briefBodyClass, "text-foreground");
+
 /** Scrollable card regions: slim thumb, inset via scrollbar track margin. */
 export const briefCardScrollClass = appScrollClass;
 
@@ -46,13 +51,19 @@ export const briefCardShellClass = cn(appCardClass, "gap-0");
 export const BRIEF_CARD_LAYOUT_CLASS = "flex min-h-0 w-full flex-col overflow-hidden";
 
 const mainCardPadding = {
-  header: "px-6 pt-5 pb-3",
-  body: "px-6 pb-5 pt-0",
+  header: "px-8 pt-5 pb-3",
+  body: "px-8 pb-5 pt-0",
 };
 const defaultCardPadding = {
   header: "px-6 pt-5 pb-3",
   body: "px-6 pb-5 pt-0",
 };
+
+/** Mark bordered nested surfaces inside main brief cards — parent applies horizontal inset */
+export const briefMainNestedSurfaceClass = "brief-main-nested";
+
+const briefMainNestedSurfaceInset =
+  "[&_.brief-main-nested]:mx-3 sm:[&_.brief-main-nested]:mx-4 [&_.glass-insight-card]:mx-3 sm:[&_.glass-insight-card]:mx-4";
 
 export const briefStickyHeaderClassName = cn(
   "shrink-0 space-y-0",
@@ -85,6 +96,8 @@ export const BRIEF_RELEVANT_CONTENT_SCROLL_MAX = "min(20rem,calc((100vh - 10rem)
 export interface BriefDetailCardProps {
   title: string;
   icon?: LucideIcon;
+  /** Custom header icon (e.g. brand SVG) — takes precedence over `icon` */
+  headerIcon?: ReactNode;
   children: ReactNode;
   /** default = sidebar/context; main = larger body in focus column */
   tone?: "default" | "main";
@@ -108,6 +121,7 @@ const stickyHeaderSurface = () => "border-0 bg-transparent";
 function BriefDetailCardTitleRow({
   title,
   icon: Icon,
+  headerIcon,
   headerExtra,
   sourceInfo,
   tone = "default",
@@ -116,6 +130,7 @@ function BriefDetailCardTitleRow({
 }: {
   title: string;
   icon?: LucideIcon;
+  headerIcon?: ReactNode;
   headerExtra?: ReactNode;
   sourceInfo?: BriefSourceInfo;
   tone?: "default" | "main";
@@ -132,17 +147,18 @@ function BriefDetailCardTitleRow({
           tone === "main" ? "text-base" : "text-sm"
         )}
       >
-        {Icon && (
-          <Icon
-            className={cn(
-              "h-4 w-4 shrink-0",
-              !isIntercom && variant === "highlight" && "text-primary",
-              !isIntercom && variant === "warning" && "text-warning",
-              isIntercom && variant === "highlight" && "text-[#ff5600]",
-              isIntercom && variant === "warning" && "text-[#ff2067]"
-            )}
-          />
-        )}
+        {headerIcon ??
+          (Icon ? (
+            <Icon
+              className={cn(
+                "h-4 w-4 shrink-0",
+                !isIntercom && variant === "highlight" && "text-primary",
+                !isIntercom && variant === "warning" && "text-warning",
+                isIntercom && variant === "highlight" && "text-[#ff5600]",
+                isIntercom && variant === "warning" && "text-[#ff2067]"
+              )}
+            />
+          ) : null)}
         <span className="truncate">{title}</span>
         {sourceInfo ? <SourceInfoIcon info={sourceInfo} /> : null}
         {isIntercom && variant === "warning" && (
@@ -181,6 +197,7 @@ function SourceInfoIcon({ info }: { info: BriefSourceInfo }) {
 export function BriefDetailCard({
   title,
   icon: Icon,
+  headerIcon,
   children,
   tone = "default",
   variant = "default",
@@ -211,6 +228,7 @@ export function BriefDetailCard({
               <BriefDetailCardTitleRow
                 title={title}
                 icon={Icon}
+                headerIcon={headerIcon}
                 headerExtra={headerExtra}
                 sourceInfo={sourceInfo}
                 tone={tone}
@@ -254,6 +272,7 @@ export function BriefDetailCard({
         <BriefDetailCardTitleRow
           title={title}
           icon={Icon}
+          headerIcon={headerIcon}
           headerExtra={headerExtra}
           sourceInfo={sourceInfo}
           tone={tone}
@@ -262,7 +281,8 @@ export function BriefDetailCard({
       </CardHeader>
       <CardContent
         className={cn(
-          tone === "main" ? briefMainBody : "text-[0.9375rem] leading-relaxed",
+          tone === "main" ? briefMainBody : briefBodyClass,
+          tone === "main" && briefMainNestedSurfaceInset,
           scrollableBody
             ? briefScrollBodyClassName(tone)
             : cn("min-h-0", tone === "main" ? mainCardPadding.body : defaultCardPadding.body)
@@ -321,7 +341,7 @@ export function BriefDetailFields({
           >
             {row.label}
           </dt>
-          <dd className="text-[0.9375rem] font-medium text-foreground leading-relaxed break-words mt-0.5">
+          <dd className={cn(briefBodyClass, "font-medium text-foreground break-words mt-0.5")}>
             {row.value}
           </dd>
         </div>
@@ -342,7 +362,7 @@ export function BriefDetailAccordion({
   summary?: string;
   children: ReactNode;
   defaultOpen?: boolean;
-  /** Sidebar section titles — extra bold */
+  /** Sidebar section titles — slightly emphasized */
   loud?: boolean;
   /** Main column: larger title with underline */
   main?: boolean;
@@ -364,9 +384,9 @@ export function BriefDetailAccordion({
           <span
             className={cn(
               "text-foreground",
-              main && "text-base font-bold underline decoration-foreground/40 underline-offset-[3px]",
-              !main && loud && "text-sm font-extrabold tracking-tight",
-              !main && !loud && "text-sm font-bold"
+              main && "text-base font-semibold underline decoration-foreground/40 underline-offset-[3px]",
+              !main && loud && "text-sm font-semibold",
+              !main && !loud && "text-sm font-medium"
             )}
           >
             {title}

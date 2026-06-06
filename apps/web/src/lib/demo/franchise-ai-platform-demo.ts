@@ -9,6 +9,7 @@ import type {
   PostCallTask,
 } from "@/lib/brief-types";
 import type { DemoTranscriptLine } from "@/lib/demo-live-transcript";
+import { internalAvatarUrl } from "@/lib/attendees/participant-display";
 
 /** Demo DC: prospect requests proposal for AI-native franchise operations platform. */
 export const FRANCHISE_DEMO_CALL_ID = "frontera-franchise-group";
@@ -39,8 +40,8 @@ export const franchiseDemoCall: Call = {
     timeline: "confirmed",
   },
   pod: [
-    { id: "ae-1", name: "Sarah Mendes", role: "ae", initials: "SM" },
-    { id: "se-1", name: "Tariq Hassan", role: "se", initials: "TH" },
+    { id: "ae-1", name: "Sarah Mendes", role: "ae", initials: "SM", avatarUrl: internalAvatarUrl("Sarah Mendes", "ae-1") },
+    { id: "se-1", name: "Tariq Hassan", role: "se", initials: "TH", avatarUrl: internalAvatarUrl("Tariq Hassan", "se-1") },
   ],
 };
 
@@ -80,6 +81,7 @@ export const franchiseDemoBrief: CallBrief = {
       designation: "Account Executive",
       fitReason: "Franchise retail portfolio · discovery-led selling",
       initials: "SM",
+      avatarUrl: internalAvatarUrl("Sarah Mendes", "ae-sarah"),
     },
     {
       id: "se-tariq",
@@ -88,6 +90,7 @@ export const franchiseDemoBrief: CallBrief = {
       designation: "Solutions Architect",
       fitReason: "Multi-tenant ops platforms · integration patterns",
       initials: "TH",
+      avatarUrl: internalAvatarUrl("Tariq Hassan", "se-tariq"),
     },
   ],
   interactionHistory: [

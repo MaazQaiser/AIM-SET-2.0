@@ -10,6 +10,7 @@ import {
   DataTableView,
   useDataTableInstance,
 } from "@dc-copilot/ui/components/data-table";
+import { ParticipantAvatar } from "@/components/participant-avatar";
 import { callDetailsHref } from "@/lib/dashboard/call-links";
 import { companyStageForCall } from "@/lib/dc-notes/company-stage";
 import { companyRatingForCall, formatCompanyRating } from "@/lib/dc-notes/icp-rating";
@@ -41,9 +42,12 @@ const columns: ColumnDef<Call>[] = [
             {call.accountName}
           </Link>
           {call.leadName && (
-            <p className="text-xs text-muted-foreground mt-0.5 truncate">
-              {call.leadName}
-              {call.leadTitle ? ` · ${call.leadTitle}` : ""}
+            <p className="text-xs text-muted-foreground mt-0.5 truncate inline-flex items-center gap-1.5">
+              <ParticipantAvatar name={call.leadName} kind="external" size="xs" />
+              <span>
+                {call.leadName}
+                {call.leadTitle ? ` · ${call.leadTitle}` : ""}
+              </span>
             </p>
           )}
         </div>

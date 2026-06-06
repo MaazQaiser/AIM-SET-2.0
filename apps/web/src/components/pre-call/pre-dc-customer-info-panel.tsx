@@ -34,7 +34,7 @@ export function PreDcCustomerInfoPanel({ widgets, widgetProps }: PreDcCustomerIn
       style={{ maxHeight: BRIEF_SIDEBAR_CARD_SCROLL_MAX }}
     >
       <CardHeader className={briefStickyHeaderClassName}>
-        <CardTitle className="text-base font-extrabold tracking-tight flex items-center gap-2">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
           <Building2 className="h-4 w-4 shrink-0 text-foreground" />
           Customer & account
         </CardTitle>

@@ -27,17 +27,23 @@ import {
 } from "@/components/pre-call/brief-widget-cards";
 import {
   PostBeforeContextCard,
-  PostHeadlineCard,
   PostDcContentSuggestionsCard,
-  PostLearnedCard,
-  PostNextStepProposalCard,
   PostScorecardCard,
   PostSummaryCard,
 } from "@/components/post-dc/post-dc-widget-cards";
+import { PostDcNextStepTasks } from "@/components/post-dc/post-dc-next-step-tasks";
+import { PostDcEmailJiraPanel } from "@/components/post-dc/post-dc-email-jira-panel";
+import { PostDcTranscriptPanel } from "@/components/post-dc/post-dc-transcript-panel";
+import { PostDcClpActivityCard } from "@/components/post-dc/post-dc-clp-activity-card";
+import { PostDcClpStatusCard } from "@/components/post-dc/post-dc-clp-status-card";
+import {
+  isPostDcLandingVisible,
+} from "@/components/post-dc/post-dc-tab-config";
+import { PostDcDealSignalsBar } from "@/components/post-dc/post-dc-deal-signals-bar";
+import { resolveDealSignals, resolveLeadStage } from "@/lib/post-dc/deal-signals";
+import type { PostDcWorkflowTaskStatus } from "@/lib/post-dc/workflow-tasks";
 import { PostDiscoveryGapsCard } from "@/components/post-dc/post-discovery-gaps-card";
-import { EmailEditor } from "@/components/post-dc/email-editor";
 import { TaskList } from "@/components/post-dc/crm-task-list";
-import { JiraTicketCard } from "@/components/post-dc/jira-ticket-card";
 import { PostDcClpAnalyticsWidget } from "@/components/post-dc/post-dc-clp-analytics-widget";
 import type { CustomerLandingPage } from "@dc-copilot/types";
 import type {
@@ -113,6 +119,7 @@ export interface PostDcWidgetProps {
   call: Call;
   callId: string;
   accountSnapshot: AccountSnapshotRow[];
+  bant?: BANTScore;
   emailDraft?: PostCallEmailDraft | null;
   internalEmailDraft?: PostCallEmailDraft | null;
   crmTasks?: PostCallTask[];
@@ -123,6 +130,63 @@ export interface PostDcWidgetProps {
   onRejectCrmTask?: (id: string) => void;
   onCreateJiraTicket?: (ticket: PostCallJiraTicket) => Promise<void> | void;
   landingPage?: CustomerLandingPage | null;
+  leadStage?: string;
+  workflowTaskStatus?: Record<string, PostDcWorkflowTaskStatus>;
+  onWorkflowTaskStatusChange?: (taskId: string, status: PostDcWorkflowTaskStatus) => void;
+  onScrollToWidget?: (widgetId: string) => void;
+}
+
+/** Post-DC left rail: lead overview accordions (account only) */
+export const POST_DC_OVERVIEW_WIDGET_IDS = [
+  "account.snapshot",
+  "account.metrics",
+] as const;
+
+/** Rendered in PostDcFocusColumn — not in widget rail */
+export const POST_DC_STRUCTURED_WIDGET_IDS = [
+  "post.summary",
+  "post.bant",
+  "post.deal_signals",
+  "post.task_list",
+  "post.email_jira_handoff",
+] as const;
+
+/** Post-DC left rail: reference accordions below BANT */
+export const POST_DC_CONTEXT_ACCORDION_WIDGET_IDS = [
+  "post.discovery_gaps",
+  "post.scorecard",
+  "post.transcript",
+  "post.before_context",
+  "post.research",
+] as const;
+
+export const POST_DC_INFO_WIDGET_IDS = [
+  ...POST_DC_OVERVIEW_WIDGET_IDS,
+  ...POST_DC_CONTEXT_ACCORDION_WIDGET_IDS,
+] as const;
+
+export function isPostDcOverviewWidget(id: string): boolean {
+  return (POST_DC_OVERVIEW_WIDGET_IDS as readonly string[]).includes(id);
+}
+
+export function isPostDcContextAccordionWidget(id: string): boolean {
+  return (POST_DC_CONTEXT_ACCORDION_WIDGET_IDS as readonly string[]).includes(id);
+}
+
+export function isPostDcInfoWidget(id: string): boolean {
+  return (POST_DC_INFO_WIDGET_IDS as readonly string[]).includes(id);
+}
+
+export function isPostDcStructuredWidget(id: string): boolean {
+  return (POST_DC_STRUCTURED_WIDGET_IDS as readonly string[]).includes(id);
+}
+
+/** Main column: center + right widgets except left-rail context. */
+export function isPostDcFocusWidget<P extends { id: string; column: WidgetColumn }>(
+  widget: P
+): boolean {
+  if (isPostDcInfoWidget(widget.id)) return false;
+  return widget.column === "center" || widget.column === "right";
 }
 
 /**
@@ -321,7 +385,7 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
   },
 ];
 
-/** Post-DC: left = account, center = outcomes, right = imports & scorecard */
+/** Post-DC: left = context rail · center + right = summary & actions */
 export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
   {
     id: "account.snapshot",
@@ -342,53 +406,27 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     render: ({ call }) => <CompanyMetricsCard call={call} />,
   },
   {
-    id: "post.headline",
-    title: "Headline",
-    category: "ai",
-    column: "center",
-    sortOrder: 0,
-    render: ({ review }) => <PostHeadlineCard headline={review.headline} />,
-  },
-  {
-    id: "post.before_context",
-    title: "Pre-call context",
-    category: "content",
-    column: "center",
-    sortOrder: -1,
-    render: ({ callId }) => <PostBeforeContextCard callId={callId} />,
-  },
-  {
-    id: "post.next_step_proposal",
-    title: "Recommended next step",
-    category: "ai",
-    column: "center",
-    sortOrder: 0,
-    isAvailable: ({ review }) => Boolean(review.nextStepProposal?.trim()),
-    render: ({ review }) => (
-      <PostNextStepProposalCard proposal={review.nextStepProposal ?? ""} />
-    ),
-  },
-  {
-    id: "post.summary",
-    title: "Call summary",
-    category: "ai",
-    column: "center",
-    sortOrder: 1,
-    render: ({ review }) => <PostSummaryCard summary={review.summary ?? []} />,
-  },
-  {
-    id: "post.learned",
-    title: "BANT",
+    id: "post.deal_signals",
+    title: "Deal signals",
     category: "qualification",
     column: "center",
-    sortOrder: 2,
-    render: ({ review }) => <PostLearnedCard learned={review.learned ?? []} />,
+    sortOrder: 1,
+    isAvailable: () => false,
+    render: ({ review }) => {
+      const signals = resolveDealSignals(review);
+      return (
+        <PostDcDealSignalsBar
+          signals={signals}
+          leadStage={resolveLeadStage(review)}
+        />
+      );
+    },
   },
   {
     id: "post.discovery_gaps",
     title: "Discovery gaps",
     category: "qualification",
-    column: "center",
+    column: "left",
     sortOrder: 3,
     isAvailable: ({ review }) =>
       arrayLen(review.openDiscoveryGaps) > 0 || review.discoveryBantCoverage !== undefined,
@@ -400,61 +438,113 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     ),
   },
   {
-    id: "post.email_draft",
-    title: "Follow-up email",
-    category: "ai",
-    column: "center",
+    id: "post.scorecard",
+    title: "Pod coaching",
+    category: "pod",
+    column: "left",
     sortOrder: 4,
-    isAvailable: ({ emailDraft }) => Boolean(emailDraft),
-    render: ({ emailDraft }) => (emailDraft ? <EmailEditor draft={emailDraft} /> : null),
+    isAvailable: ({ review }) => arrayLen(review.podScorecard) > 0,
+    render: ({ review }) => <PostScorecardCard scorecard={review.podScorecard ?? []} />,
+  },
+  {
+    id: "post.transcript",
+    title: "Transcript",
+    category: "content",
+    column: "left",
+    sortOrder: 5,
+    render: ({ callId }) => <PostDcTranscriptPanel callId={callId} />,
+  },
+  {
+    id: "post.before_context",
+    title: "Pre-call context",
+    category: "content",
+    column: "left",
+    sortOrder: 6,
+    render: ({ callId }) => <PostBeforeContextCard callId={callId} />,
   },
   {
     id: "post.research",
     title: "Post-DC import",
     category: "content",
-    column: "right",
-    sortOrder: 0,
+    column: "left",
+    sortOrder: 7,
     isAvailable: ({ review }) => arrayLen(review.researchSections) > 0,
     render: ({ review }) => (
       <PreDcResearchCard sections={review.researchSections ?? []} title="Post-DC import (all fields)" />
     ),
   },
   {
-    id: "post.scorecard",
-    title: "Pod scorecard",
-    category: "pod",
-    column: "right",
+    id: "post.summary",
+    title: "Call summary",
+    category: "ai",
+    column: "center",
+    sortOrder: 0,
+    isAvailable: () => false,
+    render: ({ review }) => <PostSummaryCard summary={review.summary ?? []} />,
+  },
+  {
+    id: "post.next_step_proposal",
+    title: "Recommended next steps",
+    category: "ai",
+    column: "center",
     sortOrder: 1,
-    isAvailable: ({ review }) => arrayLen(review.podScorecard) > 0,
-    render: ({ review }) => <PostScorecardCard scorecard={review.podScorecard ?? []} />,
+    isAvailable: () => false,
+    render: ({
+      review,
+      leadStage,
+      emailDraft,
+      jiraTicket,
+      landingPage,
+      workflowTaskStatus = {},
+      onWorkflowTaskStatusChange,
+      onScrollToWidget,
+    }) => (
+      <PostDcNextStepTasks
+        review={review}
+        leadStage={leadStage ?? resolveLeadStage(review)}
+        hasEmailDraft={Boolean(emailDraft)}
+        hasJiraTicket={Boolean(jiraTicket)}
+        landingPage={landingPage}
+        taskStatus={workflowTaskStatus}
+        onTaskStatusChange={(taskId, status) => onWorkflowTaskStatusChange?.(taskId, status)}
+        onScrollToWidget={onScrollToWidget}
+      />
+    ),
   },
   {
     id: "post.task_list",
-    title: "Task list",
+    title: "CRM tasks",
     category: "pod",
     column: "right",
-    sortOrder: 2,
-    isAvailable: ({ crmTasks }) => arrayLen(crmTasks) > 0,
+    sortOrder: 3,
+    isAvailable: () => false,
     render: ({ crmTasks = [], onApproveCrmTasks, onRejectCrmTask }) => (
       <TaskList tasks={crmTasks} onApprove={onApproveCrmTasks} onReject={onRejectCrmTask} />
     ),
   },
   {
-    id: "post.jira_ticket",
-    title: "Jira ticket",
+    id: "post.email_jira_handoff",
+    title: "Email & Jira handoff",
     category: "pod",
-    column: "right",
-    sortOrder: 3,
-    isAvailable: ({ jiraTicket }) => Boolean(jiraTicket),
-    render: ({ jiraTicket, onCreateJiraTicket }) =>
-      jiraTicket ? <JiraTicketCard ticket={jiraTicket} onCreate={onCreateJiraTicket} /> : null,
+    column: "center",
+    sortOrder: 4,
+    isAvailable: () => false,
+    render: ({ emailDraft, internalEmailDraft, jiraTicket, onCreateJiraTicket }) => (
+      <PostDcEmailJiraPanel
+        emailDraft={emailDraft}
+        internalEmailDraft={internalEmailDraft}
+        jiraTicket={jiraTicket}
+        onCreateJiraTicket={onCreateJiraTicket}
+        parallelCards
+      />
+    ),
   },
   {
     id: "post.kb_suggestions",
-    title: "Content",
+    title: "Content & attachments",
     category: "content",
-    column: "right",
-    sortOrder: 4,
+    column: "center",
+    sortOrder: 5,
     isAvailable: ({ kbSuggestions, emailAttachments }) =>
       arrayLen(kbSuggestions) > 0 ||
       arrayLen(emailAttachments?.found) > 0 ||
@@ -467,30 +557,33 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     ),
   },
   {
+    id: "post.clp_status",
+    title: "Landing page",
+    category: "content",
+    column: "center",
+    sortOrder: 9,
+    isAvailable: ({ review, landingPage }) =>
+      isPostDcLandingVisible(resolveLeadStage(review)) && Boolean(landingPage),
+    render: ({ callId, landingPage }) => (
+      <div className="space-y-4">
+        <PostDcClpStatusCard callId={callId} page={landingPage ?? undefined} />
+        <PostDcClpActivityCard
+          callId={callId}
+          enabled={landingPage?.status === "published"}
+        />
+      </div>
+    ),
+  },
+  {
     id: "post.clp_analytics",
     title: "Landing page analytics",
     category: "content",
     column: "center",
-    sortOrder: 6,
-    isAvailable: ({ landingPage }) => landingPage?.status === "published",
+    sortOrder: 10,
+    isAvailable: ({ review, landingPage }) =>
+      isPostDcLandingVisible(resolveLeadStage(review)) && landingPage?.status === "published",
     render: ({ callId, landingPage }) => (
       <PostDcClpAnalyticsWidget callId={callId} enabled={landingPage?.status === "published"} />
     ),
-  },
-  {
-    id: "post.internal_email",
-    title: "Internal team email",
-    category: "ai",
-    column: "center",
-    sortOrder: 5,
-    isAvailable: ({ internalEmailDraft }) => Boolean(internalEmailDraft),
-    render: ({ internalEmailDraft }) =>
-      internalEmailDraft ? (
-        <EmailEditor
-          draft={internalEmailDraft}
-          title="Internal team email"
-          description="Edit the internal handoff before sharing with the team."
-        />
-      ) : null,
   },
 ];

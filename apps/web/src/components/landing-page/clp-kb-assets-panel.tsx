@@ -8,14 +8,22 @@ import { KbFileTypeIcon } from "@/components/knowledge/kb-file-type-icon";
 import { KbUploadButton } from "@/components/knowledge/kb-upload-button";
 import { useKbAssets } from "@/lib/data/hooks";
 import type { CustomerLandingPage } from "@dc-copilot/types";
+import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
 import { toggleSelectedAsset } from "@/lib/landing-page/clp-editor-utils";
 
 interface ClpKbAssetsPanelProps {
   draft: CustomerLandingPage;
   onChange: (page: CustomerLandingPage) => void;
+  heading?: string;
+  description?: string;
 }
 
-export function ClpKbAssetsPanel({ draft, onChange }: ClpKbAssetsPanelProps) {
+export function ClpKbAssetsPanel({
+  draft,
+  onChange,
+  heading = "Knowledge base assets",
+  description = "Add or upload assets to show on the landing page. Selected assets appear in the Shared resources section.",
+}: ClpKbAssetsPanelProps) {
   const { data: assets = [], isLoading } = useKbAssets();
   const [query, setQuery] = useState("");
 
@@ -30,9 +38,9 @@ export function ClpKbAssetsPanel({ draft, onChange }: ClpKbAssetsPanelProps) {
   }
 
   return (
-    <div className="space-y-3 rounded-lg border bg-card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">Knowledge base assets</h2>
+    <BriefDetailCard
+      title={heading}
+      headerExtra={
         <KbUploadButton
           onAssetReady={(asset) => {
             onChange(
@@ -43,11 +51,10 @@ export function ClpKbAssetsPanel({ draft, onChange }: ClpKbAssetsPanelProps) {
             );
           }}
         />
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Add or upload assets to show on the landing page. Selected assets appear in the Shared
-        resources section.
-      </p>
+      }
+    >
+      <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">{description}</p>
 
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -139,6 +146,7 @@ export function ClpKbAssetsPanel({ draft, onChange }: ClpKbAssetsPanelProps) {
           })
         )}
       </ul>
-    </div>
+      </div>
+    </BriefDetailCard>
   );
 }

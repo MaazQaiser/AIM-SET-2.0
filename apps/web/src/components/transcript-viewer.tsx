@@ -2,6 +2,7 @@
 
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { ParticipantAvatar } from "@/components/participant-avatar";
 import { cn } from "@/lib/cn";
 import { KeywordHighlight } from "@/components/live/keyword-highlight";
 import type { TranscriptEvent } from "@/types";
@@ -112,6 +113,16 @@ export const TranscriptViewer = memo(function TranscriptViewer({
                 disabled={!onEventClick}
               >
                 <div className="flex items-center gap-2 mb-1">
+                  <ParticipantAvatar
+                    name={event.speakerName}
+                    kind={event.speakerRole === "customer" ? "external" : "internal"}
+                    role={
+                      event.speakerRole === "customer" || !event.speakerRole
+                        ? "customer"
+                        : event.speakerRole
+                    }
+                    size="xs"
+                  />
                   <span
                     className={cn(
                       "text-xs font-semibold",

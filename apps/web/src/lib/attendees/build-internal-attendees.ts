@@ -1,4 +1,5 @@
 import type { InternalAttendee } from "@/lib/brief-types";
+import { internalAvatarUrl } from "@/lib/attendees/participant-display";
 import type { Call, PodMember } from "@/types";
 
 const ROLE_LABELS: Record<InternalAttendee["role"], string> = {
@@ -8,9 +9,9 @@ const ROLE_LABELS: Record<InternalAttendee["role"], string> = {
 };
 
 const DEFAULT_POD: PodMember[] = [
-  { id: "ae-sarah", name: "Sarah Chen", role: "ae", initials: "SC" },
-  { id: "se-tariq", name: "Tariq Ali", role: "se", initials: "TA" },
-  { id: "designer-priya", name: "Priya Raman", role: "designer", initials: "PR" },
+  { id: "ae-sarah", name: "Sarah Chen", role: "ae", initials: "SC", avatarUrl: internalAvatarUrl("Sarah Chen", "ae-sarah") },
+  { id: "se-tariq", name: "Tariq Ali", role: "se", initials: "TA", avatarUrl: internalAvatarUrl("Tariq Ali", "se-tariq") },
+  { id: "designer-priya", name: "Priya Raman", role: "designer", initials: "PR", avatarUrl: internalAvatarUrl("Priya Raman", "designer-priya") },
 ];
 
 export function buildInternalAttendeesFromPreDc(
@@ -37,6 +38,7 @@ export function buildInternalAttendeesFromPreDc(
         ctx.intersection ||
         `Leads commercial discovery, maps stakeholders, and ties ${account} priorities to our service lines.`,
       initials: "SC",
+      avatarUrl: internalAvatarUrl("Sarah Chen", "ae-sarah"),
     },
     {
       id: `${callId}-se-tariq`,
@@ -47,6 +49,7 @@ export function buildInternalAttendeesFromPreDc(
         [ctx.techStacks, ctx.technicalBackground].filter(Boolean).join(" · ") ||
         `Covers architecture and integration depth when ${account} discusses platforms, compliance, or build vs. buy.`,
       initials: "TA",
+      avatarUrl: internalAvatarUrl("Tariq Ali", "se-tariq"),
     },
     {
       id: `${callId}-designer-priya`,
@@ -57,6 +60,7 @@ export function buildInternalAttendeesFromPreDc(
         ctx.needs ||
         `Joins when UX, product surfaces, or delivery model need visual framing — especially if ${account} describes end-user workflows.`,
       initials: "PR",
+      avatarUrl: internalAvatarUrl("Priya Raman", "designer-priya"),
     },
   ];
 }

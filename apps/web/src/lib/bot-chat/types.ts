@@ -2,7 +2,7 @@ import type { Citation, PodRole } from "@/types";
 
 export type BotChatMode = "direct" | "group" | "copilot";
 
-export type BotChatPhase = "prep" | "live";
+export type BotChatPhase = "prep" | "live" | "wrapup";
 
 export interface SuggestedAction {
   id: string;

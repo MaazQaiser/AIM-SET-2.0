@@ -16,6 +16,7 @@ export type {
   PostCallPipelineResult,
   BriefResearchSection,
   PostDcBriefPreview,
+  PostDcDealSignals,
   HypothesizedPain,
   AnticipatedObjection,
   DeckSlide,

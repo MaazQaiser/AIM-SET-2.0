@@ -60,10 +60,13 @@ export function createClpSection(type: ClpSectionType): ClpSection {
 }
 
 export function syncAssetSections(page: CustomerLandingPage): CustomerLandingPage {
-  const ids = page.selectedAssets.map((a) => a.assetId);
+  const selectedAssets = page.selectedAssets ?? [];
+  const sections = page.sections ?? [];
+  const ids = selectedAssets.map((a) => a.assetId);
   return {
     ...page,
-    sections: page.sections.map((s) => {
+    selectedAssets,
+    sections: sections.map((s) => {
       if (s.type === "asset") {
         return { ...s, assetIds: ids };
       }

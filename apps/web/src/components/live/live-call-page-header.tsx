@@ -7,6 +7,7 @@ import { Badge } from "@dc-copilot/ui/components/badge";
 import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import { DemoTranscriptPlayer } from "@/components/live/demo-transcript-player";
 import { RecallBotLauncher } from "@/components/live/recall-bot-launcher";
+import { ParticipantAvatar } from "@/components/participant-avatar";
 import { scoreToTone } from "@/lib/live/sentiment-display";
 import { cn } from "@/lib/cn";
 import { useLiveCall } from "@/stores/use-live-call";
@@ -23,13 +24,17 @@ function PodAvatars({ pod }: { pod: Call["pod"] }) {
   return (
     <div className="flex -space-x-1.5">
       {pod.slice(0, 3).map((member) => (
-        <span
+        <ParticipantAvatar
           key={member.id}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-full border-2 border-card bg-primary/10 text-[10px] font-semibold text-primary"
+          name={member.name}
+          kind="internal"
+          avatarUrl={member.avatarUrl}
+          initials={member.initials}
+          role={member.role}
+          size="sm"
+          className="border-2 border-card"
           title={member.name}
-        >
-          {member.initials}
-        </span>
+        />
       ))}
     </div>
   );
@@ -84,7 +89,12 @@ export function LiveCallPageHeader({
               </Badge>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 type-body-sm text-muted-foreground">
-              {leadName && <span className="font-semibold text-foreground/90">{leadName}</span>}
+              {leadName && (
+                <span className="inline-flex items-center gap-1.5 font-semibold text-foreground/90">
+                  <ParticipantAvatar name={leadName} kind="external" size="xs" />
+                  {leadName}
+                </span>
+              )}
               <span className="inline-flex items-center gap-1.5 font-mono text-destructive">
                 <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" aria-hidden />
                 REC {formatElapsed(elapsedSeconds)}

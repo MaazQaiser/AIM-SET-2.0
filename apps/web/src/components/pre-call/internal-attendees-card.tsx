@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@dc-copilot/ui/components/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@dc-copilot/ui/components/avatar";
+import { ParticipantAvatar } from "@/components/participant-avatar";
 import { cn } from "@/lib/cn";
 import type { InternalAttendee } from "@/lib/brief-types";
 
@@ -52,14 +52,14 @@ function InternalAttendeeDetailDialog({
       >
         <DialogHeader className="pr-8">
           <div className="flex items-start gap-3">
-            <Avatar className="h-12 w-12 shrink-0">
-              {attendee.avatarUrl && (
-                <AvatarImage src={attendee.avatarUrl} alt={attendee.name} />
-              )}
-              <AvatarFallback className={cn("text-sm font-bold", role.className)}>
-                {attendee.initials}
-              </AvatarFallback>
-            </Avatar>
+            <ParticipantAvatar
+              name={attendee.name}
+              kind="internal"
+              avatarUrl={attendee.avatarUrl}
+              initials={attendee.initials}
+              role={attendee.role}
+              size="lg"
+            />
             <div className="min-w-0 flex-1">
               <DialogTitle className="text-left">{attendee.name}</DialogTitle>
               <DialogDescription className="text-left mt-1">
@@ -123,16 +123,15 @@ export function InternalAttendeesCard({
                 key={member.id}
                 className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
               >
-                <Avatar className="h-9 w-9 shrink-0 mt-0.5">
-                  {member.avatarUrl && (
-                    <AvatarImage src={member.avatarUrl} alt={member.name} />
-                  )}
-                  <AvatarFallback
-                    className={cn("text-[10px] font-semibold", role.className)}
-                  >
-                    {member.initials}
-                  </AvatarFallback>
-                </Avatar>
+                <ParticipantAvatar
+                  name={member.name}
+                  kind="internal"
+                  avatarUrl={member.avatarUrl}
+                  initials={member.initials}
+                  role={member.role}
+                  size="md"
+                  className="mt-0.5"
+                />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-semibold text-foreground">{member.name}</p>

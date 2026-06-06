@@ -5,6 +5,7 @@ import { Download, Loader2 } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { KbSlidePreview } from "@/components/knowledge/kb-slide-preview";
 import { isPresentationFormat, kbFileUrl, resolveKbFileFormat } from "@/lib/kb/file-format";
+import { briefMainNestedSurfaceClass } from "@/components/pre-call/brief-detail-card";
 import { cn } from "@/lib/cn";
 import type { KBAsset } from "@/types";
 
@@ -97,6 +98,7 @@ export function KbAssetPreview({ asset, indexedText, compact = false, className 
       <div
         className={cn(
           "flex items-center justify-center gap-2 text-sm text-muted-foreground rounded-lg border bg-muted/20",
+          briefMainNestedSurfaceClass,
           compact ? "min-h-[200px]" : "min-h-[420px]",
           className
         )}
@@ -112,6 +114,7 @@ export function KbAssetPreview({ asset, indexedText, compact = false, className 
       <div
         className={cn(
           "flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground",
+          briefMainNestedSurfaceClass,
           className
         )}
       >
@@ -127,7 +130,7 @@ export function KbAssetPreview({ asset, indexedText, compact = false, className 
 
   if (meta.format === "pdf" && blobUrl) {
     return (
-      <div className={cn("min-h-[70vh] rounded-lg border overflow-hidden bg-white", className)}>
+      <div className={cn("min-h-[70vh] rounded-lg border overflow-hidden bg-white", briefMainNestedSurfaceClass, className)}>
         <iframe title={asset.title} src={blobUrl} className="w-full h-[70vh]" />
       </div>
     );
@@ -135,7 +138,7 @@ export function KbAssetPreview({ asset, indexedText, compact = false, className 
 
   if (meta.canInlinePreview && blobUrl && meta.format !== "pdf") {
     return (
-      <div className={cn("flex min-h-[420px] items-center justify-center rounded-lg border bg-muted/10 p-4", className)}>
+      <div className={cn("flex min-h-[420px] items-center justify-center rounded-lg border bg-muted/10 p-4", briefMainNestedSurfaceClass, className)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={blobUrl} alt={asset.title} className="max-h-[65vh] max-w-full object-contain rounded-md shadow-sm" />
       </div>
@@ -143,7 +146,7 @@ export function KbAssetPreview({ asset, indexedText, compact = false, className 
   }
 
   return (
-    <div className={cn("flex min-h-[420px] flex-col gap-3 rounded-lg border bg-muted/10 p-4", className)}>
+    <div className={cn("flex min-h-[420px] flex-col gap-3 rounded-lg border bg-muted/10 p-4", briefMainNestedSurfaceClass, className)}>
       <p className="text-sm text-muted-foreground shrink-0">Text preview from the knowledge base index.</p>
       {textPreview ? (
         <pre className="glass-insight-card flex-1 min-h-0 overflow-auto whitespace-pre-wrap p-4 text-xs leading-relaxed shadow-none">

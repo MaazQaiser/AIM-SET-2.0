@@ -12,10 +12,14 @@ export function mergeCallsWithImport(apiCalls: Call[], imported: Call[]): Call[]
     const local = byId.get(api.id);
     if (!local) return api;
 
+    const postDcWrapped = local.status === "completed";
+    const manualWrapped = api.status === "completed" && !postDcWrapped;
+
     const merged = {
       ...local,
       ...api,
       scheduledAt: local.scheduledAt || api.scheduledAt,
+      status: postDcWrapped || manualWrapped ? "completed" : local.status ?? api.status ?? "upcoming",
       dealStage: companyStageForCall({
         ...local,
         ...api,
@@ -34,6 +38,7 @@ export function mergeCallsWithImport(apiCalls: Call[], imported: Call[]): Call[]
       website: api.website || local.website,
       meetingUrl: api.meetingUrl || local.meetingUrl,
       pod: api.pod?.length ? api.pod : local.pod,
+      bant: postDcWrapped && local.bant ? local.bant : api.bant ?? local.bant,
     };
 
     return {

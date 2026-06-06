@@ -1,5 +1,5 @@
 import { cn } from "@/lib/cn";
-import { Avatar, AvatarFallback, AvatarImage } from "@dc-copilot/ui/components/avatar";
+import { ParticipantAvatar } from "@/components/participant-avatar";
 import type { PodMember } from "@/types";
 
 const roleLabels: Record<string, string> = {
@@ -29,14 +29,14 @@ export function PodMemberBadge({ member, showRole = true, size = "sm" }: PodMemb
         size === "sm" ? "text-xs" : "text-sm"
       )}
     >
-      <Avatar className={size === "sm" ? "h-4 w-4" : "h-5 w-5"}>
-        {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={member.name} />}
-        <AvatarFallback
-          className={cn("text-[8px] font-semibold", roleColors[member.role])}
-        >
-          {member.initials}
-        </AvatarFallback>
-      </Avatar>
+      <ParticipantAvatar
+        name={member.name}
+        kind="internal"
+        avatarUrl={member.avatarUrl}
+        initials={member.initials}
+        role={member.role}
+        size={size === "sm" ? "xs" : "sm"}
+      />
       <span className="font-medium">{member.name}</span>
       {showRole && (
         <span className="opacity-70">· {roleLabels[member.role]}</span>

@@ -43,6 +43,7 @@ export function normalizePostCallReview(review: PostCallReview): PostCallReview 
     podScorecard: review.podScorecard ?? [],
     learned: review.learned ?? [],
     researchSections: review.researchSections ?? [],
+    dealSignals: review.dealSignals,
     openDiscoveryGaps: review.openDiscoveryGaps ?? [],
   };
 }

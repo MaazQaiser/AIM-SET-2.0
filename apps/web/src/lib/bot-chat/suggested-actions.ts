@@ -140,6 +140,37 @@ const LIVE_COMMON: SuggestedAction[] = [
   },
 ];
 
+const WRAPUP_COMMON: SuggestedAction[] = [
+  {
+    id: "wrapup-email",
+    label: "Polish follow-up email",
+    prompt:
+      "Review the draft follow-up email for tone and clarity. Suggest improvements and flag anything that should not go to the client.",
+    category: "follow-up",
+  },
+  {
+    id: "wrapup-next-step",
+    label: "Validate next step",
+    prompt:
+      "Is the recommended next step realistic given BANT coverage and deal stage? Suggest a sharper alternative if needed.",
+    category: "follow-up",
+  },
+  {
+    id: "wrapup-jira",
+    label: "Jira handoff",
+    prompt:
+      "Summarise what should go in the Jira ticket for delivery — scope, risks, and open discovery gaps.",
+    category: "follow-up",
+  },
+  {
+    id: "wrapup-objections",
+    label: "Open objections",
+    prompt:
+      "List any unresolved objections or risks from the call and how we should address them in follow-up.",
+    category: "follow-up",
+  },
+];
+
 export function buildSuggestedActions(ctx: SuggestedActionsContext): SuggestedAction[] {
   if (ctx.mode === "copilot") {
     return COPILOT_STARTERS;
@@ -147,6 +178,27 @@ export function buildSuggestedActions(ctx: SuggestedActionsContext): SuggestedAc
 
   const actions: SuggestedAction[] = [];
   const role = ctx.persona === "leadership" ? "ae" : ctx.persona;
+
+  if (ctx.phase === "wrapup") {
+    actions.push(...WRAPUP_COMMON);
+    if (ctx.openGaps?.length) {
+      actions.push({
+        id: "wrapup-gaps",
+        label: "Close discovery gaps",
+        prompt: `We still have open gaps: ${ctx.openGaps.join(", ")}. How should we close them in follow-up?`,
+        category: "follow-up",
+      });
+    }
+    if (ctx.brief?.aiSummary) {
+      actions.push({
+        id: "wrapup-summary",
+        label: "Exec recap",
+        prompt: "Turn the post-call summary into five bullets I can share internally with the pod.",
+        category: "follow-up",
+      });
+    }
+    return actions.slice(0, 6);
+  }
 
   if (ctx.phase === "prep") {
     actions.push(...(ROLE_PREP[role] ?? ROLE_PREP.ae));
