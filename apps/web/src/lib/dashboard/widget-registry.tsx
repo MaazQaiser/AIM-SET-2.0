@@ -120,6 +120,8 @@ export interface PostDcWidgetProps {
   emailAttachments?: PostCallEmailDraft["attachments"];
   onApproveCrmTasks?: (ids: string[]) => void;
   onRejectCrmTask?: (id: string) => void;
+  onOpenEmailDraft?: () => void;
+  onSendEmailDraft?: (draft: PostCallEmailDraft) => void;
   onCreateJiraTicket?: (ticket: PostCallJiraTicket) => Promise<void> | void;
   landingPage?: CustomerLandingPage | null;
 }
@@ -397,7 +399,14 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     column: "center",
     sortOrder: 5,
     isAvailable: ({ emailDraft }) => Boolean(emailDraft),
-    render: ({ emailDraft }) => (emailDraft ? <EmailEditor draft={emailDraft} /> : null),
+    render: ({ emailDraft, onSendEmailDraft }) =>
+      emailDraft ? (
+        <EmailEditor
+          draft={emailDraft}
+          anchorId="post-email-draft"
+          onSent={onSendEmailDraft}
+        />
+      ) : null,
   },
   {
     id: "post.research",
@@ -426,8 +435,13 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     column: "right",
     sortOrder: 2,
     isAvailable: ({ crmTasks }) => arrayLen(crmTasks) > 0,
-    render: ({ crmTasks = [], onApproveCrmTasks, onRejectCrmTask }) => (
-      <TaskList tasks={crmTasks} onApprove={onApproveCrmTasks} onReject={onRejectCrmTask} />
+    render: ({ crmTasks = [], onApproveCrmTasks, onRejectCrmTask, onOpenEmailDraft }) => (
+      <TaskList
+        tasks={crmTasks}
+        onApprove={onApproveCrmTasks}
+        onReject={onRejectCrmTask}
+        onOpenEmailDraft={onOpenEmailDraft}
+      />
     ),
   },
   {
@@ -481,6 +495,7 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
           draft={internalEmailDraft}
           title="Internal team email"
           description="Edit the internal handoff before sharing with the team."
+          showSendAction={false}
         />
       ) : null,
   },

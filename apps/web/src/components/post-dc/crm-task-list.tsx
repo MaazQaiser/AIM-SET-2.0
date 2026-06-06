@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, Check, CheckCircle2, Clock, Loader2 } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, Clock, Loader2, Mail } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
@@ -25,6 +25,7 @@ interface TaskListProps {
   tasks: TaskItem[];
   onApprove?: (ids: string[]) => void;
   onReject?: (id: string) => void;
+  onOpenEmailDraft?: () => void;
 }
 
 const TYPE_LABELS: Record<TaskType, string> = {
@@ -41,7 +42,19 @@ const STATUS_CONFIG: Record<TaskStatus, { label: string; className: string; icon
   failed:           { label: "Failed",   className: "text-destructive border-destructive/30 bg-destructive/10", icon: AlertCircle },
 };
 
-export function TaskList({ tasks, onApprove, onReject }: TaskListProps) {
+function isFollowUpEmailTask(task: TaskItem) {
+  return (
+    task.task_type === "follow_up" &&
+    /(?:follow[-\s]?up email|email draft|send .*email)/i.test(task.description)
+  );
+}
+
+function taskDisplayLabel(task: TaskItem) {
+  if (isFollowUpEmailTask(task)) return "Send follow-up email";
+  return TYPE_LABELS[task.task_type];
+}
+
+export function TaskList({ tasks, onApprove, onReject, onOpenEmailDraft }: TaskListProps) {
   const [completingId, setCompletingId] = useState<string | null>(null);
 
   async function handleCompleteTask(id: string) {
@@ -63,12 +76,25 @@ export function TaskList({ tasks, onApprove, onReject }: TaskListProps) {
           const Icon = cfg.icon;
           const isPending = task.status === "pending_approval";
           const isCompleting = completingId === task.id;
+          const opensEmailDraft = isFollowUpEmailTask(task) && Boolean(onOpenEmailDraft);
+          const label = taskDisplayLabel(task);
 
           return (
             <div key={task.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-medium">{TYPE_LABELS[task.task_type]}</span>
+                  {opensEmailDraft ? (
+                    <button
+                      type="button"
+                      onClick={onOpenEmailDraft}
+                      className="inline-flex min-w-0 items-center gap-1.5 text-left text-xs font-medium text-primary transition-colors hover:text-primary/80"
+                    >
+                      <Mail className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{label}</span>
+                    </button>
+                  ) : (
+                    <span className="text-xs font-medium">{label}</span>
+                  )}
                   <span className="text-[10px] text-muted-foreground">→ {task.owner}</span>
                   {task.isInternalAuto && (
                     <Badge variant="secondary" className="text-[10px] h-4">
@@ -98,6 +124,18 @@ export function TaskList({ tasks, onApprove, onReject }: TaskListProps) {
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                     )}
                     Complete task
+                  </Button>
+                )}
+                {opensEmailDraft && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={onOpenEmailDraft}
+                  >
+                    <Mail className="h-3.5 w-3.5" />
+                    Review draft
                   </Button>
                 )}
                 {isPending && onReject && (

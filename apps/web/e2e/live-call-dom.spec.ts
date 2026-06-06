@@ -501,6 +501,25 @@ test.describe("Live call cockpit — DOM + API", () => {
     await expect(overviewPanel).not.toContainText(/BANT coverage finished at 0%/i);
     await expect(overviewPanel).not.toContainText(/Timeline moved from unknown to unknown/i);
 
+    await page.getByRole("tab", { name: /Actions/i }).click();
+    const actionsPanel = page.locator('[role="tabpanel"]:visible');
+    await expect(actionsPanel).toHaveCount(1);
+    const sendFollowUpTask = actionsPanel
+      .getByRole("button", { name: /^Send follow-up email$/i })
+      .first();
+    await expect(sendFollowUpTask).toBeVisible();
+    await sendFollowUpTask.click();
+
+    const taskOpenedFollowUpPanel = page.locator('[role="tabpanel"]:visible');
+    await expect(taskOpenedFollowUpPanel).toContainText(/Follow-up Email/i);
+    await expect(taskOpenedFollowUpPanel).toContainText(/400k/i);
+    await expect(taskOpenedFollowUpPanel).toContainText(
+      /implementation proposal|not more than three months/i
+    );
+    await expect(
+      taskOpenedFollowUpPanel.getByRole("button", { name: /Send email to customer/i })
+    ).toBeVisible();
+
     await page.getByRole("tab", { name: /Follow up/i }).click();
     const followUpPanel = page.locator('[role="tabpanel"]:visible');
     await expect(followUpPanel).toContainText(/not more than three months/i);

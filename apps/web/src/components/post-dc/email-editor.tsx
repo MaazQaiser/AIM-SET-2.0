@@ -11,7 +11,9 @@ import {
   ChevronUp,
   Bot,
   Wand2,
+  Send,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Textarea } from "@dc-copilot/ui/components/textarea";
 import { Input } from "@dc-copilot/ui/components/input";
@@ -40,7 +42,10 @@ interface EmailEditorProps {
   draft: EmailDraft;
   title?: string;
   description?: string;
+  anchorId?: string;
+  showSendAction?: boolean;
   onRegenerate?: () => void;
+  onSent?: (draft: EmailDraft) => void;
 }
 
 type AssistantMessage = {
@@ -78,6 +83,20 @@ function formatEmailForCopy(draft: EmailDraft) {
     "",
     draft.body_markdown.trim(),
   ].join("\n");
+}
+
+function buildMailtoHref(draft: EmailDraft) {
+  const to = draft.to.map((item) => item.trim()).filter(Boolean).join(",");
+  const params = new URLSearchParams();
+  if (draft.subject.trim()) params.set("subject", draft.subject.trim());
+  const body = draft.body_markdown.trim();
+  if (body) params.set("body", body);
+  if (draft.cc?.length) {
+    const cc = draft.cc.map((item) => item.trim()).filter(Boolean).join(",");
+    if (cc) params.set("cc", cc);
+  }
+  const query = params.toString();
+  return `mailto:${encodeURI(to)}${query ? `?${query}` : ""}`;
 }
 
 function applyAssistantInstruction(draft: EmailDraft, instruction: string): EmailDraft {
@@ -134,7 +153,10 @@ export function EmailEditor({
   draft,
   title = "Follow-up Email",
   description,
+  anchorId,
+  showSendAction = true,
   onRegenerate,
+  onSent,
 }: EmailEditorProps) {
   const [editing, setEditing] = useState(false);
   const [local, setLocal] = useState(draft);
@@ -160,6 +182,16 @@ export function EmailEditor({
     }
   }
 
+  function handleSendEmail() {
+    const next = { ...local, status: "sent" as const };
+    window.location.href = buildMailtoHref(local);
+    setLocal(next);
+    setSent(true);
+    setEditing(false);
+    onSent?.(next);
+    toast.success("Email draft opened in your mail client");
+  }
+
   async function handleAssistantUpdate() {
     const request = assistantInput.trim();
     if (!request || assistantBusy) return;
@@ -183,8 +215,10 @@ export function EmailEditor({
     setAssistantBusy(false);
   }
 
+  const hasRecipient = local.to.some((recipient) => recipient.trim().length > 0);
+
   return (
-    <div className="glass-insight-card overflow-hidden">
+    <div id={anchorId} className="glass-insight-card overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
         <div className="flex items-center gap-2">
@@ -361,7 +395,7 @@ export function EmailEditor({
       {!sent && (
         <>
           <Separator />
-          <div className={`flex items-center px-4 py-3 ${editing ? "justify-between" : "justify-end"}`}>
+          <div className={`flex items-center gap-2 px-4 py-3 ${editing ? "justify-between" : "justify-end"}`}>
             {editing && (
               <div className="flex gap-2">
                 <Button size="sm" className="h-7 text-xs" onClick={() => setEditing(false)}>
@@ -372,21 +406,45 @@ export function EmailEditor({
                 </Button>
               </div>
             )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  onClick={handleCopyEmail}
-                  aria-label={copied ? "Email copied" : "Copy email"}
-                >
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{copied ? "Copied" : "Copy email"}</TooltipContent>
-            </Tooltip>
+            <div className="flex shrink-0 items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={handleCopyEmail}
+                    aria-label={copied ? "Email copied" : "Copy email"}
+                  >
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{copied ? "Copied" : "Copy email"}</TooltipContent>
+              </Tooltip>
+              {showSendAction && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                        onClick={handleSendEmail}
+                        disabled={!hasRecipient}
+                        aria-label="Send email to customer"
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        Send email
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {hasRecipient ? "Open draft in mail client" : "Add a recipient before sending"}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
           </div>
         </>
       )}
