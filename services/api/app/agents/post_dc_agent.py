@@ -101,6 +101,25 @@ def _bant_progression(discovery_snapshot: Optional[Dict[str, Any]]) -> Dict[str,
     return progression if isinstance(progression, dict) else {}
 
 
+def _evidence_matches_dimension(dim: str, value: str) -> bool:
+    text = value.lower()
+    if dim == "budget":
+        return bool(
+            re.search(
+                r"(\$|€|£|\b(?:budget|approved|investment|price|pricing|spend|commercial)\b|"
+                r"\b\d[\d,]*(?:\.\d+)?\s*[kmb]\b|\b\d+\s*-\s*\d+\s*[kmb]\b)",
+                text,
+            )
+        )
+    if dim == "authority":
+        return bool(re.search(r"\b(authority|decision|decider|approve|approval|owner|owns|cfo|ceo|president)\b", text))
+    if dim == "need":
+        return bool(re.search(r"\b(need|priority|pain|challenge|problem|replace|custom|erp|workflow|manual|causing)\b", text))
+    if dim == "timeline":
+        return bool(re.search(r"\b(timeline|deadline|days|weeks|months|quarter|q[1-4]|go-live|launch|by)\b", text))
+    return True
+
+
 def _bant_evidence(discovery_snapshot: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, str]]:
     result = _snapshot_result(discovery_snapshot)
     checklist = result.get("checklist") if isinstance(result.get("checklist"), dict) else {}
@@ -115,16 +134,38 @@ def _bant_evidence(discovery_snapshot: Optional[Dict[str, Any]]) -> Dict[str, Di
             continue
         evidence = item.get("evidence") if isinstance(item.get("evidence"), list) else []
         latest: Dict[str, Any] = {}
+        fallback: Dict[str, Any] = {}
         for candidate in reversed(evidence):
             if not isinstance(candidate, dict):
                 continue
-            if str(candidate.get("value") or candidate.get("snippet") or "").strip():
+            candidate_text = str(candidate.get("value") or candidate.get("snippet") or "").strip()
+            if not candidate_text:
+                continue
+            if not fallback:
+                fallback = candidate
+            if _evidence_matches_dimension(item_id, candidate_text):
                 latest = candidate
                 break
+        if not latest:
+            latest = fallback
+        raw_value = str(latest.get("value") or latest.get("snippet") or "").strip()
+        if item_id == "budget":
+            budget_range = re.search(
+                r"\b\d[\d,]*(?:\.\d+)?\s*-\s*\d[\d,]*(?:\.\d+)?\s*[kmb]\b",
+                " ".join(
+                    [
+                        str(latest.get("value") or ""),
+                        str(latest.get("snippet") or ""),
+                    ]
+                ),
+                re.I,
+            )
+            if budget_range:
+                raw_value = re.sub(r"\s+", "", budget_range.group(0))
         value = re.sub(
             r"\s+",
             " ",
-            str(latest.get("value") or latest.get("snippet") or "").strip(),
+            raw_value,
         )
         if not value:
             continue
@@ -752,7 +793,11 @@ def _summary_fallback(
     else:
         headline = f"{account_name} post-call review is ready."
 
-    primary_summary = (transcript_needs[0] if transcript_needs else "")
+    primary_summary = ""
+    if transcript_needs:
+        primary_summary = f"{account_name} discussed this call need: {transcript_needs[0]}"
+        if evidence_line:
+            primary_summary = f"{primary_summary} BANT evidence captured {evidence_line}."
     if not primary_summary and evidence_line:
         primary_summary = f"Live call covered {evidence_line}."
 
@@ -868,6 +913,92 @@ def _learned(discovery_snapshot: Optional[Dict[str, Any]], post_dc_record: Optio
             out.append({"label": label, "note": note})
         elif post_note:
             out.append({"label": label, "note": post_note})
+    return out
+
+
+def _bant_status_label(status: str) -> str:
+    normalized = str(status or "").strip().lower()
+    if normalized == "confirmed":
+        return "Confirmed"
+    if normalized == "partial":
+        return "Partial"
+    return "Not captured"
+
+
+def _first_known_bant_status(*values: Any) -> str:
+    for value in values:
+        status = str(value or "").strip().lower()
+        if status and status != "unknown":
+            return status
+    return "unknown"
+
+
+def _transcript_bant_evidence(transcript_events: Optional[List[Dict[str, Any]]]) -> Dict[str, Dict[str, str]]:
+    out: Dict[str, Dict[str, str]] = {}
+    for sentence in _transcript_sentences(transcript_events):
+        text = re.sub(r"\s+", " ", str(sentence.get("text") or "")).strip()
+        if not text:
+            continue
+        for dim in ("budget", "authority", "need", "timeline"):
+            if not _evidence_matches_dimension(dim, text):
+                continue
+            if dim == "budget":
+                has_amount = bool(_money_values(text))
+                existing_has_amount = bool(_money_values((out.get(dim) or {}).get("value", "")))
+                if out.get(dim) and (existing_has_amount or not has_amount):
+                    continue
+            elif out.get(dim):
+                continue
+            out[dim] = {
+                "label": BANT_LABELS[dim],
+                "status": "confirmed",
+                "value": text[:220],
+            }
+    return out
+
+
+def _bant_score(
+    discovery_snapshot: Optional[Dict[str, Any]],
+    post_dc_record: Optional[Dict[str, Any]],
+    transcript_events: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Dict[str, str]]:
+    progression = _bant_progression(discovery_snapshot)
+    after = progression.get("after") if isinstance(progression.get("after"), dict) else {}
+    evidence = _bant_evidence(discovery_snapshot)
+    transcript_evidence = _transcript_bant_evidence(transcript_events)
+    out: Dict[str, Dict[str, str]] = {}
+    for dim in ("budget", "authority", "need", "timeline"):
+        label = BANT_LABELS[dim]
+        evidence_item = evidence.get(dim) or {}
+        transcript_item = transcript_evidence.get(dim) or {}
+        post_note = _post_field(post_dc_record, label)
+        if dim in ("authority", "need"):
+            status = _first_known_bant_status(transcript_item.get("status"), after.get(dim), evidence_item.get("status"))
+        else:
+            status = _first_known_bant_status(after.get(dim), evidence_item.get("status"), transcript_item.get("status"))
+        if dim in ("authority", "need"):
+            value = _first_text(
+                transcript_item.get("value"),
+                evidence_item.get("value"),
+                evidence_item.get("snippet"),
+                post_note,
+            )
+        else:
+            value = _first_text(
+                evidence_item.get("value"),
+                evidence_item.get("snippet"),
+                post_note,
+                transcript_item.get("value"),
+            )
+        if status == "unknown" and not value:
+            continue
+        out[dim] = {
+            "label": label,
+            "status": status,
+            "statusLabel": _bant_status_label(status),
+        }
+        if value:
+            out[dim]["value"] = value[:220]
     return out
 
 
@@ -1633,6 +1764,173 @@ def _money_value(raw: str) -> float:
     return value
 
 
+def _money_values(raw: str) -> List[float]:
+    matches = re.findall(r"([\d,.]+)\s*([kmb])?", str(raw or "").lower())
+    if not matches:
+        return []
+    first_suffix = next((suffix for _, suffix in matches if suffix), "")
+    values: List[float] = []
+    for amount, suffix in matches:
+        try:
+            value = float(amount.replace(",", ""))
+        except ValueError:
+            continue
+        unit = suffix or (first_suffix if value < 1000 else "")
+        if unit == "k":
+            value *= 1_000
+        elif unit == "m":
+            value *= 1_000_000
+        elif unit == "b":
+            value *= 1_000_000_000
+        values.append(value)
+    return values
+
+
+def _annual_potential_from_budget(value: str) -> str:
+    amounts = _money_values(value)
+    if not amounts:
+        return ""
+    largest = max(amounts)
+    if largest >= 250_000:
+        return "High Potential"
+    if largest >= 50_000:
+        return "Medium Potential"
+    return "Low Potential"
+
+
+def _conversation_text(transcript_events: Optional[List[Dict[str, Any]]], conversation_context: Optional[Dict[str, Any]]) -> str:
+    parts = [
+        _transcript_full_text(transcript_events),
+        " ".join(str(item.get("text") or "") for item in (conversation_context or {}).get("needs", []) if isinstance(item, dict)),
+        " ".join(str(item.get("text") or "") for item in (conversation_context or {}).get("nextSteps", []) if isinstance(item, dict)),
+        " ".join(str(item.get("name") or "") for item in (conversation_context or {}).get("requestedAssets", []) if isinstance(item, dict)),
+        " ".join(str(item) for item in (conversation_context or {}).get("focusAreas", []) if str(item).strip()),
+    ]
+    return re.sub(r"\s+", " ", " ".join(parts)).strip().lower()
+
+
+def _infer_engagement_model(text: str) -> str:
+    if re.search(r"\b(fixed\s*cost|fixed[-\s]?price|fixed\s*bid)\b", text):
+        return "Fixed Cost"
+    if re.search(r"\b(time\s*(?:and|&)\s*material|t\s*&\s*m|hourly)\b", text):
+        return "Time & Material"
+    if re.search(r"\b(retainer|managed\s+team|dedicated\s+team)\b", text):
+        return "Retainer"
+    if re.search(r"\b(pilot|poc|proof\s+of\s+concept|discovery\s+sprint)\b", text):
+        return "Pilot"
+    return ""
+
+
+def _infer_service_line(text: str) -> str:
+    if re.search(r"\b(erp|software\s+engineering|custom\s+software|application|app|portal|platform|"
+                 r"scheduling|payroll|billing|incident\s+reporting|client\s+communications)\b", text):
+        return "Software Engineering"
+    if re.search(r"\b(ai|automation|llm|agentic|machine\s+learning|ml|chatbot)\b", text):
+        return "AI / Automation"
+    if re.search(r"\b(data|analytics|dashboard|bi|reporting|warehouse)\b", text):
+        return "Data & Analytics"
+    if re.search(r"\b(cloud|aws|azure|gcp|devops|integration|architecture)\b", text):
+        return "Cloud & Integration"
+    if re.search(r"\b(ux|ui|design|prototype|product\s+design)\b", text):
+        return "Product Design"
+    return ""
+
+
+def _best_next_step(conversation_context: Optional[Dict[str, Any]]) -> str:
+    candidates = [
+        str(item.get("text") or "").strip()
+        for item in (conversation_context or {}).get("nextSteps", [])
+        if isinstance(item, dict) and str(item.get("text") or "").strip()
+    ]
+    for candidate in candidates:
+        if re.search(r"\b(send|share|proposal|implementation|schedule|review|meeting|follow\s*up|workshop|readout)\b", candidate, re.I):
+            return candidate
+    for candidate in candidates:
+        if not re.search(r"\b(timeline|deadline)\b", candidate, re.I):
+            return candidate
+    return candidates[0] if candidates else ""
+
+
+def _deal_signals(
+    account_name: str,
+    *,
+    call: Optional[Dict[str, Any]],
+    discovery_snapshot: Optional[Dict[str, Any]],
+    pre_dc_fields: Optional[Dict[str, str]],
+    post_dc_record: Optional[Dict[str, Any]],
+    conversation_context: Optional[Dict[str, Any]],
+    transcript_events: Optional[List[Dict[str, Any]]],
+    summary: Optional[Dict[str, Any]],
+) -> Dict[str, str]:
+    coverage = _bant_coverage(discovery_snapshot) or 0
+    progression = _bant_progression(discovery_snapshot)
+    after = progression.get("after") if isinstance(progression.get("after"), dict) else {}
+    evidence = _bant_evidence(discovery_snapshot)
+    transcript_evidence = _transcript_bant_evidence(transcript_events)
+    text = _conversation_text(transcript_events, conversation_context)
+
+    dims = ("budget", "authority", "need", "timeline")
+    is_qualified = all(
+        after.get(dim) == "confirmed" or (transcript_evidence.get(dim) or {}).get("status") == "confirmed"
+        for dim in dims
+    )
+    effective_coverage = max(
+        coverage,
+        sum(
+            1
+            for dim in dims
+            if after.get(dim) in ("confirmed", "partial") or evidence.get(dim) or transcript_evidence.get(dim)
+        )
+        / len(dims),
+    )
+    lead_stage = _first_text(
+        _post_field(post_dc_record, "Lead Stage"),
+        "Opportunity"
+        if is_qualified or effective_coverage >= 0.75
+        else "Qualified follow-up"
+        if effective_coverage >= 0.5
+        else "Discovery",
+        (call or {}).get("dealStage"),
+    )
+    budget_value = _first_text(
+        _post_field(post_dc_record, "Budget"),
+        (evidence.get("budget") or {}).get("value"),
+        (evidence.get("budget") or {}).get("snippet"),
+    )
+    annual_potential = _first_text(
+        _post_field(post_dc_record, "Accounts Annual Potential"),
+        _annual_potential_from_budget(budget_value),
+    )
+    engagement_model = _first_text(
+        _post_field(post_dc_record, "Engagement Model"),
+        _infer_engagement_model(text),
+    )
+    service_line = _first_text(
+        _post_field(post_dc_record, "Service Line"),
+        _infer_service_line(text),
+        (pre_dc_fields or {}).get("Campaign Service - PreDC"),
+    )
+    pre_dc_icp_correct = _post_field(post_dc_record, "Was Pre DC ICP bucket correct")
+    next_step = _first_text(
+        _best_next_step(conversation_context),
+        (summary or {}).get("nextStepProposal"),
+    )
+
+    signals = {
+        "leadStage": lead_stage,
+        "annualPotential": annual_potential,
+        "engagementModel": engagement_model,
+        "serviceLine": service_line,
+        "preDcIcpCorrect": pre_dc_icp_correct,
+        "nextStep": next_step,
+    }
+    return {
+        key: re.sub(r"\s+", " ", str(value or "")).strip()[:240]
+        for key, value in signals.items()
+        if str(value or "").strip()
+    }
+
+
 def _jira_ticket(
     call_id: str,
     account_name: str,
@@ -2006,6 +2304,17 @@ def run_post_dc_pipeline(
         "researchSections": _research_sections(post_dc_record),
         "podScorecard": scorecard,
         "learned": _learned(discovery_snapshot, post_dc_record),
+        "bantScore": _bant_score(discovery_snapshot, post_dc_record, transcript_events),
+        "dealSignals": _deal_signals(
+            account_name,
+            call=call,
+            discovery_snapshot=discovery_snapshot,
+            pre_dc_fields=pre_dc_fields,
+            post_dc_record=post_dc_record,
+            conversation_context=conversation_context,
+            transcript_events=transcript_events,
+            summary=summary_json,
+        ),
         "openDiscoveryGaps": gaps,
         "discoveryBantCoverage": _bant_coverage(discovery_snapshot),
     }

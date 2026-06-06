@@ -620,6 +620,12 @@ def test_post_dc_replays_fragmented_live_bant_into_summary_and_follow_up(monkeyp
     assert review_text.lower().find("not more than three months") != -1
     assert review_text.lower().find("cfo") != -1
     assert review_text.lower().find("manual follow-up tracking") != -1
+    assert review["bantScore"]["budget"]["status"] == "confirmed"
+    assert review["bantScore"]["budget"]["value"].lower().find("400k") != -1
+    assert review["bantScore"]["timeline"]["value"].lower().find("not more than three months") != -1
+    assert review["dealSignals"]["leadStage"] == "Opportunity"
+    assert review["dealSignals"]["annualPotential"] == "High Potential"
+    assert review["dealSignals"]["nextStep"].lower().find("implementation plan") != -1
     assert client_email_text.lower().find("implementation plan") != -1
     assert client_email_text.lower().find("cfo next week") != -1
     assert "BANT" not in client_email_text
@@ -631,6 +637,101 @@ def test_post_dc_replays_fragmented_live_bant_into_summary_and_follow_up(monkeyp
     assert missing_content_text.lower().find("implementation plan") != -1
     assert post["jiraTicket"] is not None
     assert all(post["jiraTicket"]["bantSnapshot"].values())
+
+
+def test_post_dc_structures_live_summary_bant_and_deal_signals(monkeypatch):
+    _clear_memory(monkeypatch)
+    ctx = TenantContext(tenant_id="tenant-post-dc", user_id="user-post-dc")
+    call_id = "call-strataguard-post-dc"
+    account_name = "Strataguard Protective Services"
+    store = get_memory_store()
+    store.upsert_calls(
+        "tenant-post-dc",
+        [
+            {
+                "id": call_id,
+                "accountName": account_name,
+                "leadEmail": "robert@example.com",
+                "status": "live",
+                "briefReady": False,
+                "pod": [],
+                "bant": {
+                    "budget": "unknown",
+                    "authority": "unknown",
+                    "need": "unknown",
+                    "timeline": "unknown",
+                },
+            }
+        ],
+    )
+
+    orchestrator = Orchestrator()
+    segments = [
+        (
+            "seg-profile",
+            "Robert runs a regional guard services firm across three states.",
+            20,
+        ),
+        (
+            "seg-need",
+            "This is a critical priority: we need a custom security operations ERP covering officer scheduling, payroll, client billing, incident reporting, and client communications.",
+            30,
+        ),
+        (
+            "seg-pain",
+            "The current spreadsheet plus QuickBooks setup is causing payroll errors and client invoicing disputes.",
+            40,
+        ),
+        ("seg-authority", "I have full decision authority for this purchase.", 45),
+        ("seg-budget", "The approved budget is 10-50K.", 50),
+        ("seg-timeline", "We need this in 30-60 days.", 55),
+        (
+            "seg-model",
+            "We want a fixed cost discovery engagement for software engineering.",
+            60,
+        ),
+        (
+            "seg-next",
+            "Please send the security operations ERP discovery proposal and loop in the solution architect for the technical walkthrough.",
+            65,
+        ),
+    ]
+    for segment_id, text, timestamp in segments:
+        orchestrator.dispatch_live_segment(
+            ctx,
+            call_id,
+            {
+                "id": segment_id,
+                "speakerId": "buyer-1",
+                "speakerName": "Robert",
+                "speakerRole": "customer",
+                "text": text,
+                "timestamp": timestamp,
+            },
+            elapsed_seconds=timestamp,
+        )
+
+    post = orchestrator.dispatch_post_call(ctx, call_id)
+    review = post["review"]
+    summary_text = " ".join(review["summary"]).lower()
+    bant_score = review["bantScore"]
+    deal_signals = review["dealSignals"]
+
+    assert "custom security operations erp" in summary_text
+    assert "payroll" in summary_text
+    assert bant_score["budget"]["status"] in ("partial", "confirmed")
+    assert "10-50k" in bant_score["budget"]["value"].lower()
+    assert bant_score["authority"]["status"] == "confirmed"
+    assert "full decision authority" in bant_score["authority"]["value"].lower()
+    assert bant_score["need"]["status"] == "confirmed"
+    assert "officer scheduling" in bant_score["need"]["value"].lower()
+    assert bant_score["timeline"]["status"] == "confirmed"
+    assert "30-60 days" in bant_score["timeline"]["value"].lower()
+    assert deal_signals["leadStage"] == "Opportunity"
+    assert deal_signals["annualPotential"] == "Medium Potential"
+    assert deal_signals["engagementModel"] == "Fixed Cost"
+    assert deal_signals["serviceLine"] == "Software Engineering"
+    assert "discovery proposal" in deal_signals["nextStep"].lower()
 
 
 def test_post_dc_replays_misattributed_recall_transcript_into_bant(monkeypatch):

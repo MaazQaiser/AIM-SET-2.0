@@ -335,6 +335,7 @@ test.describe("Live call cockpit — DOM + API", () => {
     page,
     request,
   }) => {
+    test.setTimeout(240_000);
     const callId = `misattributed-recall-post-dc-${RUN_ID}`;
     const accountName = `Misattributed Recall Post DC ${RUN_ID}`;
     await seedE2eCall(request, callId, accountName);
@@ -345,6 +346,15 @@ test.describe("Live call cockpit — DOM + API", () => {
     });
     await expect(page.getByText("Connecting stream…")).toBeHidden({ timeout: 25_000 });
 
+    await postDemoSegment(
+      request,
+      {
+        text: "we need a custom ERP for onboarding automation",
+        speaker_role: "ae",
+        offset_seconds: 49,
+      },
+      callId
+    );
     await postDemoSegment(
       request,
       {
@@ -372,13 +382,45 @@ test.describe("Live call cockpit — DOM + API", () => {
       },
       callId
     );
+    await postDemoSegment(
+      request,
+      {
+        text: "the CFO owns approval and can approve it",
+        speaker_role: "ae",
+        offset_seconds: 66,
+      },
+      callId
+    );
+    await postDemoSegment(
+      request,
+      {
+        text: "we want a fixed cost software engineering engagement",
+        speaker_role: "ae",
+        offset_seconds: 70,
+      },
+      callId
+    );
+    await postDemoSegment(
+      request,
+      {
+        text: "please send the implementation proposal and schedule the review next week",
+        speaker_role: "ae",
+        offset_seconds: 74,
+      },
+      callId
+    );
+
+    const endReviewButton = page.getByRole("button", { name: /End & review/i });
+    await expect(endReviewButton).toBeEnabled({ timeout: 30_000 });
 
     const wrapUpResponse = page.waitForResponse(
       (res) =>
-        res.url().includes(`/api/calls/${callId}/post-call`) &&
-        res.request().method() === "POST"
+        (res.url().includes(`/api/calls/${callId}/post-call`) ||
+          res.url().includes(`/api/v1/calls/${callId}/post-call`)) &&
+        res.request().method() === "POST",
+      { timeout: 180_000 }
     );
-    await page.getByRole("button", { name: /End & review/i }).click();
+    await endReviewButton.click();
     const res = await wrapUpResponse;
     expect(res.ok(), `wrap-up failed: ${res.status()} ${await res.text()}`).toBeTruthy();
 
@@ -386,6 +428,14 @@ test.describe("Live call cockpit — DOM + API", () => {
       review?: {
         summary?: string[];
         learned?: Array<{ label?: string; note?: string }>;
+        bantScore?: Record<string, { status?: string; value?: string }>;
+        dealSignals?: {
+          leadStage?: string;
+          annualPotential?: string;
+          engagementModel?: string;
+          serviceLine?: string;
+          nextStep?: string;
+        };
         openDiscoveryGaps?: string[];
         discoveryBantCoverage?: number;
       };
@@ -411,24 +461,42 @@ test.describe("Live call cockpit — DOM + API", () => {
       ...((body.review?.learned ?? []).map((item) => `${item.label ?? ""} ${item.note ?? ""}`)),
     ].join(" ");
     expect(after.budget).toMatch(/partial|confirmed/i);
+    expect(after.authority).toBe("confirmed");
+    expect(after.need).toMatch(/partial|confirmed/i);
     expect(after.timeline).toBe("confirmed");
     expect(body.review?.discoveryBantCoverage ?? 0).toBeGreaterThan(0);
     expect(body.review?.openDiscoveryGaps ?? []).not.toContain("timeline");
     expect(reviewText).toMatch(/400k/i);
+    expect(reviewText).toMatch(/custom ERP/i);
     expect(reviewText).toMatch(/not more than three months/i);
     expect(reviewText).not.toMatch(/BANT coverage finished at 0%/i);
+    expect(body.review?.bantScore?.budget?.value ?? "").toMatch(/400k/i);
+    expect(body.review?.bantScore?.authority?.value ?? "").toMatch(/CFO owns approval/i);
+    expect(body.review?.bantScore?.need?.status ?? "").toBe("confirmed");
+    expect(body.review?.bantScore?.need?.value ?? "").toMatch(/custom ERP/i);
+    expect(body.review?.dealSignals?.leadStage ?? "").toBe("Opportunity");
+    expect(body.review?.dealSignals?.annualPotential ?? "").toBe("High Potential");
+    expect(body.review?.dealSignals?.engagementModel ?? "").toBe("Fixed Cost");
+    expect(body.review?.dealSignals?.serviceLine ?? "").toBe("Software Engineering");
+    expect(body.review?.dealSignals?.nextStep ?? "").toMatch(/implementation proposal/i);
     expect(body.task?.internalEmailDraft?.body_markdown ?? "").toMatch(/400k/i);
     expect(body.task?.clientEmailDraft?.body_markdown ?? "").toMatch(/not more than three months/i);
 
     await expect(page).toHaveURL(new RegExp(`/calls/${callId}/post-dc\\?wrapped=1`), {
       timeout: 30_000,
     });
-    await expect(page.getByRole("heading", { name: /Post-DC review/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Post-DC review", exact: true })).toBeVisible({
       timeout: 30_000,
     });
 
     const overviewPanel = page.locator('[role="tabpanel"]:visible');
     await expect(overviewPanel).toContainText(/400k/i);
+    await expect(overviewPanel).toContainText(/BANT score/i);
+    await expect(overviewPanel).toContainText(/Deal signals/i);
+    await expect(overviewPanel).toContainText(/Opportunity/i);
+    await expect(overviewPanel).toContainText(/High Potential/i);
+    await expect(overviewPanel).toContainText(/Fixed Cost/i);
+    await expect(overviewPanel).toContainText(/Software Engineering/i);
     await expect(overviewPanel).toContainText(/not more than three months/i);
     await expect(overviewPanel).not.toContainText(/BANT coverage finished at 0%/i);
     await expect(overviewPanel).not.toContainText(/Timeline moved from unknown to unknown/i);

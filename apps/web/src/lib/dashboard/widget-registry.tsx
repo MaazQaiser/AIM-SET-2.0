@@ -26,6 +26,7 @@ import {
   BriefPodNotesCard,
 } from "@/components/pre-call/brief-widget-cards";
 import {
+  PostDealSignalsCard,
   PostHeadlineCard,
   PostDcContentSuggestionsCard,
   PostLearnedCard,
@@ -357,18 +358,29 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
   },
   {
     id: "post.learned",
-    title: "BANT",
+    title: "BANT score",
     category: "qualification",
     column: "center",
     sortOrder: 2,
-    render: ({ review }) => <PostLearnedCard learned={review.learned ?? []} />,
+    render: ({ review }) => (
+      <PostLearnedCard learned={review.learned ?? []} bantScore={review.bantScore} />
+    ),
+  },
+  {
+    id: "post.deal_signals",
+    title: "Deal signals",
+    category: "qualification",
+    column: "center",
+    sortOrder: 3,
+    isAvailable: ({ review }) => Object.values(review.dealSignals ?? {}).some((value) => Boolean(value)),
+    render: ({ review }) => <PostDealSignalsCard signals={review.dealSignals} />,
   },
   {
     id: "post.discovery_gaps",
     title: "Discovery gaps",
     category: "qualification",
     column: "center",
-    sortOrder: 3,
+    sortOrder: 4,
     isAvailable: ({ review }) =>
       arrayLen(review.openDiscoveryGaps) > 0 || review.discoveryBantCoverage !== undefined,
     render: ({ review }) => (
@@ -383,7 +395,7 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     title: "Follow-up email",
     category: "ai",
     column: "center",
-    sortOrder: 4,
+    sortOrder: 5,
     isAvailable: ({ emailDraft }) => Boolean(emailDraft),
     render: ({ emailDraft }) => (emailDraft ? <EmailEditor draft={emailDraft} /> : null),
   },

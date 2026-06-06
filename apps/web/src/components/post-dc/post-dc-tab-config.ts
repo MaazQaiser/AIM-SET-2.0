@@ -4,6 +4,7 @@ export const POST_DC_TAB_WIDGET_IDS = {
     "post.headline",
     "post.summary",
     "post.learned",
+    "post.deal_signals",
     "post.discovery_gaps",
     "post.research",
   ],
