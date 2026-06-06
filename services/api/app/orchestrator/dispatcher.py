@@ -11,7 +11,7 @@ from dc_core.tenancy import TenantContext
 from app.agents.content_agent import generate_pre_dc_brief
 from app.agents.pre_dc_agent import run_pre_dc_pipeline, research_from_fields
 from app.agents.relevant_content import build_relevant_content
-from app.agents.content_generation_agent import run_studio_turn
+from app.agents.content_generation_agent import run_studio_bootstrap, run_studio_turn
 from app.agents.knowledge_agent import ingest_asset_metadata
 from app.agents.discovery_checklist_agent import finalize_session, handle_segment, seed_checklist
 from app.agents.live_call.handler import handle_call_end, handle_transcript_segment
@@ -197,6 +197,9 @@ class Orchestrator:
             merged["agentRunId"] = envelope.trace_id
             self.calls.save_brief(ctx, call_id, merged)
             self._log_run(ctx, envelope)
+            from app.services.content_gaps_service import sync_gaps_from_brief
+
+            sync_gaps_from_brief(ctx, call_id, merged)
             return envelope.model_dump()
         except Exception:
             failed = {**existing, "agentStatus": "failed", "callId": call_id, "accountName": account_name}
@@ -307,6 +310,10 @@ class Orchestrator:
         validate_envelope(post_env)
         self.calls.save_post_review(ctx, call_id, post_env.result)
         self._log_run(ctx, post_env)
+        self._maybe_pregenerate_landing_page(ctx, call_id, post_env.result)
+        from app.services.content_gaps_service import sync_gaps_from_post_call
+
+        sync_gaps_from_post_call(ctx, call_id, post_env.result)
         out: Dict[str, Any] = {
             **post_env.result,
             "envelope": post_env.model_dump(),
@@ -317,6 +324,22 @@ class Orchestrator:
             out["live_signals"] = live_snapshot
         out["call_agent_outputs"] = call_agent_handoff
         return out
+
+    def _maybe_pregenerate_landing_page(
+        self, ctx: TenantContext, call_id: str, post_result: Dict[str, Any]
+    ) -> None:
+        from app.domain.clp_service import _landing_page_eligible, get_clp_service
+
+        review = post_result.get("review")
+        if not _landing_page_eligible(review if isinstance(review, dict) else None):
+            return
+        try:
+            svc = get_clp_service()
+            if svc.get(ctx, call_id):
+                return
+            svc.generate_draft(ctx, call_id)
+        except Exception:
+            _logger.exception("Landing page pre-generate failed for call %s", call_id)
 
     def dispatch_call_end(self, ctx: TenantContext, call_id: str) -> Dict[str, Any]:
         return handle_call_end(ctx, call_id)
@@ -549,6 +572,45 @@ class Orchestrator:
             allow_generation=allow_generation,
             repo=repo,
         )
+        validate_envelope(envelope)
+        repo.add_message(
+            ctx,
+            project_id,
+            role="assistant",
+            content=envelope.result,
+            turn_type=envelope.result.get("turn_type"),
+            trace_id=envelope.trace_id,
+        )
+        self._log_run(ctx, envelope)
+        return envelope.model_dump()
+
+    def dispatch_studio_bootstrap(
+        self,
+        ctx: TenantContext,
+        project_id: str,
+    ) -> Dict[str, Any]:
+        repo = get_content_studio_repository()
+        messages = repo.list_messages(ctx, project_id)
+        if messages:
+            project = repo.get_project(ctx, project_id)
+            if not project:
+                raise ValueError(f"Project not found: {project_id}")
+            return {
+                "agent": "content_generation",
+                "operation": "studio_bootstrap_skipped",
+                "result": {
+                    "project_id": project_id,
+                    "turn_type": "outline",
+                    "message": "Project already has chat history.",
+                },
+                "citations": [],
+                "confidence": 1.0,
+                "cost": {"tokens": 0, "usd": 0.0, "model": "noop"},
+                "trace_id": str(uuid.uuid4()),
+                "creative": False,
+            }
+
+        envelope = run_studio_bootstrap(ctx, project_id=project_id, repo=repo)
         validate_envelope(envelope)
         repo.add_message(
             ctx,

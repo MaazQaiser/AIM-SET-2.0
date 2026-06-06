@@ -15,6 +15,22 @@ def _public_base_url() -> str:
     )
 
 
+def _extract_post_review(payload: Optional[Dict[str, Any]]) -> tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+    if not payload:
+        return None, []
+    if isinstance(payload.get("review"), dict):
+        return payload["review"], list(payload.get("kbSuggestions") or [])
+    return payload, list(payload.get("kbSuggestions") or [])
+
+
+def _landing_page_eligible(review: Optional[Dict[str, Any]]) -> bool:
+    if not review:
+        return True
+    signals = review.get("dealSignals") or {}
+    stage = str(signals.get("leadStage") or review.get("headline") or "").split("·")[0].strip().lower()
+    return "not a fit" not in stage
+
+
 class ClpService:
     _notify_debounce: Dict[str, float] = {}
 
@@ -34,9 +50,17 @@ class ClpService:
         call = self._calls.get_call(ctx, call_id)
         if not call:
             raise ValueError("Call not found")
-        review = self._calls.get_post_review(ctx, call_id)
+        post_payload = self._calls.get_post_review(ctx, call_id)
+        review, kb_suggestions = _extract_post_review(post_payload)
         brief = self._calls.get_brief(ctx, call_id)
-        draft = run_clp_generate(ctx, call_id, call=call, review=review, brief=brief)
+        draft = run_clp_generate(
+            ctx,
+            call_id,
+            call=call,
+            review=review,
+            brief=brief,
+            kb_suggestions=kb_suggestions or None,
+        )
         return self._repo.upsert(
             ctx,
             call_id,
@@ -80,7 +104,8 @@ class ClpService:
         if not page:
             page = self.generate_draft(ctx, call_id)
         call = self._calls.get_call(ctx, call_id)
-        review = self._calls.get_post_review(ctx, call_id)
+        post_payload = self._calls.get_post_review(ctx, call_id)
+        review, _ = _extract_post_review(post_payload)
         proposal = run_clp_proposal_generate(ctx, call_id, call=call, review=review, landing_page=page)
         saved = self._repo.save_proposal(ctx, page["id"], call_id, proposal)
         sections = list(page.get("sections") or [])

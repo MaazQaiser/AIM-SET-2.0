@@ -154,9 +154,9 @@ export function ProjectRepoDetailClient({ projectId }: { projectId: string }) {
   if (isError || !project) {
     return (
       <PageShell size="wide">
-        <Link href="/knowledge/projects" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <Link href="/content?tab=projects" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-4 w-4" />
-          Project repo
+          Projects
         </Link>
         <div className="rounded-lg border border-border bg-card p-6">
           <h1 className="text-xl font-semibold text-foreground">Project not found</h1>
@@ -170,9 +170,9 @@ export function ProjectRepoDetailClient({ projectId }: { projectId: string }) {
 
   return (
     <PageShell size="wide">
-      <Link href="/knowledge/projects" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/content?tab=projects" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ChevronLeft className="h-4 w-4" />
-        Project repo
+        Projects
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -194,9 +194,9 @@ export function ProjectRepoDetailClient({ projectId }: { projectId: string }) {
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           <Button asChild variant="outline">
-            <Link href="/knowledge/projects">
+            <Link href="/content?tab=projects">
               <FolderKanban className="h-4 w-4" />
-              Repo
+              Projects
             </Link>
           </Button>
           <Button asChild>
@@ -240,9 +240,9 @@ export function ProjectRepoDetailClient({ projectId }: { projectId: string }) {
                 </Button>
               )}
               <Button asChild variant="outline" className="w-full justify-start">
-                <Link href="/knowledge">
+                <Link href="/content?tab=library">
                   <Database className="h-4 w-4" />
-                  Knowledge library
+                  Content Library
                 </Link>
               </Button>
             </CardContent>

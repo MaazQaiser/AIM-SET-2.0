@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   Copy,
@@ -32,17 +32,21 @@ import { PostDcClpActivityCard } from "@/components/post-dc/post-dc-clp-activity
 import { PostDcClpAnalyticsWidget } from "@/components/post-dc/post-dc-clp-analytics-widget";
 import {
   useClpProposal,
-  useGenerateLandingPage,
-  useLandingPage,
+  useEnsureLandingPage,
   usePublishLandingPage,
   useUpdateLandingPage,
 } from "@/lib/data/clp-hooks";
-import { useCall } from "@/lib/data/hooks";
+import { useCall, useCallBrief, usePostCallReview } from "@/lib/data/hooks";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
+import { buildOptimisticLandingDraft } from "@/lib/landing-page/build-optimistic-draft";
 import { syncAssetSections } from "@/lib/landing-page/clp-editor-utils";
+import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { toast } from "sonner";
 import type { CustomerLandingPage } from "@dc-copilot/types";
+import type { PostCallKbSuggestion } from "@/lib/brief-types";
+
+const EMPTY_KB_SUGGESTIONS: PostCallKbSuggestion[] = [];
 
 interface PostDcClientLandingColumnProps {
   callId: string;
@@ -50,9 +54,13 @@ interface PostDcClientLandingColumnProps {
 
 export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnProps) {
   const { data: call } = useCall(callId);
-  const { data: page, isLoading, refetch } = useLandingPage(callId);
+  const { data: review } = usePostCallReview(callId);
+  const { data: brief } = useCallBrief(callId);
+  const kbSuggestions =
+    useDcImportsStore((s) => s.postRunMetaByCallId[callId]?.kbSuggestions) ??
+    EMPTY_KB_SUGGESTIONS;
+  const { page, isLoading, isGenerating, generate, refetch } = useEnsureLandingPage(callId);
   const { data: proposal } = useClpProposal(callId);
-  const generate = useGenerateLandingPage(callId);
   const update = useUpdateLandingPage(callId);
   const publish = usePublishLandingPage(callId);
   const [draft, setDraft] = useState<CustomerLandingPage | null>(null);
@@ -60,24 +68,29 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
   const [password, setPassword] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const autoGenerateAttempted = useRef(false);
 
   useEffect(() => {
     if (page) setDraft(syncAssetSections(page));
   }, [page]);
 
-  useEffect(() => {
-    if (isLoading || page || generate.isPending || autoGenerateAttempted.current) return;
-    autoGenerateAttempted.current = true;
-    generate.mutate(undefined, {
-      onSuccess: (p) => setDraft(syncAssetSections(p)),
-      onError: () => toast.error("Could not plan landing page"),
+  const optimisticDraft = useMemo(() => {
+    if (page || !review) return null;
+    return buildOptimisticLandingDraft({
+      callId,
+      call,
+      review,
+      brief,
+      kbSuggestions,
     });
-  }, [isLoading, page, generate.isPending]);
+  }, [page, review, call, brief, kbSuggestions, callId]);
+
+  const displayDraft = draft ?? optimisticDraft;
+  const isHydrating = !page && isGenerating;
 
   function saveDraft(next: CustomerLandingPage) {
     const synced = syncAssetSections(next);
     setDraft(synced);
+    if (!page) return;
     update.mutate(
       {
         sections: synced.sections,
@@ -90,13 +103,13 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
   }
 
   async function copyShareLink() {
-    if (!draft?.publicUrl) return;
-    const copied = await copyTextToClipboard(draft.publicUrl);
+    if (!displayDraft?.publicUrl) return;
+    const copied = await copyTextToClipboard(displayDraft.publicUrl);
     if (copied) toast.success("Client link copied");
     else toast.error("Click back into the page before copying");
   }
 
-  if (!draft && (isLoading || generate.isPending)) {
+  if (!displayDraft && (isLoading || isGenerating)) {
     return (
       <div className="flex justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -104,19 +117,18 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
     );
   }
 
-  if (!draft) {
+  if (!displayDraft) {
     return (
       <div className="py-12 text-center text-muted-foreground space-y-3">
         <p>Could not load the client landing page.</p>
         <div className="flex flex-wrap justify-center gap-2">
           <Button
-            onClick={() => {
-              autoGenerateAttempted.current = false;
+            onClick={() =>
               generate.mutate(undefined, {
                 onSuccess: (p) => setDraft(syncAssetSections(p)),
                 onError: () => toast.error("Could not plan landing page"),
-              });
-            }}
+              })
+            }
             disabled={generate.isPending}
           >
             Plan with AI
@@ -129,9 +141,9 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
     );
   }
 
-  const isPublished = draft.status === "published";
+  const isPublished = displayDraft.status === "published";
   const isPlanning = !isPublished || editMode;
-  const accountName = call?.accountName ?? draft.branding.accountName;
+  const accountName = call?.accountName ?? displayDraft.branding.accountName;
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
@@ -146,6 +158,11 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
             >
               {isPublished && !editMode ? "Live" : "Planning"}
             </Badge>
+            {isHydrating && (
+              <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                Syncing assets…
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             Digital sales room for {accountName} — share the call summary, tkxel deck, and selected
@@ -191,9 +208,9 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
                 <Copy className="mr-1.5 h-3.5 w-3.5" />
                 Share link
               </Button>
-              {draft.publicUrl && (
+              {displayDraft.publicUrl && (
                 <Button asChild variant="outline" size="sm">
-                  <a href={draft.publicUrl} target="_blank" rel="noopener noreferrer">
+                  <a href={displayDraft.publicUrl} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                     Open live page
                   </a>
@@ -210,14 +227,14 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
       {isPublished && !editMode && (
         <section className="space-y-4">
           <PostDcClpAnalyticsWidget callId={callId} enabled />
-          <RoomPlanChecklist draft={draft} proposalAttached={Boolean(proposal)} published />
+          <RoomPlanChecklist draft={displayDraft} proposalAttached={Boolean(proposal)} published />
         </section>
       )}
 
       {isPlanning && (
         <div className="min-w-0 space-y-5">
-          <RoomPlanChecklist draft={draft} proposalAttached={Boolean(proposal)}>
-            <ClpSectionEditor draft={draft} onChange={saveDraft} embedded />
+          <RoomPlanChecklist draft={displayDraft} proposalAttached={Boolean(proposal)}>
+            <ClpSectionEditor draft={displayDraft} onChange={saveDraft} embedded />
           </RoomPlanChecklist>
 
           <BriefDetailCard title="Proposal" icon={FileText}>
@@ -232,13 +249,13 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
           </BriefDetailCard>
 
           <ClpKbAssetsPanel
-            draft={draft}
+            draft={displayDraft}
             onChange={saveDraft}
             heading="Selected decks & assets"
             description="Choose decks and files the AE wants on the page — including custom decks beyond the tkxel company deck."
           />
 
-          <ClpClientEngagementSettings draft={draft} onChange={saveDraft} />
+          <ClpClientEngagementSettings draft={displayDraft} onChange={saveDraft} />
 
           {isPublished && editMode && (
             <div className="flex gap-2 pt-2">
@@ -260,11 +277,11 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
           <BriefDetailCard title="Client feedback" icon={MessageSquare}>
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground">
-                {draft.settings?.allowChat !== false && draft.settings?.allowComments !== false
+                {displayDraft.settings?.allowChat !== false && displayDraft.settings?.allowComments !== false
                   ? "Chat and section comments are enabled on the live page."
-                  : draft.settings?.allowChat !== false
+                  : displayDraft.settings?.allowChat !== false
                     ? "Live chat is enabled on the client page."
-                    : draft.settings?.allowComments !== false
+                    : displayDraft.settings?.allowComments !== false
                       ? "Section comments are enabled on the client page."
                       : "Enable chat or comments in Modify room to collect client feedback."}
               </p>
@@ -289,7 +306,7 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto bg-background">
             <ClpPublicView
-              page={draft}
+              page={displayDraft}
               proposal={proposal ?? null}
               preview
               embedded={false}

@@ -66,6 +66,23 @@ def render_html_png(html: str) -> bytes:
         return _export_png_fallback([section])[0][1]
 
 
+def export_revision_file_bytes(ctx: TenantContext, revision_id: str, fmt: str) -> bytes:
+    if fmt not in ("pdf", "png", "pptx"):
+        raise ValueError(f"Unsupported format: {fmt}")
+
+    repo = get_content_studio_repository()
+    revision = repo.get_revision(ctx, revision_id)
+    if not revision:
+        raise ValueError(f"Revision not found: {revision_id}")
+
+    html = revision["html"]
+    if fmt == "pdf":
+        return _export_pdf(html)
+    if fmt == "png":
+        return _export_png_zip(html)
+    return _export_pptx(html)
+
+
 def _export_pdf(html: str) -> bytes:
     try:
         from playwright.sync_api import sync_playwright  # type: ignore

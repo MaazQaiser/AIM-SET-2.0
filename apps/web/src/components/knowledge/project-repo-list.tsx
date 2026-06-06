@@ -47,19 +47,6 @@ function ProjectRepoViewToggle({
     >
       <Button
         type="button"
-        variant={view === "cards" ? "secondary" : "ghost"}
-        size="sm"
-        className="h-8 gap-1.5 px-2.5"
-        onClick={() => onChange("cards")}
-        aria-pressed={view === "cards"}
-        aria-label="Cards"
-        title="Cards"
-      >
-        <LayoutGrid className="h-4 w-4" />
-        <span className="hidden sm:inline">Cards</span>
-      </Button>
-      <Button
-        type="button"
         variant={view === "table" ? "secondary" : "ghost"}
         size="sm"
         className="h-8 gap-1.5 px-2.5"
@@ -70,6 +57,19 @@ function ProjectRepoViewToggle({
       >
         <List className="h-4 w-4" />
         <span className="hidden sm:inline">Table</span>
+      </Button>
+      <Button
+        type="button"
+        variant={view === "cards" ? "secondary" : "ghost"}
+        size="sm"
+        className="h-8 gap-1.5 px-2.5"
+        onClick={() => onChange("cards")}
+        aria-pressed={view === "cards"}
+        aria-label="Cards"
+        title="Cards"
+      >
+        <LayoutGrid className="h-4 w-4" />
+        <span className="hidden sm:inline">Cards</span>
       </Button>
     </fieldset>
   );
@@ -252,7 +252,7 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
   const [search, setSearch] = useState("");
   const [industryFilter, setIndustryFilter] = useState("All");
   const [domainFilter, setDomainFilter] = useState("All");
-  const [view, setView] = useState<ProjectRepoView>("cards");
+  const [view, setView] = useState<ProjectRepoView>("table");
 
   const industryFilters = useMemo(() => ["All", ...uniqueProjectValues(projects, "industry", 7)], [projects]);
   const domainFilters = useMemo(() => ["All", ...uniqueProjectValues(projects, "domain", 7)], [projects]);
@@ -278,9 +278,9 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
             </p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/knowledge">
+            <Link href="/content">
               <Database className="h-4 w-4" />
-              Knowledge base
+              Knowledge Base
             </Link>
           </Button>
         </div>
@@ -310,26 +310,28 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">Industry</span>
           {industryFilters.map((filter) => (
             <FilterChip
-              key={filter}
+              key={`industry-${filter}`}
               active={filter === industryFilter}
               onClick={() => setIndustryFilter(filter)}
             >
-              {filter}
+              {filter === "All" ? "All industries" : filter}
             </FilterChip>
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">Domain</span>
           {domainFilters.map((filter) => (
             <FilterChip
-              key={filter}
+              key={`domain-${filter}`}
               active={filter === domainFilter}
               onClick={() => setDomainFilter(filter)}
             >
-              {filter}
+              {filter === "All" ? "All domains" : filter}
             </FilterChip>
           ))}
         </div>

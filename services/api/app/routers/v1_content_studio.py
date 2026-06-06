@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from dc_core.tenancy import TenantContext
@@ -23,6 +24,7 @@ from app.services.template_editor_service import (
     split_template_parts,
     validate_template_html,
 )
+from app.services.template_ingest_service import ensure_template_preview_slides
 
 router = APIRouter(prefix="/api/v1/content", tags=["content-studio"])
 _orch = Orchestrator()
@@ -34,6 +36,8 @@ class CreateProjectBody(BaseModel):
     templateId: Optional[str] = None
     brief: Dict[str, Any] = Field(default_factory=dict)
     recommendedTemplateIds: List[str] = Field(default_factory=list)
+    callId: Optional[str] = None
+    gapId: Optional[str] = None
 
 
 class StudioMessageBody(BaseModel):
@@ -144,6 +148,84 @@ def get_template(
     return tpl
 
 
+@router.get("/templates/{template_id}/file")
+def get_template_source_file(
+    template_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Response:
+    repo = get_content_studio_repository()
+    try:
+        data, file_name, mime_type = repo.get_template_source_file(ctx, template_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template file not found") from exc
+
+    return Response(
+        content=data,
+        media_type=mime_type,
+        headers={"Content-Disposition": f'inline; filename="{file_name}"'},
+    )
+
+
+@router.get("/templates/{template_id}/slides/{slide_index}")
+def get_template_preview_slide(
+    template_id: str,
+    slide_index: int,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Response:
+    if slide_index < 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="slide_index must be >= 1")
+
+    repo = get_content_studio_repository()
+    row = repo.get_template_row(ctx, template_id)
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+
+    slide_count = int(row.get("page_count") or 0)
+    if slide_count <= 0 or slide_index > slide_count:
+        slide_count = ensure_template_preview_slides(ctx, template_id)
+        if slide_count <= 0 or slide_index > slide_count:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Slide not found")
+
+    try:
+        data = repo.download_template_slide(ctx, template_id, slide_index)
+    except FileNotFoundError as exc:
+        rebuilt = ensure_template_preview_slides(ctx, template_id)
+        if rebuilt <= 0 or slide_index > rebuilt:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Slide file not found") from exc
+        try:
+            data = repo.download_template_slide(ctx, template_id, slide_index)
+        except FileNotFoundError as retry_exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Slide file not found") from retry_exc
+
+    return Response(
+        content=data,
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
+@router.get("/templates/{template_id}/preview")
+def get_template_preview_pdf(
+    template_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Response:
+    repo = get_content_studio_repository()
+    data = repo.get_template_preview_pdf(ctx, template_id)
+    if not data:
+        rebuilt = ensure_template_preview_slides(ctx, template_id)
+        data = repo.get_template_preview_pdf(ctx, template_id)
+        if not data and rebuilt <= 0:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Preview not found")
+    if not data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Preview not found")
+
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'inline; filename="template-preview.pdf"'},
+    )
+
+
 @router.patch("/templates/{template_id}")
 def update_template(
     template_id: str,
@@ -239,14 +321,33 @@ def create_project(
 ) -> Dict[str, Any]:
     if body.artifactType not in ARTIFACT_TYPES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid artifactType")
-    return get_content_studio_repository().create_project(
+    project = get_content_studio_repository().create_project(
         ctx,
         title=body.title,
         artifact_type=body.artifactType,
         template_id=body.templateId,
         brief=body.brief,
         recommended_template_ids=body.recommendedTemplateIds,
+        call_id=body.callId,
+        source_gap_id=body.gapId,
     )
+    _link_gap_to_project(ctx, body.gapId, str(project["id"]))
+    return project
+
+
+def _link_gap_to_project(ctx: TenantContext, gap_ref: Optional[str], project_id: str) -> None:
+    if not gap_ref:
+        return
+    from app.domain.content_gaps_repository import get_content_gaps_repository
+
+    repo = get_content_gaps_repository()
+    gap = repo.get_gap(ctx, gap_ref)
+    if gap:
+        repo.patch_gap(
+            ctx,
+            str(gap["id"]),
+            {"status": "in_progress", "studioProjectId": project_id},
+        )
 
 
 @router.get("/studio/projects/{project_id}")
@@ -272,6 +373,17 @@ def delete_project(
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     return {"status": "deleted", "projectId": project_id}
+
+
+@router.post("/studio/projects/{project_id}/bootstrap")
+def bootstrap_project(
+    project_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    try:
+        return _orch.dispatch_studio_bootstrap(ctx, project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post("/studio/projects/{project_id}/messages")
@@ -379,6 +491,32 @@ def _safe_file_stem(value: str) -> str:
 
     clean = re.sub(r"[^\w.\- ]+", "", value).strip(" ._-")
     return clean[:96] or "Generated Studio Asset"
+
+
+@router.post("/studio/projects/{project_id}/submit-review")
+def submit_project_review(
+    project_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    from app.services.content_gaps_service import submit_project_for_review
+
+    try:
+        return submit_project_for_review(ctx, project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/studio/projects/{project_id}/approve")
+def approve_project(
+    project_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    from app.services.content_gaps_service import approve_project_to_kb
+
+    try:
+        return approve_project_to_kb(ctx, project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post("/studio/projects/{project_id}/export")

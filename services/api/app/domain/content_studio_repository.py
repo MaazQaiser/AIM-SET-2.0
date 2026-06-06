@@ -4,6 +4,7 @@ import uuid
 import logging
 from datetime import datetime, timezone
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from dc_core.tenancy import TenantContext
@@ -14,7 +15,7 @@ from app.domain.memory_store import get_memory_store
 from app.domain.tenant_service import get_tenant_service
 
 TEMPLATE_EXTENSIONS = {".pptx", ".ppt", ".pdf", ".png", ".jpg", ".jpeg"}
-ARTIFACT_TYPES = frozenset({"deck", "one_pager", "image"})
+ARTIFACT_TYPES = frozenset({"deck", "one_pager", "image", "case_study"})
 _logger = logging.getLogger(__name__)
 
 
@@ -26,18 +27,28 @@ def _tenant_keys(ctx: TenantContext) -> Tuple[str, str]:
     return get_tenant_service().resolve(ctx)
 
 
+def _template_slide_path(tenant_uuid: str, template_id: str, slide_index: int) -> str:
+    return f"{tenant_uuid}/{template_id}/slides/{slide_index}.png"
+
+
 def _tpl_row_to_api(row: Dict[str, Any]) -> Dict[str, Any]:
+    source_file_name = row.get("source_file_name") or row.get("sourceFileName")
+    source_storage_path = row.get("source_storage_path") or row.get("sourceStoragePath")
+    page_count = int(row.get("page_count") or row.get("pageCount") or 1)
     return {
         "id": str(row["id"]),
         "name": row["name"],
-        "artifactType": row["artifact_type"],
+        "artifactType": row.get("artifact_type") or row.get("artifactType"),
         "status": row.get("status", "ready"),
-        "pageCount": row.get("page_count", 1),
+        "pageCount": page_count,
         "tags": row.get("tags") or [],
-        "thumbnailUrl": row.get("thumbnail_url"),
-        "cssVariables": row.get("css_variables") or {},
-        "createdAt": (row.get("created_at") or _now_iso())[:19],
-        "ingestError": row.get("ingest_error"),
+        "thumbnailUrl": row.get("thumbnail_url") or row.get("thumbnailUrl"),
+        "cssVariables": row.get("css_variables") or row.get("cssVariables") or {},
+        "createdAt": (row.get("created_at") or row.get("createdAt") or _now_iso())[:19],
+        "ingestError": row.get("ingest_error") or row.get("ingestError"),
+        "sourceFileName": source_file_name,
+        "hasSourceFile": bool(source_storage_path),
+        "previewSlideCount": page_count if source_storage_path else 0,
     }
 
 
@@ -64,6 +75,46 @@ class ContentStudioRepository:
     def __init__(self) -> None:
         self._tenants = get_tenant_service()
 
+    def _enrich_template_api(self, api: Dict[str, Any], row: Dict[str, Any]) -> Dict[str, Any]:
+        settings = get_settings()
+        thumb_path = row.get("thumbnail_storage_path") or row.get("thumbnailStoragePath")
+        if thumb_path and settings.supabase_configured:
+            signed = self._signed_url(settings.content_templates_bucket, str(thumb_path))
+            if signed:
+                api["thumbnailUrl"] = signed
+        source_path = self.resolve_template_source_path_from_row(row)
+        if source_path:
+            api["hasSourceFile"] = True
+            if not api.get("sourceFileName"):
+                api["sourceFileName"] = Path(source_path).name
+            api["previewSlideCount"] = int(api.get("pageCount") or 0)
+        return api
+
+    def resolve_template_source_path_from_row(self, row: Dict[str, Any]) -> Optional[str]:
+        path = row.get("source_storage_path") or row.get("sourceStoragePath")
+        return str(path) if path else None
+
+    def resolve_template_source_path(self, ctx: TenantContext, template_id: str) -> Optional[str]:
+        row = self.get_template_row(ctx, template_id)
+        if row:
+            path = self.resolve_template_source_path_from_row(row)
+            if path:
+                return path
+
+        tenant_uuid, _ = _tenant_keys(ctx)
+        prefix = f"{tenant_uuid}/{template_id}/"
+        candidates = []
+        for path in get_memory_store().content_template_files.keys():
+            if not str(path).startswith(prefix):
+                continue
+            if "/slides/" in str(path) or str(path).endswith("thumb.png"):
+                continue
+            candidates.append(str(path))
+        if not candidates:
+            return None
+        candidates.sort(key=lambda p: (0 if p.lower().endswith((".ppt", ".pptx")) else 1, p))
+        return candidates[0]
+
     def list_templates(
         self,
         ctx: TenantContext,
@@ -77,7 +128,7 @@ class ContentStudioRepository:
                 q = (
                     get_supabase()
                     .table("content_templates")
-                    .select("id,name,artifact_type,status,page_count,tags,thumbnail_storage_path,css_variables,created_at,ingest_error")
+                    .select("id,name,artifact_type,status,page_count,tags,thumbnail_storage_path,css_variables,created_at,ingest_error,source_file_name,source_storage_path")
                     .eq("tenant_id", tenant_uuid)
                     .order("created_at", desc=True)
                 )
@@ -86,12 +137,7 @@ class ContentStudioRepository:
                 rows = q.execute().data or []
                 out = []
                 for r in rows:
-                    api = _tpl_row_to_api(r)
-                    if r.get("thumbnail_storage_path"):
-                        api["thumbnailUrl"] = self._signed_url(
-                            settings.content_templates_bucket,
-                            r["thumbnail_storage_path"],
-                        )
+                    api = self._enrich_template_api(_tpl_row_to_api(r), r)
                     out.append(api)
                 return out
             except Exception:
@@ -119,15 +165,29 @@ class ContentStudioRepository:
                 data = (row.data or [None])[0]
                 if not data:
                     return None
-                api = _tpl_row_to_api(data)
+                api = self._enrich_template_api(_tpl_row_to_api(data), data)
                 api["html"] = data.get("html") or ""
+                source_path = self.resolve_template_source_path(ctx, template_id)
+                if source_path:
+                    api["hasSourceFile"] = True
+                    api.setdefault("sourceFileName", Path(source_path).name)
+                    api["previewSlideCount"] = int(api.get("pageCount") or 0)
                 return api
             except Exception:
                 pass
         for t in get_memory_store().content_templates.get(clerk_key, []):
             if t["id"] == template_id:
                 full = get_memory_store().content_template_html.get(f"{clerk_key}:{template_id}")
-                return {**t, "html": full or ""}
+                api = {**t, "html": full or ""}
+                source_path = self.resolve_template_source_path(ctx, template_id)
+                if source_path:
+                    api["hasSourceFile"] = True
+                    api.setdefault("sourceFileName", Path(source_path).name)
+                    api["previewSlideCount"] = int(api.get("pageCount") or 0)
+                thumb_path = f"{tenant_uuid}/{template_id}/thumb.png"
+                if not api.get("thumbnailUrl") and thumb_path in get_memory_store().content_template_files:
+                    api["thumbnailUrl"] = f"/api/content/templates/{template_id}/slides/1"
+                return api
         return None
 
     def create_template_upload(
@@ -177,6 +237,7 @@ class ContentStudioRepository:
             store = get_memory_store()
             store.content_template_files[storage_path] = file_bytes
             api = _tpl_row_to_api(row)
+            api["sourceStoragePath"] = storage_path
             store.content_templates.setdefault(clerk_key, []).append(api)
 
         return {"template": _tpl_row_to_api(row), "storagePath": storage_path}
@@ -302,7 +363,10 @@ class ContentStudioRepository:
     ) -> Dict[str, Any]:
         tenant_uuid, clerk_key = _tenant_keys(ctx)
         settings = get_settings()
-        status = "failed" if error else "ready"
+        status = "failed" if error and page_count <= 0 else "ready"
+        ingest_error = error
+        if error and page_count > 0:
+            ingest_error = f"HTML conversion skipped: {error}"
         thumb_path: Optional[str] = None
         use_memory = not settings.supabase_configured
         if thumbnail_bytes and settings.supabase_configured:
@@ -321,7 +385,7 @@ class ContentStudioRepository:
             "html": html if not error else None,
             "css_variables": css_variables,
             "page_count": page_count,
-            "ingest_error": error,
+            "ingest_error": ingest_error,
             "thumbnail_storage_path": thumb_path,
         }
 
@@ -336,8 +400,24 @@ class ContentStudioRepository:
             store = get_memory_store()
             for t in store.content_templates.get(clerk_key, []):
                 if t["id"] == template_id:
-                    t.update(_tpl_row_to_api({**t, **patch, "artifact_type": t["artifactType"]}))
+                    merged = {
+                        "id": template_id,
+                        "name": t.get("name"),
+                        "artifact_type": t.get("artifactType"),
+                        "source_file_name": t.get("sourceFileName") or t.get("source_file_name"),
+                        "source_storage_path": t.get("sourceStoragePath") or t.get("source_storage_path"),
+                        "tags": t.get("tags") or [],
+                        "created_at": t.get("createdAt"),
+                        **patch,
+                    }
+                    updated = _tpl_row_to_api(merged)
+                    updated["sourceStoragePath"] = merged.get("source_storage_path")
+                    updated["sourceFileName"] = merged.get("source_file_name")
+                    t.update(updated)
                     t["status"] = status
+            if thumbnail_bytes:
+                thumb_path = f"{tenant_uuid}/{template_id}/thumb.png"
+                store.content_template_files[thumb_path] = thumbnail_bytes
             if html:
                 store.content_template_html[f"{clerk_key}:{template_id}"] = html
 
@@ -355,6 +435,107 @@ class ContentStudioRepository:
         if not data:
             raise FileNotFoundError(storage_path)
         return data
+
+    def get_template_row(self, ctx: TenantContext, template_id: str) -> Optional[Dict[str, Any]]:
+        tenant_uuid, clerk_key = _tenant_keys(ctx)
+        settings = get_settings()
+        if settings.supabase_configured:
+            try:
+                row = (
+                    get_supabase()
+                    .table("content_templates")
+                    .select("*")
+                    .eq("tenant_id", tenant_uuid)
+                    .eq("id", template_id)
+                    .limit(1)
+                    .execute()
+                )
+                data = (row.data or [None])[0]
+                if data:
+                    return data
+            except Exception:
+                pass
+        for template in get_memory_store().content_templates.get(clerk_key, []):
+            if template.get("id") == template_id:
+                source_path = template.get("sourceStoragePath") or template.get("source_storage_path")
+                if not source_path:
+                    source_path = self.resolve_template_source_path(ctx, template_id)
+                return {
+                    "id": template_id,
+                    "name": template.get("name"),
+                    "artifact_type": template.get("artifactType"),
+                    "status": template.get("status"),
+                    "page_count": template.get("pageCount", 1),
+                    "source_file_name": template.get("sourceFileName") or template.get("source_file_name"),
+                    "source_storage_path": source_path,
+                }
+        return None
+
+    def upload_template_blob(
+        self,
+        storage_path: str,
+        file_bytes: bytes,
+        *,
+        content_type: str = "application/octet-stream",
+    ) -> None:
+        settings = get_settings()
+        if settings.supabase_configured:
+            try:
+                get_supabase().storage.from_(settings.content_templates_bucket).upload(
+                    storage_path,
+                    file_bytes,
+                    {"content-type": content_type, "upsert": "true"},
+                )
+                return
+            except Exception:
+                pass
+        get_memory_store().content_template_files[storage_path] = file_bytes
+
+    def save_template_preview_slides(
+        self,
+        ctx: TenantContext,
+        template_id: str,
+        slide_pngs: List[bytes],
+    ) -> int:
+        tenant_uuid, _ = _tenant_keys(ctx)
+        for index, png in enumerate(slide_pngs, start=1):
+            path = _template_slide_path(tenant_uuid, template_id, index)
+            self.upload_template_blob(path, png, content_type="image/png")
+        return len(slide_pngs)
+
+    def download_template_slide(
+        self,
+        ctx: TenantContext,
+        template_id: str,
+        slide_index: int,
+    ) -> bytes:
+        tenant_uuid, _ = _tenant_keys(ctx)
+        path = _template_slide_path(tenant_uuid, template_id, slide_index)
+        return self.download_template_source(ctx, path)
+
+    def get_template_source_file(
+        self,
+        ctx: TenantContext,
+        template_id: str,
+    ) -> Tuple[bytes, str, str]:
+        storage_path = self.resolve_template_source_path(ctx, template_id)
+        if not storage_path:
+            raise FileNotFoundError(template_id)
+        file_name = Path(storage_path).name
+        row = self.get_template_row(ctx, template_id)
+        if row and row.get("source_file_name"):
+            file_name = str(row["source_file_name"])
+        ext = Path(file_name).suffix.lower()
+        data = self.download_template_source(ctx, storage_path)
+        return data, file_name, _mime_for_ext(ext)
+
+    def get_template_preview_pdf(self, ctx: TenantContext, template_id: str) -> Optional[bytes]:
+        tenant_uuid, _ = _tenant_keys(ctx)
+        path = f"{tenant_uuid}/{template_id}/preview.pdf"
+        try:
+            return self.download_template_source(ctx, path)
+        except FileNotFoundError:
+            return None
 
     def list_projects(self, ctx: TenantContext) -> List[Dict[str, Any]]:
         tenant_uuid, clerk_key = _tenant_keys(ctx)
@@ -410,11 +591,18 @@ class ContentStudioRepository:
         template_id: Optional[str] = None,
         brief: Optional[Dict[str, Any]] = None,
         recommended_template_ids: Optional[List[str]] = None,
+        call_id: Optional[str] = None,
+        source_gap_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         if artifact_type not in ARTIFACT_TYPES:
             raise ValueError(f"Invalid artifact_type: {artifact_type}")
         tenant_uuid, clerk_key = _tenant_keys(ctx)
         project_id = str(uuid.uuid4())
+        project_brief = dict(brief or {})
+        if call_id:
+            project_brief.setdefault("call_id", call_id)
+        if source_gap_id:
+            project_brief.setdefault("gap_id", source_gap_id)
         row = {
             "id": project_id,
             "tenant_id": tenant_uuid,
@@ -422,7 +610,7 @@ class ContentStudioRepository:
             "artifact_type": artifact_type,
             "template_id": template_id,
             "status": "drafting",
-            "brief": brief or {},
+            "brief": project_brief,
             "recommended_template_ids": recommended_template_ids or [],
             "created_by": ctx.user_id,
             "created_at": _now_iso(),

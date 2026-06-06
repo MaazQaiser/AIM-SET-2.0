@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { bffFetch } from "@/lib/api/bff-fetch";
 import { buildArtifactStudioHref } from "@/lib/content-studio/artifact-studio-href";
+import { groupPreDcGaps } from "@/lib/content/group-pre-dc-gaps";
+import { groupPostDcGaps } from "@/lib/content/group-post-dc-gaps";
 import type {
   Call,
   CoachingInsight,
@@ -55,6 +57,7 @@ export interface PreDcContentGenerationGap extends ContentToGenerate {
   accountName: string;
   leadName?: string;
   leadTitle?: string;
+  industry?: string;
   scheduledAt?: string;
   studioHref: string;
 }
@@ -65,6 +68,7 @@ export interface PostDcContentGenerationGap {
   accountName: string;
   leadName?: string;
   leadTitle?: string;
+  industry?: string;
   scheduledAt?: string;
   name: string;
   type: PlannedArtifactType;
@@ -377,6 +381,7 @@ export function useRunPostCallPipeline(callId: string) {
       void queryClient.invalidateQueries({ queryKey: ["post-call-tasks"] });
       void queryClient.invalidateQueries({ queryKey: ["call", callId] });
       void queryClient.invalidateQueries({ queryKey: ["calls"] });
+      void queryClient.invalidateQueries({ queryKey: ["landing-page", callId] });
     },
   });
 }
@@ -558,56 +563,35 @@ function contentStudioHref(item: ContentToGenerate, call: Call, accountName: str
   });
 }
 
-/** Sidebar + Content Manager: real queue counts from the same pipelines as /content */
+/** Sidebar + Knowledge Base: count unique content assets to generate (grouped by document, not by lead). */
 export function useContentManagerSidebarStats() {
-  const { data: preDcGaps = [], isLoading, isFetching } = usePreDcContentGenerationGaps();
+  const { data: preDcGaps = [], isLoading: preLoading, isFetching: preFetching } =
+    usePreDcContentGenerationGaps();
+  const { data: postDcGaps = [], isLoading: postLoading, isFetching: postFetching } =
+    usePostDcContentGenerationGaps();
   const { data: draftGaps = [] } = useContentGaps();
-  const postRunMetaByCallId = useDcImportsStore((s) => s.postRunMetaByCallId);
-  const emailDraftsByCallId = useDcImportsStore((s) => s.emailDraftsByCallId);
-  const importVersion = useDcImportsStore((s) => s.importVersion ?? 0);
 
   return useMemo(() => {
-    const missingKeys = new Set<string>();
-    let postDcMissing = 0;
-
-    for (const [callId, meta] of Object.entries(postRunMetaByCallId)) {
-      for (const item of meta?.emailAttachments?.missing ?? []) {
-        const key = `${callId}:${item.name}`;
-        if (!missingKeys.has(key)) {
-          missingKeys.add(key);
-          postDcMissing += 1;
-        }
-      }
-    }
-    for (const [callId, draft] of Object.entries(emailDraftsByCallId)) {
-      for (const item of draft.attachments?.missing ?? []) {
-        const key = `${callId}:${item.name}`;
-        if (!missingKeys.has(key)) {
-          missingKeys.add(key);
-          postDcMissing += 1;
-        }
-      }
-    }
-
-    const preDcCount = preDcGaps.length;
+    const preDcAssetCount = groupPreDcGaps(preDcGaps).length;
+    const postDcAssetCount = groupPostDcGaps(postDcGaps).length;
+    const toGenerateCount = preDcAssetCount + postDcAssetCount;
     const draftReviewCount = draftGaps.filter((g) => g.status !== "approved").length;
-    const toGenerateCount = preDcCount + postDcMissing;
 
     return {
       toGenerateCount,
-      preDcCount,
-      postDcMissingCount: postDcMissing,
+      preDcAssetCount,
+      postDcAssetCount,
       draftReviewCount,
-      isLoading: isLoading || isFetching,
+      isLoading: preLoading || preFetching || postLoading || postFetching,
     };
   }, [
     preDcGaps,
+    postDcGaps,
     draftGaps,
-    postRunMetaByCallId,
-    emailDraftsByCallId,
-    importVersion,
-    isLoading,
-    isFetching,
+    preLoading,
+    preFetching,
+    postLoading,
+    postFetching,
   ]);
 }
 
@@ -629,6 +613,7 @@ export function usePreDcContentGenerationGaps() {
             accountName,
             leadName: call.leadName,
             leadTitle: call.leadTitle,
+            industry: call.industry?.trim() || undefined,
             scheduledAt: call.scheduledAt,
             studioHref: contentStudioHref(item, call, accountName),
           }));
@@ -667,6 +652,7 @@ function collectPostDcMissingGaps(
       accountName: call?.accountName ?? callId,
       leadName: call?.leadName,
       leadTitle: call?.leadTitle,
+      industry: call?.industry?.trim() || undefined,
       scheduledAt: call?.scheduledAt,
       name: item.name,
       type: mapPostDcGapType(item.name),
@@ -674,7 +660,7 @@ function collectPostDcMissingGaps(
       status: "missing",
       reason: formatPostDcMissingReason(item.requiredData),
       neededFor: "Post-call follow-up and email attachments",
-      studioHref: item.contentStudioLink || "/content/studio",
+      studioHref: item.contentStudioLink || "/content?tab=suggestions",
     });
   };
 

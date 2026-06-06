@@ -20,7 +20,7 @@ export const mainNavItems: SidebarNavItem[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/calls", label: "Calls", icon: Phone },
   { href: "/agents", label: "Agents", icon: Bot },
-  { href: "/content/studio", label: "Deal room", icon: FileText },
+  { href: "/content", label: "Knowledge Base", icon: FileText },
   { href: "/coaching", label: "Coaching", icon: GraduationCap },
   { href: "/governance", label: "Governance", icon: Shield },
   { href: "/analytics/landing-pages", label: "Lead hubs", icon: FileText },
@@ -43,20 +43,18 @@ export interface SidebarWidgetCard {
 }
 
 export const sidebarWidgetCards: SidebarWidgetCard[] = [
-  { href: "/knowledge", title: "Knowledge Base", subtitle: "" },
-  { href: "/knowledge/projects", title: "Project Repo", subtitle: "Projects" },
-  { href: "/content", title: "Content Manager", subtitle: "" },
+  { href: "/content", title: "Knowledge Base", subtitle: "" },
 ];
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "Sales Plan Overview",
   "/calls": "Calls",
   "/agents": "Agents",
-  "/content": "Deal room",
+  "/content": "Knowledge Base",
   "/coaching": "Coaching",
   "/governance": "Governance",
   "/settings": "Settings",
-  "/knowledge/projects": "Project Repo",
+  "/knowledge/projects": "Knowledge Base",
   "/knowledge": "Knowledge Base",
   "/analytics/landing-pages": "Lead hub analytics",
 };

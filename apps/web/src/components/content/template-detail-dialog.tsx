@@ -14,6 +14,8 @@ import {
 } from "@dc-copilot/ui/components/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import { useContentTemplate } from "@/lib/data/content-studio-hooks";
+import { resolveTemplatePreviewMode } from "@/lib/content-studio/template-preview";
+import { TemplateSourcePreview } from "@/components/content/template-source-preview";
 import type { ContentTemplate } from "@/types/content_studio";
 
 interface TemplateDetailDialogProps {
@@ -41,6 +43,8 @@ export function TemplateDetailDialog({
   );
   const cssVariables = Object.entries(template?.cssVariables ?? {});
   const isSelected = Boolean(template?.id && template.id === selectedTemplateId);
+  const sourcePreviewMode = template ? resolveTemplatePreviewMode(template).mode : "html";
+  const showSourcePreview = sourcePreviewMode !== "html";
 
   function handleUseTemplate() {
     if (!template?.id || !onUseTemplate) return;
@@ -57,8 +61,9 @@ export function TemplateDetailDialog({
             {template?.name ?? "Template details"}
           </DialogTitle>
           <DialogDescription>
-            Explore the generated preview, structure, source, and styling before using this
-            template.
+            {showSourcePreview
+              ? "Preview the uploaded source file. HTML/CSS conversion is optional for Content Studio."
+              : "Explore the generated preview, structure, source, and styling before using this template."}
           </DialogDescription>
         </DialogHeader>
 
@@ -67,17 +72,27 @@ export function TemplateDetailDialog({
             <p className="py-8 text-sm text-muted-foreground">Loading template details…</p>
           ) : template ? (
             <div className="space-y-4">
-              <TemplateMetadata template={template} cssVariableCount={cssVariables.length} />
+              <TemplateMetadata
+                template={template}
+                cssVariableCount={cssVariables.length}
+                showSourceFile={showSourcePreview}
+              />
 
               <Tabs defaultValue="preview">
                 <TabsList>
                   <TabsTrigger value="preview">Preview</TabsTrigger>
                   <TabsTrigger value="details">Details</TabsTrigger>
-                  <TabsTrigger value="html">HTML</TabsTrigger>
-                  <TabsTrigger value="css">CSS</TabsTrigger>
+                  {!showSourcePreview ? (
+                    <>
+                      <TabsTrigger value="html">HTML</TabsTrigger>
+                      <TabsTrigger value="css">CSS</TabsTrigger>
+                    </>
+                  ) : null}
                 </TabsList>
                 <TabsContent value="preview" className="mt-3">
-                  {compiledPreviewHtml ? (
+                  {showSourcePreview ? (
+                    <TemplateSourcePreview template={template} />
+                  ) : compiledPreviewHtml ? (
                     <div className="h-[62vh] overflow-hidden rounded-md border bg-white">
                       <iframe
                         title="Template preview"
@@ -96,23 +111,32 @@ export function TemplateDetailDialog({
                     </div>
                   ) : (
                     <p className="rounded-md border p-4 text-sm text-muted-foreground">
-                      No HTML or thumbnail found for this template.
+                      No preview available for this template.
                     </p>
                   )}
                 </TabsContent>
                 <TabsContent value="details" className="mt-3">
                   <TemplateVariableList variables={cssVariables} />
+                  {template.sourceFileName ? (
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Source file: <span className="font-medium text-foreground">{template.sourceFileName}</span>
+                    </p>
+                  ) : null}
                 </TabsContent>
-                <TabsContent value="html" className="mt-3">
-                  <pre className="max-h-[60vh] overflow-auto rounded-md border bg-muted/20 p-3 text-xs whitespace-pre-wrap break-all">
-                    {templateHtml || "No HTML found for this template."}
-                  </pre>
-                </TabsContent>
-                <TabsContent value="css" className="mt-3">
-                  <pre className="max-h-[60vh] overflow-auto rounded-md border bg-muted/20 p-3 text-xs whitespace-pre-wrap break-all">
-                    {templateCss || "No <style> CSS block found in this template HTML."}
-                  </pre>
-                </TabsContent>
+                {!showSourcePreview ? (
+                  <>
+                    <TabsContent value="html" className="mt-3">
+                      <pre className="max-h-[60vh] overflow-auto rounded-md border bg-muted/20 p-3 text-xs whitespace-pre-wrap break-all">
+                        {templateHtml || "No HTML found for this template."}
+                      </pre>
+                    </TabsContent>
+                    <TabsContent value="css" className="mt-3">
+                      <pre className="max-h-[60vh] overflow-auto rounded-md border bg-muted/20 p-3 text-xs whitespace-pre-wrap break-all">
+                        {templateCss || "No <style> CSS block found in this template HTML."}
+                      </pre>
+                    </TabsContent>
+                  </>
+                ) : null}
               </Tabs>
             </div>
           ) : (
@@ -145,9 +169,11 @@ export function TemplateDetailDialog({
 function TemplateMetadata({
   template,
   cssVariableCount,
+  showSourceFile = false,
 }: {
   template: ContentTemplate;
   cssVariableCount: number;
+  showSourceFile?: boolean;
 }) {
   return (
     <div className="grid gap-3 rounded-md border bg-muted/20 p-3 md:grid-cols-[minmax(0,1fr)_auto]">
@@ -158,7 +184,12 @@ function TemplateMetadata({
             {template.status}
           </Badge>
           <Badge variant="secondary">{template.pageCount} pages</Badge>
-          <Badge variant="secondary">{cssVariableCount} variables</Badge>
+          {!showSourceFile && (
+            <Badge variant="secondary">{cssVariableCount} variables</Badge>
+          )}
+          {template.sourceFileName ? (
+            <Badge variant="outline">{template.sourceFileName}</Badge>
+          ) : null}
         </div>
         {template.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">

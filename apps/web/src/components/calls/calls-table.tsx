@@ -34,21 +34,26 @@ const columns: ColumnDef<Call>[] = [
     cell: ({ row }) => {
       const call = row.original;
       return (
-        <div>
+        <div className="min-w-0">
           <Link
             href={callDetailsHref(call)}
-            className="font-medium text-foreground hover:text-primary hover:underline"
+            className="block font-medium text-foreground hover:text-primary hover:underline truncate"
           >
             {call.accountName}
           </Link>
           {call.leadName && (
-            <p className="text-xs text-muted-foreground mt-0.5 truncate inline-flex items-center gap-1.5">
-              <ParticipantAvatar name={call.leadName} kind="external" size="xs" />
-              <span>
+            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+              <ParticipantAvatar
+                name={call.leadName}
+                kind="external"
+                size="xs"
+                className="shrink-0"
+              />
+              <span className="min-w-0 truncate">
                 {call.leadName}
                 {call.leadTitle ? ` · ${call.leadTitle}` : ""}
               </span>
-            </p>
+            </div>
           )}
         </div>
       );

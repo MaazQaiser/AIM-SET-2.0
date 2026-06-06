@@ -1,8 +1,8 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { BookOpenCheck, ChevronLeft, Download, Eye, Plus, RotateCcw, Sparkles } from "lucide-react";
+import { BookOpenCheck, ChevronLeft, Download, Eye, Plus, RotateCcw, Send, Sparkles } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import {
@@ -18,14 +18,17 @@ import { Label } from "@dc-copilot/ui/components/label";
 import { StudioChat } from "@/components/content/studio-chat";
 import { StudioPreview } from "@/components/content/studio-preview";
 import { TemplatePicker } from "@/components/content/template-picker";
+import { SuggestionContextBar } from "@/components/content/suggestion-context-bar";
 import {
   useContentTemplates,
   useRestoreStudioRevision,
   useSaveRevisionToKb,
-  useStudioRevision,
+  useStudioBootstrap,
   useStudioExport,
   useStudioMessage,
   useStudioProject,
+  useStudioRevision,
+  useSubmitStudioProject,
 } from "@/lib/data/content-studio-hooks";
 import type { StudioKbSaveFormat, StudioTurnResult } from "@/types/content_studio";
 
@@ -36,20 +39,26 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
   const templates = useContentTemplates(project?.artifactType);
   const exportMut = useStudioExport(projectId);
   const generateMut = useStudioMessage(projectId);
+  const bootstrapMut = useStudioBootstrap(projectId);
   const restoreMut = useRestoreStudioRevision(projectId);
   const saveToKbMut = useSaveRevisionToKb(projectId);
+  const submitMut = useSubmitStudioProject();
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>();
   const [previewHtml, setPreviewHtml] = useState<string | undefined>();
   const [previewRevisionId, setPreviewRevisionId] = useState<string | undefined>();
   const [actionMessage, setActionMessage] = useState<string>("");
+  const [hideSuggestion, setHideSuggestion] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveTitle, setSaveTitle] = useState("");
   const [saveTags, setSaveTags] = useState("generated, content-studio");
   const [saveFormat, setSaveFormat] = useState<StudioKbSaveFormat>("pdf");
+  const bootstrapAttemptedRef = useRef(false);
   const previewRevision = useStudioRevision(projectId, previewRevisionId);
 
   const latestHtml = previewHtml ?? data?.latestRevision?.html;
   const revisionId = previewRevisionId ?? data?.latestRevision?.id;
+  const brief = (project?.brief ?? {}) as Record<string, unknown>;
+  const hasSuggestionContext = Boolean(brief.generation_reason || brief.needed_for || brief.asset_name);
   const artifactLabel =
     project?.artifactType === "one_pager"
       ? "one-pager"
@@ -64,12 +73,33 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
       setPreviewHtml(result.html);
       setActionMessage("Draft is ready. Save it to KB when you want it reused across the platform.");
     }
-    if (result.recommended_templates?.length) {
+    if (result.template_id) {
+      setSelectedTemplateId(result.template_id);
+    } else if (result.recommended_templates?.length) {
       const first = result.recommended_templates[0]?.template_id;
       if (first) setSelectedTemplateId(first);
     }
     void refetch();
   }
+
+  useEffect(() => {
+    if (!project || bootstrapAttemptedRef.current) return;
+    if ((data?.messages?.length ?? 0) > 0) return;
+    if (!hasSuggestionContext) return;
+
+    bootstrapAttemptedRef.current = true;
+    void bootstrapMut.mutateAsync().then((envelope) => {
+      if (envelope.operation === "studio_bootstrap_skipped") return;
+      onTurn(envelope.result);
+    });
+  }, [bootstrapMut, data?.messages?.length, hasSuggestionContext, project]);
+
+  useEffect(() => {
+    const html = previewRevision.data?.html;
+    if (!html) return;
+    setPreviewHtml(html);
+    setActionMessage("Previewing an older version. Restore it to make it current.");
+  }, [previewRevision.data?.html]);
 
   async function handleExport(fmt: "pdf" | "png" | "pptx") {
     if (!revisionId) {
@@ -133,17 +163,23 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
     onTurn(envelope.result);
   }
 
-  useEffect(() => {
-    const html = previewRevision.data?.html;
-    if (!html) return;
-    setPreviewHtml(html);
-    setActionMessage("Previewing an older version. Restore it to make it current.");
-  }, [previewRevision.data?.html]);
+  async function handleSubmitReview() {
+    if (!revisionId) {
+      window.alert("Generate a preview before submitting for review.");
+      return;
+    }
+    try {
+      await submitMut.mutateAsync(projectId);
+      await refetch();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Failed to submit for review");
+    }
+  }
 
   if (!project) {
     return (
       <div className="p-6">
-        <p className="text-sm text-muted-foreground">Loading studio project…</p>
+        <p className="text-sm text-muted-foreground">Loading content…</p>
       </div>
     );
   }
@@ -151,12 +187,16 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
   return (
     <div className="p-6 space-y-4 h-[calc(100vh-4rem)] flex flex-col">
       <Link
-        href="/content/studio"
+        href="/content?tab=studio"
         className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground shrink-0"
       >
         <ChevronLeft className="h-4 w-4" />
-        Studio
+        Knowledge Base
       </Link>
+
+      {!hideSuggestion && Boolean(brief.generation_reason || brief.asset_name) ? (
+        <SuggestionContextBar brief={brief} onDismiss={() => setHideSuggestion(true)} />
+      ) : null}
 
       <div className="flex items-center justify-between shrink-0">
         <div>
@@ -173,6 +213,15 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
           >
             <Sparkles className="h-3 w-3 mr-1" />
             {generateMut.isPending ? "Generating..." : `Generate ${artifactLabel}`}
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!revisionId || submitMut.isPending}
+            onClick={() => void handleSubmitReview()}
+          >
+            <Send className="h-3 w-3 mr-1" />
+            {submitMut.isPending ? "Submitting…" : "Submit for review"}
           </Button>
           <Button
             size="sm"
@@ -224,6 +273,8 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
             messages={data?.messages ?? []}
             onTurn={onTurn}
             selectedTemplateId={selectedTemplateId ?? project.templateId ?? undefined}
+            hasSuggestionContext={hasSuggestionContext}
+            isBootstrapping={bootstrapMut.isPending}
           />
         </div>
         <div className="lg:col-span-5 min-h-0">
@@ -235,9 +286,9 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-sm">Templates</CardTitle>
                 <Button size="sm" variant="ghost" asChild>
-                  <Link href="/content/templates/new">
+                  <Link href="/content?tab=templates">
                     <Plus className="mr-1 h-3.5 w-3.5" />
-                    New
+                    Manage
                   </Link>
                 </Button>
               </div>

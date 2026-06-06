@@ -31,8 +31,7 @@ export function TemplatePicker({
   if (sorted.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No templates yet. Create an HTML/CSS template or upload a PPT, PDF, or image under
-        Templates.
+        No templates yet. Upload or create templates under Knowledge Base → Templates.
       </p>
     );
   }

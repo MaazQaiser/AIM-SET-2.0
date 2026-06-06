@@ -11,25 +11,22 @@ import { useSidebar } from "./sidebar-context";
 import { SidebarKbDocumentsStack } from "./sidebar-kb-stack";
 import styles from "./sidebar.module.css";
 
-function formatAssetCount(count: number) {
-  return `${count.toLocaleString()} ${count === 1 ? "Asset" : "Assets"}`;
-}
-
-function formatToGenerateCount(count: number, loading: boolean) {
-  if (loading && count === 0) return "Loading…";
-  return `${count.toLocaleString()} to generate`;
+function formatContentSubtitle(assetCount: number, toGenerateCount: number, loading: boolean) {
+  if (loading && assetCount === 0 && toGenerateCount === 0) return "Loading…";
+  const parts: string[] = [];
+  parts.push(`${assetCount.toLocaleString()} asset${assetCount === 1 ? "" : "s"}`);
+  if (toGenerateCount > 0) {
+    parts.push(`${toGenerateCount.toLocaleString()} to generate`);
+  }
+  return parts.join(" · ");
 }
 
 export function SidebarSubpanel() {
   const { setExpanded } = useSidebar();
   const { data: assets = [] } = useKbAssets();
-  const {
-    toGenerateCount,
-    isLoading: contentStatsLoading,
-  } = useContentManagerSidebarStats();
+  const { toGenerateCount, isLoading: contentStatsLoading } = useContentManagerSidebarStats();
 
-  const assetCountLabel = formatAssetCount(assets.length);
-  const generateCountLabel = formatToGenerateCount(toGenerateCount, contentStatsLoading);
+  const contentSubtitle = formatContentSubtitle(assets.length, toGenerateCount, contentStatsLoading);
 
   return (
     <div className={styles.widgetsColumn} aria-label="Sidebar widgets">
@@ -48,34 +45,17 @@ export function SidebarSubpanel() {
         <SidebarKbDocumentsStack className={styles.kbStackSvg} />
       </div>
 
-      <Link
-        href="/knowledge"
-        className={cn(appSidebarWidgetClass, styles.widgetCard, styles.kbWidgetCard)}
-        onClick={() => setExpanded(false)}
-      >
-        <span className={styles.widgetCardText}>
-          <span className={styles.widgetCardTitle}>Knowledge Base</span>
-          <span className={styles.widgetCardSubtitle}>{assetCountLabel}</span>
-        </span>
-        <ChevronRight className={styles.widgetCardIcon} strokeWidth={1.5} aria-hidden />
-      </Link>
-
-      {sidebarWidgetCards.slice(1).map((card) => (
+      {sidebarWidgetCards.map((card) => (
         <Link
           key={card.href + card.title}
           href={card.href}
-          className={cn(appSidebarWidgetClass, styles.widgetCard)}
+          className={cn(appSidebarWidgetClass, styles.widgetCard, styles.kbWidgetCard)}
           onClick={() => setExpanded(false)}
         >
           <span className={styles.widgetCardText}>
             <span className={styles.widgetCardTitle}>{card.title}</span>
-            <span
-              className={cn(
-                styles.widgetCardSubtitle,
-                card.title === "Content Manager" && styles.widgetCardSubtitleLg
-              )}
-            >
-              {card.title === "Content Manager" ? generateCountLabel : card.subtitle}
+            <span className={cn(styles.widgetCardSubtitle, styles.widgetCardSubtitleLg)}>
+              {contentSubtitle}
             </span>
           </span>
           <ChevronRight className={styles.widgetCardIcon} strokeWidth={1.5} aria-hidden />

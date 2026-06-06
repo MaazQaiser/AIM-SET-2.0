@@ -1,4 +1,5 @@
 import type { PreDcContentGenerationGap } from "@/lib/data/hooks";
+import { resolveContextualGroupTitle } from "@/lib/content/suggestion-context";
 
 export interface ContentGenerationLead {
   id: string;
@@ -16,14 +17,10 @@ export interface PreDcGenerationGroup {
   reason: string;
   neededFor: string;
   studioHref: string;
+  industryLabel?: string;
+  kbMatches?: import("@/lib/content/suggestion-context").SuggestionKbMatch[];
   leads: ContentGenerationLead[];
 }
-
-const ARTIFACT_DISPLAY_NAMES: Record<string, string> = {
-  "art-deck": "Services overview deck",
-  "art-case": "Industry case study",
-  "art-onepager": "Service one-pager",
-};
 
 function stripAccountFromName(name: string, accountName: string) {
   let normalized = name.trim().replace(/\s+/g, " ");
@@ -49,22 +46,6 @@ export function normalizeDocumentKey(item: PreDcContentGenerationGap) {
   return `${item.type}:${normalizedName}`;
 }
 
-export function resolveGroupDisplayName(leads: PreDcContentGenerationGap[]) {
-  const artifactId = leads[0]?.sourceArtifactId?.trim();
-  if (artifactId && ARTIFACT_DISPLAY_NAMES[artifactId]) {
-    return ARTIFACT_DISPLAY_NAMES[artifactId];
-  }
-
-  const counts = new Map<string, number>();
-  for (const lead of leads) {
-    const label = stripAccountFromName(lead.name, lead.accountName) || lead.name.trim();
-    counts.set(label, (counts.get(label) ?? 0) + 1);
-  }
-
-  const [mostCommonName] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] ?? [];
-  return mostCommonName ?? leads[0]?.name ?? "Content asset";
-}
-
 function buildGroupStudioHref(group: Omit<PreDcGenerationGroup, "studioHref">) {
   const params = new URLSearchParams({
     template: group.type,
@@ -72,7 +53,7 @@ function buildGroupStudioHref(group: Omit<PreDcGenerationGroup, "studioHref">) {
     asset: group.name,
     leadCount: String(group.leads.length),
   });
-  return `/content/studio?${params.toString()}`;
+  return `/content?tab=suggestions&${params.toString()}`;
 }
 
 export function groupPreDcGaps(items: PreDcContentGenerationGap[]): PreDcGenerationGroup[] {
@@ -109,9 +90,11 @@ export function groupPreDcGaps(items: PreDcContentGenerationGap[]): PreDcGenerat
         if (accountCompare !== 0) return accountCompare;
         return (a.leadName ?? "").localeCompare(b.leadName ?? "");
       });
+      const resolvedTitle = resolveContextualGroupTitle(leads as PreDcContentGenerationGap[]);
       const resolved = {
         ...group,
-        name: resolveGroupDisplayName(leads as PreDcContentGenerationGap[]),
+        name: resolvedTitle.name,
+        industryLabel: resolvedTitle.industryLabel,
         leads,
       };
       return {

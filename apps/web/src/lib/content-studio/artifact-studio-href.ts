@@ -15,5 +15,5 @@ export function buildArtifactStudioHref(options: {
   });
   if (options.leadName) params.set("lead", options.leadName);
   if (options.assetName) params.set("asset", options.assetName);
-  return `/content/studio?${params.toString()}`;
+  return `/content?tab=suggestions&${params.toString()}`;
 }

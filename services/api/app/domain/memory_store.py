@@ -22,6 +22,7 @@ class MemoryStore:
         self.content_template_html: Dict[str, str] = {}
         self.content_template_files: Dict[str, bytes] = {}
         self.content_projects: Dict[str, List[Dict[str, Any]]] = {}
+        self.content_gaps: Dict[str, List[Dict[str, Any]]] = {}
         self.content_messages: Dict[str, List[Dict[str, Any]]] = {}
         self.content_revisions: Dict[str, List[Dict[str, Any]]] = {}
         self.content_exports: Dict[str, bytes] = {}

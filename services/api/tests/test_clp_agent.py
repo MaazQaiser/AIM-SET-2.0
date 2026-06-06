@@ -19,3 +19,28 @@ def test_run_clp_generate_produces_sections():
     assert len(out["sections"]) >= 3
     hero = next(s for s in out["sections"] if s["type"] == "hero")
     assert not has_client_unsafe_text(hero.get("headline") or "")
+
+
+def test_run_clp_generate_reuses_kb_suggestions_without_search(monkeypatch):
+    ctx = TenantContext(user_id="u1", tenant_id="t1")
+
+    def fail_search(*_args, **_kwargs):
+        raise AssertionError("build_relevant_content should not run when kb suggestions exist")
+
+    monkeypatch.setattr("app.agents.clp_agent.build_relevant_content", fail_search)
+    out = run_clp_generate(
+        ctx,
+        "call-1",
+        call={"accountName": "Acme Corp", "leadName": "Jane"},
+        review={"headline": "Follow-up ready", "summary": ["Discussed platform roadmap"]},
+        kb_suggestions=[
+            {
+                "assetId": "asset-1",
+                "title": "Case study",
+                "reason": "Matches cloud context",
+                "score": 0.9,
+            }
+        ],
+    )
+    assert out["selectedAssets"][0]["assetId"] == "asset-1"
+    assert out["aiSuggestions"][0]["title"] == "Case study"

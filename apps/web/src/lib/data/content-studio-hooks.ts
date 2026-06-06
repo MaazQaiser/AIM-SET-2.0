@@ -91,7 +91,7 @@ export function useContentTemplate(templateId?: string) {
 export function useCreateStudioProject() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (body: CreateStudioProjectInput) => {
+    mutationFn: async (body: CreateStudioProjectInput & { callId?: string; gapId?: string }) => {
       const res = await fetch("/api/content/studio/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -129,6 +129,28 @@ export function useDeleteStudioProject() {
       return res.json() as Promise<{ status: string; projectId: string }>;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["studio-projects"] }),
+  });
+}
+
+export function useStudioBootstrap(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/content/studio/projects/${projectId}/bootstrap`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json() as Promise<{
+        agent: string;
+        operation: string;
+        result: StudioTurnResult;
+        citations?: unknown[];
+      }>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["studio-project", projectId] });
+      qc.invalidateQueries({ queryKey: ["studio-projects"] });
+    },
   });
 }
 
@@ -292,5 +314,40 @@ export function useDeleteTemplate() {
       return res.json() as Promise<{ status: string; templateId: string }>;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["content-templates"] }),
+  });
+}
+
+export function useSubmitStudioProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (projectId: string) => {
+      const res = await fetch(`/api/content/studio/projects/${projectId}/submit-review`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json() as Promise<StudioProject>;
+    },
+    onSuccess: (_data, projectId) => {
+      qc.invalidateQueries({ queryKey: ["studio-projects"] });
+      qc.invalidateQueries({ queryKey: ["studio-project", projectId] });
+    },
+  });
+}
+
+export function useApproveStudioProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (projectId: string) => {
+      const res = await fetch(`/api/content/studio/projects/${projectId}/approve`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json() as Promise<{ projectId: string; asset: { id: string; title: string } }>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["studio-projects"] });
+      qc.invalidateQueries({ queryKey: ["kb-assets"] });
+      qc.invalidateQueries({ queryKey: ["content-gaps"] });
+    },
   });
 }

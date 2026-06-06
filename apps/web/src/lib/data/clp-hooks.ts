@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { bffFetch } from "@/lib/api/bff-fetch";
 import type {
@@ -28,6 +29,27 @@ export function useGenerateLandingPage(callId: string) {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["landing-page", callId] }),
   });
+}
+
+/** Prefetch landing page generation as soon as Post-DC is ready (not only on tab open). */
+export function useEnsureLandingPage(callId: string, enabled = true) {
+  const { data: page, isLoading, isFetching, refetch } = useLandingPage(callId);
+  const generate = useGenerateLandingPage(callId);
+  const attempted = useRef(false);
+
+  useEffect(() => {
+    if (!enabled || !callId || isLoading || page || generate.isPending || attempted.current) return;
+    attempted.current = true;
+    generate.mutate(undefined);
+  }, [enabled, callId, isLoading, page, generate]);
+
+  return {
+    page,
+    isLoading: isLoading || isFetching,
+    isGenerating: generate.isPending,
+    generate,
+    refetch,
+  };
 }
 
 export function useUpdateLandingPage(callId: string) {

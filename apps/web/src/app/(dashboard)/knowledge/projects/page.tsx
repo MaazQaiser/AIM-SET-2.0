@@ -1,8 +1,5 @@
-import type { Metadata } from "next";
-import { ProjectRepoList } from "@/components/knowledge/project-repo-list";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Project repo" };
-
-export default function KnowledgeProjectsPage() {
-  return <ProjectRepoList />;
+export default function KnowledgeProjectsRedirect() {
+  redirect("/content?tab=projects");
 }

@@ -1,6 +1,7 @@
 import type { PlannedArtifactType } from "@dc-copilot/types/brief";
 import type { PostDcContentGenerationGap } from "@/lib/data/hooks";
 import type { PreDcGenerationGroup } from "@/lib/content/group-pre-dc-gaps";
+import { resolveContextualGroupTitle } from "@/lib/content/suggestion-context";
 
 function inferArtifactType(name: string): PlannedArtifactType {
   const normalized = name.toLowerCase();
@@ -22,7 +23,7 @@ function buildGroupStudioHref(group: Omit<PreDcGenerationGroup, "studioHref">) {
     asset: group.name,
     leadCount: String(group.leads.length),
   });
-  return `/content/studio?${params.toString()}`;
+  return `/content?tab=suggestions&${params.toString()}`;
 }
 
 export function groupPostDcGaps(items: PostDcContentGenerationGap[]): PreDcGenerationGroup[] {
@@ -59,9 +60,13 @@ export function groupPostDcGaps(items: PostDcContentGenerationGap[]): PreDcGener
         if (accountCompare !== 0) return accountCompare;
         return (a.leadName ?? "").localeCompare(b.leadName ?? "");
       });
+      const resolvedTitle = resolveContextualGroupTitle(
+        leads as Parameters<typeof resolveContextualGroupTitle>[0]
+      );
       const resolved = {
         ...group,
-        name: leads[0]?.name ?? "Content asset",
+        name: resolvedTitle.name || leads[0]?.name || "Content asset",
+        industryLabel: resolvedTitle.industryLabel,
         leads,
       };
       return {

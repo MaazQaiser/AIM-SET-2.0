@@ -26,11 +26,15 @@ export function StudioChat({
   messages,
   onTurn,
   selectedTemplateId,
+  hasSuggestionContext = false,
+  isBootstrapping = false,
 }: {
   projectId: string;
   messages: Message[];
   onTurn: (result: StudioTurnResult) => void;
   selectedTemplateId?: string;
+  hasSuggestionContext?: boolean;
+  isBootstrapping?: boolean;
 }) {
   const [input, setInput] = useState("");
   const [transientMessages, setTransientMessages] = useState<DisplayMessage[]>([]);
@@ -164,9 +168,18 @@ export function StudioChat({
   return (
     <div className="flex flex-col h-full border border-border rounded-lg bg-card">
       <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[320px]">
-        {displayMessages.length === 0 && (
+        {displayMessages.length === 0 && !send.isPending && !isBootstrapping && (
           <div className="rounded-md border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-            What should we create first?
+            {hasSuggestionContext
+              ? "Loading your suggested plan from discovery context…"
+              : "What should we create first?"}
+          </div>
+        )}
+        {displayMessages.length === 0 && (send.isPending || isBootstrapping) && (
+          <div className="mr-10 flex items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground animate-in fade-in-0 slide-in-from-bottom-1">
+            <Bot className="h-4 w-4" />
+            <TypingDots />
+            <span>Preparing your slide plan…</span>
           </div>
         )}
         {displayMessages.map((message) => (
@@ -342,12 +355,13 @@ function messageText(message: Message): string {
     const intro =
       stringField(content, "message") ||
       "Here is the proposed slide plan. Tell me what to change on any slide, or click Generate when it looks right.";
-    return `${intro}\n\n${outline}`;
+    const kbLines = kbMatchesText(content);
+    return [intro, kbLines, outline].filter(Boolean).join("\n\n");
   }
 
   const turnType = stringField(content, "turn_type") || message.turnType || "";
   const askItems = extractAskItems(content);
-  if (askItems.length > 0) {
+  if (askItems.length > 0 && turnType !== "outline") {
     if (askItems.length === 1 && !isQuestionPrompt(askItems[0])) {
       return askItems[0];
     }
@@ -363,7 +377,7 @@ function messageText(message: Message): string {
         return rationale ? `${index + 1}. ${rationale}` : "";
       })
       .filter(Boolean);
-    return ["I found templates that fit this project.", ...lines].join("\n");
+    return ["I found templates that fit this content.", ...lines].join("\n");
   }
 
   if (turnType === "html" || stringField(content, "revision_id")) {
@@ -389,6 +403,21 @@ function messageText(message: Message): string {
 
 function messageSignature(message: Message): string {
   return `${message.role}:${messageText(message)}`;
+}
+
+function kbMatchesText(content: Record<string, unknown>): string {
+  const matches = arrayField(content, "kb_matches").filter(isRecord);
+  if (matches.length === 0) return "";
+
+  const lines = matches
+    .map((item, index) => {
+      const title = stringField(item, "title") || "Knowledge base document";
+      const snippet = stringField(item, "snippet");
+      return snippet ? `${index + 1}. ${title} — ${snippet}` : `${index + 1}. ${title}`;
+    })
+    .filter(Boolean);
+
+  return lines.length > 0 ? ["Related KB content:", ...lines].join("\n") : "";
 }
 
 function slideOutlineText(content: Record<string, unknown>): string {

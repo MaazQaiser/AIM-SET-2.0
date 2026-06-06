@@ -176,6 +176,77 @@ def _brief_citations(project_id: str, brief: Dict[str, Any]) -> List[Citation]:
     ]
 
 
+def run_studio_bootstrap(
+    ctx: TenantContext,
+    *,
+    project_id: str,
+    repo: Optional[ContentStudioRepository] = None,
+) -> AgentEnvelope:
+    """Proactively seed chat from a content suggestion: brief, slide plan, template, KB hits."""
+    repo = repo or get_content_studio_repository()
+    project = repo.get_project(ctx, project_id)
+    if not project:
+        raise ValueError(f"Project not found: {project_id}")
+
+    title = str(project.get("title") or "Generated content")
+    artifact_type = str(project.get("artifactType") or "deck")
+    brief = _normalize_brief(project.get("brief"))
+    brief["artifact_type"] = artifact_type
+    brief = _enrich_brief_from_suggestion(brief, title, artifact_type)
+
+    kb_hits = _retrieve_studio_kb_hits(ctx, f"{title} {brief.get('needed_for', '')} {brief.get('generation_reason', '')}")
+    if kb_hits:
+        brief["kb_asset_ids"] = [str(hit.get("asset_id", "")) for hit in kb_hits[:5] if hit.get("asset_id")]
+
+    if artifact_type == "deck" and _needs_slide_outline(brief, artifact_type):
+        brief["slide_outline"] = _build_slide_outline(title=title, brief=brief)
+        brief["slide_outline"] = _attach_outline_sources(
+            brief["slide_outline"],
+            project_id=project_id,
+            kb_hits=kb_hits,
+        )
+
+    best_template, recommendations = _pick_default_templates(ctx, repo, project, brief, title)
+    patch: Dict[str, Any] = {"brief": brief}
+    if best_template:
+        patch["templateId"] = best_template["id"]
+        patch["recommendedTemplateIds"] = [r["template_id"] for r in recommendations]
+    repo.update_project(ctx, project_id, patch)
+
+    message = _bootstrap_message(
+        brief=brief,
+        artifact_type=artifact_type,
+        template_name=str((best_template or {}).get("name") or ""),
+        kb_hits=kb_hits,
+    )
+    result: Dict[str, Any] = {
+        "project_id": project_id,
+        "turn_type": "outline",
+        "message": message,
+    }
+    if brief.get("slide_outline"):
+        result["slide_outline"] = brief["slide_outline"]
+    if recommendations:
+        result["recommended_templates"] = recommendations
+    if best_template:
+        result["template_id"] = best_template["id"]
+    if kb_hits:
+        result["kb_matches"] = _kb_matches_payload(kb_hits)
+
+    envelope = AgentEnvelope(
+        agent="content_generation",
+        operation="studio_bootstrap",
+        result=result,
+        citations=_hits_to_citations(kb_hits),
+        confidence=0.9,
+        cost={"tokens": 0, "usd": 0.0, "model": "rule-based-bootstrap"},
+        trace_id=str(uuid.uuid4()),
+        creative=True,
+    )
+    validate_envelope(envelope)
+    return envelope
+
+
 def run_studio_turn(
     ctx: TenantContext,
     *,
@@ -201,7 +272,39 @@ def run_studio_turn(
         project_ceiling_usd=float(runtime["project_ceiling_usd"]),
     )
     brief = _normalize_brief(project.get("brief"))
-    brief["artifact_type"] = str(project.get("artifactType") or brief.get("artifact_type") or "deck")
+    artifact_type = str(project.get("artifactType") or brief.get("artifact_type") or "deck")
+    brief["artifact_type"] = artifact_type
+    title = str(project.get("title") or "Generated content")
+
+    if _has_suggestion_context(brief):
+        enriched = _enrich_brief_from_suggestion(brief, title, artifact_type)
+        if enriched != brief:
+            brief = enriched
+            repo.update_project(ctx, project_id, {"brief": brief})
+
+    if clean_msg and _is_kb_content_question(clean_msg):
+        kb_hits = _retrieve_studio_kb_hits(
+            ctx,
+            f"{title} {clean_msg} {brief.get('needed_for', '')} {brief.get('generation_reason', '')}",
+        )
+        envelope = AgentEnvelope(
+            agent="content_generation",
+            operation="studio_kb_lookup",
+            result={
+                "project_id": project_id,
+                "turn_type": "outline" if brief.get("slide_outline") else "ask",
+                "message": _kb_lookup_message(kb_hits, brief),
+                "slide_outline": brief.get("slide_outline") or [],
+                "kb_matches": _kb_matches_payload(kb_hits),
+            },
+            citations=_hits_to_citations(kb_hits),
+            confidence=0.85 if kb_hits else 0.6,
+            cost={"tokens": 0, "usd": 0.0, "model": "rule-based-kb-lookup"},
+            trace_id=str(uuid.uuid4()),
+            creative=True,
+        )
+        validate_envelope(envelope)
+        return envelope
 
     if not allow_generation:
         updated = _update_brief_from_reply(brief, clean_msg)
@@ -235,15 +338,34 @@ def run_studio_turn(
                 title=str(project.get("title") or "Generated Deck"),
                 brief=brief,
             )
-            repo.update_project(ctx, project_id, {"brief": brief})
+            best_template, recommendations = _pick_default_templates(
+                ctx, repo, project, brief, title
+            )
+            patch: Dict[str, Any] = {"brief": brief}
+            if best_template and not project.get("templateId"):
+                patch["templateId"] = best_template["id"]
+                patch["recommendedTemplateIds"] = [r["template_id"] for r in recommendations]
+            repo.update_project(ctx, project_id, patch)
+            message = (
+                _bootstrap_message(
+                    brief=brief,
+                    artifact_type=artifact_type,
+                    template_name=str((best_template or {}).get("name") or ""),
+                    kb_hits=[],
+                )
+                if _has_suggestion_context(brief)
+                else "Here is the proposed slide plan. Tell me what to change on any slide, or click Generate when it looks right."
+            )
             envelope = AgentEnvelope(
                 agent="content_generation",
                 operation="studio_ask",
                 result={
                     "project_id": project_id,
-                    "turn_type": "ask",
-                    "message": "Here is the proposed slide plan. Tell me what to change on any slide, or click Generate when it looks right.",
+                    "turn_type": "outline",
+                    "message": message,
                     "slide_outline": brief["slide_outline"],
+                    "recommended_templates": recommendations or None,
+                    "template_id": (best_template or {}).get("id"),
                 },
                 citations=[],
                 confidence=0.8,
@@ -799,6 +921,237 @@ def _normalize_brief(brief: Any) -> Dict[str, Any]:
     if isinstance(brief, dict):
         return dict(brief)
     return {}
+
+
+def _has_suggestion_context(brief: Dict[str, Any]) -> bool:
+    return bool(
+        str(brief.get("generation_reason") or "").strip()
+        or str(brief.get("needed_for") or "").strip()
+        or str(brief.get("asset_name") or "").strip()
+    )
+
+
+def _extract_industry_from_needed_for(needed_for: str) -> Optional[str]:
+    text = needed_for.strip()
+    if not text:
+        return None
+    patterns = (
+        r"(?:anchor the conversation|social proof aligned)\s+(?:to|for)\s+(.+?)(?:\.|$)",
+        r"(?:conversation|material|proof)\s+for\s+(.+?)(?:\.|$)",
+        r"for\s+(.+?)(?:\.|$)",
+    )
+    generic = {"their industry", "this call", "the call", "this account", "the account"}
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        candidate = (match.group(1) if match else "").strip().rstrip(".")
+        if candidate and candidate.lower() not in generic and len(candidate) >= 3:
+            return candidate
+    return None
+
+
+def _enrich_brief_from_suggestion(brief: Dict[str, Any], title: str, artifact_type: str) -> Dict[str, Any]:
+    if not _has_suggestion_context(brief):
+        return brief
+
+    b = dict(brief)
+    needed_for = str(b.get("needed_for") or "").strip()
+    reason = str(b.get("generation_reason") or "").strip()
+    asset_name = str(b.get("asset_name") or title).strip()
+    account = str(b.get("account_name") or "").strip()
+    industry = str(b.get("industry") or "").strip() or _extract_industry_from_needed_for(needed_for) or ""
+
+    if not str(b.get("audience", "")).strip():
+        if industry:
+            b["audience"] = f"{industry} stakeholders and decision makers"
+        elif account:
+            b["audience"] = f"{account} stakeholders"
+        elif needed_for:
+            b["audience"] = "Executive stakeholders aligned to the upcoming discovery conversation"
+        else:
+            b["audience"] = "Executive stakeholders"
+
+    points = b.get("pain_points_coverage") or b.get("key_points")
+    if not isinstance(points, list) or len([p for p in points if str(p).strip()]) == 0:
+        derived: List[str] = []
+        if needed_for:
+            derived.append(needed_for)
+        if reason and reason.lower() not in needed_for.lower():
+            derived.append(reason)
+        lowered = asset_name.lower()
+        if "overview" in lowered or artifact_type == "deck":
+            derived.append("Position services and capabilities for the buyer conversation")
+        if "case study" in lowered or artifact_type == "case_study":
+            derived.append("Show measurable customer outcomes and proof points")
+        if not derived:
+            derived = ["Current challenge and business impact", "Recommended approach and expected outcomes"]
+        b["pain_points_coverage"] = derived[:5]
+        b["key_points"] = b["pain_points_coverage"]
+
+    if not str(b.get("content_context", "")).strip():
+        lowered = asset_name.lower()
+        if "case study" in lowered or artifact_type == "case_study":
+            b["content_context"] = f"Customer case study{f' for {industry}' if industry else ''}".strip()
+        elif "one-pager" in lowered or "one pager" in lowered or artifact_type == "one_pager":
+            b["content_context"] = f"Service one-pager{f' for {industry}' if industry else ''}".strip()
+        elif "overview" in lowered or artifact_type == "deck":
+            b["content_context"] = f"Services overview presentation{f' for {industry}' if industry else ''}".strip()
+        elif reason:
+            b["content_context"] = reason
+        else:
+            b["content_context"] = "Executive summary grounded in discovery context"
+        b["style"] = b["content_context"]
+
+    if artifact_type == "deck" and not _slide_count(b):
+        b["slide_count"] = 5
+
+    if industry:
+        b["industry"] = industry
+
+    return b
+
+
+def _pick_default_templates(
+    ctx: TenantContext,
+    repo: ContentStudioRepository,
+    project: Dict[str, Any],
+    brief: Dict[str, Any],
+    title: str,
+) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, str]]]:
+    templates = repo.list_templates(ctx, artifact_type=project.get("artifactType"))
+    if not templates:
+        return None, []
+
+    haystack = " ".join(
+        str(part)
+        for part in (
+            title,
+            brief.get("needed_for"),
+            brief.get("generation_reason"),
+            brief.get("asset_name"),
+            brief.get("industry"),
+            brief.get("content_context"),
+        )
+        if part
+    ).lower()
+    tokens = [token for token in re.split(r"[\s,/]+", haystack) if len(token) > 3]
+
+    scored: List[Tuple[int, Dict[str, Any]]] = []
+    for template in templates:
+        score = 1
+        name = str(template.get("name") or "").lower()
+        tags = " ".join(str(tag) for tag in (template.get("tags") or [])).lower()
+        for token in tokens:
+            if token in name or token in tags:
+                score += 2
+        if template.get("isDefault"):
+            score += 3
+        scored.append((score, template))
+
+    scored.sort(key=lambda item: item[0], reverse=True)
+    best = scored[0][1] if scored else None
+    recommendations = [
+        {
+            "template_id": str(item[1]["id"]),
+            "rationale": f"Matches the suggested {title} format and topic.",
+        }
+        for item in scored[:3]
+    ]
+    return best, recommendations
+
+
+def _retrieve_studio_kb_hits(ctx: TenantContext, query: str) -> List[Dict[str, Any]]:
+    settings = get_settings()
+    kb_repo = get_kb_repository()
+    tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+    from app.domain.memory_store import get_memory_store
+
+    def vector_search(tid: str, embedding: List[float], limit: int) -> List[Dict[str, Any]]:
+        return kb_repo.match_chunks(tenant_uuid, embedding, limit=limit, clerk_key=clerk_key)
+
+    embed_fn = default_embed_fn if settings.openai_configured or settings.openai_api_key else None
+    return retrieve_kb(
+        tenant_uuid,
+        query,
+        limit=5,
+        chunks=get_memory_store().kb_chunks.get(clerk_key, []),
+        embed_fn=embed_fn,
+        vector_search_fn=vector_search if embed_fn else None,
+    )
+
+
+def _kb_matches_payload(hits: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    matches: List[Dict[str, str]] = []
+    for hit in hits[:5]:
+        asset_id = str(hit.get("asset_id") or "").strip()
+        title = str(hit.get("title") or hit.get("asset_title") or "Knowledge base document").strip()
+        snippet = str(hit.get("chunk_text") or hit.get("snippet") or "").strip()[:180]
+        if asset_id or title:
+            matches.append({"asset_id": asset_id, "title": title, "snippet": snippet})
+    return matches
+
+
+def _bootstrap_message(
+    *,
+    brief: Dict[str, Any],
+    artifact_type: str,
+    template_name: str,
+    kb_hits: List[Dict[str, Any]],
+) -> str:
+    account = str(brief.get("account_name") or "").strip()
+    needed_for = str(brief.get("needed_for") or "").strip()
+    lines = ["I pulled context from your content suggestion and drafted a starting plan."]
+    if account and needed_for:
+        lines.append(f"Account: {account}. Needed for: {needed_for}.")
+    elif needed_for:
+        lines.append(f"Needed for: {needed_for}.")
+    elif account:
+        lines.append(f"Account: {account}.")
+
+    if artifact_type == "deck":
+        lines.append("Review each slide below and tell me what to change on any slide.")
+    else:
+        lines.append("Review the outline below and tell me what to adjust.")
+
+    if template_name:
+        lines.append(f"I selected {template_name} as the default template — change it on the right if you prefer another.")
+
+    if kb_hits:
+        titles = [str(hit.get("title") or hit.get("asset_title") or "KB document") for hit in kb_hits[:3]]
+        lines.append(f"Related KB content I can ground claims in: {', '.join(titles)}.")
+
+    lines.append("Click Generate when you're satisfied and I'll build the first draft.")
+    return " ".join(lines)
+
+
+def _kb_lookup_message(kb_hits: List[Dict[str, Any]], brief: Dict[str, Any]) -> str:
+    if kb_hits:
+        titles = [str(hit.get("title") or hit.get("asset_title") or "KB document") for hit in kb_hits[:5]]
+        intro = f"Yes — I found {len(kb_hits)} relevant KB item{'s' if len(kb_hits) != 1 else ''}: {', '.join(titles)}."
+    else:
+        intro = "I didn't find close matches in the knowledge base yet for this suggestion."
+
+    if brief.get("slide_outline"):
+        return f"{intro} The slide plan below still stands — tell me what to change, or click Generate when you're ready."
+    return f"{intro} Tell me what to emphasize and I'll refine the plan, or click Generate to draft from what we have."
+
+
+def _is_kb_content_question(text: str) -> bool:
+    low = text.strip().lower()
+    if not low:
+        return False
+    patterns = (
+        "relevant content",
+        "related content",
+        "knowledge base",
+        "kb content",
+        "do we have",
+        "any content",
+        "existing content",
+        "uploaded content",
+        "in the kb",
+        "from the kb",
+    )
+    return any(pattern in low for pattern in patterns)
 
 
 def _missing_brief_fields(brief: Dict[str, Any]) -> List[str]:

@@ -76,10 +76,15 @@ function CompactCallBlock({ call }: { call: Call }) {
         <p className="text-[10px] font-medium text-primary/90">{call.annualRevenue} revenue</p>
       )}
       {call.leadName && (
-        <p className="text-[10px] text-muted-foreground truncate inline-flex items-center gap-1 mt-0.5">
-          <ParticipantAvatar name={call.leadName} kind="external" size="xs" />
-          {call.leadName}
-        </p>
+        <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
+          <ParticipantAvatar
+            name={call.leadName}
+            kind="external"
+            size="xs"
+            className="shrink-0"
+          />
+          <span className="min-w-0 truncate">{call.leadName}</span>
+        </div>
       )}
     </Link>
   );

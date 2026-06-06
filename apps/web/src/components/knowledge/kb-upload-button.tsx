@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Upload, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -87,9 +87,11 @@ function combinedProgress(phase: UploadPhase, uploadPct: number, ingestPct: numb
 
 interface KbUploadButtonProps {
   onAssetReady?: (asset: { id: string; title: string }) => void;
+  trigger?: ReactNode;
+  defaultTitle?: string;
 }
 
-export function KbUploadButton({ onAssetReady }: KbUploadButtonProps = {}) {
+export function KbUploadButton({ onAssetReady, trigger, defaultTitle }: KbUploadButtonProps = {}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<UploadPhase>("idle");
   const [uploadPct, setUploadPct] = useState(0);
@@ -119,7 +121,7 @@ export function KbUploadButton({ onAssetReady }: KbUploadButtonProps = {}) {
 
   const onFileSelected = (file: File) => {
     setPendingFile(file);
-    setTitle(file.name.replace(/\.[^.]+$/, ""));
+    setTitle(defaultTitle?.trim() || file.name.replace(/\.[^.]+$/, ""));
     setAssetType(defaultAssetTypeForFile(file.name));
     setTags("");
     setDialogOpen(true);
@@ -193,10 +195,27 @@ export function KbUploadButton({ onAssetReady }: KbUploadButtonProps = {}) {
           if (file) onFileSelected(file);
         }}
       />
-      <Button type="button" disabled={busy} onClick={() => inputRef.current?.click()}>
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-        {busy ? `Uploading ${overallPct}%` : "Upload asset"}
-      </Button>
+      {trigger ? (
+        <span
+          role="button"
+          tabIndex={busy ? -1 : 0}
+          className={busy ? "pointer-events-none opacity-60" : "inline-flex"}
+          onClick={() => !busy && inputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (!busy && (e.key === "Enter" || e.key === " ")) {
+              e.preventDefault();
+              inputRef.current?.click();
+            }
+          }}
+        >
+          {trigger}
+        </span>
+      ) : (
+        <Button type="button" disabled={busy} onClick={() => inputRef.current?.click()}>
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          {busy ? `Uploading ${overallPct}%` : "Upload asset"}
+        </Button>
+      )}
 
       <Dialog
         open={dialogOpen}

@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     kb_embedding_model: str = "text-embedding-3-small"
     kb_worker_poll_interval_ms: int = 2000
     kb_ingest_sync: bool = False
-    kb_shared_mode: bool = False
+    kb_shared_mode: bool = True
     kb_shared_tenant_key: str = "dc-copilot-shared"
     # Legacy env name; prefer OPENAI_API_KEY for all LLM + embedding calls.
     anthropic_api_key: str = ""

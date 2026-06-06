@@ -13,6 +13,94 @@ def _section_id() -> str:
     return str(uuid.uuid4())[:8]
 
 
+def _kb_entry_asset_id(entry: Dict[str, Any]) -> Optional[str]:
+    asset_id = entry.get("assetId") or entry.get("asset_id") or entry.get("id")
+    return str(asset_id) if asset_id else None
+
+
+def _kb_entry_title(entry: Dict[str, Any], asset_id: str) -> str:
+    title = entry.get("title")
+    if title:
+        return str(title)
+    return asset_id.replace("dc:", "").replace(":", " ").strip() or "Reference"
+
+
+def _apply_kb_entries(
+    sections: List[Dict[str, Any]],
+    selected_assets: List[Dict[str, Any]],
+    ai_suggestions: List[Dict[str, Any]],
+    entries: List[Dict[str, Any]],
+) -> None:
+    for entry in entries[:8]:
+        asset_id = _kb_entry_asset_id(entry)
+        if not asset_id:
+            continue
+        title = _kb_entry_title(entry, asset_id)
+        reason = str(
+            entry.get("reason")
+            or entry.get("suggestedUse")
+            or "Relevant to your discovery conversation"
+        )
+        score = entry.get("score") or entry.get("confidence") or entry.get("relevanceScore") or 0.7
+        ai_suggestions.append(
+            {
+                "assetId": asset_id,
+                "title": title,
+                "reason": reason,
+                "confidence": score,
+            }
+        )
+        if len(selected_assets) < 4 and not any(a["assetId"] == asset_id for a in selected_assets):
+            selected_assets.append(
+                {
+                    "assetId": asset_id,
+                    "title": title,
+                    "kind": entry.get("format") or entry.get("type") or entry.get("kind") or "document",
+                    "displayMode": "embed",
+                }
+            )
+
+
+def _ensure_asset_section(sections: List[Dict[str, Any]], selected_assets: List[Dict[str, Any]]) -> None:
+    if not selected_assets:
+        return
+    asset_ids = [a["assetId"] for a in selected_assets]
+    for section in sections:
+        if section.get("type") == "asset":
+            section["assetIds"] = asset_ids
+            section["visible"] = True
+            return
+    sections.insert(
+        3,
+        {
+            "id": _section_id(),
+            "type": "asset",
+            "visible": True,
+            "title": "Shared resources",
+            "assetIds": asset_ids,
+        },
+    )
+
+
+def _hits_to_kb_entries(hits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    entries: List[Dict[str, Any]] = []
+    for hit in hits:
+        asset_id = hit.get("asset_id")
+        if not asset_id:
+            continue
+        chunk = str(hit.get("chunk_text") or "").strip()
+        snippet = " ".join(chunk.split())[:180] if chunk else "Relevant to your discovery conversation"
+        entries.append(
+            {
+                "assetId": str(asset_id),
+                "title": _kb_entry_title(hit, str(asset_id)),
+                "reason": snippet,
+                "score": hit.get("score"),
+            }
+        )
+    return entries
+
+
 def run_clp_generate(
     ctx: TenantContext,
     call_id: str,
@@ -20,6 +108,8 @@ def run_clp_generate(
     call: Optional[Dict[str, Any]] = None,
     review: Optional[Dict[str, Any]] = None,
     brief: Optional[Dict[str, Any]] = None,
+    kb_suggestions: Optional[List[Dict[str, Any]]] = None,
+    kb_hits: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     account = (call or {}).get("accountName") or (call or {}).get("account_name") or "your team"
     lead = (call or {}).get("leadName") or (call or {}).get("lead_name") or ""
@@ -66,38 +156,38 @@ def run_clp_generate(
     selected_assets: List[Dict[str, Any]] = []
     ai_suggestions: List[Dict[str, Any]] = []
 
-    research = {}
-    if brief:
-        for sec in brief.get("researchSections") or []:
-            for row in sec.get("rows") or []:
-                if row.get("label") and row.get("value"):
-                    research[str(row["label"]).lower().replace(" ", "_")] = str(row["value"])
-    try:
-        relevant = build_relevant_content(ctx, account, research)
-        docs = relevant.get("relevantDocuments") or []
-        for doc in docs[:8]:
-            asset_id = doc.get("assetId") or doc.get("asset_id") or doc.get("id")
-            title = doc.get("title") or "Reference"
-            if not asset_id:
-                continue
-            entry = {
-                "assetId": str(asset_id),
-                "title": title,
-                "kind": doc.get("format") or doc.get("type") or "document",
-                "displayMode": "embed",
-            }
-            ai_suggestions.append(
+    kb_applied = False
+    if kb_suggestions:
+        _apply_kb_entries(sections, selected_assets, ai_suggestions, kb_suggestions)
+        kb_applied = True
+    elif kb_hits:
+        _apply_kb_entries(sections, selected_assets, ai_suggestions, _hits_to_kb_entries(kb_hits))
+        kb_applied = True
+
+    if not kb_applied:
+        research = {}
+        if brief:
+            for sec in brief.get("researchSections") or []:
+                for row in sec.get("rows") or []:
+                    if row.get("label") and row.get("value"):
+                        research[str(row["label"]).lower().replace(" ", "_")] = str(row["value"])
+        try:
+            relevant = build_relevant_content(ctx, account, research)
+            docs = relevant.get("relevantDocuments") or []
+            doc_entries = [
                 {
-                    "assetId": str(asset_id),
-                    "title": title,
+                    "assetId": doc.get("assetId") or doc.get("asset_id") or doc.get("id"),
+                    "title": doc.get("title") or "Reference",
                     "reason": doc.get("reason") or "Relevant to your discovery conversation",
-                    "confidence": doc.get("score") or 0.7,
+                    "score": doc.get("score") or doc.get("relevanceScore") or 0.7,
+                    "format": doc.get("format") or doc.get("type") or "document",
                 }
-            )
-            if len(selected_assets) < 4:
-                selected_assets.append(entry)
-    except Exception:
-        pass
+                for doc in docs[:8]
+                if doc.get("assetId") or doc.get("asset_id") or doc.get("id")
+            ]
+            _apply_kb_entries(sections, selected_assets, ai_suggestions, doc_entries)
+        except Exception:
+            pass
 
     attachments = (review or {}).get("emailDraft", {}).get("attachments") or {}
     if isinstance(attachments, dict):
@@ -113,16 +203,7 @@ def run_clp_generate(
                 )
 
     if selected_assets:
-        sections.insert(
-            3,
-            {
-                "id": _section_id(),
-                "type": "asset",
-                "visible": True,
-                "title": "Shared resources",
-                "assetIds": [a["assetId"] for a in selected_assets],
-            },
-        )
+        _ensure_asset_section(sections, selected_assets)
 
     deck = (brief or {}).get("recommendedDeck")
     if deck and deck.get("assetId"):

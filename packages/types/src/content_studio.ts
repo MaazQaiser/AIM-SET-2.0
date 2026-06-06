@@ -1,10 +1,10 @@
-export type StudioArtifactType = "deck" | "one_pager" | "image";
+export type StudioArtifactType = "deck" | "one_pager" | "image" | "case_study";
 
 export type TemplateStatus = "processing" | "ready" | "failed";
 
-export type StudioProjectStatus = "drafting" | "preview" | "exported";
+export type StudioProjectStatus = "drafting" | "preview" | "exported" | "pending_review" | "published";
 
-export type StudioTurnType = "ask" | "recommend" | "html" | "patch" | "refuse" | "unknown";
+export type StudioTurnType = "ask" | "recommend" | "outline" | "html" | "patch" | "refuse" | "unknown";
 
 export type ExportFormat = "pdf" | "png" | "pptx";
 
@@ -22,6 +22,9 @@ export interface ContentTemplate {
   createdAt: string;
   ingestError?: string;
   html?: string;
+  sourceFileName?: string;
+  hasSourceFile?: boolean;
+  previewSlideCount?: number;
 }
 
 export interface ContentTemplateDraft {
@@ -94,6 +97,7 @@ export interface StudioTurnResult {
     visual?: string;
   }>;
   recommended_templates?: Array<{ template_id: string; rationale: string }>;
+  kb_matches?: Array<{ asset_id: string; title: string; snippet?: string }>;
   revision_id?: string;
   html?: string;
   patch?: { slide: number; html: string };

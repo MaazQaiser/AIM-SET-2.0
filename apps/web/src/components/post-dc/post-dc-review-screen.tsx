@@ -15,10 +15,11 @@ import {
   PostDcScreenTabs,
   type PostDcScreenTab,
 } from "@/components/post-dc/post-dc-screen-tabs";
+import { isPostDcLandingVisible } from "@/components/post-dc/post-dc-tab-config";
 import { normalizePostDcWidgetProps } from "@/lib/dashboard/normalize-widget-props";
 import { POST_DC_WIDGETS } from "@/lib/dashboard/widget-registry";
 import { PostDcPageLoader } from "@/components/layout/page-loaders";
-import { useLandingPage } from "@/lib/data/clp-hooks";
+import { useEnsureLandingPage } from "@/lib/data/clp-hooks";
 import type { AccountSnapshotRow } from "@/components/calls/account-widget-cards";
 import { enrichCallBant } from "@/lib/bant/authority-from-lead";
 import { buildAccountSnapshot } from "@/lib/dc-data/build-account-snapshot";
@@ -79,7 +80,6 @@ export function PostDcReviewScreen({
   const preRecord = useDcImportsStore((s) =>
     findPreDcRecordForCall(s.preDcRecords, callId, call?.accountName)
   );
-  const { data: landingPage } = useLandingPage(callId);
   const createJiraTicket = useCreateJiraTicket(callId);
   const emailDraft = useDcImportsStore((s) => s.emailDraftsByCallId[callId]);
   const internalEmailDraft = useDcImportsStore((s) => s.internalEmailDraftsByCallId[callId]);
@@ -97,6 +97,9 @@ export function PostDcReviewScreen({
   const [screenTab, setScreenTab] = useState<PostDcScreenTab>("overview");
   const importedReview = resolvePostCallReview(callId);
   const displayedReview = review ?? importedReview ?? null;
+  const landingPrefetchEnabled =
+    Boolean(displayedReview) && isPostDcLandingVisible(resolveLeadStage(displayedReview ?? {}));
+  const { page: landingPage } = useEnsureLandingPage(callId, landingPrefetchEnabled);
   const showReview = Boolean(displayedReview);
   const waitingForReview =
     !importsHydrated || callLoading || (reviewLoading && !displayedReview);

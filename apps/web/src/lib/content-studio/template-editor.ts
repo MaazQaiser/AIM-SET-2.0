@@ -1,5 +1,6 @@
 export const TEMPLATE_ARTIFACT_TYPES = [
   { value: "deck", label: "Deck" },
+  { value: "case_study", label: "Case study" },
   { value: "one_pager", label: "One pager" },
   { value: "image", label: "Image" },
 ] as const;

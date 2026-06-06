@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from dc_core.tenancy import TenantContext
 
-from app.agents.content_generation_agent import run_studio_turn
+from app.agents.content_generation_agent import run_studio_bootstrap, run_studio_turn
 from app.config import get_settings
 
 
@@ -48,7 +48,7 @@ class _FakeContentStudioRepo:
         return dict(self.project)
 
     def list_templates(self, _ctx: TenantContext, artifact_type: Optional[str] = None) -> List[Dict[str, Any]]:
-        return []
+        return list(getattr(self, "templates", []))
 
     def list_messages(self, _ctx: TenantContext, project_id: str) -> List[Dict[str, Any]]:
         assert project_id == self.project["id"]
@@ -127,7 +127,7 @@ def test_studio_turn_collects_basics_then_slide_count_and_outline(monkeypatch):
         allow_generation=False,
         repo=repo,
     )
-    assert outline.result["turn_type"] == "ask"
+    assert outline.result["turn_type"] == "outline"
     assert outline.result["slide_outline"]
     assert len(outline.result["slide_outline"]) == 5
     assert outline.result["slide_outline"][1]["heading"] == "scheduling friction"
@@ -211,3 +211,69 @@ def test_studio_turn_accepts_short_pain_point_reply(monkeypatch):
     assert reply.result["ask"] == ["How many slides should this deck include?"]
     assert repo.project["brief"]["pain_points_coverage"] == ["Mobile app optimisation"]
     assert "Which customer pain points" not in str(reply.result)
+
+
+def test_studio_bootstrap_uses_suggestion_context(monkeypatch):
+    monkeypatch.setenv("SUPABASE_URL", "")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    get_settings.cache_clear()
+    repo = _FakeContentStudioRepo()
+    repo.project["brief"] = {
+        "generation_reason": "Upload or tag KB content for: tk overview deck",
+        "needed_for": "Anchor the conversation for Transportation, Logistics and Supply Chain.",
+        "asset_name": "Franchise operations services overview deck",
+        "account_name": "Aetherline Analytics",
+        "source": "pre-dc",
+    }
+    repo.templates = [
+        {
+            "id": "template-deck",
+            "name": "Executive Overview Deck",
+            "artifactType": "deck",
+            "tags": ["overview", "transportation"],
+        }
+    ]
+    ctx = TenantContext(tenant_id="tenant-content", user_id="user-content")
+
+    bootstrap = run_studio_bootstrap(ctx, project_id="project-1", repo=repo)
+
+    assert bootstrap.operation == "studio_bootstrap"
+    assert bootstrap.result["turn_type"] == "outline"
+    assert len(bootstrap.result["slide_outline"]) == 5
+    assert bootstrap.result["template_id"] == "template-deck"
+    assert repo.project["templateId"] == "template-deck"
+    assert "Transportation, Logistics and Supply Chain" in repo.project["brief"]["audience"]
+    assert "Generate when you're satisfied" in bootstrap.result["message"]
+
+
+def test_studio_turn_answers_kb_content_question(monkeypatch):
+    monkeypatch.setenv("SUPABASE_URL", "")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    get_settings.cache_clear()
+    repo = _FakeContentStudioRepo()
+    repo.project["brief"] = {
+        "generation_reason": "Upload or tag KB content for: tk overview deck",
+        "needed_for": "Anchor the conversation for Transportation, Logistics and Supply Chain.",
+        "asset_name": "Franchise operations services overview deck",
+        "account_name": "Aetherline Analytics",
+        "audience": "Transportation stakeholders",
+        "content_context": "Services overview presentation",
+        "pain_points_coverage": ["Anchor the conversation for Transportation, Logistics and Supply Chain."],
+        "slide_count": 5,
+        "slide_outline": [{"slide": 1, "heading": "Title", "body": "Intro", "visual": "Logo"}],
+    }
+    ctx = TenantContext(tenant_id="tenant-content", user_id="user-content")
+
+    reply = run_studio_turn(
+        ctx,
+        project_id="project-1",
+        user_message="do we have any relevant content for the suggested deck?",
+        allow_generation=False,
+        repo=repo,
+    )
+
+    assert reply.operation == "studio_kb_lookup"
+    assert "Which customer pain points" not in str(reply.result)
+    assert reply.result["turn_type"] in {"ask", "outline"}

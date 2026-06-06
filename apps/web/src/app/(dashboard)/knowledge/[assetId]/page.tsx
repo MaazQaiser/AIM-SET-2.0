@@ -28,9 +28,9 @@ export default function KnowledgeAssetPage({ params }: { params: Promise<{ asset
   if (!asset) {
     return (
       <div className="p-6 space-y-4 max-w-5xl mx-auto">
-        <Link href="/knowledge" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <Link href="/content?tab=library" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-4 w-4" />
-          Knowledge base
+          Knowledge Base
         </Link>
         <p className="text-muted-foreground">Asset not found or could not be loaded.</p>
       </div>
@@ -55,14 +55,14 @@ export default function KnowledgeAssetPage({ params }: { params: Promise<{ asset
       return;
     }
     toast.success("Asset deleted");
-    window.location.href = "/knowledge";
+    window.location.href = "/content?tab=library";
   };
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      <Link href="/knowledge" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/content?tab=library" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ChevronLeft className="h-4 w-4" />
-        Knowledge base
+        Knowledge Base
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-4">

@@ -43,6 +43,19 @@ describe("groupPreDcGaps", () => {
     expect(groups[0]?.name).toBe("Industry case study");
   });
 
+  it("uses industry from neededFor for artifact-backed groups", () => {
+    const groups = groupPreDcGaps([
+      gap({
+        callId: "call-1",
+        name: "Industry case study",
+        sourceArtifactId: "art-case",
+        neededFor: "Social proof aligned to Transportation, Logistics and Supply Chain.",
+      }),
+    ]);
+
+    expect(groups[0]?.name).toBe("Transportation, Logistics and Supply Chain case study");
+  });
+
   it("uses normalized type/name when sourceArtifactId is missing", () => {
     expect(
       normalizeDocumentKey(

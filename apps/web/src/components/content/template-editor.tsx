@@ -160,7 +160,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <Link
-            href="/content/templates"
+            href="/content?tab=templates"
             className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />

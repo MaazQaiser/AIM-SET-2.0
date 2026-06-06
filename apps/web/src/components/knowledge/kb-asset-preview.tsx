@@ -18,10 +18,18 @@ interface KbAssetPreviewProps {
   indexedText?: string;
   /** Shorter preview for inline cards (e.g. call detail recommended deck). */
   compact?: boolean;
+  /** Expand preview to fill the parent panel (library full-screen view). */
+  fillHeight?: boolean;
   className?: string;
 }
 
-export function KbAssetPreview({ asset, indexedText, compact = false, className }: KbAssetPreviewProps) {
+export function KbAssetPreview({
+  asset,
+  indexedText,
+  compact = false,
+  fillHeight = false,
+  className,
+}: KbAssetPreviewProps) {
   const meta = resolveKbFileFormat(asset.fileName, asset.mimeType);
   const isPresentation = isPresentationFormat(meta.format);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
@@ -130,8 +138,19 @@ export function KbAssetPreview({ asset, indexedText, compact = false, className 
 
   if (meta.format === "pdf" && blobUrl) {
     return (
-      <div className={cn("min-h-[70vh] rounded-lg border overflow-hidden bg-white", briefMainNestedSurfaceClass, className)}>
-        <iframe title={asset.title} src={blobUrl} className="w-full h-[70vh]" />
+      <div
+        className={cn(
+          "rounded-lg border overflow-hidden bg-white",
+          fillHeight ? "h-[calc(100svh-10rem)] min-h-[480px]" : "min-h-[70vh]",
+          briefMainNestedSurfaceClass,
+          className
+        )}
+      >
+        <iframe
+          title={asset.title}
+          src={blobUrl}
+          className={cn("w-full", fillHeight ? "h-full" : "h-[70vh]")}
+        />
       </div>
     );
   }

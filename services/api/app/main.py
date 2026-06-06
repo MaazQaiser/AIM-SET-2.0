@@ -24,6 +24,7 @@ from app.routers import (  # noqa: E402
     v1_briefing,
     v1_calls,
     v1_clp_notifications,
+    v1_content_gaps,
     v1_content_studio,
     v1_copilot,
     v1_integrations_jira,
@@ -55,6 +56,7 @@ app.include_router(v1_copilot.router)
 app.include_router(v1_workflow.router)
 app.include_router(v1_kb.router)
 app.include_router(v1_content_studio.router)
+app.include_router(v1_content_gaps.router)
 app.include_router(v1_agents.router)
 app.include_router(v1_briefing.router)
 app.include_router(v1_integrations_jira.router)

@@ -1,8 +1,5 @@
-import type { Metadata } from "next";
-import { KnowledgePageClient } from "@/components/knowledge/knowledge-page-client";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Knowledge base" };
-
-export default function KnowledgePage() {
-  return <KnowledgePageClient />;
+export default function KnowledgeRedirectPage() {
+  redirect("/content?tab=library");
 }
