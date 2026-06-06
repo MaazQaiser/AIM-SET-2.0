@@ -13,11 +13,14 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const { callId } = await params;
   const body = (await request.json()) as {
+    id?: string;
     text?: string;
     speaker_id?: string;
+    speaker_name?: string;
     speaker_role?: string;
     offset_seconds?: number;
     provider_event_id?: string;
+    async_analysis?: boolean;
   };
 
   if (!body.text?.trim()) {
@@ -37,11 +40,14 @@ export async function POST(request: NextRequest, { params }: Params) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        id: body.id,
         text: body.text,
         speaker_id: body.speaker_id ?? "demo",
+        speaker_name: body.speaker_name,
         speaker_role: body.speaker_role ?? "customer",
         offset_seconds: body.offset_seconds ?? 0,
         provider_event_id: body.provider_event_id,
+        async_analysis: body.async_analysis,
       }),
     }
   );

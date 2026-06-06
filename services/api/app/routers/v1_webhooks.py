@@ -133,6 +133,7 @@ async def demo_segment(
     event = {
         "id": body.get("id"),
         "speaker_id": body.get("speaker_id", "prospect"),
+        "speaker_name": body.get("speaker_name"),
         "speaker_role": body.get("speaker_role", "customer"),
         "text": body.get("text", ""),
         "offset_seconds": body.get("offset_seconds", 0),
@@ -146,6 +147,37 @@ async def demo_segment(
     # Broadcast transcript IMMEDIATELY
     transcript_ws = transcript_event_to_ws(event)
     await channel.broadcast(call_id, transcript_ws)
+
+    if body.get("async_analysis"):
+        from app.domain.live_call_repository import get_live_call_repository
+
+        repo = get_live_call_repository()
+        await asyncio.to_thread(repo.get_or_create_session, ctx, call_id, provider="demo")
+        await asyncio.to_thread(repo.append_transcript_event, ctx, call_id, event)
+
+        async def _analyze_and_broadcast() -> None:
+            try:
+                result = await asyncio.to_thread(_orch.dispatch_live_segment, ctx, call_id, event)
+                for msg in result.get("ws_messages") or []:
+                    await channel.broadcast(call_id, msg)
+            except Exception:
+                _logger.exception("demo background analysis failed call_id=%s", call_id)
+
+        asyncio.create_task(_analyze_and_broadcast())
+        return {
+            "ok": True,
+            "call_id": call_id,
+            "async_analysis": True,
+            "transcript_event": {
+                "id": event.get("id") or event.get("provider_event_id"),
+                "speaker_id": event["speaker_id"],
+                "speaker_name": event.get("speaker_name"),
+                "speaker_role": event["speaker_role"],
+                "text": event["text"],
+                "offset_seconds": event["offset_seconds"],
+            },
+            "ws_messages": [transcript_ws],
+        }
 
     try:
         result = await asyncio.to_thread(_orch.dispatch_live_segment, ctx, call_id, event)
@@ -161,6 +193,7 @@ async def demo_segment(
         "transcript_event": {
             "id": event.get("id") or event.get("provider_event_id"),
             "speaker_id": event["speaker_id"],
+            "speaker_name": event.get("speaker_name"),
             "speaker_role": event["speaker_role"],
             "text": event["text"],
             "offset_seconds": event["offset_seconds"],

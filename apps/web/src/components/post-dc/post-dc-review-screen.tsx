@@ -48,7 +48,7 @@ import type {
   PostCallReview,
   PostCallTask,
 } from "@/lib/brief-types";
-import type { Call } from "@/types";
+import type { BANTScore, BANTStatus, Call } from "@/types";
 
 const EMPTY_ACCOUNT_SNAPSHOT: AccountSnapshotRow[] = [];
 const EMPTY_TASKS: PostCallTask[] = [];
@@ -58,6 +58,29 @@ const JIRA_FINANCIAL_RE =
   /(\$|€|£|\b(?:budget|financial|finance|financing|revenue|roi|pricing|price|cost|investment|unit economics|cfo|economic buyer|board approval|approval path|annual potential|year-one|year one|bant|open discovery gap|open discovery gaps|discovery gaps|discovery coverage)\b)/i;
 const JIRA_TIMELINE_RE =
   /\b(?:timeline|pilot|poc|proof of concept|launch|go-live|production|readout|next step|follow up|schedule|meeting|workshop|proposal|by|before|after|q[1-4]|week|month|date|deadline)\b/i;
+
+function normalizeBantStatus(value: unknown): BANTStatus | null {
+  const status =
+    typeof value === "string"
+      ? value
+      : value && typeof value === "object" && "status" in value
+        ? (value as { status?: unknown }).status
+        : null;
+  if (status === "confirmed" || status === "partial" || status === "unknown") return status;
+  return null;
+}
+
+function mergePostDcBantStatus(base: BANTScore, review?: PostCallReview | null): BANTScore {
+  const score = review?.bantScore as Record<string, unknown> | undefined;
+  if (!score) return base;
+  return BANT_TICKET_KEYS.reduce<BANTScore>(
+    (next, key) => {
+      const status = normalizeBantStatus(score[key]);
+      return status ? { ...next, [key]: status } : next;
+    },
+    base
+  );
+}
 
 interface PostDcReviewScreenProps {
   callId: string;
@@ -144,11 +167,11 @@ export function PostDcReviewScreen({
       ? accountSnapshot
       : buildAccountSnapshot({ preRecord, call, includePlaceholder: true });
 
-  const resolvedBant = enrichCallBant(call?.bant, {
+  const resolvedBant = mergePostDcBantStatus(enrichCallBant(call?.bant, {
     leadTitle:
       call?.leadTitle ?? (preRecord ? preDcField(preRecord, "prospectPersona") : undefined),
     clientAttendees: brief?.clientAttendees,
-  });
+  }), displayedReview);
 
   function handleApproveTasks(ids: string[]) {
     const approved = taskList.map((task) =>

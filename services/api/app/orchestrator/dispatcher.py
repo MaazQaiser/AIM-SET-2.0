@@ -70,7 +70,8 @@ def _discovery_context_text(
 
     latest_offset = _float_or_zero(latest.get("offset_seconds"))
     latest_speaker = str(latest.get("speaker_id") or latest.get("speaker_name") or "")
-    parts: List[str] = []
+    fallback_text = fallback.strip()
+    parts: List[str] = [fallback_text] if fallback_text else []
 
     for event in events[-8:]:
         role = str(event.get("speaker_role") or "").lower()
@@ -82,11 +83,11 @@ def _discovery_context_text(
         if latest_speaker and speaker and speaker != latest_speaker:
             continue
         text = str(event.get("text") or "").strip()
-        if text:
+        if text and text != fallback_text:
             parts.append(text)
 
     context = " ".join(parts).strip()
-    return context[-360:] if context else fallback
+    return context[:360] if context else fallback
 
 
 def _event_offset_seconds(event: Dict[str, Any]) -> float:
@@ -462,7 +463,11 @@ class Orchestrator:
         checklist_data: Dict[str, Any] = {}
         bant_signals = []
         try:
-            call = self.calls.get_call(ctx, call_id) or {}
+            try:
+                call = self.calls.get_call(ctx, call_id) or {}
+            except Exception:
+                _logger.exception("call lookup failed during live checklist update call_id=%s", call_id)
+                call = {}
             seed_bant = call.get("bant") if isinstance(call.get("bant"), dict) else None
             transcript_analysis = (
                 live_result.get("transcript") if isinstance(live_result.get("transcript"), dict) else {}

@@ -25,21 +25,26 @@ export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
   const [mode, setMode] = useState<DemoMode | null>(null);
   const stopRef = useRef(false);
   const modeRef = useRef<DemoMode>("api");
+  const apiQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lines = getDemoTranscriptForCall(callId);
   const appendTranscriptEvent = useLiveCall((s) => s.appendTranscriptEvent);
   const setConnected = useLiveCall((s) => s.setConnected);
 
   async function postDemoSegment(lineIndex: number) {
     const line = lines[lineIndex];
+    const optimisticEvent = transcriptEventFromDemoLine(callId, line, lineIndex);
     const res = await fetch(`/api/calls/${callId}/demo-segment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        id: optimisticEvent.id,
         text: line.text,
         speaker_id: line.speakerId,
+        speaker_name: line.speakerName,
         speaker_role: line.speakerRole,
         offset_seconds: line.offsetSeconds,
         provider_event_id: `demo-${callId}-${lineIndex}`,
+        async_analysis: true,
       }),
     });
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & {
@@ -70,16 +75,18 @@ export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
     applyApiDemoResult(data);
   }
 
-  async function resolveDemoMode(): Promise<DemoMode> {
-    if (process.env.NEXT_PUBLIC_DEMO_CLIENT_ONLY === "true") {
-      return "client";
-    }
-    try {
-      await postDemoSegment(0);
-      return "api";
-    } catch {
-      return "client";
-    }
+  function enqueueApiSegment(lineIndex: number) {
+    const run = apiQueueRef.current.then(async () => {
+      try {
+        await postDemoSegment(lineIndex);
+      } catch (err) {
+        modeRef.current = "client";
+        setMode("client");
+        setConnected(true);
+        setError(err instanceof Error ? err.message : "Demo API playback failed");
+      }
+    });
+    apiQueueRef.current = run.catch(() => undefined);
   }
 
   async function playDemo() {
@@ -88,31 +95,26 @@ export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
     setPlaying(true);
     setLineIndex(0);
     setError(null);
+    apiQueueRef.current = Promise.resolve();
 
-    const resolved = await resolveDemoMode();
+    const resolved: DemoMode =
+      process.env.NEXT_PUBLIC_DEMO_CLIENT_ONLY === "true" ? "client" : "api";
     modeRef.current = resolved;
     setMode(resolved);
 
-    if (resolved === "client") {
-      setConnected(true);
-      useLiveCall.getState().reset();
-      useLiveCall.getState().setCallId(callId);
-      useLiveCall.getState().setConnected(true);
-    }
+    setConnected(true);
+    useLiveCall.getState().reset();
+    useLiveCall.getState().setCallId(callId);
+    useLiveCall.getState().setConnected(true);
 
-    const startIndex = resolved === "api" ? 1 : 0;
-
-    for (let i = startIndex; i < lines.length; i++) {
+    for (let i = 0; i < lines.length; i++) {
       if (stopRef.current) break;
       const line = lines[i];
       setLineIndex(i + 1);
 
       try {
-        if (modeRef.current === "client") {
-          applyClientDemoSegment(callId, i, line);
-        } else {
-          await postDemoSegment(i);
-        }
+        applyClientDemoSegment(callId, i, line);
+        if (modeRef.current === "api") enqueueApiSegment(i);
       } catch (err) {
         modeRef.current = "client";
         setMode("client");

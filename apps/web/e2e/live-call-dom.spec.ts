@@ -289,7 +289,7 @@ test.describe("Live call cockpit — DOM + API", () => {
       },
       callId
     );
-    await postDemoSegment(
+    const budgetOut = await postDemoSegment(
       request,
       {
         text: "400k",
@@ -308,7 +308,7 @@ test.describe("Live call cockpit — DOM + API", () => {
       callId
     );
 
-    const budgetItem = out.checklist?.items?.find((item) => item.id === "budget");
+    const budgetItem = budgetOut.checklist?.items?.find((item) => item.id === "budget");
     const timelineItem = out.checklist?.items?.find((item) => item.id === "timeline");
     expect(budgetItem?.evidence?.at(-1)?.value?.toLowerCase()).toContain("400k");
     expect(out.checklist?.bant?.timeline).toBe("confirmed");
@@ -485,45 +485,43 @@ test.describe("Live call cockpit — DOM + API", () => {
     await expect(page).toHaveURL(new RegExp(`/calls/${callId}/post-dc\\?wrapped=1`), {
       timeout: 30_000,
     });
-    await expect(page.getByRole("heading", { name: "Post-DC review", exact: true })).toBeVisible({
+    await expect(page.getByRole("heading", { name: accountName })).toBeVisible({
       timeout: 30_000,
     });
 
-    const overviewPanel = page.locator('[role="tabpanel"]:visible');
-    await expect(overviewPanel).toContainText(/400k/i);
-    await expect(overviewPanel).toContainText(/BANT score/i);
-    await expect(overviewPanel).toContainText(/Deal signals/i);
-    await expect(overviewPanel).toContainText(/Opportunity/i);
-    await expect(overviewPanel).toContainText(/High Potential/i);
-    await expect(overviewPanel).toContainText(/Fixed Cost/i);
-    await expect(overviewPanel).toContainText(/Software Engineering/i);
-    await expect(overviewPanel).toContainText(/not more than three months/i);
-    await expect(overviewPanel).not.toContainText(/BANT coverage finished at 0%/i);
-    await expect(overviewPanel).not.toContainText(/Timeline moved from unknown to unknown/i);
+    const main = page.locator("main");
+    await expect(main).toContainText(/400k/i);
+    await expect(main).toContainText(/BANT score/i);
+    await expect(main).toContainText(/Deal signals/i);
+    await expect(main).toContainText(/Opportunity/i);
+    await expect(main).toContainText(/Fixed Cost/i);
+    await expect(main).toContainText(/Software Engineering/i);
+    await expect(main).toContainText(/not more than three months/i);
+    await expect(main).not.toContainText(/BANT coverage finished at 0%/i);
+    await expect(main).not.toContainText(/Timeline moved from unknown to unknown/i);
 
-    await page.getByRole("tab", { name: /Actions/i }).click();
-    const actionsPanel = page.locator('[role="tabpanel"]:visible');
-    await expect(actionsPanel).toHaveCount(1);
-    const sendFollowUpTask = actionsPanel
+    const bantWidget = page.locator('[id="post-dc-widget-post.bant"]');
+    await expect(bantWidget).toContainText(/Budget\s*Confirmed/i);
+    await expect(bantWidget).toContainText(/Authority\s*Confirmed/i);
+    await expect(bantWidget).toContainText(/Timeline\s*Confirmed/i);
+
+    const emailHandoff = page.locator('[id="post-dc-widget-post.email_jira_handoff"]');
+    await expect(emailHandoff).toContainText(/Email/i);
+    await expect(emailHandoff).toContainText(/400k/i);
+    await expect(emailHandoff).toContainText(/implementation proposal|not more than three months/i);
+    await expect(emailHandoff).toContainText(/Jira ticket/i);
+
+    const taskRail = page.getByRole("complementary", { name: /Wrap-up tasks/i });
+    const sendFollowUpTask = taskRail
       .getByRole("button", { name: /^Send follow-up email$/i })
       .first();
     await expect(sendFollowUpTask).toBeVisible();
     await sendFollowUpTask.click();
 
-    const taskOpenedFollowUpPanel = page.locator('[role="tabpanel"]:visible');
-    await expect(taskOpenedFollowUpPanel).toContainText(/Follow-up Email/i);
-    await expect(taskOpenedFollowUpPanel).toContainText(/400k/i);
-    await expect(taskOpenedFollowUpPanel).toContainText(
-      /implementation proposal|not more than three months/i
-    );
-    await expect(
-      taskOpenedFollowUpPanel.getByRole("button", { name: /Send email to customer/i })
-    ).toBeVisible();
-
-    await page.getByRole("tab", { name: /Follow up/i }).click();
-    const followUpPanel = page.locator('[role="tabpanel"]:visible');
-    await expect(followUpPanel).toContainText(/not more than three months/i);
-    await expect(followUpPanel).toContainText(/400k/i);
+    await expect(emailHandoff).toContainText(/Email/i);
+    await expect(emailHandoff).toContainText(/400k/i);
+    await expect(emailHandoff).toContainText(/implementation proposal|not more than three months/i);
+    await expect(emailHandoff.getByRole("button", { name: /Copy email/i })).toBeVisible();
   });
 
   test("API sentiment payloads switch the rail between red and green", async ({
@@ -723,50 +721,41 @@ test.describe("Live call cockpit — DOM + API", () => {
     await expect(page).toHaveURL(new RegExp(`/calls/${CALL_ID}/post-dc\\?wrapped=1`), {
       timeout: 30_000,
     });
-    await expect(page.getByRole("heading", { name: /Post-DC review/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: ACCOUNT_NAME })).toBeVisible({
       timeout: 30_000,
     });
+    await expect(page.getByRole("heading", { name: /Call summary/i })).toBeVisible();
+    await expect(page.locator("main")).toContainText(/Budget is approved/i);
+    await expect(page.locator("main")).toContainText(/security architecture overview/i);
+    await expect(page.locator("main")).toContainText(/CFO ROI one-pager/i);
 
-    await page.getByRole("tab", { name: /Follow up/i }).click();
-    const followUpPanel = page.locator('[role="tabpanel"]:visible');
-    await expect(followUpPanel).toHaveCount(1);
-    const clientEmailCard = followUpPanel
-      .locator(".glass-insight-card")
-      .filter({ has: page.getByText("Follow-up Email", { exact: true }) });
-    await expect(clientEmailCard).toHaveCount(1);
-    await expect(clientEmailCard).toContainText(/Minutes of meeting/i);
-    await expect(clientEmailCard).toContainText(/What we committed to/i);
-    await expect(clientEmailCard).toContainText(/security architecture|CFO ROI|Q3 pilot/i);
-    await expect(clientEmailCard).not.toContainText(/\bBANT\b|Open discovery gaps|internal|Jira/i);
+    const emailHandoff = page.locator('[id="post-dc-widget-post.email_jira_handoff"]');
+    await expect(emailHandoff).toHaveCount(1);
+    await expect(emailHandoff).toContainText(/Email/i);
+    await expect(emailHandoff).toContainText(/Minutes of meeting/i);
+    await expect(emailHandoff).toContainText(/security architecture|CFO ROI|Q3 pilot/i);
 
-    const internalEmailCard = followUpPanel
-      .locator(".glass-insight-card")
-      .filter({ has: page.getByText("Internal team email", { exact: true }) });
-    await expect(internalEmailCard).toHaveCount(1);
-    await expect(internalEmailCard).toContainText(/BANT score|BANT details/i);
-    await expect(internalEmailCard).toContainText(/Budget|Authority|Need|Timeline/i);
-    await expect(internalEmailCard).toContainText(/Next action items/i);
-    await expect(internalEmailCard).toContainText(/security architecture|CFO ROI|Q3 pilot|CFO/i);
+    await emailHandoff.getByRole("tab", { name: "Internal" }).click();
+    await expect(emailHandoff).toContainText(/BANT score|BANT details/i);
+    await expect(emailHandoff).toContainText(/Budget|Authority|Need|Timeline/i);
+    await expect(emailHandoff).toContainText(/security architecture|CFO ROI|Q3 pilot|CFO/i);
 
-    await page.getByRole("tab", { name: /Actions/i }).click();
-    const actionsPanel = page.locator('[role="tabpanel"]:visible');
-    await expect(actionsPanel).toHaveCount(1);
-    await expect(actionsPanel).toContainText(/Task list/i);
-    await expect(actionsPanel).toContainText(/Pending/i);
-    await expect(actionsPanel).toContainText(/Follow-up|Content request|Schedule next meeting|Internal review/i);
-    await expect(actionsPanel).toContainText(/security architecture|CFO ROI|Q3 pilot|CFO/i);
+    const taskRail = page.getByRole("complementary", { name: /Wrap-up tasks/i });
+    await expect(taskRail).toContainText(/Tasks/i);
+    await expect(taskRail).toContainText(/Send follow-up email/i);
+    await expect(taskRail).toContainText(/Create Jira handoff/i);
+    await expect(taskRail).toContainText(/Review and send the follow-up email draft/i);
 
     const isBantQualified =
       body.jiraTicket?.bantSnapshot &&
       Object.values(body.jiraTicket.bantSnapshot).every((isConfirmed) => isConfirmed);
-    await page.getByRole("tab", { name: /Jira ticket/i }).click();
-    const jiraPanel = page.locator('[role="tabpanel"]:visible');
-    await expect(jiraPanel).toHaveCount(1);
-    await expect(jiraPanel).toContainText(/Jira ticket draft/i);
-    await expect(jiraPanel).toContainText(isBantQualified ? /BANT qualified/i : /BANT review needed/i);
-    await expect(jiraPanel).toContainText(/Budget/i);
-    await expect(jiraPanel).toContainText(/Authority/i);
-    await expect(jiraPanel).toContainText(/Need/i);
-    await expect(jiraPanel).toContainText(/Timeline/i);
+    await expect(emailHandoff).toContainText(/Jira ticket/i);
+    await expect(emailHandoff).toContainText(isBantQualified ? /DC Qualified/i : /DC Follow-up/i);
+
+    const main = page.locator("main");
+    await expect(main).toContainText(/Suggest Content/i);
+    await expect(main).toContainText(/Missing content/i);
+    await expect(main).toContainText(/Generate .*CFO ROI one-pager/i);
+    await expect(main).toContainText(/Generate .*Security architecture overview/i);
   });
 });

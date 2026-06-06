@@ -462,11 +462,24 @@ export function transcriptEventFromDemoLine(
   return lineToTranscriptEvent(callId, line, index);
 }
 
+function checklistElapsedSeconds(state: DiscoveryChecklistState | null | undefined): number {
+  const elapsed = state?.elapsedSeconds;
+  return typeof elapsed === "number" && Number.isFinite(elapsed) ? elapsed : -1;
+}
+
+function applyFreshChecklistUpdate(state: DiscoveryChecklistState) {
+  const store = useLiveCall.getState();
+  const currentElapsed = checklistElapsedSeconds(store.checklistState);
+  const incomingElapsed = checklistElapsedSeconds(state);
+  if (incomingElapsed >= 0 && currentElapsed > incomingElapsed) return;
+  store.applyChecklistUpdate(state);
+}
+
 /** Apply analysis fields returned by POST demo-segment (when WebSocket is down). */
 export function applyApiDemoResult(data: Record<string, unknown>) {
   const store = useLiveCall.getState();
   if (data.checklist && typeof data.checklist === "object") {
-    store.applyChecklistUpdate(data.checklist as DiscoveryChecklistState);
+    applyFreshChecklistUpdate(data.checklist as DiscoveryChecklistState);
   }
   if (data.intent && typeof data.intent === "object") {
     store.applyIntentUpdate(data.intent as IntentSnapshot);
@@ -499,7 +512,7 @@ export function applyApiDemoResult(data: Record<string, unknown>) {
           break;
         case "checklist_update":
           if (typed.payload && typeof typed.payload === "object") {
-            store.applyChecklistUpdate(typed.payload as DiscoveryChecklistState);
+            applyFreshChecklistUpdate(typed.payload as DiscoveryChecklistState);
           }
           break;
         case "intent_update":
