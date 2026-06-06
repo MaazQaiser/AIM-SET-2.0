@@ -780,8 +780,16 @@ def _build_pre_deck(
 def _content_to_generate(
     plan: List[Dict[str, Any]],
     fulfillments: List[Dict[str, Any]],
+    relevant: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     planned_by_id = {str(item.get("id", "")): item for item in plan}
+    relevant = relevant or {}
+    relevant_projects = _relevant_projects(relevant)[:5]
+    relevant_documents = [
+        doc for doc in (relevant.get("relevantDocuments") or [])
+        if isinstance(doc, dict)
+    ][:5]
+    recommended_deck = _select_recommended_deck(relevant)
     output: List[Dict[str, Any]] = []
     for row in fulfillments:
         status = str(row.get("status") or "").lower()
@@ -801,19 +809,51 @@ def _content_to_generate(
             reason_parts.append(
                 "The workflow could not find a strong enough knowledge-base match for this planned call asset."
             )
-        output.append(
-            {
-                "id": f"gap-{artifact_id or len(output) + 1}",
-                "sourceArtifactId": artifact_id or None,
-                "name": name,
-                "type": planned.get("type") or "one_pager",
-                "priority": _artifact_priority(planned, len(output) + 1),
-                "status": status,
-                "reason": " ".join(reason_parts),
-                "neededFor": rationale
-                or "Give the pod stronger call-specific material than the current KB can provide.",
-            }
-        )
+        reason = " ".join(reason_parts)
+        item: Dict[str, Any] = {
+            "id": f"gap-{artifact_id or len(output) + 1}",
+            "sourceArtifactId": artifact_id or None,
+            "name": name,
+            "type": planned.get("type") or "one_pager",
+            "priority": _artifact_priority(planned, len(output) + 1),
+            "status": status,
+            "reason": reason,
+            "neededFor": rationale
+            or "Give the pod stronger call-specific material than the current KB can provide.",
+        }
+        if relevant_projects:
+            item["relevantProjects"] = relevant_projects
+        if relevant_documents:
+            item["relevantDocuments"] = relevant_documents
+        if recommended_deck:
+            item["recommendedDeck"] = recommended_deck
+        evidence: List[Dict[str, Any]] = []
+        for project in relevant_projects[:3]:
+            evidence.append(
+                {
+                    "sourceType": str(project.get("source") or "project_database"),
+                    "sourceId": str(project.get("id") or ""),
+                    "assetId": project.get("assetId"),
+                    "title": str(project.get("title") or "Relevant project"),
+                    "summary": str(project.get("summary") or ""),
+                    "details": str(project.get("details") or ""),
+                    "relevanceScore": project.get("relevanceScore"),
+                }
+            )
+        for doc in relevant_documents[:3]:
+            evidence.append(
+                {
+                    "sourceType": "knowledge_base",
+                    "sourceId": str(doc.get("assetId") or ""),
+                    "assetId": doc.get("assetId"),
+                    "title": str(doc.get("title") or "Relevant KB document"),
+                    "summary": str(doc.get("snippet") or doc.get("previewText") or ""),
+                    "relevanceScore": doc.get("relevanceScore"),
+                }
+            )
+        if evidence:
+            item["evidence"] = evidence
+        output.append(item)
     output.sort(key=lambda item: _artifact_priority(item))
     return output
 
@@ -932,8 +972,9 @@ def run_pre_dc_pipeline(
     else:
         fulfillments = _fulfill_artifacts_heuristic(artifact_plan, hits)
 
+    relevant = build_relevant_content(ctx, account_name, research)
     pre_deck = _build_pre_deck(account_name, research, artifact_plan, hits)
-    content_to_generate = _content_to_generate(artifact_plan, fulfillments)
+    content_to_generate = _content_to_generate(artifact_plan, fulfillments, relevant)
 
     citations: List[Citation] = []
     for i, hit in enumerate(hits[:3]):
@@ -973,7 +1014,6 @@ def run_pre_dc_pipeline(
         elif "potential" in b:
             icp_match = 0.62
 
-    relevant = build_relevant_content(ctx, account_name, research)
     summary_sections = _complete_summary_sections(summary_sections, fields, account_name)
     summary_sections = _enrich_customer_profile_section(summary_sections, fields, account_name)
     summary_sections = _enrich_customer_pain_points_section(summary_sections, fields)

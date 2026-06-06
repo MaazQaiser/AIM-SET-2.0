@@ -138,6 +138,8 @@ export interface SuggestionPlanEvidenceProject {
   source: string;
   snippet?: string;
   score?: number;
+  details?: string;
+  source_project_id?: string;
 }
 
 export interface SuggestionPlanEvidenceKb {
@@ -146,6 +148,8 @@ export interface SuggestionPlanEvidenceKb {
   snippet?: string;
   slide_count?: number;
   score?: number;
+  file_name?: string;
+  format?: string;
 }
 
 export interface SuggestionPlan {
@@ -190,6 +194,33 @@ export interface ContentPlanInput {
     accountName?: string;
     leadName?: string;
     industry?: string;
+    relevantProjects?: Array<{
+      id?: string;
+      assetId?: string;
+      title: string;
+      source?: string;
+      relevanceScore?: number;
+      summary?: string;
+      details?: string;
+    }>;
+    relevantDocuments?: Array<{
+      assetId: string;
+      title: string;
+      fileName?: string;
+      format?: string;
+      relevanceScore?: number;
+      snippet?: string;
+      previewText?: string;
+    }>;
+    recommendedDeck?: {
+      assetId: string;
+      title: string;
+      fileName?: string;
+      format?: string;
+      relevanceScore?: number;
+      snippet?: string;
+      previewText?: string;
+    } | null;
   }>;
   kbAssetIds?: string[];
 }

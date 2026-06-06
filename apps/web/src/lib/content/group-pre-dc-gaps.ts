@@ -1,5 +1,11 @@
 import type { PreDcContentGenerationGap } from "@/lib/data/hooks";
 import { resolveContextualGroupTitle } from "@/lib/content/suggestion-context";
+import type {
+  ContentSuggestionEvidenceSource,
+  ContentSuggestionSlidePlan,
+  RelevantDocument,
+  RelevantProject,
+} from "@dc-copilot/types/brief";
 
 export interface ContentGenerationLead {
   id: string;
@@ -12,6 +18,11 @@ export interface ContentGenerationLead {
   type: PreDcContentGenerationGap["type"];
   reason: string;
   neededFor: string;
+  relevantProjects?: RelevantProject[];
+  relevantDocuments?: RelevantDocument[];
+  recommendedDeck?: RelevantDocument | null;
+  evidence?: ContentSuggestionEvidenceSource[];
+  slidePlan?: ContentSuggestionSlidePlan[];
 }
 
 function toContentGenerationLead(item: PreDcContentGenerationGap): ContentGenerationLead {
@@ -26,6 +37,11 @@ function toContentGenerationLead(item: PreDcContentGenerationGap): ContentGenera
     type: item.type,
     reason: item.reason,
     neededFor: item.neededFor,
+    relevantProjects: item.relevantProjects,
+    relevantDocuments: item.relevantDocuments,
+    recommendedDeck: item.recommendedDeck,
+    evidence: item.evidence,
+    slidePlan: item.slidePlan,
   };
 }
 

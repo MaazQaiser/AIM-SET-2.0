@@ -16,7 +16,7 @@ The transcript implied 10+ agents (sentiment, task, completeness, creative, cont
 
 **Why:** Agent proliferation is the leading failure mode in production agentic systems. Each additional agent multiplies handoff failures, debugging surface area, latency, and cost. Most "agents" people imagine are actually **tools** — deterministic functions an LLM calls — not autonomous reasoning loops.
 
-**Our shape:** One orchestrator + five specialist agents + ~15 tools. Anything that doesn't require multi-step reasoning is a tool, not an agent.
+**Our shape:** One Lead Orchestrator Agent, six product agents exposed in the agent control surface, and a small set of supporting backend agent modules. Anything that does not require multi-step reasoning is a tool, not an agent.
 
 ### Position 2: Evidence before answers
 
@@ -28,97 +28,141 @@ The live-call hot path has different requirements from async work (briefs, summa
 
 ---
 
-## 2. System Diagram
+## 2. System Workflow Diagram
 
 ```mermaid
 flowchart TB
-    subgraph CLIENT["Client Layer"]
-        WEB["Web App<br/>(Next.js)"]
-        EXT["Browser Extension<br/>(fallback capture)"]
-        BOT["Meeting Bot<br/>(Recall.ai-backed)"]
+    subgraph USERS["Users and meeting surfaces"]
+        AE["AE / Pod members"]
+        CM["Content Manager"]
+        DIR["Sales Director"]
+        MEET["Zoom / Meet / Teams"]
     end
 
-    subgraph EDGE["API & Edge"]
-        GW["API Gateway<br/>(auth, rate limit, audit)"]
-        WS["WebSocket Layer<br/>(live call streams)"]
+    subgraph CLIENT["Client layer"]
+        WEB["Next.js Web App"]
+        BFF["Next.js BFF routes<br/>/api/*"]
+        LIVEUI["Live Call Workspace<br/>WebSocket client"]
+        STUDIO["Content Studio"]
     end
 
-    subgraph ORCH["Orchestration Layer"]
-        LO["Lead Orchestrator Agent<br/>(routing, state, evidence enforcement)"]
-        EQ["Event Queue<br/>(Kafka or Redpanda)"]
+    subgraph API["FastAPI API layer"]
+        REST["REST routers<br/>calls, agents, kb, content, workflow"]
+        WS["WebSocket router<br/>live call channel"]
+        WEBHOOK["Recall webhook<br/>and transcript poll"]
+        AUTH["Tenant/Auth context"]
     end
 
-    subgraph AGENTS["Specialist Agents"]
-        LCA["Live Call Agent"]
-        CA["Content Agent"]
-        KA["Knowledge Agent"]
-        COA["Coaching Agent"]
-        TA["Task Agent"]
+    subgraph ORCH["Orchestration"]
+        LO["Lead Orchestrator Agent<br/>routing, state, evidence enforcement"]
+        RUNLOG["Agent runs + audit log"]
     end
 
-    subgraph TOOLS["Tool Layer (deterministic)"]
-        TR["Transcribe"]
-        SE["Sentiment"]
-        KW["Keyword Extract"]
-        EM["Embedding"]
-        RT["Retrieve KB"]
-        SU["Summarize"]
-        DR["Draft Email"]
-        SC["Score BANT"]
-        DG["Deck Generate"]
-        TC["Task Create"]
-        CC["Cost Check"]
-        CT["Citation Track"]
+    subgraph PRODUCT_AGENTS["Product agents"]
+        COPILOT["Sales Copilot Agent<br/>agent id: sales-copilot"]
+        PRE["PRE-DC Workflow<br/>agent id: workflow"]
+        CONTENT["Content Agent<br/>agent id: content"]
+        LIVE["Live Call Agent<br/>agent id: live-call"]
+        CHECK["Discovery Checklist Tracker<br/>agent id: discovery-checklist"]
+        POST["Post-DC Agent<br/>agent id: post_dc"]
+        GEN["Content Generation Agent<br/>agent id: content_generation"]
+    end
+
+    subgraph SUPPORT_AGENTS["Supporting backend agent modules"]
+        KNOW["Knowledge Agent<br/>agent id: knowledge"]
+        PLAN["Content Plan Agent<br/>agent id: content_plan"]
+        COACH["Coaching Agent<br/>agent id: coaching"]
+        TASK["Task Agent<br/>agent id: task"]
+    end
+
+    subgraph TOOLS["Tool layer"]
+        TOOLBUS["Deterministic tools<br/>transcribe, sentiment, keyword extract, retrieve KB, embed, BANT score, summarize, draft, export"]
+        LLM["LLM providers<br/>Anthropic / OpenAI"]
+        RECALL["Recall.ai bot + transcript API"]
+        JIRA["Jira / CRM adapters"]
     end
 
     subgraph DATA["Data Layer"]
-        VEC["Vector Store<br/>(KB embeddings)"]
-        OBJ["Object Store<br/>(decks, recordings)"]
-        REL["Postgres<br/>(transactional state)"]
-        TS["Time-series<br/>(metrics, traces)"]
+        PG["Supabase Postgres<br/>calls, notes, briefs, reviews, configs"]
+        VEC["pgvector / KB chunks<br/>semantic retrieval"]
+        OBJ["Supabase Storage<br/>decks, templates, exports, previews"]
+        MEM["Live memory/cache<br/>sessions, checklist state"]
+        AUDIT["Agent runs / audit events"]
     end
 
-    subgraph EXT_SYS["External Systems"]
-        CRM["CRM Adapter<br/>(HubSpot / Salesforce)"]
-        MEET["Meeting Platforms<br/>(Zoom / Meet / Teams)"]
-        LLM["LLM Providers<br/>(Anthropic primary)"]
-    end
+    AE --> WEB
+    CM --> WEB
+    DIR --> WEB
+    WEB --> BFF
+    WEB --> LIVEUI
+    WEB --> STUDIO
+    LIVEUI --> WS
+    STUDIO --> BFF
+    BFF --> REST
+    REST --> AUTH
+    WS --> AUTH
+    AUTH --> LO
+    MEET --> RECALL
+    RECALL --> WEBHOOK
+    WEBHOOK --> LO
 
-    WEB --> GW
-    EXT --> GW
-    BOT --> WS
-    GW --> LO
-    WS --> LO
-    LO <--> EQ
-    EQ --> LCA
-    EQ --> CA
-    EQ --> KA
-    EQ --> COA
-    EQ --> TA
-    LCA --> TOOLS
-    CA --> TOOLS
-    KA --> TOOLS
-    COA --> TOOLS
-    TA --> TOOLS
-    TOOLS --> DATA
-    TOOLS --> LLM
-    TA --> CRM
-    BOT --> MEET
+    REST --> COPILOT
+    COPILOT --> LO
+    LO --> PRE
+    LO --> CONTENT
+    LO --> LIVE
+    LO --> CHECK
+    LO --> POST
+    LO --> GEN
+    LO --> KNOW
+    LO --> PLAN
+    LO --> COACH
+    LO --> TASK
+    LO --> RUNLOG
+
+    PRE --> TOOLBUS
+    CONTENT --> TOOLBUS
+    LIVE --> TOOLBUS
+    CHECK --> TOOLBUS
+    POST --> TOOLBUS
+    GEN --> TOOLBUS
+    KNOW --> TOOLBUS
+    PLAN --> TOOLBUS
+    COACH --> TOOLBUS
+    TASK --> TOOLBUS
+    TOOLBUS --> LLM
+    TOOLBUS --> JIRA
+    TOOLBUS --> PG
+    TOOLBUS --> VEC
+    TOOLBUS --> OBJ
+    TOOLBUS --> MEM
+    RUNLOG --> AUDIT
+    PG --> BFF
+    MEM --> WS
 ```
 
 ---
 
-## 3. The Five Agents (and why only five)
+## 3. Agent Names in the Current System
 
-| Agent | Owns | Triggered by | Sample tools used |
+The Agent Control Panel exposes the six product agents below. Backend modules also emit named agent envelopes for assistant dispatch, KB ingestion, content planning, and older coaching/task paths.
+
+| Agent name | Agent id | Owns | Main trigger |
 |---|---|---|---|
-| **Live Call Agent** | Everything that happens during an in-progress call | Live transcript stream | Sentiment, Keyword Extract, Retrieve KB, Citation Track |
-| **Content Agent** | Generating new assets (decks, slides, one-pagers) and finding existing ones | Content gap signals, AE requests | Retrieve KB, Embedding, Deck Generate |
-| **Knowledge Agent** | Maintaining the KB: ingestion, tagging, deprecation, effectiveness scoring | Schedule + user actions | Embedding, Retrieve KB |
-| **Coaching Agent** | Producing coaching insights, scorecards, win-loss analysis | Post-call + weekly schedule | Summarize, Score BANT, Retrieve KB |
-| **Task Agent** | Creating tasks, drafting emails, executing CRM writes | Post-call + AE approvals | Draft Email, Task Create, CRM Adapter |
+| **Lead Orchestrator Agent** | orchestrator | Routes events, enforces citations, logs runs, coordinates handoffs | REST/WebSocket/webhook events |
+| **Sales Copilot Agent** | `sales-copilot` | Global assistant that answers user questions and dispatches agent actions | Bot-chat/copilot messages |
+| **PRE-DC Workflow** | `workflow` | AI summary, artifact plan, KB fulfillment, content-gap sync | Pre-DC CSV ingest or manual workflow run |
+| **Content Agent** | `content` | Pre-DC brief generation and relevant content retrieval fallback | Manual brief generation |
+| **Live Call Agent** | `live-call` | Intent detection, live transcript analysis, proactive nudges, bot-chat answers | Recall transcript segment or live chat |
+| **Discovery Checklist Tracker** | `discovery-checklist` | BANT/discovery coverage, timed nudges, final checklist handoff | Live transcript segment and call end |
+| **Post-DC Agent** | `post_dc` | Post-call summary, email draft, task list, Jira draft, coaching scorecard | Call-end/post-call pipeline |
+| **Content Generation Agent** | `content_generation` | Studio chat, template ingest, deck/one-pager generation, export | Content Studio project message or export |
+| **Content Plan Agent** | `content_plan` | Turns a detected content gap into a concrete Studio generation plan | Content gap/suggestion planning |
+| **Knowledge Agent** | `knowledge` | KB metadata ingest and chunk registration | KB asset metadata ingest |
+| **Coaching Agent** | `coaching` | Coaching insight envelope used by older/supporting flows | Post-call coaching path |
+| **Task Agent** | `task` | Email/task draft envelope used by older/supporting flows | Post-call task path |
 
-Everything else (sentiment analysis, summarization, scoring, etc) is a **tool**, not an agent. Tools are deterministic, callable, cacheable, individually testable, and cheap.
+Everything else - sentiment analysis, keyword extraction, BANT scoring, retrieval, embedding, export rendering, summarization, and citation validation - is a **tool**. Tools are deterministic, callable, cacheable, individually testable, and cheaper than another autonomous agent.
 
 ---
 
@@ -137,36 +181,146 @@ Critically, the orchestrator does **not** do reasoning about content. It does re
 
 ---
 
-## 5. Data Flow: A Single DC End-to-End
+## 5. Data Flow Diagram
 
-### Pre-DC (T-4 hours before call)
-1. Scheduler fires on a calendar event tagged as a DC
-2. Orchestrator dispatches to Content Agent and Knowledge Agent in parallel
-3. Knowledge Agent retrieves: account history, ICP match, prior call transcripts
-4. Content Agent assembles brief + suggested deck
-5. Coaching Agent enriches with "what to focus on" notes per pod role
-6. Orchestrator stitches outputs, validates citations, writes to Postgres
-7. Notification fires to pod members
+```mermaid
+flowchart LR
+    subgraph INPUTS["Inputs"]
+        PRECSV["Pre-DC CSV / lead form"]
+        POSTCSV["Post-DC CSV"]
+        KBUPLOAD["KB uploads<br/>docs, decks, templates"]
+        MEETING["Meeting audio/video"]
+        USERMSG["User chat / Studio prompt"]
+    end
 
-### Live Call (T-0)
-1. Meeting bot joins via Recall.ai
-2. Audio stream → Transcribe tool → WebSocket → Live Call Agent
-3. Every 5 seconds: Live Call Agent runs sentiment, keyword extract, retrieves relevant KB chunks
-4. When confidence threshold met → proactive nudge dispatched to the relevant pod member's panel
-5. Bot-chat queries from pod members → Live Call Agent → grounded answer with citation
-6. All events logged to time-series store
+    subgraph BFF["Next.js BFF"]
+        DCINGEST["/api/dc-notes/ingest"]
+        CALLBFF["/api/calls/*"]
+        KBBFF["/api/kb/*"]
+        CONTENTBFF["/api/content/*"]
+        COPILOTBFF["/api/copilot/chat"]
+    end
 
-### Post-DC (T+0 to T+60s)
-1. Call-end event triggers Orchestrator
-2. Task Agent + Coaching Agent fire in parallel
-3. Task Agent: summary, draft email, CRM task creation (writes staged, not auto-sent)
-4. Coaching Agent: pod scorecard, BANT progression, coaching note generation
-5. Knowledge Agent runs effectiveness updates: which assets were referenced, which got positive engagement
-6. AE notified; approval flow for outbound artifacts
+    subgraph API["FastAPI services"]
+        DCNOTES["dc_notes router"]
+        CALLS["v1_calls router"]
+        KBROUTER["v1_kb router"]
+        CONTENTROUTER["v1_content_studio router"]
+        WEBHOOKS["v1_webhooks / transcript poll"]
+        ORCH["Lead Orchestrator Agent"]
+    end
+
+    subgraph AGENTS["Agent processing"]
+        WORKFLOW["PRE-DC Workflow<br/>workflow"]
+        CONTENT["Content Agent<br/>content"]
+        LIVE["Live Call Agent<br/>live-call"]
+        CHECK["Discovery Checklist Tracker<br/>discovery-checklist"]
+        POST["Post-DC Agent<br/>post_dc"]
+        GEN["Content Generation Agent<br/>content_generation"]
+        PLAN["Content Plan Agent<br/>content_plan"]
+        KNOW["Knowledge Agent<br/>knowledge"]
+        COPILOT["Sales Copilot Agent<br/>sales-copilot"]
+    end
+
+    subgraph STORES["Tenant-scoped stores"]
+        PG["Supabase Postgres<br/>calls, dc notes, briefs, reviews, gaps, configs"]
+        VECTOR["KB chunks / pgvector"]
+        STORAGE["Supabase Storage<br/>source files, previews, exports"]
+        LIVESESSION["Live session memory<br/>transcript, suggestions, checklist"]
+        AUDIT["agent_runs + audit log"]
+    end
+
+    subgraph OUTPUTS["Outputs"]
+        PREUI["Pre-call brief"]
+        LIVEUI["Live workspace<br/>transcript, nudges, checklist"]
+        POSTUI["Post-DC review<br/>email, tasks, Jira draft, scorecard"]
+        STUDIOUI["Content Studio artifact<br/>HTML, PDF, PNG, PPTX"]
+        KBUI["Knowledge library"]
+    end
+
+    PRECSV --> DCINGEST --> DCNOTES --> PG
+    POSTCSV --> DCINGEST --> DCNOTES --> PG
+    KBUPLOAD --> KBBFF --> KBROUTER --> STORAGE
+    KBROUTER --> KNOW --> VECTOR
+    KBROUTER --> KNOW --> PG
+
+    PG --> ORCH
+    ORCH --> WORKFLOW
+    ORCH --> CONTENT
+    WORKFLOW --> VECTOR
+    CONTENT --> VECTOR
+    WORKFLOW --> PG
+    CONTENT --> PG
+    CALLBFF --> CALLS
+    CALLS --> PG
+    PG --> CALLS
+    CALLS --> CALLBFF
+    CALLBFF --> PREUI
+
+    MEETING --> WEBHOOKS --> ORCH
+    ORCH --> LIVE
+    ORCH --> CHECK
+    LIVE --> LIVESESSION
+    CHECK --> LIVESESSION
+    LIVESESSION --> LIVEUI
+
+    LIVESESSION --> ORCH
+    PG --> ORCH
+    ORCH --> POST
+    POST --> PG
+    POST --> AUDIT
+    PG --> CALLBFF --> POSTUI
+
+    USERMSG --> COPILOTBFF --> COPILOT --> ORCH
+    USERMSG --> CONTENTBFF --> CONTENTROUTER --> ORCH
+    ORCH --> PLAN
+    ORCH --> GEN
+    PLAN --> PG
+    GEN --> VECTOR
+    GEN --> STORAGE
+    GEN --> PG
+    STORAGE --> STUDIOUI
+    PG --> STUDIOUI
+    VECTOR --> KBUI
+    STORAGE --> KBUI
+    ORCH --> AUDIT
+```
 
 ---
 
-## 6. Key Build vs Buy Decisions
+## 6. Data Flow: A Single DC End-to-End
+
+### Pre-DC (T-4 hours before call)
+1. Pre-DC CSV import, lead creation, or manual workflow run stores tenant-scoped lead fields in Supabase.
+2. The Lead Orchestrator Agent dispatches **PRE-DC Workflow** (`workflow`).
+3. PRE-DC Workflow creates the executive summary, plans needed artifacts, retrieves matching KB material, and marks missing content gaps.
+4. **Content Agent** (`content`) can run the older/manual brief path when no imported Pre-DC row is available.
+5. Orchestrator validates the agent envelope, writes the brief/relevant-content payload to Postgres, logs the run, and makes the brief available to the web app.
+
+### Live Call (T-0)
+1. Meeting bot joins via Recall.ai
+2. Recall webhooks or transcript polling persist speaker-attributed transcript events.
+3. Orchestrator sends each segment to **Live Call Agent** (`live-call`) for intent, sentiment, keyword, KB, and nudge decisions.
+4. The same segment updates **Discovery Checklist Tracker** (`discovery-checklist`) for BANT coverage and discovery nudges.
+5. WebSocket messages push transcript events, nudges, BANT signals, checklist updates, and bot-chat answers to the Live Call Workspace.
+6. Live suggestions, transcript events, checklist state, and agent runs are stored for post-call replay.
+
+### Post-DC (T+0 to T+60s)
+1. Call-end event triggers Orchestrator
+2. Orchestrator finalizes **Discovery Checklist Tracker** (`discovery-checklist`) from the full transcript and builds the Live Call Agent handoff.
+3. **Post-DC Agent** (`post_dc`) turns transcript, live suggestions, Pre-DC fields, checklist coverage, and post-call records into review artifacts.
+4. Output includes summary, email draft, next-step tasks, Jira draft data, deal signals, coaching scorecard, and approval-ready artifacts.
+5. Orchestrator saves the review, syncs any post-call content gaps, optionally pre-generates a client landing page draft, and logs the run.
+
+### Content and KB Loop
+1. KB uploads go through the BFF and FastAPI KB router, then **Knowledge Agent** (`knowledge`) registers metadata/chunks for retrieval.
+2. Content gaps can trigger **Content Plan Agent** (`content_plan`) to create a Studio-ready plan.
+3. **Content Generation Agent** (`content_generation`) uses the plan, templates, KB evidence, and user prompts to produce artifacts.
+4. Exports can be saved back into the KB, closing the loop for future Pre-DC, live-call, and post-call retrieval.
+
+---
+
+## 7. Key Build vs Buy Decisions
 
 | Capability | Decision | Rationale |
 |---|---|---|
@@ -182,7 +336,7 @@ Critically, the orchestrator does **not** do reasoning about content. It does re
 
 ---
 
-## 7. Non-Functional Architecture
+## 8. Non-Functional Architecture
 
 ### Latency budgets (live call hot path)
 - Audio → transcript display: 3s end-to-end
@@ -215,7 +369,7 @@ Critically, the orchestrator does **not** do reasoning about content. It does re
 
 ---
 
-## 8. Failure Modes and Degradation
+## 9. Failure Modes and Degradation
 
 The platform must degrade gracefully when components fail. Not all failures are equal.
 
@@ -230,7 +384,7 @@ The platform must degrade gracefully when components fail. Not all failures are 
 
 ---
 
-## 9. Deployment Model
+## 10. Deployment Model
 
 **Recommended v1:** Single-tenant per customer, regional deployment.
 
@@ -242,7 +396,7 @@ The platform must degrade gracefully when components fail. Not all failures are 
 
 ---
 
-## 10. What's Deliberately Not in the Diagram
+## 11. What's Deliberately Not in the Diagram
 
 Things that will exist but aren't worth crowding the architecture view at this draft stage:
 

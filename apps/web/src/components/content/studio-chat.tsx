@@ -435,6 +435,10 @@ function slideOutlineText(content: Record<string, unknown>): string {
       const visual = stringField(item, "visual");
       const mode = stringField(item, "mode");
       const evidence = stringField(item, "evidence") || stringField(item, "citation_source");
+      const reuse = isRecord(item.reuse) ? item.reuse : null;
+      const reuseText = reuse
+        ? `Reuse: ${stringField(reuse, "source_vertical") || "KB"} slide ${stringField(reuse, "source_slide_index") || "?"}`
+        : "";
       const modeLabel =
         mode === "reuse" ? "[Reuse]" : mode === "hybrid" ? "[Hybrid]" : mode === "generate" ? "[Generate]" : "";
       return [
@@ -442,6 +446,7 @@ function slideOutlineText(content: Record<string, unknown>): string {
         body ? `Body: ${body}` : "",
         visual ? `Visual: ${visual}` : "",
         evidence ? `Evidence: ${evidence}` : "",
+        reuseText,
       ]
         .filter(Boolean)
         .join("\n");

@@ -51,7 +51,10 @@ export async function createProjectFromSuggestion(input: SuggestionProjectInput)
     callId: lead.callId,
     accountName: lead.accountName,
     leadName: lead.leadName,
-    industry: input.industry,
+    industry: lead.industry ?? input.industry,
+    relevantProjects: lead.relevantProjects,
+    relevantDocuments: lead.relevantDocuments,
+    recommendedDeck: lead.recommendedDeck,
   }));
 
   let suggestionPlan: SuggestionPlan | undefined;
@@ -86,6 +89,27 @@ export async function createProjectFromSuggestion(input: SuggestionProjectInput)
     leads,
     source_artifact_id: input.sourceArtifactId,
     kb_asset_ids: (input.kbMatches ?? []).map((m) => m.id),
+    explicit_evidence: leads.flatMap((lead) => [
+      ...(lead.relevantProjects ?? []).map((project) => ({
+        source_type: project.source ?? "project_database",
+        source_id: project.id,
+        asset_id: project.assetId,
+        title: project.title,
+        summary: project.summary,
+        details: project.details,
+        relevance_score: project.relevanceScore,
+      })),
+      ...(lead.relevantDocuments ?? []).map((doc) => ({
+        source_type: "knowledge_base",
+        source_id: doc.assetId,
+        asset_id: doc.assetId,
+        title: doc.title,
+        summary: doc.snippet ?? doc.previewText,
+        file_name: doc.fileName,
+        format: doc.format,
+        relevance_score: doc.relevanceScore,
+      })),
+    ]),
   };
 
   if (suggestionPlan) {

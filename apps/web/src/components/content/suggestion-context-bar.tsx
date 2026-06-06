@@ -21,6 +21,16 @@ export function SuggestionContextBar({ brief, onDismiss }: SuggestionContextBarP
   const source = brief.source === "post-dc" ? "Post-DC" : brief.source === "pre-dc" ? "Pre-DC" : "Suggestion";
   const account = String(brief.account_name || "");
   const callId = brief.call_id ? String(brief.call_id) : undefined;
+  const suggestionPlan = brief.suggestion_plan as
+    | {
+        evidence?: { projects?: unknown[]; kb_assets?: unknown[] };
+        slide_plan?: Array<{ mode?: string }>;
+      }
+    | undefined;
+  const projectCount = suggestionPlan?.evidence?.projects?.length ?? 0;
+  const kbCount = suggestionPlan?.evidence?.kb_assets?.length ?? 0;
+  const slideCount = suggestionPlan?.slide_plan?.length ?? 0;
+  const reuseCount = suggestionPlan?.slide_plan?.filter((slide) => slide.mode === "reuse").length ?? 0;
   const leadCount = Number(brief.lead_count || plan?.lead_count || 0);
   const projects = plan?.evidence?.projects ?? [];
 
@@ -70,6 +80,14 @@ export function SuggestionContextBar({ brief, onDismiss }: SuggestionContextBarP
                 </>
               )}
             </p>
+          )}
+          {(projectCount > 0 || kbCount > 0 || slideCount > 0) && (
+            <div className="flex flex-wrap gap-1.5">
+              {projectCount > 0 && <Badge variant="secondary">{projectCount} project proof{projectCount === 1 ? "" : "s"}</Badge>}
+              {kbCount > 0 && <Badge variant="secondary">{kbCount} KB asset{kbCount === 1 ? "" : "s"}</Badge>}
+              {slideCount > 0 && <Badge variant="outline">{slideCount} planned slide{slideCount === 1 ? "" : "s"}</Badge>}
+              {reuseCount > 0 && <Badge variant="outline">{reuseCount} reuse slide{reuseCount === 1 ? "" : "s"}</Badge>}
+            </div>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">

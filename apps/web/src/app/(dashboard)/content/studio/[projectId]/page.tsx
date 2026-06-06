@@ -3,7 +3,19 @@
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { BookOpenCheck, ChevronLeft, Download, Eye, Plus, RotateCcw, Send, Sparkles } from "lucide-react";
+import {
+  BookOpenCheck,
+  ChevronLeft,
+  Database,
+  Download,
+  Eye,
+  FileText,
+  Layers,
+  Plus,
+  RotateCcw,
+  Send,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import {
@@ -62,6 +74,9 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
   const revisionId = previewRevisionId ?? data?.latestRevision?.id;
   const brief = (project?.brief ?? {}) as Record<string, unknown>;
   const suggestionPlan = brief.suggestion_plan as import("@/types/content_studio").SuggestionPlan | undefined;
+  const evidenceProjects = suggestionPlan?.evidence?.projects ?? [];
+  const evidenceKbAssets = suggestionPlan?.evidence?.kb_assets ?? [];
+  const reusedSlides = (suggestionPlan?.slide_plan ?? []).filter((slide) => slide.mode === "reuse" || slide.reuse);
   const planSlideCount =
     suggestionPlan?.slide_plan?.length ??
     (Array.isArray(brief.slide_outline) ? brief.slide_outline.length : 0);
@@ -313,6 +328,78 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
               />
             </CardContent>
           </Card>
+          {suggestionPlan && (evidenceProjects.length > 0 || evidenceKbAssets.length > 0 || reusedSlides.length > 0) && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Evidence plan</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {suggestionPlan.plan_summary && (
+                  <p className="text-xs leading-relaxed text-muted-foreground">{suggestionPlan.plan_summary}</p>
+                )}
+                {evidenceProjects.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                      <Database className="h-3.5 w-3.5 text-muted-foreground" />
+                      Project database
+                    </div>
+                    <div className="space-y-1.5">
+                      {evidenceProjects.slice(0, 4).map((project) => (
+                        <div key={project.asset_id} className="rounded-md border border-border/70 p-2">
+                          <p className="truncate text-xs font-medium text-foreground">{project.title}</p>
+                          {project.snippet && (
+                            <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+                              {project.snippet}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {evidenceKbAssets.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                      KB assets
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {evidenceKbAssets.slice(0, 5).map((asset) => (
+                        <Link
+                          key={asset.asset_id}
+                          href={`/content?tab=library&asset=${encodeURIComponent(asset.asset_id)}`}
+                          className="inline-flex max-w-full items-center rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+                        >
+                          <span className="truncate">{asset.title}</span>
+                          {asset.slide_count ? (
+                            <span className="ml-1 shrink-0 text-[10px]">({asset.slide_count})</span>
+                          ) : null}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {reusedSlides.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                      <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+                      Reused slides
+                    </div>
+                    <div className="space-y-1">
+                      {reusedSlides.map((slide) => (
+                        <p key={slide.slide} className="text-[11px] text-muted-foreground">
+                          <span className="font-medium text-foreground">Slide {slide.slide}</span>
+                          {slide.reuse
+                            ? ` from ${slide.reuse.source_vertical || "KB"} slide ${slide.reuse.source_slide_index}`
+                            : " uses KB content"}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
           {data?.revisions && data.revisions.length > 0 && (
             <Card>
               <CardHeader className="pb-2">

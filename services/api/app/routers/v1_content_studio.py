@@ -54,6 +54,12 @@ class ContentPlanLead(BaseModel):
     leadName: Optional[str] = None
     lead_name: Optional[str] = None
     industry: Optional[str] = None
+    relevantProjects: List[Dict[str, Any]] = Field(default_factory=list)
+    relevant_projects: List[Dict[str, Any]] = Field(default_factory=list)
+    relevantDocuments: List[Dict[str, Any]] = Field(default_factory=list)
+    relevant_documents: List[Dict[str, Any]] = Field(default_factory=list)
+    recommendedDeck: Optional[Dict[str, Any]] = None
+    recommended_deck: Optional[Dict[str, Any]] = None
 
 
 class ContentPlanBody(BaseModel):

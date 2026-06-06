@@ -294,6 +294,9 @@ function ContentGenerationCard({
       accountName: lead.accountName,
       leadName: lead.leadName,
       industry: lead.industry ?? group.industryLabel,
+      relevantProjects: lead.relevantProjects,
+      relevantDocuments: lead.relevantDocuments,
+      recommendedDeck: lead.recommendedDeck,
     })),
     kbAssetIds: (group.kbMatches ?? []).map((m) => m.id),
   };
@@ -476,6 +479,7 @@ function SuggestionPlanPreview({
   plan: import("@/types/content_studio").SuggestionPlan;
 }) {
   const projects = plan.evidence?.projects ?? [];
+  const kbAssets = plan.evidence?.kb_assets ?? [];
   const slides = plan.slide_plan ?? [];
 
   return (
@@ -490,6 +494,19 @@ function SuggestionPlanPreview({
             {projects.map((proj) => (
               <Badge key={proj.asset_id} variant="secondary" className="text-[10px] font-normal">
                 {proj.title}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+      {kbAssets.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-foreground">Reusable KB assets</p>
+          <div className="flex flex-wrap gap-1.5">
+            {kbAssets.map((asset) => (
+              <Badge key={asset.asset_id} variant="outline" className="text-[10px] font-normal">
+                {asset.title}
+                {asset.slide_count ? ` · ${asset.slide_count} slides` : ""}
               </Badge>
             ))}
           </div>
@@ -513,6 +530,11 @@ function SuggestionPlanPreview({
                 )}
                 {slide.mode === "hybrid" && (
                   <Badge variant="outline" className="h-5 text-[10px]">Hybrid</Badge>
+                )}
+                {slide.reuse && (
+                  <span className="text-[10px] text-muted-foreground">
+                    from {slide.reuse.source_vertical || "KB"} slide {slide.reuse.source_slide_index}
+                  </span>
                 )}
               </li>
             ))}

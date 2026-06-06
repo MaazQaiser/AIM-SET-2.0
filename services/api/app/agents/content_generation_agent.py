@@ -151,11 +151,12 @@ def _attach_outline_sources(
             continue
         next_item = dict(item)
         if kb_sources:
-            next_item["citation_source"] = kb_sources[index % len(kb_sources)]
+            if not next_item.get("citation_source"):
+                next_item["citation_source"] = kb_sources[index % len(kb_sources)]
             snippet = str(kb_hits[index % len(kb_hits)].get("chunk_text") or "").strip()
-            if snippet:
+            if snippet and not next_item.get("evidence"):
                 next_item["evidence"] = snippet[:180]
-        else:
+        elif not next_item.get("citation_source"):
             next_item["citation_source"] = f"session:{project_id}"
         out.append(next_item)
     return out
@@ -178,6 +179,64 @@ def _brief_citations(project_id: str, brief: Dict[str, Any]) -> List[Citation]:
             confidence=0.7,
         )
     ]
+
+
+def _float_or(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _suggestion_plan_citations(brief: Dict[str, Any]) -> List[Citation]:
+    plan = _get_suggestion_plan(brief)
+    if not plan:
+        return []
+    evidence = plan.get("evidence") or {}
+    citations: List[Citation] = []
+    for project in (evidence.get("projects") or [])[:5]:
+        if not isinstance(project, dict):
+            continue
+        source_id = str(project.get("asset_id") or project.get("source_project_id") or "").strip()
+        snippet = str(project.get("snippet") or project.get("details") or project.get("title") or "").strip()
+        if not source_id and not snippet:
+            continue
+        citations.append(
+            Citation(
+                source_type="project_database",
+                source_id=source_id or str(project.get("title") or "project"),
+                snippet=snippet[:200],
+                confidence=_float_or(project.get("score"), 0.8),
+            )
+        )
+    for kb in (evidence.get("kb_assets") or [])[:5]:
+        if not isinstance(kb, dict):
+            continue
+        source_id = str(kb.get("asset_id") or "").strip()
+        snippet = str(kb.get("snippet") or kb.get("title") or "").strip()
+        if not source_id and not snippet:
+            continue
+        citations.append(
+            Citation(
+                source_type="kb_document",
+                source_id=source_id or str(kb.get("title") or "kb-document"),
+                snippet=snippet[:200],
+                confidence=_float_or(kb.get("score"), 0.85),
+            )
+        )
+    return citations
+
+
+def _dedupe_citations(citations: List[Citation]) -> List[Citation]:
+    seen: set[tuple[str, str]] = set()
+    out: List[Citation] = []
+    for citation in citations:
+        key = (citation.source_type, citation.source_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(citation)
+    return out
 
 
 def _get_suggestion_plan(brief: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -236,6 +295,7 @@ def _generate_deck_from_plan(
         user_message=clean_msg,
         settings=settings,
     )
+    citations = _dedupe_citations([*_suggestion_plan_citations(brief), *citations])
     if not citations:
         citations = _brief_citations(project_id, brief)
 
@@ -460,7 +520,7 @@ def run_studio_bootstrap(
         agent="content_generation",
         operation="studio_bootstrap",
         result=result,
-        citations=_hits_to_citations(kb_hits),
+        citations=_dedupe_citations([*_suggestion_plan_citations(brief), *_hits_to_citations(kb_hits)]),
         confidence=0.9,
         cost={"tokens": 0, "usd": 0.0, "model": "rule-based-bootstrap"},
         trace_id=str(uuid.uuid4()),

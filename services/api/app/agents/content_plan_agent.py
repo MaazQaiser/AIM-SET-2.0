@@ -36,9 +36,33 @@ def _normalize_leads(leads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "account_name": str(lead.get("account_name") or lead.get("accountName") or "").strip(),
                 "lead_name": str(lead.get("lead_name") or lead.get("leadName") or "").strip(),
                 "industry": str(lead.get("industry") or "").strip(),
+                "relevant_projects": [
+                    item
+                    for item in (lead.get("relevant_projects") or lead.get("relevantProjects") or [])
+                    if isinstance(item, dict)
+                ],
+                "relevant_documents": [
+                    item
+                    for item in (lead.get("relevant_documents") or lead.get("relevantDocuments") or [])
+                    if isinstance(item, dict)
+                ],
+                "recommended_deck": (
+                    lead.get("recommended_deck")
+                    if isinstance(lead.get("recommended_deck"), dict)
+                    else lead.get("recommendedDeck")
+                    if isinstance(lead.get("recommendedDeck"), dict)
+                    else None
+                ),
             }
         )
     return out
+
+
+def _float_or(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _dedupe_evidence_projects(projects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -56,7 +80,9 @@ def _dedupe_evidence_projects(projects: List[Dict[str, Any]]) -> List[Dict[str, 
                 "title": str(item.get("title") or "Project"),
                 "source": str(item.get("source") or "project_database"),
                 "snippet": str(item.get("summary") or item.get("snippet") or "")[:280],
-                "score": float(item.get("relevanceScore") or item.get("score") or 0),
+                "score": _float_or(item.get("relevanceScore") or item.get("score"), 0),
+                "details": str(item.get("details") or "")[:500],
+                "source_project_id": str(item.get("source_project_id") or item.get("id") or ""),
             }
         )
     return out[:8]
@@ -80,6 +106,41 @@ def _kb_assets_payload(hits: List[Dict[str, Any]], ctx: TenantContext) -> List[D
                 "snippet": str(hit.get("chunk_text") or hit.get("snippet") or "")[:280],
                 "slide_count": int((row or {}).get("preview_slide_count") or 0),
                 "score": float(hit.get("score") or 0),
+            }
+        )
+    return out[:8]
+
+
+def _dedupe_evidence_kb_assets(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen: set[str] = set()
+    out: List[Dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        asset_id = str(item.get("assetId") or item.get("asset_id") or item.get("id") or "").strip()
+        title = str(item.get("title") or item.get("name") or item.get("fileName") or item.get("file_name") or "").strip()
+        key = asset_id or title.lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        fmt = str(item.get("format") or item.get("mimeType") or item.get("mime_type") or "").lower()
+        file_name = str(item.get("fileName") or item.get("file_name") or "").strip()
+        is_deck = fmt in {"ppt", "pptx"} or file_name.lower().endswith((".ppt", ".pptx"))
+        slide_count = int(
+            item.get("slide_count")
+            or item.get("previewSlideCount")
+            or item.get("preview_slide_count")
+            or (6 if is_deck else 0)
+        )
+        out.append(
+            {
+                "asset_id": asset_id or key,
+                "title": title or "KB document",
+                "snippet": str(item.get("snippet") or item.get("previewText") or item.get("preview_text") or "")[:280],
+                "slide_count": slide_count,
+                "score": _float_or(item.get("relevanceScore") or item.get("score"), 0.85),
+                "file_name": file_name,
+                "format": fmt,
             }
         )
     return out[:8]
@@ -245,7 +306,13 @@ def run_content_plan(
     query = " ".join(p for p in query_parts if p).strip()
 
     evidence_projects: List[Dict[str, Any]] = []
+    explicit_kb_assets: List[Dict[str, Any]] = []
     for lead in normalized_leads[:4]:
+        evidence_projects.extend(_dedupe_evidence_projects(lead.get("relevant_projects") or []))
+        explicit_kb_assets.extend(_dedupe_evidence_kb_assets(lead.get("relevant_documents") or []))
+        recommended_deck = lead.get("recommended_deck")
+        if isinstance(recommended_deck, dict):
+            explicit_kb_assets.extend(_dedupe_evidence_kb_assets([recommended_deck]))
         research = {
             "needs": generation_reason,
             "industry": lead.get("industry") or industry,
@@ -276,7 +343,7 @@ def run_content_plan(
                     },
                 )
 
-    evidence_kb = _kb_assets_payload(kb_hits, ctx)
+    evidence_kb = _dedupe_evidence_kb_assets(explicit_kb_assets + _kb_assets_payload(kb_hits, ctx))
 
     brief_stub = {
         "needed_for": needed_for,
