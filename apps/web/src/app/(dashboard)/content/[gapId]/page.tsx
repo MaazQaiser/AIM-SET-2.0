@@ -1,27 +1,23 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect } from "react";
 import Link from "next/link";
-import { ChevronLeft, FileText, Lightbulb } from "lucide-react";
-import { Button } from "@dc-copilot/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
-import { Badge } from "@dc-copilot/ui/components/badge";
-import { Textarea } from "@dc-copilot/ui/components/textarea";
-import { AIGeneratedBadge } from "@/components/ai-generated-badge";
+import { useRouter } from "next/navigation";
+import { ChevronLeft, Lightbulb } from "lucide-react";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { useContentGaps } from "@/lib/data/hooks";
 
-const EVIDENCE = [
-  { call: "Meridian Trust DC", quote: "ESG regulatory pressure is the urgency driver", anonymized: true },
-  { call: "Beta Technologies DC", quote: "We need a mid-market ESG compliance brief", anonymized: true },
-  { call: "Gamma FS call", quote: "Nothing in the library covers hybrid-cloud audit trails", anonymized: true },
-];
-
 export default function ContentGapDetailPage({ params }: { params: Promise<{ gapId: string }> }) {
   const { gapId } = use(params);
+  const router = useRouter();
   const { data: gaps = [] } = useContentGaps();
   const gap = gaps.find((g) => g.id === gapId);
-  const [notes, setNotes] = useState("Opening needs rewrite. Mark paragraphs 2–3 for refresh.");
+
+  useEffect(() => {
+    if (gap?.studioProjectId) {
+      router.replace(`/content/studio/${gap.studioProjectId}`);
+    }
+  }, [gap?.studioProjectId, router]);
 
   if (!gap) {
     return (
@@ -35,44 +31,25 @@ export default function ContentGapDetailPage({ params }: { params: Promise<{ gap
     );
   }
 
-  const title = gap.topic;
+  if (gap.studioProjectId) {
+    return (
+      <div className="p-6 text-sm text-muted-foreground">
+        Opening linked Studio project…
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-3xl mx-auto">
-      <Link href="/content" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/content?tab=suggestions" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ChevronLeft className="h-4 w-4" />
-        Content
+        Content suggestions
       </Link>
-
-      <div>
-        <h1 className="text-2xl font-semibold">{title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">Content gap studio</p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            AI draft
-            <AIGeneratedBadge />
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={6} />
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">Evidence chain</p>
-            {EVIDENCE.map((e) => (
-              <div key={e.call} className="rounded-md border p-2 text-xs">
-                <Badge variant="outline" className="mb-1">
-                  {e.call}
-                </Badge>
-                <p className="italic text-muted-foreground">&ldquo;{e.quote}&rdquo;</p>
-              </div>
-            ))}
-          </div>
-          <Button>Submit for review</Button>
-        </CardContent>
-      </Card>
+      <EmptyState
+        icon={Lightbulb}
+        title={gap.topic}
+        description="Generate this asset from the Content suggestions tab to open it in Studio with a full evidence-backed plan."
+      />
     </div>
   );
 }

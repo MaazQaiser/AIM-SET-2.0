@@ -6,6 +6,27 @@ export interface ContentGenerationLead {
   callId: string;
   accountName: string;
   leadName?: string;
+  industry?: string;
+  name: string;
+  sourceArtifactId?: string;
+  type: PreDcContentGenerationGap["type"];
+  reason: string;
+  neededFor: string;
+}
+
+function toContentGenerationLead(item: PreDcContentGenerationGap): ContentGenerationLead {
+  return {
+    id: item.id,
+    callId: item.callId,
+    accountName: item.accountName,
+    leadName: item.leadName,
+    industry: item.industry,
+    name: item.name,
+    sourceArtifactId: item.sourceArtifactId,
+    type: item.type,
+    reason: item.reason,
+    neededFor: item.neededFor,
+  };
 }
 
 export interface PreDcGenerationGroup {
@@ -70,7 +91,7 @@ export function groupPreDcGaps(items: PreDcContentGenerationGap[]): PreDcGenerat
         status: item.status,
         reason: item.reason,
         neededFor: item.neededFor,
-        leads: [item],
+        leads: [toContentGenerationLead(item)],
       });
       continue;
     }
@@ -80,7 +101,7 @@ export function groupPreDcGaps(items: PreDcContentGenerationGap[]): PreDcGenerat
     existing.priority = Math.min(existing.priority, item.priority);
     existing.status =
       existing.status === "missing" || item.status === "missing" ? "missing" : "partial";
-    existing.leads.push(item);
+    existing.leads.push(toContentGenerationLead(item));
   }
 
   return [...byDocument.values()]
@@ -90,7 +111,7 @@ export function groupPreDcGaps(items: PreDcContentGenerationGap[]): PreDcGenerat
         if (accountCompare !== 0) return accountCompare;
         return (a.leadName ?? "").localeCompare(b.leadName ?? "");
       });
-      const resolvedTitle = resolveContextualGroupTitle(leads as PreDcContentGenerationGap[]);
+      const resolvedTitle = resolveContextualGroupTitle(leads);
       const resolved = {
         ...group,
         name: resolvedTitle.name,

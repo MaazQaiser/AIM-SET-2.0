@@ -25,6 +25,10 @@ from app.domain.content_studio_guardrails import (
 from app.domain.content_studio_repository import ContentStudioRepository, get_content_studio_repository
 from app.domain.kb_repository import get_kb_repository
 from app.domain.kb_tenancy import resolve_kb_tenant
+from app.services.deck_assembly_service import (
+    merge_slide_plan_to_html,
+    slide_plan_to_outline,
+)
 
 PROMPTS_ROOT = Path(__file__).resolve().parents[4] / "prompts"
 
@@ -176,6 +180,185 @@ def _brief_citations(project_id: str, brief: Dict[str, Any]) -> List[Citation]:
     ]
 
 
+def _get_suggestion_plan(brief: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    plan = brief.get("suggestion_plan")
+    return plan if isinstance(plan, dict) else None
+
+
+def _get_slide_plan(brief: Dict[str, Any]) -> List[Dict[str, Any]]:
+    plan = _get_suggestion_plan(brief)
+    if plan and isinstance(plan.get("slide_plan"), list):
+        return [item for item in plan["slide_plan"] if isinstance(item, dict)]
+    outline = brief.get("slide_outline")
+    if isinstance(outline, list):
+        return [item for item in outline if isinstance(item, dict)]
+    return []
+
+
+def _sync_slide_plan_to_brief(brief: Dict[str, Any], slide_plan: List[Dict[str, Any]]) -> Dict[str, Any]:
+    b = dict(brief)
+    b["slide_outline"] = slide_plan_to_outline(slide_plan)
+    b["slide_count"] = len(slide_plan) or b.get("slide_count")
+    plan = _get_suggestion_plan(b)
+    if plan:
+        plan = dict(plan)
+        plan["slide_plan"] = slide_plan
+        b["suggestion_plan"] = plan
+    return b
+
+
+def _generate_deck_from_plan(
+    ctx: TenantContext,
+    *,
+    project_id: str,
+    project: Dict[str, Any],
+    brief: Dict[str, Any],
+    clean_msg: str,
+    template_id: Optional[str],
+    repo: ContentStudioRepository,
+    settings: Any,
+    runtime: Dict[str, Any],
+) -> AgentEnvelope:
+    """Generate deck HTML from suggestion_plan: reuse slides + LLM for generate modes."""
+    tpl_id = template_id or project.get("templateId")
+    chosen_template = repo.get_template(ctx, tpl_id) if tpl_id else None
+    title = str(project.get("title") or "Generated Deck")
+
+    slide_plan = _get_slide_plan(brief)
+    if not slide_plan:
+        brief = _brief_with_defaults(brief)
+        slide_plan = _get_slide_plan(brief) or _build_slide_outline(title=title, brief=brief)
+
+    kb_hits, citations = _retrieve_studio_evidence(
+        ctx,
+        project=project,
+        brief=brief,
+        user_message=clean_msg,
+        settings=settings,
+    )
+    if not citations:
+        citations = _brief_citations(project_id, brief)
+
+    generated_sections: Dict[int, str] = {}
+    slides_to_generate = [
+        item for item in slide_plan
+        if isinstance(item, dict) and str(item.get("mode") or "generate").lower() in ("generate", "hybrid")
+    ]
+
+    if slides_to_generate and (settings.llm_api_key or settings.openai_configured):
+        suggestion_plan = _get_suggestion_plan(brief) or {}
+        template_context = _template_context(chosen_template)
+        system = runtime["system_prompt"]
+        gen_payload = json.dumps(
+            {
+                "title": title,
+                "brief": brief,
+                "suggestion_plan": suggestion_plan,
+                "slides_to_generate": slides_to_generate,
+                "kb_hits": kb_hits[:5],
+                "template_css": (chosen_template or {}).get("cssVariables", {}),
+                "template_context": template_context,
+            },
+            indent=2,
+        )
+        try:
+            completion = LlmClient(api_key=settings.llm_api_key or None).complete(
+                system=system,
+                user=(
+                    "Generate ONLY the slides listed in slides_to_generate. "
+                    "Return each as <section class=\"slide\" data-slide=\"N\">...</section> "
+                    "inside a single <html> block. Ground claims in kb_hits.\n\n"
+                    + gen_payload
+                ),
+                max_tokens=4096,
+                model=runtime["model_name"],
+                fallback_model=runtime["fallback_model_name"],
+            )
+            _, html_body = _extract_html_block(completion.text)
+            if html_body:
+                pattern = re.compile(
+                    r'(<section[^>]*\bdata-slide=["\']?(\d+)["\']?[^>]*>.*?</section>)',
+                    re.DOTALL | re.IGNORECASE,
+                )
+                for match in pattern.finditer(html_body):
+                    generated_sections[int(match.group(2))] = match.group(1)
+        except Exception:
+            pass
+
+    if not generated_sections:
+        for item in slides_to_generate:
+            if not isinstance(item, dict):
+                continue
+            slide_num = int(item.get("slide") or 0)
+            partial_html = _build_slide_preview_html(title=title, brief={"slide_outline": [item]}, template=chosen_template)
+            section = extract_slide_section(partial_html, slide_num)
+            if section:
+                generated_sections[slide_num] = section
+
+    full_html = merge_slide_plan_to_html(
+        ctx,
+        title=title,
+        slide_plan=slide_plan,
+        template=chosen_template,
+        generated_sections=generated_sections,
+        repo=repo,
+    )
+
+    _, violations = sanitize_html(full_html)
+    if violations:
+        raise ValueError(f"HTML guardrail violations: {violations}")
+    deck_err = validate_deck_slide_count(full_html, "deck")
+    if deck_err:
+        raise ValueError(deck_err)
+
+    rev = repo.create_revision(
+        ctx,
+        project_id,
+        html=full_html,
+        citations=[c.model_dump() for c in citations],
+        template_id=tpl_id,
+    )
+    brief = _sync_slide_plan_to_brief(brief, slide_plan)
+    patch: Dict[str, Any] = {"brief": brief, "status": "preview"}
+    if tpl_id:
+        patch["templateId"] = tpl_id
+    repo.update_project(ctx, project_id, patch)
+
+    reuse_count = sum(1 for s in slide_plan if isinstance(s, dict) and str(s.get("mode")) == "reuse")
+    gen_count = len(slide_plan) - reuse_count
+    message = (
+        f"Draft ready: {gen_count} generated slide{'s' if gen_count != 1 else ''}, "
+        f"{reuse_count} reused from KB. Tell me which slide to edit from chat."
+    )
+
+    envelope = AgentEnvelope(
+        agent="content_generation",
+        operation="html_generate",
+        result={
+            "project_id": project_id,
+            "turn_type": "html",
+            "message": message,
+            "revision_id": rev["id"],
+            "html": full_html,
+            "template_id": tpl_id,
+            "slide_plan": slide_plan,
+        },
+        citations=citations,
+        confidence=0.9 if kb_hits else 0.78,
+        cost={"tokens": 0, "usd": 0.0, "model": "deck-plan-assembly"},
+        trace_id=str(uuid.uuid4()),
+        creative=bool(slides_to_generate),
+    )
+    validate_envelope(envelope)
+    return envelope
+
+
+def extract_slide_section(html: str, slide_index: int) -> Optional[str]:
+    from app.services.deck_assembly_service import extract_slide_section as _extract
+
+    return _extract(html, slide_index)
+
+
 def run_studio_bootstrap(
     ctx: TenantContext,
     *,
@@ -194,12 +377,36 @@ def run_studio_bootstrap(
     brief["artifact_type"] = artifact_type
     brief = _enrich_brief_from_suggestion(brief, title, artifact_type)
 
+    suggestion_plan = _get_suggestion_plan(brief)
+    if suggestion_plan:
+        evidence = suggestion_plan.get("evidence") or {}
+        kb_ids = []
+        for kb in (evidence.get("kb_assets") or []):
+            if isinstance(kb, dict) and kb.get("asset_id"):
+                kb_ids.append(str(kb["asset_id"]))
+        if kb_ids:
+            brief["kb_asset_ids"] = kb_ids[:8]
+        slide_plan = suggestion_plan.get("slide_plan")
+        if isinstance(slide_plan, list) and slide_plan:
+            brief["slide_outline"] = slide_plan_to_outline(slide_plan)
+            brief["slide_count"] = len(slide_plan)
+        tpl = suggestion_plan.get("template") or {}
+        template_id_from_plan = str(tpl.get("template_id") or "").strip()
+    else:
+        template_id_from_plan = ""
+
     kb_hits = _retrieve_studio_kb_hits(ctx, f"{title} {brief.get('needed_for', '')} {brief.get('generation_reason', '')}")
-    if kb_hits:
+    if kb_hits and not brief.get("kb_asset_ids"):
         brief["kb_asset_ids"] = [str(hit.get("asset_id", "")) for hit in kb_hits[:5] if hit.get("asset_id")]
 
-    if artifact_type == "deck" and _needs_slide_outline(brief, artifact_type):
+    if artifact_type == "deck" and _needs_slide_outline(brief, artifact_type) and not brief.get("slide_outline"):
         brief["slide_outline"] = _build_slide_outline(title=title, brief=brief)
+        brief["slide_outline"] = _attach_outline_sources(
+            brief["slide_outline"],
+            project_id=project_id,
+            kb_hits=kb_hits,
+        )
+    elif artifact_type == "deck" and brief.get("slide_outline") and kb_hits:
         brief["slide_outline"] = _attach_outline_sources(
             brief["slide_outline"],
             project_id=project_id,
@@ -207,6 +414,18 @@ def run_studio_bootstrap(
         )
 
     best_template, recommendations = _pick_default_templates(ctx, repo, project, brief, title)
+    if template_id_from_plan:
+        planned = repo.get_template(ctx, template_id_from_plan)
+        if planned:
+            best_template = planned
+            if not any(r.get("template_id") == template_id_from_plan for r in recommendations):
+                recommendations = [
+                    {
+                        "template_id": template_id_from_plan,
+                        "rationale": str((suggestion_plan or {}).get("template", {}).get("rationale") or ""),
+                    },
+                    *recommendations,
+                ]
     patch: Dict[str, Any] = {"brief": brief}
     if best_template:
         patch["templateId"] = best_template["id"]
@@ -218,6 +437,7 @@ def run_studio_bootstrap(
         artifact_type=artifact_type,
         template_name=str((best_template or {}).get("name") or ""),
         kb_hits=kb_hits,
+        suggestion_plan=suggestion_plan,
     )
     result: Dict[str, Any] = {
         "project_id": project_id,
@@ -226,6 +446,9 @@ def run_studio_bootstrap(
     }
     if brief.get("slide_outline"):
         result["slide_outline"] = brief["slide_outline"]
+    if suggestion_plan and suggestion_plan.get("slide_plan"):
+        result["slide_plan"] = suggestion_plan["slide_plan"]
+        result["suggestion_plan"] = suggestion_plan
     if recommendations:
         result["recommended_templates"] = recommendations
     if best_template:
@@ -425,14 +648,21 @@ def run_studio_turn(
                 return envelope
 
         if str(project.get("artifactType") or "deck") == "deck" and "slide" in clean_msg.lower():
+            updated = _update_brief_from_reply(brief, clean_msg)
+            if updated != brief:
+                brief = updated
+                repo.update_project(ctx, project_id, {"brief": brief})
+            slide_plan = _get_slide_plan(brief)
             envelope = AgentEnvelope(
                 agent="content_generation",
                 operation="studio_ask",
                 result={
                     "project_id": project_id,
-                    "turn_type": "ask",
+                    "turn_type": "outline",
                     "message": "Updated the slide plan. Tell me any other slide edits, or click Generate when it looks right.",
                     "slide_outline": brief.get("slide_outline") or [],
+                    "slide_plan": slide_plan,
+                    "suggestion_plan": _get_suggestion_plan(brief),
                 },
                 citations=[],
                 confidence=0.8,
@@ -465,64 +695,17 @@ def run_studio_turn(
     repo.update_project(ctx, project_id, {"brief": brief})
 
     if str(project.get("artifactType") or "deck") == "deck":
-        tpl_id = template_id or project.get("templateId")
-        chosen_template = repo.get_template(ctx, tpl_id) if tpl_id else None
-        kb_hits, citations = _retrieve_studio_evidence(
+        return _generate_deck_from_plan(
             ctx,
+            project_id=project_id,
             project=project,
             brief=brief,
-            user_message=clean_msg,
+            clean_msg=clean_msg,
+            template_id=template_id,
+            repo=repo,
             settings=settings,
+            runtime=runtime,
         )
-        if not citations:
-            citations = _brief_citations(project_id, brief)
-        if isinstance(brief.get("slide_outline"), list):
-            brief["slide_outline"] = _attach_outline_sources(
-                brief["slide_outline"],
-                project_id=project_id,
-                kb_hits=kb_hits,
-            )
-        full_html = _build_slide_preview_html(
-            title=str(project.get("title") or "Generated Deck"),
-            brief=brief,
-            template=chosen_template,
-        )
-        _, violations = sanitize_html(full_html)
-        if violations:
-            raise ValueError(f"HTML guardrail violations: {violations}")
-        deck_err = validate_deck_slide_count(full_html, str(project.get("artifactType") or "deck"))
-        if deck_err:
-            raise ValueError(deck_err)
-        rev = repo.create_revision(
-            ctx,
-            project_id,
-            html=full_html,
-            citations=[c.model_dump() for c in citations],
-            template_id=tpl_id,
-        )
-        patch: Dict[str, Any] = {"brief": brief, "status": "preview"}
-        if tpl_id:
-            patch["templateId"] = tpl_id
-        repo.update_project(ctx, project_id, patch)
-        envelope = AgentEnvelope(
-            agent="content_generation",
-            operation="html_generate",
-            result={
-                "project_id": project_id,
-                "turn_type": "html",
-                "message": "Draft is ready in the preview. Tell me which slide to edit and I will update it from chat.",
-                "revision_id": rev["id"],
-                "html": full_html,
-                "template_id": tpl_id,
-            },
-            citations=citations,
-            confidence=0.9 if kb_hits else 0.78,
-            cost={"tokens": 0, "usd": 0.0, "model": "rule-based-slide-preview"},
-            trace_id=str(uuid.uuid4()),
-            creative=not bool(kb_hits),
-        )
-        validate_envelope(envelope)
-        return envelope
 
     kb_repo = get_kb_repository()
     tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
@@ -1096,10 +1279,40 @@ def _bootstrap_message(
     artifact_type: str,
     template_name: str,
     kb_hits: List[Dict[str, Any]],
+    suggestion_plan: Optional[Dict[str, Any]] = None,
 ) -> str:
     account = str(brief.get("account_name") or "").strip()
     needed_for = str(brief.get("needed_for") or "").strip()
     lines = ["I pulled context from your content suggestion and drafted a starting plan."]
+
+    if suggestion_plan:
+        lead_count = int(suggestion_plan.get("lead_count") or 0)
+        leads = suggestion_plan.get("leads") or []
+        if lead_count > 1:
+            names = [str(l.get("account_name") or l.get("lead_name") or "") for l in leads if isinstance(l, dict)]
+            preview = ", ".join(n for n in names[:4] if n)
+            extra = f" (+{lead_count - 4} more)" if lead_count > 4 else ""
+            lines.append(f"This asset is needed by {lead_count} leads: {preview}{extra}.")
+        elif leads and isinstance(leads[0], dict):
+            lead = leads[0]
+            if lead.get("account_name"):
+                lines.append(f"Primary account: {lead['account_name']}.")
+
+        evidence = suggestion_plan.get("evidence") or {}
+        projects = evidence.get("projects") or []
+        if projects:
+            titles = [str(p.get("title") or "Project") for p in projects[:3] if isinstance(p, dict)]
+            lines.append(f"Matching project data: {', '.join(titles)}.")
+
+        slide_plan = suggestion_plan.get("slide_plan") or []
+        reuse_count = sum(1 for s in slide_plan if isinstance(s, dict) and str(s.get("mode")) == "reuse")
+        if reuse_count:
+            lines.append(f"{reuse_count} slide{'s' if reuse_count != 1 else ''} will reuse existing KB content.")
+
+        summary = str(suggestion_plan.get("plan_summary") or "").strip()
+        if summary:
+            lines.append(summary)
+
     if account and needed_for:
         lines.append(f"Account: {account}. Needed for: {needed_for}.")
     elif needed_for:
@@ -1155,6 +1368,8 @@ def _is_kb_content_question(text: str) -> bool:
 
 
 def _missing_brief_fields(brief: Dict[str, Any]) -> List[str]:
+    if _get_suggestion_plan(brief) and _get_slide_plan(brief):
+        return []
     missing: List[str] = []
     if not str(brief.get("audience", "")).strip():
         missing.append("audience")
@@ -1254,6 +1469,9 @@ def _update_brief_from_reply(brief: Dict[str, Any], text: str) -> Dict[str, Any]
         return b
 
     if _apply_slide_outline_edit(b, raw):
+        return b
+
+    if _apply_suggestion_plan_chat(b, raw):
         return b
 
     labeled = _extract_labeled_sections(raw)
@@ -1689,6 +1907,59 @@ def _build_slide_preview_html(
     """
 
 
+def _apply_suggestion_plan_chat(brief: Dict[str, Any], text: str) -> bool:
+    plan = _get_suggestion_plan(brief)
+    if not plan:
+        return False
+    slide_plan = plan.get("slide_plan")
+    if not isinstance(slide_plan, list) or not slide_plan:
+        return False
+
+    low = text.strip().lower()
+    changed = False
+
+    remove_match = re.search(r"(?:remove|delete|drop)\s+slide\s*(\d{1,2})", low)
+    if remove_match:
+        target = int(remove_match.group(1))
+        slide_plan = [item for item in slide_plan if isinstance(item, dict) and int(item.get("slide") or 0) != target]
+        for index, item in enumerate(slide_plan, start=1):
+            if isinstance(item, dict):
+                item["slide"] = index
+        changed = True
+
+    reuse_match = re.search(
+        r"use\s+slide\s*(\d{1,2})\s+from\s+(.+?)\s+for\s+slide\s*(\d{1,2})",
+        text,
+        re.IGNORECASE,
+    )
+    if reuse_match:
+        source_idx = int(reuse_match.group(1))
+        source_label = reuse_match.group(2).strip()
+        target_idx = int(reuse_match.group(3))
+        asset_id = ""
+        for kb in (plan.get("evidence") or {}).get("kb_assets") or []:
+            if isinstance(kb, dict) and source_label.lower() in str(kb.get("title") or "").lower():
+                asset_id = str(kb.get("asset_id") or "")
+                break
+        for item in slide_plan:
+            if isinstance(item, dict) and int(item.get("slide") or 0) == target_idx:
+                item["mode"] = "reuse"
+                item["reuse"] = {
+                    "source_asset_id": asset_id or source_label,
+                    "source_slide_index": source_idx,
+                    "source_vertical": source_label,
+                    "rationale": f"User requested reuse of slide {source_idx} from {source_label}",
+                }
+                changed = True
+                break
+
+    if changed:
+        synced = _sync_slide_plan_to_brief(brief, slide_plan)
+        brief.clear()
+        brief.update(synced)
+    return changed
+
+
 def _apply_slide_outline_edit(brief: Dict[str, Any], text: str) -> bool:
     outline = brief.get("slide_outline")
     if not isinstance(outline, list) or not outline:
@@ -1726,6 +1997,18 @@ def _apply_slide_outline_edit(brief: Dict[str, Any], text: str) -> bool:
 
     if changed:
         brief["slide_outline"] = outline
+        plan = _get_suggestion_plan(brief)
+        if plan and isinstance(plan.get("slide_plan"), list):
+            for item in plan["slide_plan"]:
+                if isinstance(item, dict) and int(item.get("slide") or 0) == slide_num:
+                    if heading:
+                        item["heading"] = heading
+                    if body:
+                        item["body"] = body
+                    if visual:
+                        item["visual"] = visual
+                    break
+            brief["suggestion_plan"] = plan
     return changed
 
 

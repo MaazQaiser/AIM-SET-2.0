@@ -1,0 +1,22 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { bffFetch } from "@/lib/api/bff-fetch";
+import type { ContentPlanInput, ContentPlanResult } from "@/types/content_studio";
+
+export function useContentPlan(input: ContentPlanInput | null) {
+  return useQuery({
+    queryKey: ["content-plan", input?.suggestionId, input?.title],
+    queryFn: async () => {
+      if (!input) return null;
+      const envelope = await bffFetch<{ result: ContentPlanResult }>("/api/content/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      return envelope?.result ?? null;
+    },
+    enabled: Boolean(input?.suggestionId && input?.title),
+    staleTime: 60_000,
+  });
+}

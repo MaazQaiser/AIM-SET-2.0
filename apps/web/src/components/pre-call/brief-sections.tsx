@@ -58,7 +58,12 @@ export function BriefSections({
 
       <BriefAISummary brief={brief} call={call} />
 
-      <BriefPreDeckPanel deck={brief.preDeck} />
+      <BriefPreDeckPanel
+        deck={brief.preDeck}
+        callId={brief.callId}
+        accountName={brief.accountName}
+        industry={call?.industry}
+      />
 
       {brief.researchSections && brief.researchSections.length > 0 && (
         <PreDcResearchCard sections={brief.researchSections} />

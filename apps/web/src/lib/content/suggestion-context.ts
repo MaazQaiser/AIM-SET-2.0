@@ -1,5 +1,10 @@
 import type { PreDcContentGenerationGap } from "@/lib/data/hooks";
 import type { PreDcGenerationGroup } from "@/lib/content/group-pre-dc-gaps";
+
+type GroupLeadContext = Pick<
+  PreDcContentGenerationGap,
+  "name" | "accountName" | "industry" | "sourceArtifactId" | "type" | "reason" | "neededFor"
+>;
 import type { KBAsset } from "@/types";
 
 export interface SuggestionKbMatch {
@@ -28,9 +33,9 @@ const ARTIFACT_TITLE_BUILDERS: Record<
     industry ? `${industry} service one-pager` : "Service one-pager",
 };
 
-function stripAccountFromName(name: string, accountName: string) {
-  let normalized = name.trim().replace(/\s+/g, " ");
-  const account = accountName.trim();
+function stripAccountFromName(name: string | undefined, accountName: string | undefined) {
+  let normalized = (name ?? "").trim().replace(/\s+/g, " ");
+  const account = (accountName ?? "").trim();
   if (!account) return normalized;
 
   const accountLower = account.toLowerCase();
@@ -122,7 +127,7 @@ function extractIndustryFromAssetName(name: string, type: PreDcContentGeneration
   return undefined;
 }
 
-export function extractIndustryFromGap(lead: PreDcContentGenerationGap): string | undefined {
+export function extractIndustryFromGap(lead: GroupLeadContext): string | undefined {
   const fromCall = lead.industry?.trim();
   if (fromCall && !isGenericIndustry(fromCall)) return normalizeIndustryLabel(fromCall);
 
@@ -136,7 +141,7 @@ export function extractIndustryFromGap(lead: PreDcContentGenerationGap): string 
   return extractIndustryFromAssetName(strippedName || lead.name, lead.type);
 }
 
-export function resolveDominantIndustry(leads: PreDcContentGenerationGap[]): string | undefined {
+export function resolveDominantIndustry(leads: GroupLeadContext[]): string | undefined {
   const counts = new Map<string, number>();
   for (const lead of leads) {
     const industry = extractIndustryFromGap(lead);
@@ -154,7 +159,7 @@ export function resolveDominantIndustry(leads: PreDcContentGenerationGap[]): str
   return topIndustry;
 }
 
-export function resolveContextualGroupTitle(leads: PreDcContentGenerationGap[]): {
+export function resolveContextualGroupTitle(leads: GroupLeadContext[]): {
   name: string;
   industryLabel?: string;
 } {
@@ -168,13 +173,15 @@ export function resolveContextualGroupTitle(leads: PreDcContentGenerationGap[]):
 
   const counts = new Map<string, number>();
   for (const lead of leads) {
-    const label = stripAccountFromName(lead.name, lead.accountName) || lead.name.trim();
+    const assetName = (lead.name ?? "").trim();
+    if (!assetName) continue;
+    const label = stripAccountFromName(assetName, lead.accountName) || assetName;
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }
 
   const [mostCommonName] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] ?? [];
   return {
-    name: mostCommonName ?? leads[0]?.name ?? "Content asset",
+    name: mostCommonName ?? ((leads[0]?.name ?? "").trim() || "Content asset"),
     industryLabel,
   };
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Layers3, Library, Presentation, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Eye, Layers3, Library, Loader2, Presentation, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,10 +22,14 @@ import {
   briefMainUnderline,
 } from "@/components/pre-call/brief-detail-card";
 import type { PreDeck, PreDeckSlide } from "@/lib/brief-types";
+import { createProjectFromPreDeck } from "@/lib/content/create-project-from-suggestion";
 import { cn } from "@/lib/cn";
 
 interface BriefPreDeckPanelProps {
   deck?: PreDeck;
+  callId?: string;
+  accountName?: string;
+  industry?: string;
 }
 
 function SlideSourceBadge({ slide }: { slide: PreDeckSlide }) {
@@ -45,9 +50,30 @@ function SlideSourceBadge({ slide }: { slide: PreDeckSlide }) {
   );
 }
 
-export function BriefPreDeckPanel({ deck }: BriefPreDeckPanelProps) {
+export function BriefPreDeckPanel({ deck, callId, accountName, industry }: BriefPreDeckPanelProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [continuing, setContinuing] = useState(false);
   const slides = deck?.slides ?? [];
+
+  async function handleContinueInStudio() {
+    if (!callId || !accountName || !deck) return;
+    setContinuing(true);
+    try {
+      const projectId = await createProjectFromPreDeck({
+        callId,
+        accountName,
+        deckTitle: deck.title,
+        slides,
+        industry,
+      });
+      router.push(`/content/studio/${projectId}?suggestionId=predeck:${callId}`);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Failed to open in Studio");
+    } finally {
+      setContinuing(false);
+    }
+  }
 
   if (!deck || slides.length === 0) return null;
 
@@ -90,6 +116,16 @@ export function BriefPreDeckPanel({ deck }: BriefPreDeckPanelProps) {
               <Eye className="h-3.5 w-3.5" />
               Preview
             </Button>
+            {callId && accountName && (
+              <Button
+                type="button"
+                size="sm"
+                disabled={continuing}
+                onClick={() => void handleContinueInStudio()}
+              >
+                {continuing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Continue in Studio"}
+              </Button>
+            )}
           </div>
           <ul className="space-y-2">
             {slides.slice(0, 3).map((slide, index) => (

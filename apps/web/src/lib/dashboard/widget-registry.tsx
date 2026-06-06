@@ -209,7 +209,13 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     column: "center",
     sortOrder: 0.25,
     isAvailable: ({ brief }) => arrayLen(brief.preDeck?.slides) > 0,
-    render: ({ brief }) => <BriefPreDeckPanel deck={brief.preDeck} />,
+    render: ({ brief }) => (
+      <BriefPreDeckPanel
+        deck={brief.preDeck}
+        callId={brief.callId}
+        accountName={brief.accountName}
+      />
+    ),
   },
   {
     id: "brief.workflow-artifacts",

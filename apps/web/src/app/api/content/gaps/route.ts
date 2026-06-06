@@ -12,6 +12,7 @@ export async function GET() {
       topic: gap.name,
       sourcedFrom: gap.source === "pre_dc" ? "Pre-DC workflow" : "Post-DC wrap-up",
       callId: gap.callId,
+      studioProjectId: gap.studioProjectId,
       status:
         gap.status === "in_progress"
           ? "draft"

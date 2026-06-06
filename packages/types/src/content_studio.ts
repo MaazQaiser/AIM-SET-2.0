@@ -95,7 +95,13 @@ export interface StudioTurnResult {
     heading: string;
     body: string;
     visual?: string;
+    mode?: SlidePlanMode;
+    evidence?: string;
+    citation_source?: string;
+    reuse?: SlideReuseSpec;
   }>;
+  slide_plan?: SlidePlanItem[];
+  suggestion_plan?: SuggestionPlan;
   recommended_templates?: Array<{ template_id: string; rationale: string }>;
   kb_matches?: Array<{ asset_id: string; title: string; snippet?: string }>;
   revision_id?: string;
@@ -103,6 +109,94 @@ export interface StudioTurnResult {
   patch?: { slide: number; html: string };
   message?: string;
   template_id?: string;
+}
+
+export type SlidePlanMode = "generate" | "reuse" | "hybrid";
+
+export interface SlideReuseSpec {
+  source_asset_id: string;
+  source_slide_index: number;
+  source_vertical?: string;
+  rationale?: string;
+}
+
+export interface SlidePlanItem {
+  slide: number;
+  heading: string;
+  body?: string;
+  intent?: string;
+  visual?: string;
+  mode?: SlidePlanMode;
+  evidence_refs?: string[];
+  data_points?: string[];
+  reuse?: SlideReuseSpec;
+}
+
+export interface SuggestionPlanEvidenceProject {
+  asset_id: string;
+  title: string;
+  source: string;
+  snippet?: string;
+  score?: number;
+}
+
+export interface SuggestionPlanEvidenceKb {
+  asset_id: string;
+  title: string;
+  snippet?: string;
+  slide_count?: number;
+  score?: number;
+}
+
+export interface SuggestionPlan {
+  suggestion_id: string;
+  source: string;
+  generation_reason?: string;
+  needed_for?: string;
+  lead_count?: number;
+  leads?: Array<{
+    call_id?: string;
+    account_name?: string;
+    lead_name?: string;
+    industry?: string;
+  }>;
+  industry?: string;
+  artifact_type?: string;
+  title?: string;
+  plan_summary?: string;
+  evidence?: {
+    projects?: SuggestionPlanEvidenceProject[];
+    kb_assets?: SuggestionPlanEvidenceKb[];
+  };
+  template?: {
+    template_id?: string;
+    name?: string;
+    rationale?: string;
+  };
+  recommended_templates?: Array<{ template_id: string; rationale: string }>;
+  slide_plan?: SlidePlanItem[];
+}
+
+export interface ContentPlanInput {
+  suggestionId: string;
+  title: string;
+  artifactType: string;
+  source?: "pre-dc" | "post-dc";
+  generationReason?: string;
+  neededFor?: string;
+  industry?: string;
+  leads?: Array<{
+    callId?: string;
+    accountName?: string;
+    leadName?: string;
+    industry?: string;
+  }>;
+  kbAssetIds?: string[];
+}
+
+export interface ContentPlanResult {
+  suggestion_plan: SuggestionPlan;
+  slide_outline?: StudioTurnResult["slide_outline"];
 }
 
 export interface ContentExportResult {
