@@ -25,6 +25,7 @@ import type {
   PostCallJiraTicket,
   PostCallReview,
   PostCallTask,
+  PostCallEmailDraft,
 } from "@/lib/brief-types";
 import type { Call } from "@/types";
 
@@ -111,6 +112,18 @@ export function PostDcReviewScreen({
 
   function handleRejectTask(id: string) {
     setPostCallArtifacts(callId, { crmTasks: taskList.filter((task) => task.id !== id) });
+  }
+
+  function handleClientEmailSent(draft: PostCallEmailDraft) {
+    const updatedTasks = taskList.map((task) =>
+      isFollowUpEmailTask(task)
+        ? ({ ...task, status: "created" } satisfies PostCallTask)
+        : task
+    );
+    setPostCallArtifacts(callId, {
+      emailDraft: { ...draft, status: "sent" },
+      crmTasks: updatedTasks,
+    });
   }
 
   async function handleCreateJiraTicket(ticket: PostCallJiraTicket) {
@@ -239,6 +252,7 @@ export function PostDcReviewScreen({
               landingPage: landingPage ?? null,
               onApproveCrmTasks: handleApproveTasks,
               onRejectCrmTask: handleRejectTask,
+              onSendEmailDraft: handleClientEmailSent,
               onCreateJiraTicket: handleCreateJiraTicket,
             });
             return (
@@ -276,6 +290,13 @@ export function PostDcReviewScreen({
         </div>
       )}
     </div>
+  );
+}
+
+function isFollowUpEmailTask(task: PostCallTask) {
+  return (
+    task.task_type === "follow_up" &&
+    /(?:follow[-\s]?up email|email draft|send .*email)/i.test(task.description)
   );
 }
 

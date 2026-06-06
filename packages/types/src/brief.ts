@@ -129,6 +129,24 @@ export interface PostDcBriefPreview {
   bant: { label: string; value: string }[];
 }
 
+export type PostCallBantDimension = "budget" | "authority" | "need" | "timeline";
+
+export interface PostCallBantScoreItem {
+  label: string;
+  status: string;
+  statusLabel?: string;
+  value?: string;
+}
+
+export interface PostCallDealSignals {
+  leadStage?: string;
+  annualPotential?: string;
+  engagementModel?: string;
+  serviceLine?: string;
+  preDcIcpCorrect?: string;
+  nextStep?: string;
+}
+
 export type PlannedArtifactType =
   | "deck"
   | "case_study"
@@ -245,6 +263,8 @@ export interface PostCallReview {
     areasToWork?: string[];
   }[];
   learned: { label: string; from?: number; to?: number; note: string }[];
+  bantScore?: Partial<Record<PostCallBantDimension, PostCallBantScoreItem>>;
+  dealSignals?: PostCallDealSignals;
   openDiscoveryGaps?: string[];
   discoveryBantCoverage?: number;
 }

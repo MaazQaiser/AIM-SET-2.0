@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import { PostDcProposalWidget } from "@/components/post-dc/post-dc-proposal-widget";
 import { JiraTicketCard } from "@/components/post-dc/jira-ticket-card";
@@ -50,10 +50,25 @@ export function PostDcTabbedContent({
   const hidden = useDashboardLayoutStore((s) => s.hidden["post-dc"] ?? EMPTY_HIDDEN);
   const hideWidget = useDashboardLayoutStore((s) => s.hideWidget);
 
+  const openEmailDraft = useCallback(() => {
+    setActiveTab("follow-up");
+    window.setTimeout(() => {
+      document.getElementById("post-email-draft")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
+  }, []);
+
+  const widgetPropsWithActions = useMemo(
+    () => ({ ...widgetProps, onOpenEmailDraft: openEmailDraft }),
+    [openEmailDraft, widgetProps]
+  );
+
   const visibleByTab = useMemo(() => {
     const available = widgets.filter((w) => {
       if (hidden.includes(w.id)) return false;
-      if (w.isAvailable && !w.isAvailable(widgetProps)) return false;
+      if (w.isAvailable && !w.isAvailable(widgetPropsWithActions)) return false;
       return true;
     });
     const byId = new Map(available.map((w) => [w.id, w]));
@@ -67,7 +82,7 @@ export function PostDcTabbedContent({
       },
       {} as Record<PostDcTabId, WidgetSpec<PostDcWidgetProps>[]>
     );
-  }, [widgets, hidden, widgetProps]);
+  }, [widgets, hidden, widgetPropsWithActions]);
 
   const tabHasContent = (tabId: PostDcTabId) => {
     if (tabId === "transcript") {
@@ -132,7 +147,7 @@ export function PostDcTabbedContent({
       <TabsContent value="before" className="m-0 space-y-4 focus-visible:outline-none">
         <PostDcWidgetRail
           widgets={visibleByTab.before}
-          widgetProps={widgetProps}
+          widgetProps={widgetPropsWithActions}
           onHide={(id) => hideWidget("post-dc", id)}
           emptyMessage="Import post-DC notes or run wrap-up to populate pre-call context."
         />
@@ -141,7 +156,7 @@ export function PostDcTabbedContent({
       <TabsContent value="summary" className="m-0 space-y-4 focus-visible:outline-none">
         <PostDcWidgetRail
           widgets={visibleByTab.summary}
-          widgetProps={widgetProps}
+          widgetProps={widgetPropsWithActions}
           onHide={(id) => hideWidget("post-dc", id)}
           emptyMessage="Run wrap-up to generate the call summary."
         />
@@ -150,7 +165,7 @@ export function PostDcTabbedContent({
       <TabsContent value="next-steps" className="m-0 space-y-4 focus-visible:outline-none">
         <PostDcWidgetRail
           widgets={visibleByTab["next-steps"]}
-          widgetProps={widgetProps}
+          widgetProps={widgetPropsWithActions}
           onHide={(id) => hideWidget("post-dc", id)}
           emptyMessage="Recommended next steps and CRM tasks appear here after wrap-up."
         />
@@ -163,7 +178,7 @@ export function PostDcTabbedContent({
       <TabsContent value="coaching" className="m-0 space-y-4 focus-visible:outline-none">
         <PostDcWidgetRail
           widgets={visibleByTab.coaching}
-          widgetProps={widgetProps}
+          widgetProps={widgetPropsWithActions}
           onHide={(id) => hideWidget("post-dc", id)}
           emptyMessage="Pod member coaching scorecards appear here after wrap-up."
         />
@@ -172,7 +187,7 @@ export function PostDcTabbedContent({
       <TabsContent value="follow-up" className="m-0 space-y-4 focus-visible:outline-none">
         <PostDcWidgetRail
           widgets={visibleByTab["follow-up"]}
-          widgetProps={widgetProps}
+          widgetProps={widgetPropsWithActions}
           onHide={(id) => hideWidget("post-dc", id)}
           emptyMessage="Follow-up emails appear here after wrap-up."
         />
@@ -181,7 +196,7 @@ export function PostDcTabbedContent({
       <TabsContent value="content" className="m-0 space-y-4 focus-visible:outline-none">
         <PostDcWidgetRail
           widgets={visibleByTab.content}
-          widgetProps={widgetProps}
+          widgetProps={widgetPropsWithActions}
           onHide={(id) => hideWidget("post-dc", id)}
           emptyMessage="Suggest Content and Missing content sections appear here after wrap-up."
         />
@@ -209,7 +224,7 @@ export function PostDcTabbedContent({
         />
         <PostDcWidgetRail
           widgets={visibleByTab.landing}
-          widgetProps={widgetProps}
+          widgetProps={widgetPropsWithActions}
           onHide={(id) => hideWidget("post-dc", id)}
         />
       </TabsContent>

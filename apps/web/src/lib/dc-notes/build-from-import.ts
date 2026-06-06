@@ -181,6 +181,12 @@ function mapPostDcBant(value: string): BANTStatus {
   return "partial";
 }
 
+function postDcBantStatusLabel(status: BANTStatus): string {
+  if (status === "confirmed") return "Confirmed";
+  if (status === "partial") return "Partial";
+  return "Not captured";
+}
+
 export function buildCallFromPreDc(record: PreDCRecord): Call {
   const companyName = preDcField(record, "companyName");
   const discoveryCallDatePkt = preDcField(record, "discoveryCallDatePkt");
@@ -508,7 +514,9 @@ export function buildPostReviewFromPostDc(record: PostDCRecord): PostCallReview 
 
   const leadStage = postDcField(record, "leadStage");
   const potential = postDcField(record, "accountsAnnualPotential");
+  const engagementModel = postDcField(record, "engagementModel");
   const serviceLine = postDcField(record, "serviceLine");
+  const icpBucketCorrect = postDcField(record, "icpBucketCorrect");
 
   const bantNotes = {
     budget: postDcField(record, "budget"),
@@ -528,6 +536,40 @@ export function buildPostReviewFromPostDc(record: PostDCRecord): PostCallReview 
       postDcField(record, "engagementModel") ||
       undefined,
     openDiscoveryGaps,
+    bantScore: {
+      budget: {
+        label: "Budget",
+        status: mapPostDcBant(bantNotes.budget),
+        statusLabel: postDcBantStatusLabel(mapPostDcBant(bantNotes.budget)),
+        value: bantNotes.budget || undefined,
+      },
+      authority: {
+        label: "Authority",
+        status: mapPostDcBant(bantNotes.authority),
+        statusLabel: postDcBantStatusLabel(mapPostDcBant(bantNotes.authority)),
+        value: bantNotes.authority || undefined,
+      },
+      need: {
+        label: "Need",
+        status: mapPostDcBant(bantNotes.need),
+        statusLabel: postDcBantStatusLabel(mapPostDcBant(bantNotes.need)),
+        value: bantNotes.need || undefined,
+      },
+      timeline: {
+        label: "Timeline",
+        status: mapPostDcBant(bantNotes.timeline),
+        statusLabel: postDcBantStatusLabel(mapPostDcBant(bantNotes.timeline)),
+        value: bantNotes.timeline || undefined,
+      },
+    },
+    dealSignals: {
+      leadStage: leadStage || undefined,
+      annualPotential: potential || undefined,
+      engagementModel: engagementModel || undefined,
+      serviceLine: serviceLine || undefined,
+      preDcIcpCorrect: icpBucketCorrect || undefined,
+      nextStep: postDcField(record, "salesStrategy") || undefined,
+    },
     researchSections: buildPostDcResearchSections(record),
     podScorecard: [
       {

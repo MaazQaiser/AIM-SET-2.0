@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 from dc_core.evidence import AgentEnvelope, validate_envelope
@@ -37,13 +38,34 @@ def _float_or_zero(value: Any) -> float:
         return 0.0
 
 
-def _discovery_context_text(events: List[Dict[str, Any]], fallback: str) -> str:
+CUSTOMER_LIKE_ROLES = {"customer", "prospect", "buyer", "guest", ""}
+
+BANT_REPLAY_CUE_RE = re.compile(
+    r"(\$|\b\d+(?:\.\d+)?\s*(?:k|m|b|thousand|million|billion)\b|"
+    r"\b(?:budget|pricing|spend|investment|funding|deadline|timeline|eta|go-live|go live|"
+    r"launch|pilot|rollout|cfo|ceo|cto|coo|board|decision|approve|approval|need|needs|"
+    r"critical|priority|pain|problem|challenge|manual|bottleneck|must have)\b)",
+    re.I,
+)
+
+REP_QUESTION_RE = re.compile(
+    r"\b(?:what|who|when|where|why|how|can|could|would|do|does|did|is|are)\b.+\?",
+    re.I,
+)
+
+
+def _discovery_context_text(
+    events: List[Dict[str, Any]],
+    fallback: str,
+    *,
+    strict_roles: bool = True,
+) -> str:
     if not events:
         return fallback
 
     latest = events[-1]
     latest_role = str(latest.get("speaker_role") or "").lower()
-    if latest_role not in ("customer", "prospect", "guest", ""):
+    if strict_roles and latest_role not in CUSTOMER_LIKE_ROLES:
         return fallback
 
     latest_offset = _float_or_zero(latest.get("offset_seconds"))
@@ -52,7 +74,7 @@ def _discovery_context_text(events: List[Dict[str, Any]], fallback: str) -> str:
 
     for event in events[-8:]:
         role = str(event.get("speaker_role") or "").lower()
-        if role not in ("customer", "prospect", "guest", ""):
+        if strict_roles and role not in CUSTOMER_LIKE_ROLES:
             continue
         if latest_offset and latest_offset - _float_or_zero(event.get("offset_seconds")) > 14:
             continue
@@ -75,6 +97,23 @@ def _event_speaker_role(event: Dict[str, Any]) -> str:
     return str(event.get("speaker_role") or event.get("speakerRole") or "").lower()
 
 
+def _event_text(event: Dict[str, Any]) -> str:
+    return str(event.get("text") or "").strip()
+
+
+def _is_customer_like_event(event: Dict[str, Any]) -> bool:
+    return _event_speaker_role(event) in CUSTOMER_LIKE_ROLES
+
+
+def _is_bant_replay_candidate(event: Dict[str, Any]) -> bool:
+    text = _event_text(event)
+    if not text:
+        return False
+    if REP_QUESTION_RE.search(text):
+        return False
+    return bool(BANT_REPLAY_CUE_RE.search(text))
+
+
 def _replay_discovery_from_transcript(state: Any, transcript_events: List[Dict[str, Any]]) -> Any:
     """Repair missed live BANT signals at wrap-up from the completed transcript."""
     if not transcript_events:
@@ -82,14 +121,21 @@ def _replay_discovery_from_transcript(state: Any, transcript_events: List[Dict[s
 
     replayed = state
     ordered = sorted(transcript_events, key=_event_offset_seconds)
+    has_customer_like_events = any(_is_customer_like_event(event) for event in ordered)
     for index, event in enumerate(ordered):
-        text = str(event.get("text") or "").strip()
+        text = _event_text(event)
         if not text:
             continue
-        role = _event_speaker_role(event)
-        if role and role not in ("customer", "prospect", "buyer", "guest"):
+        strict_roles = has_customer_like_events
+        if strict_roles and not _is_customer_like_event(event):
             continue
-        context_text = _discovery_context_text(ordered[: index + 1], text)
+        if not strict_roles and not _is_bant_replay_candidate(event):
+            continue
+        context_text = _discovery_context_text(
+            ordered[: index + 1],
+            text,
+            strict_roles=strict_roles,
+        )
         replayed, _, _ = update_checklist_from_segment(
             replayed,
             context_text,

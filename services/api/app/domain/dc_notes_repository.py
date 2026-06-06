@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from typing import Any, Dict, List, Literal
 
@@ -11,6 +12,8 @@ from app.deps import get_supabase
 from app.domain.memory_store import get_memory_store
 from app.domain.supabase_utils import execute_with_retry
 from app.domain.kb_tenancy import resolve_team_tenant
+
+_logger = logging.getLogger(__name__)
 
 
 def _dc_asset_id(kind: Literal["pre-dc", "post-dc"], record_id: str) -> str:
@@ -26,18 +29,38 @@ def _record_chunk_text(kind: Literal["pre-dc", "post-dc"], fields: Dict[str, Any
     return "\n".join(lines)
 
 
+def _fallback_clerk_key(ctx: TenantContext) -> str:
+    settings = get_settings()
+    if settings.kb_shared_mode:
+        return settings.kb_shared_tenant_key.strip() or "dc-copilot-shared"
+    return ctx.clerk_org_id or ctx.tenant_id or ctx.user_id or "local-dev"
+
+
 class DcNotesRepository:
     """Pre/Post-DC records in Supabase (or in-memory when Supabase is unset)."""
 
     def _tenant_keys(self, ctx: TenantContext) -> tuple[str, str]:
         return resolve_team_tenant(ctx)
 
+    def _read_tenant_keys(self, ctx: TenantContext) -> tuple[str | None, str, bool]:
+        try:
+            tenant_uuid, clerk_key = self._tenant_keys(ctx)
+            return tenant_uuid, clerk_key, True
+        except Exception as exc:
+            clerk_key = _fallback_clerk_key(ctx)
+            _logger.warning(
+                "tenant resolution failed for DC notes read; using memory fallback tenant_key=%s error=%s",
+                clerk_key,
+                exc,
+            )
+            return None, clerk_key, False
+
     def get_notes(self, ctx: TenantContext) -> Dict[str, List[Dict[str, Any]]]:
-        tenant_uuid, clerk_key = self._tenant_keys(ctx)
+        tenant_uuid, clerk_key, tenant_resolved = self._read_tenant_keys(ctx)
         settings = get_settings()
         store = get_memory_store()
 
-        if settings.supabase_configured:
+        if settings.supabase_configured and tenant_resolved and tenant_uuid:
             try:
                 supabase = get_supabase()
                 pre_result = execute_with_retry(

@@ -66,34 +66,43 @@ async function seedE2eCall(
   callId = CALL_ID,
   accountName = ACCOUNT_NAME
 ) {
-  const res = await request.post(`${API_BASE}/dc-notes/ingest`, {
-    headers: {
-      "X-Internal-Secret": INTERNAL_SECRET,
-      "x-user-id": USER,
-      "x-tenant-id": TENANT,
-    },
-    data: {
-      kind: "pre-dc",
-      records: [
-        {
-          id: `pre-${callId}`,
-          fields: {
-            "Company Name-PreDC": accountName,
-            "Lead Name-PreDC": "Marcus Rivera",
-            "Prospect's Persona": "Chief Financial Officer",
-            "Industry - PreDC": "Franchise operations",
-            "Campaign Service - PreDC": "AI operations platform",
-            "ICP Bucket": "Enterprise desirable",
-            "Annual Revenue - PreDC": "$180M",
-            "No. of Employees - PreDC": "950",
-            "Have they described their needs":
-              "Reduce manual compliance audits and standardize franchisee operations before a Q3 pilot.",
+  let lastStatus = 0;
+  let lastText = "";
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const res = await request.post(`${API_BASE}/dc-notes/ingest`, {
+      headers: {
+        "X-Internal-Secret": INTERNAL_SECRET,
+        "x-user-id": USER,
+        "x-tenant-id": TENANT,
+      },
+      data: {
+        kind: "pre-dc",
+        records: [
+          {
+            id: `pre-${callId}`,
+            fields: {
+              "Company Name-PreDC": accountName,
+              "Lead Name-PreDC": "Marcus Rivera",
+              "Prospect's Persona": "Chief Financial Officer",
+              "Industry - PreDC": "Franchise operations",
+              "Campaign Service - PreDC": "AI operations platform",
+              "ICP Bucket": "Enterprise desirable",
+              "Annual Revenue - PreDC": "$180M",
+              "No. of Employees - PreDC": "950",
+              "Have they described their needs":
+                "Reduce manual compliance audits and standardize franchisee operations before a Q3 pilot.",
+            },
           },
-        },
-      ],
-    },
-  });
-  expect(res.ok(), `seed call failed: ${res.status()} ${await res.text()}`).toBeTruthy();
+        ],
+      },
+    });
+    if (res.ok()) return;
+    lastStatus = res.status();
+    lastText = await res.text();
+    if (lastStatus !== 503) break;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  expect(false, `seed call failed: ${lastStatus} ${lastText}`).toBeTruthy();
 }
 
 test.describe.configure({ mode: "serial" });
@@ -320,6 +329,201 @@ test.describe("Live call cockpit — DOM + API", () => {
     expect(bodyText).not.toMatch(/Still to cover: [^.]*Timeline/i);
 
     await expect(page.locator(".animate-cursor")).toHaveCount(0, { timeout: 6_000 });
+  });
+
+  test("End & review reflects misattributed Recall BANT transcript on Post-DC page", async ({
+    page,
+    request,
+  }) => {
+    test.setTimeout(240_000);
+    const callId = `misattributed-recall-post-dc-${RUN_ID}`;
+    const accountName = `Misattributed Recall Post DC ${RUN_ID}`;
+    await seedE2eCall(request, callId, accountName);
+
+    await page.goto(`/calls/${callId}/live`, { waitUntil: "domcontentloaded" });
+    await expect(page.locator(`a[href="/calls/${callId}"]`).first()).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByText("Connecting stream…")).toBeHidden({ timeout: 25_000 });
+
+    await postDemoSegment(
+      request,
+      {
+        text: "we need a custom ERP for onboarding automation",
+        speaker_role: "ae",
+        offset_seconds: 49,
+      },
+      callId
+    );
+    await postDemoSegment(
+      request,
+      {
+        text: "i have budget around",
+        speaker_role: "ae",
+        offset_seconds: 54,
+      },
+      callId
+    );
+    await postDemoSegment(
+      request,
+      {
+        text: "400k",
+        speaker_role: "ae",
+        offset_seconds: 59,
+      },
+      callId
+    );
+    await postDemoSegment(
+      request,
+      {
+        text: "and the deadline for our project timeline will be not more than three months",
+        speaker_role: "ae",
+        offset_seconds: 62,
+      },
+      callId
+    );
+    await postDemoSegment(
+      request,
+      {
+        text: "the CFO owns approval and can approve it",
+        speaker_role: "ae",
+        offset_seconds: 66,
+      },
+      callId
+    );
+    await postDemoSegment(
+      request,
+      {
+        text: "we want a fixed cost software engineering engagement",
+        speaker_role: "ae",
+        offset_seconds: 70,
+      },
+      callId
+    );
+    await postDemoSegment(
+      request,
+      {
+        text: "please send the implementation proposal and schedule the review next week",
+        speaker_role: "ae",
+        offset_seconds: 74,
+      },
+      callId
+    );
+
+    const endReviewButton = page.getByRole("button", { name: /End & review/i });
+    await expect(endReviewButton).toBeEnabled({ timeout: 30_000 });
+
+    const wrapUpResponse = page.waitForResponse(
+      (res) =>
+        (res.url().includes(`/api/calls/${callId}/post-call`) ||
+          res.url().includes(`/api/v1/calls/${callId}/post-call`)) &&
+        res.request().method() === "POST",
+      { timeout: 180_000 }
+    );
+    await endReviewButton.click();
+    const res = await wrapUpResponse;
+    expect(res.ok(), `wrap-up failed: ${res.status()} ${await res.text()}`).toBeTruthy();
+
+    const body = (await res.json()) as {
+      review?: {
+        summary?: string[];
+        learned?: Array<{ label?: string; note?: string }>;
+        bantScore?: Record<string, { status?: string; value?: string }>;
+        dealSignals?: {
+          leadStage?: string;
+          annualPotential?: string;
+          engagementModel?: string;
+          serviceLine?: string;
+          nextStep?: string;
+        };
+        openDiscoveryGaps?: string[];
+        discoveryBantCoverage?: number;
+      };
+      coaching?: {
+        bantProgression?: {
+          after?: Record<"budget" | "authority" | "need" | "timeline", string>;
+        };
+      };
+      task?: {
+        clientEmailDraft?: { body_markdown?: string };
+        internalEmailDraft?: { body_markdown?: string };
+      };
+    };
+
+    const after = body.coaching?.bantProgression?.after ?? {
+      budget: "",
+      authority: "",
+      need: "",
+      timeline: "",
+    };
+    const reviewText = [
+      ...(body.review?.summary ?? []),
+      ...((body.review?.learned ?? []).map((item) => `${item.label ?? ""} ${item.note ?? ""}`)),
+    ].join(" ");
+    expect(after.budget).toMatch(/partial|confirmed/i);
+    expect(after.authority).toBe("confirmed");
+    expect(after.need).toMatch(/partial|confirmed/i);
+    expect(after.timeline).toBe("confirmed");
+    expect(body.review?.discoveryBantCoverage ?? 0).toBeGreaterThan(0);
+    expect(body.review?.openDiscoveryGaps ?? []).not.toContain("timeline");
+    expect(reviewText).toMatch(/400k/i);
+    expect(reviewText).toMatch(/custom ERP/i);
+    expect(reviewText).toMatch(/not more than three months/i);
+    expect(reviewText).not.toMatch(/BANT coverage finished at 0%/i);
+    expect(body.review?.bantScore?.budget?.value ?? "").toMatch(/400k/i);
+    expect(body.review?.bantScore?.authority?.value ?? "").toMatch(/CFO owns approval/i);
+    expect(body.review?.bantScore?.need?.status ?? "").toBe("confirmed");
+    expect(body.review?.bantScore?.need?.value ?? "").toMatch(/custom ERP/i);
+    expect(body.review?.dealSignals?.leadStage ?? "").toBe("Opportunity");
+    expect(body.review?.dealSignals?.annualPotential ?? "").toBe("High Potential");
+    expect(body.review?.dealSignals?.engagementModel ?? "").toBe("Fixed Cost");
+    expect(body.review?.dealSignals?.serviceLine ?? "").toBe("Software Engineering");
+    expect(body.review?.dealSignals?.nextStep ?? "").toMatch(/implementation proposal/i);
+    expect(body.task?.internalEmailDraft?.body_markdown ?? "").toMatch(/400k/i);
+    expect(body.task?.clientEmailDraft?.body_markdown ?? "").toMatch(/not more than three months/i);
+
+    await expect(page).toHaveURL(new RegExp(`/calls/${callId}/post-dc\\?wrapped=1`), {
+      timeout: 30_000,
+    });
+    await expect(page.getByRole("heading", { name: "Post-DC review", exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
+
+    const overviewPanel = page.locator('[role="tabpanel"]:visible');
+    await expect(overviewPanel).toContainText(/400k/i);
+    await expect(overviewPanel).toContainText(/BANT score/i);
+    await expect(overviewPanel).toContainText(/Deal signals/i);
+    await expect(overviewPanel).toContainText(/Opportunity/i);
+    await expect(overviewPanel).toContainText(/High Potential/i);
+    await expect(overviewPanel).toContainText(/Fixed Cost/i);
+    await expect(overviewPanel).toContainText(/Software Engineering/i);
+    await expect(overviewPanel).toContainText(/not more than three months/i);
+    await expect(overviewPanel).not.toContainText(/BANT coverage finished at 0%/i);
+    await expect(overviewPanel).not.toContainText(/Timeline moved from unknown to unknown/i);
+
+    await page.getByRole("tab", { name: /Actions/i }).click();
+    const actionsPanel = page.locator('[role="tabpanel"]:visible');
+    await expect(actionsPanel).toHaveCount(1);
+    const sendFollowUpTask = actionsPanel
+      .getByRole("button", { name: /^Send follow-up email$/i })
+      .first();
+    await expect(sendFollowUpTask).toBeVisible();
+    await sendFollowUpTask.click();
+
+    const taskOpenedFollowUpPanel = page.locator('[role="tabpanel"]:visible');
+    await expect(taskOpenedFollowUpPanel).toContainText(/Follow-up Email/i);
+    await expect(taskOpenedFollowUpPanel).toContainText(/400k/i);
+    await expect(taskOpenedFollowUpPanel).toContainText(
+      /implementation proposal|not more than three months/i
+    );
+    await expect(
+      taskOpenedFollowUpPanel.getByRole("button", { name: /Send email to customer/i })
+    ).toBeVisible();
+
+    await page.getByRole("tab", { name: /Follow up/i }).click();
+    const followUpPanel = page.locator('[role="tabpanel"]:visible');
+    await expect(followUpPanel).toContainText(/not more than three months/i);
+    await expect(followUpPanel).toContainText(/400k/i);
   });
 
   test("API sentiment payloads switch the rail between red and green", async ({

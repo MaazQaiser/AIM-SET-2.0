@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Brain, FilePlus2, FileSearch, ListChecks, Sparkles, Users } from "lucide-react";
+import {
+  ArrowRight,
+  Brain,
+  FilePlus2,
+  FileSearch,
+  ListChecks,
+  Sparkles,
+  Target,
+  Users,
+} from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import {
@@ -164,20 +173,102 @@ function areasToWork(row: PostCallReview["podScorecard"][number]) {
   return row.watch?.trim() ? [row.watch.trim()] : [];
 }
 
-export function PostLearnedCard({ learned }: { learned: PostCallReview["learned"] }) {
-  if (learned.length === 0) return null;
+const BANT_DIMENSIONS: Array<keyof NonNullable<PostCallReview["bantScore"]>> = [
+  "budget",
+  "authority",
+  "need",
+  "timeline",
+];
+
+function bantBadgeVariant(status: string | undefined): "success" | "warning" | "secondary" {
+  const normalized = status?.toLowerCase() ?? "";
+  if (normalized === "confirmed") return "success";
+  if (normalized === "partial") return "warning";
+  return "secondary";
+}
+
+export function PostLearnedCard({
+  learned,
+  bantScore,
+}: {
+  learned: PostCallReview["learned"];
+  bantScore?: PostCallReview["bantScore"];
+}) {
+  const scoreRows = BANT_DIMENSIONS.map((key) => bantScore?.[key]).filter(Boolean);
+  if (scoreRows.length === 0 && learned.length === 0) return null;
 
   return (
-    <BriefDetailCard title="BANT">
-      <ul className="space-y-2">
-        {learned.map((item) => (
-          <li key={item.label}>
+    <BriefDetailCard title="BANT score">
+      {scoreRows.length > 0 ? (
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {scoreRows.map((item) =>
+            item ? (
+              <li key={item.label}>
+                <BriefDetailRow>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[10px] font-semibold text-muted-foreground">{item.label}</p>
+                    <Badge variant={bantBadgeVariant(item.status)} className="shrink-0">
+                      {item.statusLabel ?? item.status}
+                    </Badge>
+                  </div>
+                  {item.value ? (
+                    <p className="mt-2 text-sm text-foreground/90 whitespace-pre-wrap break-words">
+                      {item.value}
+                    </p>
+                  ) : null}
+                </BriefDetailRow>
+              </li>
+            ) : null
+          )}
+        </ul>
+      ) : (
+        <ul className="space-y-2">
+          {learned.map((item) => (
+            <li key={item.label}>
+              <BriefDetailRow>
+                <p className="text-[10px] font-semibold text-muted-foreground">
+                  {item.label}
+                </p>
+                <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words mt-1">
+                  {item.note}
+                </p>
+              </BriefDetailRow>
+            </li>
+          ))}
+        </ul>
+      )}
+    </BriefDetailCard>
+  );
+}
+
+const DEAL_SIGNAL_FIELDS: Array<{
+  key: keyof NonNullable<PostCallReview["dealSignals"]>;
+  label: string;
+}> = [
+  { key: "leadStage", label: "Lead stage" },
+  { key: "annualPotential", label: "Annual potential" },
+  { key: "engagementModel", label: "Engagement model" },
+  { key: "serviceLine", label: "Service line" },
+  { key: "preDcIcpCorrect", label: "Pre-DC ICP correct" },
+  { key: "nextStep", label: "Next step" },
+];
+
+export function PostDealSignalsCard({ signals }: { signals?: PostCallReview["dealSignals"] }) {
+  const rows = DEAL_SIGNAL_FIELDS.map((field) => ({
+    ...field,
+    value: signals?.[field.key]?.trim(),
+  })).filter((field) => field.value);
+  if (rows.length === 0) return null;
+
+  return (
+    <BriefDetailCard title="Deal signals" icon={Target}>
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {rows.map((row) => (
+          <li key={row.key}>
             <BriefDetailRow>
-              <p className="text-[10px] font-semibold text-muted-foreground">
-                {item.label}
-              </p>
-              <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words mt-1">
-                {item.note}
+              <p className="text-[10px] font-semibold text-muted-foreground">{row.label}</p>
+              <p className="mt-1 text-sm font-medium text-foreground whitespace-pre-wrap break-words">
+                {row.value}
               </p>
             </BriefDetailRow>
           </li>

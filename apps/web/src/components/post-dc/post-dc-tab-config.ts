@@ -1,7 +1,13 @@
 /** Widget ids grouped by Post-DC tab (order preserved within each tab). */
 export const POST_DC_TAB_WIDGET_IDS = {
   before: ["post.before_context", "post.research"],
-  summary: ["post.headline", "post.summary", "post.discovery_gaps"],
+  summary: [
+    "post.headline",
+    "post.summary",
+    "post.learned",
+    "post.deal_signals",
+    "post.discovery_gaps",
+  ],
   "next-steps": ["post.next_step_proposal", "post.task_list"],
   transcript: [],
   coaching: ["post.scorecard"],

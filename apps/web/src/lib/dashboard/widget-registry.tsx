@@ -27,6 +27,7 @@ import {
 } from "@/components/pre-call/brief-widget-cards";
 import {
   PostBeforeContextCard,
+  PostDealSignalsCard,
   PostHeadlineCard,
   PostDcContentSuggestionsCard,
   PostLearnedCard,
@@ -121,6 +122,8 @@ export interface PostDcWidgetProps {
   emailAttachments?: PostCallEmailDraft["attachments"];
   onApproveCrmTasks?: (ids: string[]) => void;
   onRejectCrmTask?: (id: string) => void;
+  onOpenEmailDraft?: () => void;
+  onSendEmailDraft?: (draft: PostCallEmailDraft) => void;
   onCreateJiraTicket?: (ticket: PostCallJiraTicket) => Promise<void> | void;
   landingPage?: CustomerLandingPage | null;
 }
@@ -378,18 +381,29 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
   },
   {
     id: "post.learned",
-    title: "BANT",
+    title: "BANT score",
     category: "qualification",
     column: "center",
     sortOrder: 2,
-    render: ({ review }) => <PostLearnedCard learned={review.learned ?? []} />,
+    render: ({ review }) => (
+      <PostLearnedCard learned={review.learned ?? []} bantScore={review.bantScore} />
+    ),
+  },
+  {
+    id: "post.deal_signals",
+    title: "Deal signals",
+    category: "qualification",
+    column: "center",
+    sortOrder: 3,
+    isAvailable: ({ review }) => Object.values(review.dealSignals ?? {}).some((value) => Boolean(value)),
+    render: ({ review }) => <PostDealSignalsCard signals={review.dealSignals} />,
   },
   {
     id: "post.discovery_gaps",
     title: "Discovery gaps",
     category: "qualification",
     column: "center",
-    sortOrder: 3,
+    sortOrder: 4,
     isAvailable: ({ review }) =>
       arrayLen(review.openDiscoveryGaps) > 0 || review.discoveryBantCoverage !== undefined,
     render: ({ review }) => (
@@ -404,9 +418,16 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     title: "Follow-up email",
     category: "ai",
     column: "center",
-    sortOrder: 4,
+    sortOrder: 5,
     isAvailable: ({ emailDraft }) => Boolean(emailDraft),
-    render: ({ emailDraft }) => (emailDraft ? <EmailEditor draft={emailDraft} /> : null),
+    render: ({ emailDraft, onSendEmailDraft }) =>
+      emailDraft ? (
+        <EmailEditor
+          draft={emailDraft}
+          anchorId="post-email-draft"
+          onSent={onSendEmailDraft}
+        />
+      ) : null,
   },
   {
     id: "post.research",
@@ -435,8 +456,13 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
     column: "right",
     sortOrder: 2,
     isAvailable: ({ crmTasks }) => arrayLen(crmTasks) > 0,
-    render: ({ crmTasks = [], onApproveCrmTasks, onRejectCrmTask }) => (
-      <TaskList tasks={crmTasks} onApprove={onApproveCrmTasks} onReject={onRejectCrmTask} />
+    render: ({ crmTasks = [], onApproveCrmTasks, onRejectCrmTask, onOpenEmailDraft }) => (
+      <TaskList
+        tasks={crmTasks}
+        onApprove={onApproveCrmTasks}
+        onReject={onRejectCrmTask}
+        onOpenEmailDraft={onOpenEmailDraft}
+      />
     ),
   },
   {
@@ -490,6 +516,7 @@ export const POST_DC_WIDGETS: WidgetSpec<PostDcWidgetProps>[] = [
           draft={internalEmailDraft}
           title="Internal team email"
           description="Edit the internal handoff before sharing with the team."
+          showSendAction={false}
         />
       ) : null,
   },
