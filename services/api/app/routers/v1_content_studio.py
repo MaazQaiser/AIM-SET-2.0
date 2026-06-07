@@ -179,6 +179,48 @@ def assist_template(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+@router.get("/templates/parent")
+def get_parent_template(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Optional[Dict[str, Any]]:
+    """Return the singleton parent template, or null when not yet configured."""
+    return get_content_studio_repository().get_parent_template(ctx)
+
+
+@router.post("/templates/parent/assets")
+async def upload_parent_template_asset(
+    file: UploadFile = File(...),
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, str]:
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing file")
+    try:
+        return get_content_studio_repository().upload_parent_asset(
+            ctx,
+            file_bytes=data,
+            file_name=file.filename or "asset.png",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/templates/parent/assets/{asset_name}")
+def get_parent_template_asset(
+    asset_name: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Response:
+    try:
+        data, mime_type = get_content_studio_repository().download_parent_asset(ctx, asset_name)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found") from exc
+    return Response(
+        content=data,
+        media_type=mime_type,
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
 @router.get("/templates/{template_id}")
 def get_template(
     template_id: str,
