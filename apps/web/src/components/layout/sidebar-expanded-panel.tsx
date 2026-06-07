@@ -52,9 +52,7 @@ export function SidebarExpandedPanel() {
         <nav className={styles.primaryNav} aria-label="Primary">
           {mainNavItems.map((item) => {
             const isActive =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
+              pathname === item.href || pathname.startsWith(`${item.href}/`);
 
             return (
               <Link

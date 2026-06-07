@@ -5,6 +5,7 @@ import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
 import { isClerkConfigured, isClerkSecretConfigured } from "@/lib/public-env";
 
 const isPublicRoute = createRouteMatcher([
+  "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/health/deployment",

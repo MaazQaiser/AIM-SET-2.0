@@ -64,7 +64,7 @@ export function SidebarRail() {
       <div className={styles.railPrimaryNavWrap}>
         <nav className={styles.railPrimaryNav} aria-label="Primary">
           {mainNavItems.map((item) => {
-            const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
             return (
               <RailTooltip key={item.href} label={item.label}>

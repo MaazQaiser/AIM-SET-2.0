@@ -11,7 +11,7 @@ function surfaceFromPath(pathname: string): GlobalSurface {
   if (pathname.startsWith("/content")) return "content";
   if (pathname.startsWith("/agents")) return "agents";
   if (pathname.startsWith("/settings")) return "settings";
-  if (pathname === "/" || pathname.startsWith("/calls")) return "home";
+  if (pathname === "/home" || pathname.startsWith("/calls")) return "home";
   return "global";
 }
 
@@ -60,7 +60,7 @@ function contextFromPath(pathname: string): Record<string, string> {
   }
 
   // home / calls list
-  if (pathname === "/" || pathname === "/calls" || pathname.startsWith("/calls?")) {
+  if (pathname === "/home" || pathname === "/calls" || pathname.startsWith("/calls?")) {
     ctx.currentScreen = "Home dashboard";
   }
 

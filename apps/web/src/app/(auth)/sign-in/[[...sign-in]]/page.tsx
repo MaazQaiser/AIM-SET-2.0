@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Sign in" };
 export const dynamic = "force-dynamic";
 
 export default function SignInPage() {
-  if (isLocalAuthBypassEnabled()) redirect("/");
+  if (isLocalAuthBypassEnabled()) redirect("/home");
 
   if (!isClerkConfigured()) {
     return (

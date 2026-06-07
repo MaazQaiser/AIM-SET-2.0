@@ -16,7 +16,7 @@ export interface SidebarNavItem {
 }
 
 export const mainNavItems: SidebarNavItem[] = [
-  { href: "/", label: "Home", icon: Home },
+  { href: "/home", label: "Home", icon: Home },
   { href: "/calls", label: "Calls", icon: Phone },
   { href: "/agents", label: "Agents", icon: Bot },
   { href: "/coaching", label: "Coaching", icon: GraduationCap },
@@ -44,7 +44,7 @@ export const sidebarWidgetCards: SidebarWidgetCard[] = [
 ];
 
 const PAGE_TITLES: Record<string, string> = {
-  "/": "Sales Plan Overview",
+  "/home": "Sales Plan Overview",
   "/calls": "Calls",
   "/agents": "Agents",
   "/content": "Knowledge Base",
@@ -57,11 +57,11 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 export function getSidebarPageTitle(pathname: string): string {
-  if (pathname === "/") return PAGE_TITLES["/"] ?? "Sales Plan Overview";
+  if (pathname === "/home") return PAGE_TITLES["/home"] ?? "Sales Plan Overview";
 
   const match = Object.keys(PAGE_TITLES)
-    .filter((p) => p !== "/" && pathname.startsWith(p))
+    .filter((p) => p !== "/home" && pathname.startsWith(p))
     .sort((a, b) => b.length - a.length)[0];
 
-  return match ? (PAGE_TITLES[match] ?? "Sales Plan Overview") : PAGE_TITLES["/"];
+  return match ? (PAGE_TITLES[match] ?? "Sales Plan Overview") : PAGE_TITLES["/home"];
 }

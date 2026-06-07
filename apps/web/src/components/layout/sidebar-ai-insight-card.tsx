@@ -26,7 +26,7 @@ export function SidebarAiInsightCard() {
           <header className={styles.aiInsightHeader}>
             <h2 className={styles.aiInsightTitle}>AI Insight</h2>
             <Link
-              href="/"
+              href="/home"
               className={styles.aiInsightHomeLink}
               aria-label="Go to home"
             >
