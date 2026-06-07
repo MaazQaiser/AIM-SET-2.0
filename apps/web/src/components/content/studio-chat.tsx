@@ -66,6 +66,7 @@ export function StudioChat({
   messages,
   onTurn,
   onRefetch,
+  onStreamDone,
   selectedTemplateId,
   onTemplateSelect,
   templates = [],
@@ -82,6 +83,7 @@ export function StudioChat({
   messages: StoredMessage[];
   onTurn: (result: StudioTurnResult) => void;
   onRefetch: () => void;
+  onStreamDone?: () => void;
   selectedTemplateId?: string;
   onTemplateSelect?: (id: string) => void;
   templates?: ContentTemplate[];
@@ -286,9 +288,10 @@ export function StudioChat({
       } finally {
         setStreamingText("");
         setIsStreaming(false);
+        onStreamDone?.();
       }
     },
-    [isStreaming, projectId, selectedTemplateId, onTurn, onRefetch]
+    [isStreaming, projectId, selectedTemplateId, onTurn, onRefetch, onStreamDone]
   );
 
   function handleStop() {
