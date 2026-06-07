@@ -16,6 +16,7 @@ from app.domain.tenant_service import get_tenant_service
 
 TEMPLATE_EXTENSIONS = {".pptx", ".ppt", ".pdf", ".png", ".jpg", ".jpeg"}
 ARTIFACT_TYPES = frozenset({"deck", "one_pager", "image", "case_study"})
+PARENT_TEMPLATE_TAG = "__parent_template__"
 _logger = logging.getLogger(__name__)
 
 
@@ -86,6 +87,17 @@ def _warn_memory_fallback(operation: str, exc: Exception) -> None:
     _logger.warning("content_studio.%s falling back to memory store: %s", operation, exc)
 
 
+def _parent_draft_is_usable(metadata: Any) -> bool:
+    if not isinstance(metadata, dict):
+        return False
+    draft = metadata.get("fixedSlidesDraft")
+    if not isinstance(draft, dict):
+        return False
+    start = draft.get("startSlides")
+    end = draft.get("endSlides")
+    return isinstance(start, list) and len(start) > 0 and isinstance(end, list) and len(end) > 0
+
+
 class ContentStudioRepository:
     def __init__(self) -> None:
         self._tenants = get_tenant_service()
@@ -153,13 +165,16 @@ class ContentStudioRepository:
         settings = get_settings()
         if settings.supabase_configured:
             try:
+                # Omit metadata here — large JSON blobs make this query very slow (~15s+)
+                # and cause the web BFF fetch to time out. Full metadata is loaded via
+                # get_template() when editing or resolving the parent template.
                 q = (
                     get_supabase()
                     .table("content_templates")
                     .select(
                         "id,name,artifact_type,status,page_count,tags,"
                         "thumbnail_storage_path,css_variables,created_at,ingest_error,"
-                        "source_file_name,source_storage_path,metadata"
+                        "source_file_name,source_storage_path"
                     )
                     .order("created_at", desc=True)
                 )
@@ -178,6 +193,45 @@ class ContentStudioRepository:
         if artifact_type:
             items = [t for t in items if t.get("artifactType") == artifact_type]
         return sorted(items, key=lambda t: str(t.get("createdAt") or ""), reverse=True)
+
+    def get_parent_template(self, ctx: TenantContext) -> Optional[Dict[str, Any]]:
+        """Return the latest usable parent template without loading the heavy html blob."""
+        settings = get_settings()
+        if settings.supabase_configured:
+            try:
+                rows = (
+                    get_supabase()
+                    .table("content_templates")
+                    .select(
+                        "id,name,artifact_type,status,page_count,tags,"
+                        "css_variables,created_at,metadata"
+                    )
+                    .contains("tags", [PARENT_TEMPLATE_TAG])
+                    .order("created_at", desc=True)
+                    .limit(5)
+                    .execute()
+                    .data
+                    or []
+                )
+                for data in rows:
+                    metadata = data.get("metadata") or {}
+                    if not _parent_draft_is_usable(metadata):
+                        continue
+                    api = _tpl_row_to_api(data)
+                    api["html"] = ""
+                    return api
+            except Exception:
+                pass
+        for _clerk_key, template in self._all_memory_templates():
+            tags = template.get("tags") or []
+            metadata = template.get("metadata") or {}
+            if PARENT_TEMPLATE_TAG in tags or (
+                isinstance(metadata, dict) and metadata.get("isParentTemplate")
+            ):
+                if not _parent_draft_is_usable(metadata):
+                    continue
+                return {**template, "html": ""}
+        return None
 
     def get_template(self, ctx: TenantContext, template_id: str) -> Optional[Dict[str, Any]]:
         settings = get_settings()
@@ -427,6 +481,12 @@ class ContentStudioRepository:
             if not found:
                 return None
 
+        tags = patch.get("tags")
+        if tags is None:
+            summary = self.get_template_summary(ctx, template_id)
+            tags = (summary or {}).get("tags") or []
+        if PARENT_TEMPLATE_TAG in tags:
+            return self.get_parent_template(ctx)
         return self.get_template(ctx, template_id)
 
     def finalize_template(
@@ -525,6 +585,35 @@ class ContentStudioRepository:
             raise FileNotFoundError(storage_path)
         return data
 
+    def get_template_summary(self, ctx: TenantContext, template_id: str) -> Optional[Dict[str, Any]]:
+        settings = get_settings()
+        if settings.supabase_configured:
+            try:
+                row = (
+                    get_supabase()
+                    .table("content_templates")
+                    .select("id,name,artifact_type,tags,status,page_count")
+                    .eq("id", template_id)
+                    .limit(1)
+                    .execute()
+                )
+                data = (row.data or [None])[0]
+                if data:
+                    return data
+            except Exception:
+                pass
+        for _clerk_key, template in self._all_memory_templates():
+            if template.get("id") == template_id:
+                return {
+                    "id": template_id,
+                    "name": template.get("name"),
+                    "artifact_type": template.get("artifactType"),
+                    "tags": template.get("tags") or [],
+                    "status": template.get("status"),
+                    "page_count": template.get("pageCount", 1),
+                }
+        return None
+
     def get_template_row(self, ctx: TenantContext, template_id: str) -> Optional[Dict[str, Any]]:
         settings = get_settings()
         if settings.supabase_configured:
@@ -556,6 +645,43 @@ class ContentStudioRepository:
                     "metadata": template.get("metadata") or {},
                 }
         return None
+
+    def _parent_asset_storage_path(self, ctx: TenantContext, asset_name: str) -> str:
+        tenant_uuid, _ = self.template_tenant_keys(ctx)
+        return f"{tenant_uuid}/parent-template/assets/{asset_name}"
+
+    def upload_parent_asset(
+        self,
+        ctx: TenantContext,
+        *,
+        file_bytes: bytes,
+        file_name: str,
+    ) -> Dict[str, str]:
+        settings = get_settings()
+        if len(file_bytes) > settings.kb_max_upload_bytes:
+            raise ValueError(
+                f"Image exceeds upload limit ({settings.kb_max_upload_bytes // (1024 * 1024)} MB)."
+            )
+        ext = Path(file_name).suffix.lower()
+        if ext not in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}:
+            ext = ".png"
+        asset_name = f"{uuid.uuid4()}{ext}"
+        storage_path = self._parent_asset_storage_path(ctx, asset_name)
+        content_type = _mime_for_ext(ext)
+        self.upload_template_blob(storage_path, file_bytes, content_type=content_type)
+        return {
+            "assetId": asset_name,
+            "fileName": file_name,
+            "url": f"/api/content/templates/parent/assets/{asset_name}",
+        }
+
+    def download_parent_asset(self, ctx: TenantContext, asset_name: str) -> Tuple[bytes, str]:
+        safe_name = Path(asset_name).name
+        if not safe_name or safe_name in {".", ".."}:
+            raise FileNotFoundError(asset_name)
+        storage_path = self._parent_asset_storage_path(ctx, safe_name)
+        data = self.download_template_source(ctx, storage_path)
+        return data, _mime_for_ext(Path(safe_name).suffix.lower())
 
     def upload_template_blob(
         self,

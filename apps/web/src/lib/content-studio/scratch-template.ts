@@ -17,6 +17,7 @@ export interface ScratchSlideDraft {
   backgroundColor: string;
   textColor?: string;
   backgroundImageDataUrl?: string;
+  backgroundImageUrl?: string;
   backgroundImageName?: string;
   /** When true the slide occupies a locked position (start or end group) and cannot be deleted or reordered. */
   isFixed?: boolean;
@@ -26,6 +27,7 @@ export interface ScratchLogoAsset {
   id: string;
   label: string;
   dataUrl: string;
+  url?: string;
   fileName?: string;
   isPrimary?: boolean;
 }
@@ -226,9 +228,10 @@ function buildSlideMarkup(
 ): string {
   const bg = safeColor(slide.backgroundColor, "#ffffff");
   const textColor = safeColor(slide.textColor ?? defaultTextColor, defaultTextColor);
-  const hasBackgroundImage = Boolean(slide.backgroundImageDataUrl);
+  const hasBackgroundImage = Boolean(slide.backgroundImageUrl || slide.backgroundImageDataUrl);
+  const backgroundSrc = slide.backgroundImageUrl || slide.backgroundImageDataUrl || "";
   const backgroundImage = hasBackgroundImage
-    ? `<img class="scratch-bg-image" src="${escapeAttr(slide.backgroundImageDataUrl ?? "")}" alt="" />`
+    ? `<img class="scratch-bg-image" src="${escapeAttr(backgroundSrc)}" alt="" />`
     : "";
   const classes = [
     "slide",
@@ -247,7 +250,7 @@ function buildSlideMarkup(
 }
 
 function normalizeLogos(draft: ScratchTemplateDraft): ScratchLogoAsset[] {
-  const logo = (draft.logos ?? []).find((entry) => Boolean(entry.dataUrl));
+  const logo = (draft.logos ?? []).find((entry) => Boolean(entry.url || entry.dataUrl));
   if (logo) return [logo];
   if (!draft.logoDataUrl) return [];
   return [
@@ -261,19 +264,25 @@ function normalizeLogos(draft: ScratchTemplateDraft): ScratchLogoAsset[] {
   ];
 }
 
+function logoSrc(logo: ScratchLogoAsset): string {
+  return logo.url || logo.dataUrl;
+}
+
 function buildLogoCluster(logos: ScratchLogoAsset[]): string {
   const logo = logos[0];
   if (!logo) return "";
+  const src = logoSrc(logo);
+  if (!src) return "";
 
   return `<div class="scratch-logo-cluster">
-  <img class="scratch-logo-primary" src="${escapeAttr(logo.dataUrl)}" alt="${escapeAttr(
+  <img class="scratch-logo-primary" src="${escapeAttr(src)}" alt="${escapeAttr(
     logo.fileName || logo.label || "Logo"
   )}" />
 </div>`;
 }
 
 function buildLayoutBody(slide: ScratchSlideDraft, slideNumber: number): string {
-  const kicker = escapeHtml(slide.kicker || `Slide ${slideNumber}`);
+  const kicker = escapeHtml(`Slide ${slideNumber}`);
   const title = escapeHtml(slide.title || `Slide ${slideNumber} title`);
   const body = escapeHtml(slide.body || "Add content here.");
 

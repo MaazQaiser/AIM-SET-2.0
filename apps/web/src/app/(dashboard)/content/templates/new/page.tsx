@@ -1,5 +1,5 @@
-import { TemplateScratchBuilder } from "@/components/content/template-scratch-builder";
+import { TemplateEditor } from "@/components/content/template-editor";
 
 export default function NewTemplatePage() {
-  return <TemplateScratchBuilder />;
+  return <TemplateEditor />;
 }

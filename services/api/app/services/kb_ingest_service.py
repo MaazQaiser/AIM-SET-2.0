@@ -11,7 +11,7 @@ from dc_kb.extract import extract_document
 
 from app.config import get_settings
 from app.domain.kb_repository import KbRepository, get_kb_repository
-from app.services.office_preview import rasterize_presentation_slides
+from app.services.office_preview import convert_office_bytes_to_pdf, rasterize_presentation_slides
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,15 @@ def generate_presentation_preview(
     slide_pngs = rasterize_presentation_slides(file_bytes, suffix)
     if not slide_pngs:
         raise ValueError("No slides could be rendered from presentation")
+
     repo.save_preview_slides(tenant_id, asset_id, slide_pngs, clerk_key=clerk_key)
+
+    try:
+        pdf_bytes = convert_office_bytes_to_pdf(file_bytes, suffix, allow_text_fallback=False)
+        repo.save_preview_pdf(tenant_id, asset_id, pdf_bytes, clerk_key=clerk_key)
+    except Exception as exc:
+        logger.warning("KB preview PDF save failed for %s: %s", asset_id, exc)
+
     return True
 
 

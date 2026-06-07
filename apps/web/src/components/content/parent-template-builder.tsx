@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -39,19 +39,14 @@ import {
   type ScratchTemplateFont,
 } from "@/lib/content-studio/scratch-template";
 import { compileTemplateDocument } from "@/lib/content-studio/template-editor";
+import {
+  compactSlidesForSave,
+  PARENT_TEMPLATE_MAX_IMAGE_BYTES,
+  uploadParentTemplateAsset,
+} from "@/lib/content-studio/parent-template-assets";
 import { useParentTemplate, useSaveParentTemplate } from "@/lib/data/content-studio-hooks";
 
 const PREVIEW_SCALE = 0.34;
-const MAX_IMAGE_BYTES = 3.5 * 1024 * 1024;
-
-function readImageDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("Could not read image file."));
-    reader.readAsDataURL(file);
-  });
-}
 
 interface FixedSlidesDraft {
   startSlides: ScratchSlideDraft[];
@@ -59,6 +54,7 @@ interface FixedSlidesDraft {
   accentColor: string;
   textColor: string;
   fontFamily: ScratchTemplateFont;
+  logoUrl?: string;
 }
 
 function SlideListButton({
@@ -107,6 +103,7 @@ export function ParentTemplateBuilder() {
   const [textColor, setTextColor] = useState("#0f172a");
   const [fontFamily, setFontFamily] = useState<ScratchTemplateFont>("urbanist");
   const [logoDataUrl, setLogoDataUrl] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
   const [logoFileName, setLogoFileName] = useState("");
 
   const [startSlides, setStartSlides] = useState<ScratchSlideDraft[]>(() =>
@@ -119,19 +116,25 @@ export function ParentTemplateBuilder() {
   const [activeSlideId, setActiveSlideId] = useState(() => startSlides[0]?.id ?? "");
   const [error, setError] = useState("");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const hydratedFromIdRef = useRef<string | null>(null);
 
   // Hydrate from saved parent template when it loads.
   useEffect(() => {
-    if (!existing?.metadata) return;
+    if (!existing?.id || !existing.metadata) return;
     const draft = existing.metadata.fixedSlidesDraft as FixedSlidesDraft | undefined;
-    if (!draft) return;
-    if (draft.startSlides?.length) setStartSlides(draft.startSlides);
-    if (draft.endSlides?.length) setEndSlides(draft.endSlides);
+    if (!draft?.startSlides?.length || !draft.endSlides?.length) return;
+    if (hydratedFromIdRef.current === existing.id) return;
+    setStartSlides(draft.startSlides);
+    setEndSlides(draft.endSlides);
     if (draft.accentColor) setAccentColor(draft.accentColor);
     if (draft.textColor) setTextColor(draft.textColor);
     if (draft.fontFamily) setFontFamily(draft.fontFamily);
-    // Set active to first slide after hydration.
-    setActiveSlideId(draft.startSlides?.[0]?.id ?? draft.endSlides?.[0]?.id ?? "");
+    if (draft.logoUrl) {
+      setLogoUrl(draft.logoUrl);
+      setLogoDataUrl("");
+    }
+    setActiveSlideId(draft.startSlides[0]?.id ?? draft.endSlides[0]?.id ?? "");
+    hydratedFromIdRef.current = existing.id;
   }, [existing]);
 
   const allSlides = useMemo(() => [...startSlides, ...endSlides], [startSlides, endSlides]);
@@ -148,10 +151,12 @@ export function ParentTemplateBuilder() {
 
   const logos = useMemo<ScratchLogoAsset[]>(
     () =>
-      logoDataUrl
-        ? [{ id: "logo", label: "Logo", dataUrl: logoDataUrl, fileName: logoFileName, isPrimary: true }]
-        : [],
-    [logoDataUrl, logoFileName]
+      logoUrl
+        ? [{ id: "logo", label: "Logo", dataUrl: "", url: logoUrl, fileName: logoFileName, isPrimary: true }]
+        : logoDataUrl
+          ? [{ id: "logo", label: "Logo", dataUrl: logoDataUrl, fileName: logoFileName, isPrimary: true }]
+          : [],
+    [logoDataUrl, logoFileName, logoUrl]
   );
 
   const compiled = useMemo(
@@ -201,36 +206,76 @@ export function ParentTemplateBuilder() {
 
   async function handleLogoUpload(file?: File | null) {
     if (!file) return;
-    const dataUrl = await readCheckedImage(file);
-    if (dataUrl) { setLogoDataUrl(dataUrl); setLogoFileName(file.name); }
+    if (!(await validateImageFile(file))) return;
+    try {
+      const url = await uploadParentTemplateAsset(file);
+      setLogoUrl(url);
+      setLogoDataUrl("");
+      setLogoFileName(file.name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload logo.");
+    }
   }
 
   async function handleBackgroundUpload(file?: File | null) {
     if (!file) return;
-    const dataUrl = await readCheckedImage(file);
-    if (dataUrl) updateActiveSlide({ backgroundImageDataUrl: dataUrl, backgroundImageName: file.name });
+    if (!(await validateImageFile(file))) return;
+    try {
+      const url = await uploadParentTemplateAsset(file);
+      updateActiveSlide({
+        backgroundImageUrl: url,
+        backgroundImageName: file.name,
+        backgroundImageDataUrl: "",
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload background image.");
+    }
   }
 
-  async function readCheckedImage(file: File): Promise<string | null> {
+  async function validateImageFile(file: File): Promise<boolean> {
     setError("");
-    if (!file.type.startsWith("image/")) { setError("Use an image file."); return null; }
-    if (file.size > MAX_IMAGE_BYTES) { setError("Use images under 3.5 MB."); return null; }
-    try { return await readImageDataUrl(file); }
-    catch (err) { setError(err instanceof Error ? err.message : "Could not read image file."); return null; }
+    if (!file.type.startsWith("image/")) {
+      setError("Use an image file.");
+      return false;
+    }
+    if (file.size > PARENT_TEMPLATE_MAX_IMAGE_BYTES) {
+      setError("Image is too large. Maximum size is 52 MB.");
+      return false;
+    }
+    return true;
   }
 
   async function handleSave() {
     setError("");
     try {
-      const draft: FixedSlidesDraft = { startSlides, endSlides, accentColor, textColor, fontFamily };
-      await save.mutateAsync({
+      const draft: FixedSlidesDraft = {
+        startSlides: compactSlidesForSave(startSlides),
+        endSlides: compactSlidesForSave(endSlides),
+        accentColor,
+        textColor,
+        fontFamily,
+        ...(logoUrl ? { logoUrl } : {}),
+      };
+      const compiledForSave = buildScratchTemplateDocument({
+        name: "Parent Template",
+        accentColor,
+        textColor,
+        fontFamily,
+        tags: [],
+        logos,
+        fixedStartSlides: draft.startSlides,
+        slides: [],
+        fixedEndSlides: draft.endSlides,
+      });
+      const saved = await save.mutateAsync({
         name: "__parent_template__",
         artifactType: "deck",
         tags: [],
-        html: compiled.html,
-        css: compiled.css,
+        html: compiledForSave.html,
+        css: compiledForSave.css,
         metadata: { isParentTemplate: true, fixedSlidesDraft: draft },
       });
+      hydratedFromIdRef.current = saved.id;
       setLastSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save parent template.");
@@ -385,8 +430,18 @@ export function ParentTemplateBuilder() {
                 <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                   {logoFileName || "No file"}
                 </span>
-                {logoDataUrl ? (
-                  <Button type="button" variant="ghost" size="icon-sm" onClick={() => { setLogoDataUrl(""); setLogoFileName(""); }} aria-label="Remove logo">
+                {logoUrl || logoDataUrl ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => {
+                      setLogoUrl("");
+                      setLogoDataUrl("");
+                      setLogoFileName("");
+                    }}
+                    aria-label="Remove logo"
+                  >
                     <X className="h-4 w-4" />
                   </Button>
                 ) : null}

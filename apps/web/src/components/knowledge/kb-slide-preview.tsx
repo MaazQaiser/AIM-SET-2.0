@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Loader2 } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
-import { kbFileUrl, kbSlideMetaUrl, kbSlideUrl } from "@/lib/kb/file-format";
+import {
+  KB_SLIDE_PREVIEW_CACHE_VERSION,
+  kbFileUrl,
+  kbPreviewUrl,
+  kbSlideMetaUrl,
+  kbSlideUrl,
+} from "@/lib/kb/file-format";
 import { cn } from "@/lib/cn";
 import { briefMainNestedSurfaceClass } from "@/components/pre-call/brief-detail-card";
 import type { KBAsset } from "@/types";
@@ -18,6 +24,9 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
   const [slideCount, setSlideCount] = useState(asset.previewSlideCount ?? 0);
   const [currentSlide, setCurrentSlide] = useState(1);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [usePdfFallback, setUsePdfFallback] = useState(false);
+  const [slideCacheVersion, setSlideCacheVersion] = useState(KB_SLIDE_PREVIEW_CACHE_VERSION);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,6 +34,7 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setUsePdfFallback(false);
 
     void (async () => {
       try {
@@ -38,16 +48,17 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
         }
 
         let count = asset.previewSlideCount ?? 0;
-        if (count <= 0) {
-          const metaRes = await fetch(kbSlideMetaUrl(asset.id));
-          if (!metaRes.ok) {
-            if (!cancelled) {
-              setError("Visual slide preview is not ready yet. Click Re-embed and refresh in a moment.");
-            }
-            return;
+        let cacheVersion = KB_SLIDE_PREVIEW_CACHE_VERSION;
+        const metaRes = await fetch(kbSlideMetaUrl(asset.id), { cache: "no-store" });
+        if (metaRes.ok) {
+          const meta = (await metaRes.json()) as { slideCount?: number; cacheVersion?: string };
+          if ((meta.slideCount ?? 0) > 0) count = meta.slideCount ?? count;
+          if (meta.cacheVersion) cacheVersion = `${KB_SLIDE_PREVIEW_CACHE_VERSION}-${meta.cacheVersion}`;
+        } else if (count <= 0) {
+          if (!cancelled) {
+            setError("Visual slide preview is not ready yet. Click Re-embed and refresh in a moment.");
           }
-          const meta = (await metaRes.json()) as { slideCount?: number };
-          count = meta.slideCount ?? 0;
+          return;
         }
         if (count <= 0) {
           if (!cancelled) setError("No slide previews available yet.");
@@ -59,9 +70,15 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
           const blob = await fileRes.blob();
           if (!cancelled) setDownloadUrl(URL.createObjectURL(blob));
         }
+        const previewRes = await fetch(kbPreviewUrl(asset.id));
+        if (previewRes.ok) {
+          const blob = await previewRes.blob();
+          if (!cancelled) setPreviewPdfUrl(URL.createObjectURL(blob));
+        }
 
         if (!cancelled) {
           setSlideCount(count);
+          setSlideCacheVersion(cacheVersion);
           setCurrentSlide(1);
         }
       } catch (e) {
@@ -83,6 +100,17 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
       if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     };
   }, [downloadUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (previewPdfUrl) URL.revokeObjectURL(previewPdfUrl);
+    };
+  }, [previewPdfUrl]);
+
+  const slideSrc = useMemo(
+    () => kbSlideUrl(asset.id, currentSlide, slideCacheVersion),
+    [asset.id, currentSlide, slideCacheVersion]
+  );
 
   if (loading) {
     return (
@@ -160,19 +188,36 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
       </div>
 
       <div className="flex flex-1 min-h-0 items-center justify-center bg-neutral-950/5 p-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          key={`${asset.id}-${currentSlide}`}
-          src={kbSlideUrl(asset.id, currentSlide)}
-          alt={`${asset.title} — slide ${currentSlide}`}
-          className={cn(
-            "max-w-full rounded-md shadow-md object-contain bg-white",
-            compact ? "max-h-48" : "max-h-[65vh]"
-          )}
-        />
+        {usePdfFallback && previewPdfUrl ? (
+          <iframe
+            title={`${asset.title} preview`}
+            src={previewPdfUrl}
+            className={cn("w-full rounded-md bg-white", compact ? "h-56" : "h-[65vh]")}
+          />
+        ) : (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              key={slideSrc}
+              src={slideSrc}
+              alt={`${asset.title} — slide ${currentSlide}`}
+              className={cn(
+                "max-w-full rounded-md shadow-md object-contain bg-white",
+                compact ? "max-h-48" : "max-h-[65vh]"
+              )}
+              onError={() => {
+                if (previewPdfUrl) {
+                  setUsePdfFallback(true);
+                } else {
+                  setError("Visual slide preview is unavailable for this file. Use Download original.");
+                }
+              }}
+            />
+          </>
+        )}
       </div>
 
-      {slideCount > 1 ? (
+      {slideCount > 1 && !usePdfFallback ? (
         <div className="flex gap-2 overflow-x-auto border-t bg-card px-4 py-3">
           {Array.from({ length: slideCount }, (_, i) => i + 1).map((index) => (
             <button
@@ -187,7 +232,7 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={kbSlideUrl(asset.id, index)}
+                src={kbSlideUrl(asset.id, index, slideCacheVersion)}
                 alt=""
                 className="h-14 w-24 object-cover bg-white"
                 loading="lazy"

@@ -1,6 +1,5 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  Bell,
   Bot,
   FileText,
   GraduationCap,
@@ -31,7 +30,6 @@ export type FooterNavItem =
   | { kind: "link"; href: string; label: string; icon: LucideIcon | "account" };
 
 export const footerNavItems: FooterNavItem[] = [
-  { label: "Notification", kind: "button", icon: Bell },
   { href: "/settings", label: "Settings", kind: "link", icon: Settings },
   { href: "/settings", label: "Account", kind: "link", icon: "account" },
 ];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useDeferredValue } from "react";
+import { useEffect, useMemo, useState, useDeferredValue } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -40,7 +40,6 @@ import {
 } from "@/lib/content-studio/scratch-template";
 import { compileTemplateDocument } from "@/lib/content-studio/template-editor";
 import { useCreateTemplate, useParentTemplate } from "@/lib/data/content-studio-hooks";
-import type { ContentTemplate } from "@/types/content_studio";
 
 function SlideListButton({
   slide,
@@ -100,21 +99,8 @@ function readImageDataUrl(file: File): Promise<string> {
 }
 
 export function TemplateScratchBuilder() {
-  const { data: parentTemplate, isLoading: parentLoading } = useParentTemplate();
-
-  if (parentLoading) {
-    return (
-      <PageShell size="wide" className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </PageShell>
-    );
-  }
-
-  return <TemplateScratchBuilderForm parentTemplate={parentTemplate ?? null} />;
-}
-
-function TemplateScratchBuilderForm({ parentTemplate }: { parentTemplate: ContentTemplate | null }) {
   const create = useCreateTemplate();
+  const { data: parentTemplate } = useParentTemplate();
   const [name, setName] = useState("Scratch deck template");
   const [accentColor, setAccentColor] = useState("#2563eb");
   const [textColor, setTextColor] = useState("#0f172a");
@@ -122,18 +108,30 @@ function TemplateScratchBuilderForm({ parentTemplate }: { parentTemplate: Conten
   const [logoDataUrl, setLogoDataUrl] = useState("");
   const [logoFileName, setLogoFileName] = useState("");
 
-  const parentDraft = (parentTemplate?.metadata as { fixedSlidesDraft?: { startSlides?: ScratchSlideDraft[]; endSlides?: ScratchSlideDraft[] } } | null)?.fixedSlidesDraft;
-
-  // Fixed slides — seeded from the parent template if one is configured.
+  // Fixed slides at the start (1 slide) and end (6 slides) of every template.
   const [fixedStartSlides, setFixedStartSlides] = useState<ScratchSlideDraft[]>(
-    () => parentDraft?.startSlides?.length ? parentDraft.startSlides : createDefaultFixedStartSlides()
+    () => createDefaultFixedStartSlides()
   );
   const [fixedEndSlides, setFixedEndSlides] = useState<ScratchSlideDraft[]>(
-    () => parentDraft?.endSlides?.length ? parentDraft.endSlides : createDefaultFixedEndSlides()
+    () => createDefaultFixedEndSlides()
   );
 
   // User-editable slides between the two fixed groups.
   const [slides, setSlides] = useState<ScratchSlideDraft[]>([createScratchSlide(1)]);
+
+  // When a parent template is configured, use its fixed slides instead of the local defaults.
+  useEffect(() => {
+    if (!parentTemplate?.metadata) return;
+    const draft = parentTemplate.metadata.fixedSlidesDraft as
+      | { startSlides?: ScratchSlideDraft[]; endSlides?: ScratchSlideDraft[] }
+      | undefined;
+    if (!draft) return;
+    if (draft.startSlides?.length) {
+      setFixedStartSlides(draft.startSlides);
+      setActiveSlideId(draft.startSlides[0].id);
+    }
+    if (draft.endSlides?.length) setFixedEndSlides(draft.endSlides);
+  }, [parentTemplate]);
 
   const allSlides = useMemo(
     () => [...fixedStartSlides, ...slides, ...fixedEndSlides],

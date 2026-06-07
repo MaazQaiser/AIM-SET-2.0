@@ -11,13 +11,11 @@ import {
 import {
   mainNavItems,
   footerNavItems,
-  getSidebarPageTitle,
 } from "./sidebar-nav-config";
 import { useSidebar } from "./sidebar-context";
-import { SidebarSubpanel } from "./sidebar-subpanel";
+import { SidebarKbWidgetCard } from "./sidebar-kb-widget-card";
 import {
   SummitLogo,
-  SidebarSearchIcon,
   SidebarAccountAvatar,
 } from "./sidebar-icons";
 import styles from "./sidebar.module.css";
@@ -40,42 +38,17 @@ function FooterIcon({ icon }: { icon: LucideIcon | "account" }) {
 
 export function SidebarExpandedPanel() {
   const pathname = usePathname();
-  const pageTitle = getSidebarPageTitle(pathname);
   const { setExpanded } = useSidebar();
 
   return (
-    <>
-      <div className={styles.navColumn}>
-        <div className={styles.navHeaderBlock}>
-          <div className={styles.brandRow}>
-            <SummitLogo />
-          </div>
-
-          <div className={styles.titleSearchBlock}>
-            <h1 className={styles.pageTitle}>
-              {pageTitle === "Sales Plan Overview" ? (
-                <>
-                  Sales Plan
-                  <br />
-                  Overview
-                </>
-              ) : (
-                pageTitle
-              )}
-            </h1>
-
-            <label className={styles.searchField}>
-              <SidebarSearchIcon />
-              <input
-                type="search"
-                className={styles.searchInput}
-                placeholder="Press ⌘K to search"
-                aria-label="Search"
-              />
-            </label>
-          </div>
+    <div className={styles.navColumn}>
+      <div className={styles.navHeaderBlock}>
+        <div className={styles.brandRow}>
+          <SummitLogo />
         </div>
+      </div>
 
+      <div className={styles.navMain}>
         <nav className={styles.primaryNav} aria-label="Primary">
           {mainNavItems.map((item) => {
             const isActive =
@@ -102,51 +75,51 @@ export function SidebarExpandedPanel() {
           })}
         </nav>
 
-        <div className={styles.footerNav}>
-          {footerNavItems.map((item) => {
-            const isActive =
-              item.kind === "link" && pathname.startsWith(item.href);
+        <SidebarKbWidgetCard />
+      </div>
 
-            const rowClass = cn(
-              styles.footerRow,
-              isActive && styles.footerRowActive
-            );
+      <div className={styles.footerNav}>
+        {footerNavItems.map((item) => {
+          const isActive =
+            item.kind === "link" && pathname.startsWith(item.href);
 
-            if (item.kind === "button") {
-              return (
-                <button
-                  key={item.label}
-                  type="button"
-                  className={rowClass}
-                  aria-label={item.label}
-                >
-                  <span className={styles.footerIconWrap}>
-                    <FooterIcon icon={item.icon} />
-                  </span>
-                  <span className={styles.footerLabel}>{item.label}</span>
-                </button>
-              );
-            }
+          const rowClass = cn(
+            styles.footerRow,
+            isActive && styles.footerRowActive
+          );
 
+          if (item.kind === "button") {
             return (
-              <Link
+              <button
                 key={item.label}
-                href={item.href}
+                type="button"
                 className={rowClass}
-                aria-current={isActive ? "page" : undefined}
-                onClick={() => setExpanded(false)}
+                aria-label={item.label}
               >
                 <span className={styles.footerIconWrap}>
                   <FooterIcon icon={item.icon} />
                 </span>
                 <span className={styles.footerLabel}>{item.label}</span>
-              </Link>
+              </button>
             );
-          })}
-        </div>
-      </div>
+          }
 
-      <SidebarSubpanel />
-    </>
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={rowClass}
+              aria-current={isActive ? "page" : undefined}
+              onClick={() => setExpanded(false)}
+            >
+              <span className={styles.footerIconWrap}>
+                <FooterIcon icon={item.icon} />
+              </span>
+              <span className={styles.footerLabel}>{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
   );
 }

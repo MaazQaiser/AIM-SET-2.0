@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { appSidebarWidgetClass } from "@dc-copilot/ui/surfaces";
-import { SidebarAiInsightCard } from "./sidebar-ai-insight-card";
 import { useContentManagerSidebarStats, useKbAssets } from "@/lib/data/hooks";
 import { sidebarWidgetCards } from "./sidebar-nav-config";
 import { useSidebar } from "./sidebar-context";
@@ -21,7 +20,7 @@ function formatContentSubtitle(assetCount: number, toGenerateCount: number, load
   return parts.join(" · ");
 }
 
-export function SidebarSubpanel() {
+export function SidebarKbWidgetCard({ className }: { className?: string }) {
   const { setExpanded } = useSidebar();
   const { data: assets = [] } = useKbAssets();
   const { toGenerateCount, isLoading: contentStatsLoading } = useContentManagerSidebarStats();
@@ -29,19 +28,8 @@ export function SidebarSubpanel() {
   const contentSubtitle = formatContentSubtitle(assets.length, toGenerateCount, contentStatsLoading);
 
   return (
-    <div className={styles.widgetsColumn} aria-label="Sidebar widgets">
-      <button
-        type="button"
-        className={styles.closeButton}
-        aria-label="Close sidebar"
-        onClick={() => setExpanded(false)}
-      >
-        <X className="h-4 w-4" strokeWidth={1.5} />
-      </button>
-
-      <SidebarAiInsightCard />
-
-      <div className={styles.kbStackScene} aria-hidden>
+    <div className={cn(styles.navKbCardWrap, className)}>
+      <div className={cn(styles.kbStackScene, styles.navKbStackScene)} aria-hidden>
         <SidebarKbDocumentsStack className={styles.kbStackSvg} />
       </div>
 
@@ -61,8 +49,6 @@ export function SidebarSubpanel() {
           <ChevronRight className={styles.widgetCardIcon} strokeWidth={1.5} aria-hidden />
         </Link>
       ))}
-
-      <div className={styles.widgetsScrollbar} aria-hidden />
     </div>
   );
 }

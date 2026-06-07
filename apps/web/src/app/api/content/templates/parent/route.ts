@@ -12,16 +12,10 @@ interface RawTemplate {
 }
 
 async function findParent(headers: HeadersInit): Promise<RawTemplate | null> {
-  const res = await fetch(`${apiBaseUrl()}/api/v1/content/templates`, { headers });
+  const res = await fetch(`${apiBaseUrl()}/api/v1/content/templates/parent`, { headers });
   if (!res.ok) return null;
-  const list = (await res.json()) as RawTemplate[];
-  return (
-    list.find(
-      (t) =>
-        t.tags?.includes(PARENT_TAG) ||
-        (t.metadata as { isParentTemplate?: boolean } | undefined)?.isParentTemplate
-    ) ?? null
-  );
+  const parent = (await res.json()) as RawTemplate | null;
+  return parent ?? null;
 }
 
 /** GET — returns the parent template record (or null if not yet configured). */

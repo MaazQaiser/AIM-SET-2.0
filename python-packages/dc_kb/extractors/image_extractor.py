@@ -11,7 +11,10 @@ def extract_image(path: Path) -> ExtractedDocument:
         import pytesseract
 
         image = Image.open(path)
-        text = pytesseract.image_to_string(image).strip()
+        # Prevent uploads from hanging indefinitely in OCR when the local
+        # tesseract binary is slow/unavailable. If OCR times out or fails,
+        # caller will fall back to placeholder chunking.
+        text = pytesseract.image_to_string(image, timeout=8).strip()
         if not text:
             return ExtractedDocument(
                 chunks=[],

@@ -17,6 +17,29 @@ import type {
   TemplateAssistResult,
 } from "@/types/content_studio";
 
+const TEMPLATE_SAVE_TIMEOUT_MS = 20_000;
+
+async function fetchTemplateWithTimeout(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), TEMPLATE_SAVE_TIMEOUT_MS);
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: init?.signal ?? controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Save timed out after 20s. Please try again.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
 export interface StudioProjectDetail {
   project: StudioProject;
   messages: Array<{
@@ -88,6 +111,7 @@ export function useContentTemplates(artifactType?: string) {
 }
 
 export function useContentTemplate(templateId?: string) {
+  const qc = useQueryClient();
   return useQuery({
     queryKey: ["content-template", templateId],
     queryFn: async () => {
@@ -97,6 +121,12 @@ export function useContentTemplate(templateId?: string) {
     },
     enabled: Boolean(templateId),
     staleTime: QUERY_STALE_TIME_MS,
+    // Show template instantly from list cache while fetching fresh detail.
+    placeholderData: () => {
+      if (!templateId) return undefined;
+      const list = qc.getQueryData<ContentTemplate[]>(["content-templates"]);
+      return list?.find((template) => template.id === templateId);
+    },
   });
 }
 
@@ -266,7 +296,7 @@ export function useCreateTemplate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: ContentTemplateDraft) => {
-      const res = await fetch("/api/content/templates", {
+      const res = await fetchTemplateWithTimeout("/api/content/templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -283,7 +313,7 @@ export function useUpdateTemplate(templateId?: string) {
   return useMutation({
     mutationFn: async (body: ContentTemplateDraft) => {
       if (!templateId) throw new Error("Template id is required");
-      const res = await fetch(`/api/content/templates/${templateId}`, {
+      const res = await fetchTemplateWithTimeout(`/api/content/templates/${templateId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -293,7 +323,7 @@ export function useUpdateTemplate(templateId?: string) {
       // Final safety net: if update target is stale/missing, create a fresh
       // template from the current editor draft instead of failing the save.
       if (res.status === 404) {
-        const createRes = await fetch("/api/content/templates", {
+        const createRes = await fetchTemplateWithTimeout("/api/content/templates", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -330,20 +360,32 @@ export function useTemplateAssist() {
 }
 
 const PARENT_TEMPLATE_TAG = "__parent_template__";
+const PARENT_TEMPLATE_FETCH_TIMEOUT_MS = 120_000;
+const PARENT_TEMPLATE_SAVE_TIMEOUT_MS = 120_000;
 
-/**
- * Derives the parent template from the shared content-templates cache.
- * This guarantees the UI always reflects the latest save without a separate fetch.
- */
+async function fetchParentTemplate(): Promise<ContentTemplate | null> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), PARENT_TEMPLATE_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch("/api/content/templates/parent", {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as ContentTemplate | null;
+  } catch {
+    return null;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+/** Loads the singleton parent template (includes metadata for scratch builder). */
 export function useParentTemplate() {
   return useQuery({
-    queryKey: ["content-templates"],
-    queryFn: async () => {
-      const api = await bffFetch<ContentTemplate[]>("/api/content/templates");
-      return api ?? [];
-    },
+    queryKey: ["content-parent-template"],
+    queryFn: fetchParentTemplate,
     staleTime: QUERY_STALE_TIME_MS,
-    select: (all) => all.find((t) => t.tags?.includes(PARENT_TEMPLATE_TAG)) ?? null,
   });
 }
 
@@ -351,25 +393,34 @@ export function useSaveParentTemplate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: ContentTemplateDraft) => {
-      const res = await fetch("/api/content/templates/parent", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json() as Promise<ContentTemplate>;
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), PARENT_TEMPLATE_SAVE_TIMEOUT_MS);
+      try {
+        const res = await fetch("/api/content/templates/parent", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(await res.text());
+        return res.json() as Promise<ContentTemplate>;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          throw new Error("Save timed out. Your images may be very large — try again or use smaller images.");
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timeout);
+      }
     },
     onSuccess: (savedTemplate) => {
-      // Write the saved template directly into the shared cache so the templates
-      // listing reflects the change immediately — no async refetch race condition.
+      qc.setQueryData<ContentTemplate | null>(["content-parent-template"], savedTemplate);
       qc.setQueryData<ContentTemplate[]>(["content-templates"], (old) => {
         const withoutParent = (old ?? []).filter(
           (t) => !t.tags?.includes(PARENT_TEMPLATE_TAG)
         );
         return [savedTemplate, ...withoutParent];
       });
-      // Also schedule a background refresh so any other mutations are synced.
-      void qc.invalidateQueries({ queryKey: ["content-templates"] });
     },
   });
 }

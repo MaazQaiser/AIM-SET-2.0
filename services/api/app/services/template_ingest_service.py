@@ -315,7 +315,7 @@ def _prepare_visual_assets(
 
     if ext in {".ppt", ".pptx"}:
         try:
-            pdf_bytes = convert_office_bytes_to_pdf(file_bytes, ext, allow_text_fallback=True)
+            pdf_bytes = convert_office_bytes_to_pdf(file_bytes, ext, allow_text_fallback=False)
             preview_pdf_bytes = pdf_bytes
             repo.upload_template_blob(
                 _template_preview_pdf_path(template_id, tenant_uuid),
