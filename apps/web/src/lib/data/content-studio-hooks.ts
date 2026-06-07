@@ -288,8 +288,21 @@ export function useUpdateTemplate(templateId?: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json() as Promise<ContentTemplate>;
+      if (res.ok) return res.json() as Promise<ContentTemplate>;
+
+      // Final safety net: if update target is stale/missing, create a fresh
+      // template from the current editor draft instead of failing the save.
+      if (res.status === 404) {
+        const createRes = await fetch("/api/content/templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!createRes.ok) throw new Error(await createRes.text());
+        return createRes.json() as Promise<ContentTemplate>;
+      }
+
+      throw new Error(await res.text());
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["content-templates"] });
@@ -312,6 +325,51 @@ export function useTemplateAssist() {
       });
       if (!res.ok) throw new Error(await res.text());
       return res.json() as Promise<TemplateAssistResult>;
+    },
+  });
+}
+
+const PARENT_TEMPLATE_TAG = "__parent_template__";
+
+/**
+ * Derives the parent template from the shared content-templates cache.
+ * This guarantees the UI always reflects the latest save without a separate fetch.
+ */
+export function useParentTemplate() {
+  return useQuery({
+    queryKey: ["content-templates"],
+    queryFn: async () => {
+      const api = await bffFetch<ContentTemplate[]>("/api/content/templates");
+      return api ?? [];
+    },
+    staleTime: QUERY_STALE_TIME_MS,
+    select: (all) => all.find((t) => t.tags?.includes(PARENT_TEMPLATE_TAG)) ?? null,
+  });
+}
+
+export function useSaveParentTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: ContentTemplateDraft) => {
+      const res = await fetch("/api/content/templates/parent", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json() as Promise<ContentTemplate>;
+    },
+    onSuccess: (savedTemplate) => {
+      // Write the saved template directly into the shared cache so the templates
+      // listing reflects the change immediately — no async refetch race condition.
+      qc.setQueryData<ContentTemplate[]>(["content-templates"], (old) => {
+        const withoutParent = (old ?? []).filter(
+          (t) => !t.tags?.includes(PARENT_TEMPLATE_TAG)
+        );
+        return [savedTemplate, ...withoutParent];
+      });
+      // Also schedule a background refresh so any other mutations are synced.
+      void qc.invalidateQueries({ queryKey: ["content-templates"] });
     },
   });
 }

@@ -19,5 +19,8 @@ export function useContentPlan(input: ContentPlanInput | null) {
     },
     enabled: Boolean(input?.suggestionId && input?.title),
     staleTime: QUERY_STALE_TIME_MS,
+    gcTime: QUERY_STALE_TIME_MS * 2,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 }

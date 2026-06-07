@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 import re
+import threading
+import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from dc_core.evidence import AgentEnvelope, Citation, validate_envelope
 from dc_core.tenancy import TenantContext
@@ -23,6 +26,38 @@ from app.domain.kb_tenancy import resolve_kb_tenant
 from app.services.deck_assembly_service import slide_plan_to_outline
 
 PROMPTS_ROOT = Path(__file__).resolve().parents[4] / "prompts"
+
+# ── Plan cache ────────────────────────────────────────────────────────────────
+# Avoid re-running the expensive evidence + LLM pipeline for identical requests
+# within the same deployment session. TTL is 10 minutes.
+_PLAN_CACHE_TTL = 600
+_plan_cache: Dict[str, Tuple[float, Any]] = {}
+_plan_cache_lock = threading.Lock()
+
+
+def _plan_cache_key(tenant_id: str, suggestion_id: str, title: str) -> str:
+    return f"{tenant_id}:{suggestion_id}:{title.strip().lower()}"
+
+
+def _get_cached_plan(key: str) -> Optional[Any]:
+    with _plan_cache_lock:
+        entry = _plan_cache.get(key)
+        if entry and (time.monotonic() - entry[0]) < _PLAN_CACHE_TTL:
+            return entry[1]
+        if entry:
+            del _plan_cache[key]
+    return None
+
+
+def _set_cached_plan(key: str, value: Any) -> None:
+    with _plan_cache_lock:
+        # Evict stale entries when cache grows large
+        now = time.monotonic()
+        if len(_plan_cache) > 500:
+            stale = [k for k, (ts, _) in _plan_cache.items() if now - ts >= _PLAN_CACHE_TTL]
+            for k in stale:
+                _plan_cache.pop(k, None)
+        _plan_cache[key] = (now, value)
 
 
 def _normalize_leads(leads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -283,6 +318,31 @@ def _parse_llm_plan(raw: str) -> Optional[Dict[str, Any]]:
     return data
 
 
+def _gather_lead_evidence(
+    ctx: TenantContext,
+    lead: Dict[str, Any],
+    generation_reason: str,
+    needed_for: str,
+    industry: str,
+    title: str,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Return (evidence_projects, explicit_kb_assets) for a single lead."""
+    proj = _dedupe_evidence_projects(lead.get("relevant_projects") or [])
+    kb = _dedupe_evidence_kb_assets(lead.get("relevant_documents") or [])
+    recommended_deck = lead.get("recommended_deck")
+    if isinstance(recommended_deck, dict):
+        kb.extend(_dedupe_evidence_kb_assets([recommended_deck]))
+    research = {
+        "needs": generation_reason,
+        "industry": lead.get("industry") or industry,
+        "intersection": needed_for,
+        "campaign_service": title,
+    }
+    bundle = build_relevant_content(ctx, lead.get("account_name") or title, research, limit=10)
+    proj.extend(_dedupe_evidence_projects(bundle.get("relevantProjects") or []))
+    return proj, kb
+
+
 def run_content_plan(
     ctx: TenantContext,
     *,
@@ -305,52 +365,28 @@ def run_content_plan(
     settings = get_settings()
     normalized_leads = _normalize_leads(leads or [])
     lead_count = len(normalized_leads) or 1
-
     extra_context = extra_context or {}
+
+    # ── Cache check ───────────────────────────────────────────────────────────
+    tenant_id = str(getattr(ctx, "tenant_id", "") or getattr(ctx, "org_id", "") or "")
+    cache_key = _plan_cache_key(tenant_id, suggestion_id, title)
+    cached = _get_cached_plan(cache_key)
+    if cached is not None:
+        return cached
+
+    # ── Build search query ────────────────────────────────────────────────────
     query_parts = [title, generation_reason, needed_for, content_requirements, industry]
     for lead in normalized_leads[:6]:
         query_parts.extend([lead.get("account_name", ""), lead.get("industry", "")])
     query = " ".join(p for p in query_parts if p).strip()
 
+    # ── Gather evidence in parallel ───────────────────────────────────────────
+    # Run per-lead evidence (vector DB calls) + KB search + template pick concurrently
     evidence_projects: List[Dict[str, Any]] = []
     explicit_kb_assets: List[Dict[str, Any]] = []
-    for lead in normalized_leads[:4]:
-        evidence_projects.extend(_dedupe_evidence_projects(lead.get("relevant_projects") or []))
-        explicit_kb_assets.extend(_dedupe_evidence_kb_assets(lead.get("relevant_documents") or []))
-        recommended_deck = lead.get("recommended_deck")
-        if isinstance(recommended_deck, dict):
-            explicit_kb_assets.extend(_dedupe_evidence_kb_assets([recommended_deck]))
-        research = {
-            "needs": generation_reason,
-            "industry": lead.get("industry") or industry,
-            "intersection": needed_for,
-            "campaign_service": title,
-        }
-        bundle = build_relevant_content(ctx, lead.get("account_name") or title, research, limit=10)
-        evidence_projects.extend(_dedupe_evidence_projects(bundle.get("relevantProjects") or []))
-    evidence_projects = _dedupe_evidence_projects(evidence_projects)
-
-    kb_hits = _retrieve_studio_kb_hits(ctx, query)
-    if kb_asset_ids:
-        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
-        kb_repo = get_kb_repository()
-        existing_ids = {str(h.get("asset_id")) for h in kb_hits}
-        for asset_id in kb_asset_ids:
-            if asset_id in existing_ids:
-                continue
-            row = kb_repo.get_asset_row(tenant_uuid, asset_id, clerk_key)
-            if row:
-                kb_hits.insert(
-                    0,
-                    {
-                        "asset_id": asset_id,
-                        "title": row.get("title"),
-                        "chunk_text": "",
-                        "score": 0.95,
-                    },
-                )
-
-    evidence_kb = _dedupe_evidence_kb_assets(explicit_kb_assets + _kb_assets_payload(kb_hits, ctx))
+    kb_hits: List[Dict[str, Any]] = []
+    best_template: Optional[Dict[str, Any]] = None
+    recommendations: List[Dict[str, Any]] = []
 
     brief_stub = {
         "needed_for": needed_for,
@@ -360,7 +396,49 @@ def run_content_plan(
         "content_context": needed_for or generation_reason,
     }
     project_stub = {"artifactType": artifact_type, "title": title}
-    best_template, recommendations = _pick_default_templates(ctx, repo, project_stub, brief_stub, title)
+
+    with ThreadPoolExecutor(max_workers=min(6, len(normalized_leads[:4]) + 2)) as pool:
+        lead_futures = {
+            pool.submit(
+                _gather_lead_evidence, ctx, lead, generation_reason, needed_for, industry, title
+            ): lead
+            for lead in normalized_leads[:4]
+        }
+        kb_future = pool.submit(_retrieve_studio_kb_hits, ctx, query)
+        tpl_future = pool.submit(_pick_default_templates, ctx, repo, project_stub, brief_stub, title)
+
+        for fut in as_completed(lead_futures):
+            try:
+                proj, kb = fut.result()
+                evidence_projects.extend(proj)
+                explicit_kb_assets.extend(kb)
+            except Exception:
+                pass
+
+        try:
+            kb_hits = kb_future.result()
+        except Exception:
+            kb_hits = []
+
+        try:
+            best_template, recommendations = tpl_future.result()
+        except Exception:
+            best_template, recommendations = None, []
+
+    evidence_projects = _dedupe_evidence_projects(evidence_projects)
+
+    if kb_asset_ids:
+        tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
+        kb_repo = get_kb_repository()
+        existing_ids = {str(h.get("asset_id")) for h in kb_hits}
+        for asset_id in kb_asset_ids:
+            if asset_id in existing_ids:
+                continue
+            row = kb_repo.get_asset_row(tenant_uuid, asset_id, clerk_key)
+            if row:
+                kb_hits.insert(0, {"asset_id": asset_id, "title": row.get("title"), "chunk_text": "", "score": 0.95})
+
+    evidence_kb = _dedupe_evidence_kb_assets(explicit_kb_assets + _kb_assets_payload(kb_hits, ctx))
 
     slide_plan = _heuristic_slide_plan(
         title=title,
@@ -409,7 +487,7 @@ def run_content_plan(
             completion = LlmClient(openai_api_key=settings.openai_api_key or None).complete(
                 system=system,
                 user=user_payload,
-                max_tokens=2048,
+                max_tokens=800,
                 model="gpt-5.4-mini",
                 fallback_model="gpt-5.4-mini",
             )
@@ -481,4 +559,5 @@ def run_content_plan(
         creative=True,
     )
     validate_envelope(envelope)
+    _set_cached_plan(cache_key, envelope)
     return envelope

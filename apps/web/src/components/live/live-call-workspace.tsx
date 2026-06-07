@@ -150,9 +150,18 @@ export function LiveCallWorkspace({
             className="flex-1 min-h-0"
           />
         ) : (
-          <p className={cn(liveColumnHorizontalPadding, "py-8 text-center type-body text-muted-foreground")}>
-            Waiting for transcript. Start Recall above or play a demo transcript.
-          </p>
+          <div className={cn(liveColumnHorizontalPadding, "flex flex-col items-center justify-center gap-4 py-12 text-center")}>
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <Mic className="h-5 w-5 text-muted-foreground" aria-hidden />
+            </div>
+            <div className="space-y-1">
+              <p className="type-body font-medium text-foreground">No live data yet</p>
+              <p className="type-body-sm text-muted-foreground">
+                Connect Recall to capture a live call, or run the demo to see the AI copilot in action.
+              </p>
+            </div>
+            <DemoTranscriptPlayer callId={callId} />
+          </div>
         )}
       </div>
     </>

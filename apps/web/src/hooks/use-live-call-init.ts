@@ -63,6 +63,7 @@ function mapSuggestionLog(row: Record<string, unknown>): SuggestionLogEntry | nu
 /** Initialize live call session (WebSocket transcript feed connects separately). */
 export function useLiveCallInit(callId: string) {
   const initialized = useRef(false);
+  const activeCallIdRef = useRef<string>(callId);
   const setCallId = useLiveCall((s) => s.setCallId);
   const reset = useLiveCall((s) => s.reset);
   const hydrateFromStoredSession = useLiveCall((s) => s.hydrateFromStoredSession);
@@ -70,6 +71,9 @@ export function useLiveCallInit(callId: string) {
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
+    activeCallIdRef.current = callId;
+
+    // Always start with a clean null state — no data from a previous call
     reset();
     setCallId(callId);
 
@@ -85,6 +89,9 @@ export function useLiveCallInit(callId: string) {
           events?: Record<string, unknown>[];
           suggestions?: Record<string, unknown>[];
         };
+
+        // Guard: discard result if the user has already navigated to a different call
+        if (activeCallIdRef.current !== callId) return;
 
         const transcript = (data.events ?? []).map(mapStoredEvent);
         const suggestionLog = (data.suggestions ?? [])
@@ -119,6 +126,8 @@ export function useLiveCallInit(callId: string) {
     })();
 
     return () => {
+      // Signal that this callId is no longer active so the async hydration above is discarded
+      activeCallIdRef.current = "";
       clearInterval(tick);
       reset();
       initialized.current = false;

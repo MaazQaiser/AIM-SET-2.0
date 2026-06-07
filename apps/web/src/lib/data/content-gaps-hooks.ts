@@ -46,6 +46,40 @@ export function useDismissContentGap() {
   });
 }
 
+export function useTrackContentGap() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      gapKey,
+      studioProjectId,
+      ...context
+    }: {
+      gapKey: string;
+      studioProjectId: string;
+      source?: "pre-dc" | "post-dc";
+      name?: string;
+      artifactType?: string;
+      callId?: string;
+      reason?: string;
+      neededFor?: string;
+      sourcePath?: string;
+      contentRequirements?: string;
+      context?: Record<string, unknown>;
+      priority?: number;
+    }) =>
+      patchContentGap(gapKey, {
+        ...context,
+        status: "in_progress",
+        studioProjectId,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["content-gaps"] });
+      qc.invalidateQueries({ queryKey: ["pre-dc-content-generation-gaps"] });
+      qc.invalidateQueries({ queryKey: ["post-dc-content-generation-gaps"] });
+    },
+  });
+}
+
 export function useResolveContentGap() {
   const qc = useQueryClient();
   return useMutation({

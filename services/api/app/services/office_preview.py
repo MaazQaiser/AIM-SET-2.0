@@ -36,7 +36,11 @@ def rasterize_presentation_slides(
     *,
     dpi: int = DEFAULT_SLIDE_DPI,
 ) -> List[bytes]:
-    """Render presentation slides to PNG bytes (LibreOffice → PDF → rasterize)."""
+    """Render presentation slides to PNG bytes.
+
+    Preferred path is LibreOffice -> PDF -> PNG. If LibreOffice is unavailable,
+    fall back to a text-only PPTX PDF so preview thumbnails remain available.
+    """
     normalized = ext.lower() if ext.startswith(".") else f".{ext.lower()}"
     if normalized not in PRESENTATION_EXTENSIONS:
         raise ValueError(f"Not a presentation: {ext}")
@@ -45,7 +49,7 @@ def rasterize_presentation_slides(
         work_dir = Path(tmp)
         src = work_dir / f"source{normalized}"
         src.write_bytes(file_bytes)
-        pdf_path = convert_office_file_to_pdf(src, work_dir, allow_text_fallback=False)
+        pdf_path = convert_office_file_to_pdf(src, work_dir, allow_text_fallback=True)
         return pdf_path_to_png_bytes(pdf_path, dpi=dpi)
 
 

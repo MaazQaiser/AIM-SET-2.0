@@ -59,6 +59,8 @@ export interface ContentTemplateMetadata {
   };
   extractionError?: string;
   sourceFormatNote?: string;
+  /** Allow arbitrary extra fields stored by custom template builders (e.g. parent template draft data). */
+  [key: string]: unknown;
 }
 
 export interface ContentTemplate {
@@ -85,6 +87,8 @@ export interface ContentTemplateDraft {
   tags: string[];
   html: string;
   css: string;
+  /** Arbitrary JSON stored in the template's metadata column. Used for parent template draft data etc. */
+  metadata?: Record<string, unknown>;
 }
 
 export interface TemplateAssistResult {
@@ -138,20 +142,26 @@ export interface StudioRevision {
   createdAt: string;
 }
 
+export interface StudioSlideOutlineItem {
+  slide: number;
+  heading: string;
+  body: string;
+  /** Left / primary section — populated when the template has two body columns. */
+  section_a?: string;
+  /** Right / secondary section — populated when the template has two body columns. */
+  section_b?: string;
+  visual?: string;
+  mode?: SlidePlanMode;
+  evidence?: string;
+  citation_source?: string;
+  reuse?: SlideReuseSpec;
+}
+
 export interface StudioTurnResult {
   project_id: string;
   turn_type: StudioTurnType;
   ask?: string[];
-  slide_outline?: Array<{
-    slide: number;
-    heading: string;
-    body: string;
-    visual?: string;
-    mode?: SlidePlanMode;
-    evidence?: string;
-    citation_source?: string;
-    reuse?: SlideReuseSpec;
-  }>;
+  slide_outline?: StudioSlideOutlineItem[];
   slide_plan?: SlidePlanItem[];
   suggestion_plan?: SuggestionPlan;
   recommended_templates?: Array<{ template_id: string; rationale: string }>;
@@ -176,6 +186,8 @@ export interface SlidePlanItem {
   slide: number;
   heading: string;
   body?: string;
+  section_a?: string;
+  section_b?: string;
   intent?: string;
   visual?: string;
   mode?: SlidePlanMode;

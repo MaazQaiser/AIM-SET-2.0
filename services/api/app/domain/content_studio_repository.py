@@ -328,6 +328,7 @@ class ContentStudioRepository:
         css_variables: Dict[str, Any],
         tags: Optional[List[str]] = None,
         page_count: int = 1,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         if artifact_type not in ARTIFACT_TYPES:
             raise ValueError(f"Invalid artifact_type: {artifact_type}")
@@ -347,6 +348,7 @@ class ContentStudioRepository:
             "css_variables": css_variables,
             "page_count": max(1, page_count),
             "ingest_error": None,
+            "metadata": metadata or {},
             "created_by": ctx.user_id,
             "created_at": _now_iso(),
         }

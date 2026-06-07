@@ -2,15 +2,21 @@
 
 import { useMemo, useState } from "react";
 import {
+  AlertCircle,
   ArrowUpRight,
+  Building2,
   CalendarClock,
-  FilePlus2,
+  ChevronDown,
+  ChevronUp,
   FileText,
   Lightbulb,
   Loader2,
   Sparkles,
+  TrendingUp,
   Upload,
+  Users,
   X,
+  Zap,
 } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
@@ -38,7 +44,7 @@ import { groupPostDcGaps } from "@/lib/content/group-post-dc-gaps";
 import { attachKbMatchesToGroups } from "@/lib/content/suggestion-context";
 import { createProjectFromSuggestion } from "@/lib/content/create-project-from-suggestion";
 import { useContentPlan } from "@/lib/data/content-plan-hooks";
-import { useDismissContentGap, useResolveContentGap } from "@/lib/data/content-gaps-hooks";
+import { useDismissContentGap, useResolveContentGap, useTrackContentGap } from "@/lib/data/content-gaps-hooks";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -77,6 +83,63 @@ function buildContentRequirements(
   const purpose = (group.neededFor || group.reason || "support the upcoming conversation").replace(/\s+/g, " ").trim();
   const artifactType = titleCaseArtifactType(group.type).toLowerCase();
   return `Create a ${artifactType} titled "${group.name}" for ${audience}. It should cover: ${purpose} Include reusable proof points, relevant KB/project evidence, and a clear call next step.`;
+}
+
+function buildImpactStatement(
+  group: PreDcGenerationGroup,
+  source: "pre-dc" | "post-dc"
+): string {
+  const count = group.leads.length;
+  const accounts = [...new Set(group.leads.map((l) => l.accountName).filter(Boolean))];
+  const phase = source === "post-dc" ? "post-call follow-up" : "upcoming call";
+  const coreReason = group.reason?.trim() || group.neededFor?.trim() || "";
+
+  if (count === 1) {
+    const account = accounts[0];
+    const prefix = account
+      ? `This asset is missing ahead of ${account}'s ${phase}.`
+      : `This asset is missing for an ${phase}.`;
+    return coreReason ? `${prefix} ${coreReason}` : prefix;
+  }
+
+  const accountText =
+    accounts.length === 0
+      ? `${count} active deals`
+      : accounts.length === 1
+        ? `${accounts[0]}`
+        : accounts.length === 2
+          ? `${accounts[0]} and ${accounts[1]}`
+          : `${accounts[0]}, ${accounts[1]}, and ${accounts.length - 2} more`;
+
+  const verb = source === "post-dc" ? "heading into follow-ups" : "going into their calls";
+  const riskText = `${count} deal${count > 1 ? "s are" : " is"} ${verb} without this asset — putting engagement with ${accountText} at risk.`;
+
+  return coreReason ? `${riskText} ${coreReason}` : riskText;
+}
+
+function getPriorityConfig(priority: number) {
+  if (priority <= 1) {
+    return {
+      label: "Urgent",
+      accentClass: "border-l-4 border-l-destructive",
+      badgeVariant: "destructive" as const,
+      Icon: AlertCircle,
+    };
+  }
+  if (priority <= 2) {
+    return {
+      label: "High priority",
+      accentClass: "border-l-4 border-l-warning",
+      badgeVariant: "warning" as const,
+      Icon: TrendingUp,
+    };
+  }
+  return {
+    label: "Suggested",
+    accentClass: "border-l-4 border-l-primary/50",
+    badgeVariant: "secondary" as const,
+    Icon: Zap,
+  };
 }
 
 function buildGapKey(
@@ -241,7 +304,7 @@ function ContentAgentInputsSection({
       <Tabs
         value={activeTab}
         onValueChange={(value) => setActiveTab(value as ContentInputTab)}
-        className="space-y-3"
+        className="space-y-4"
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
@@ -338,9 +401,10 @@ function ContentGenerationCard({
 }) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const dismissGap = useDismissContentGap();
   const resolveGap = useResolveContentGap();
+  const trackGap = useTrackContentGap();
   const primaryLead = group.leads[0];
   const gapKey = buildGapKey(group, primaryLead, source);
   const sourceCount = group.leads.length;
@@ -354,6 +418,10 @@ function ContentGenerationCard({
         : `/calls/${primaryLead.callId}`
       : "/content?tab=suggestions");
   const contentRequirements = buildContentRequirements(group, primaryLead);
+  const impactStatement = buildImpactStatement(group, source);
+  const priorityCfg = getPriorityConfig(group.priority);
+  const uniqueAccounts = [...new Set(group.leads.map((l) => l.accountName).filter(Boolean))];
+
   const suggestionContext = {
     ...(primaryLead?.context ?? {}),
     source: source === "post-dc" ? "post_dc" : "pre_dc",
@@ -459,6 +527,20 @@ function ContentGenerationCard({
         leads: group.leads,
         kbMatches: group.kbMatches,
         sourceArtifactId,
+        cachedPlan: planPreview?.suggestion_plan ?? undefined,
+      });
+      trackGap.mutate({
+        gapKey,
+        studioProjectId: projectId,
+        source,
+        name: group.name,
+        artifactType: group.type,
+        callId: primaryLead?.callId,
+        reason: group.reason,
+        neededFor: group.neededFor,
+        sourcePath,
+        contentRequirements,
+        priority: group.priority,
       });
       router.push(`/content/studio/${projectId}?suggestionId=${encodeURIComponent(group.id)}`);
     } catch (err) {
@@ -469,44 +551,53 @@ function ContentGenerationCard({
   }
 
   return (
-    <Card className="w-full">
+    <Card className={`w-full overflow-hidden ${priorityCfg.accentClass}`}>
       <CardHeader className="pb-3">
-        <div className="flex min-w-0 items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-2">
-            <FilePlus2 className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-            <div className="min-w-0 space-y-2">
-              <CardTitle className="break-words type-body font-medium">{group.name}</CardTitle>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="capitalize">
-                  {formatArtifactType(group.type)}
-                </Badge>
-                <TooltipProvider delayDuration={200}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Badge variant="outline" className="cursor-default font-normal">
-                        <span className="font-medium tabular-nums text-destructive">
-                          {sourceCount} call brief{sourceCount === 1 ? "" : "s"}
-                        </span>
-                        <span className="text-muted-foreground">need this asset</span>
-                      </Badge>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" align="start" className="max-w-xs whitespace-pre-line type-label">
-                      {formatLeadTooltip(group.leads)}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 space-y-2">
+            {/* Priority + type badges */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={priorityCfg.badgeVariant} className="gap-1 text-xs">
+                <priorityCfg.Icon className="h-3 w-3" />
+                {priorityCfg.label}
+              </Badge>
+              <Badge variant="outline" className="capitalize text-xs">
+                {formatArtifactType(group.type)}
+              </Badge>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="cursor-default gap-1.5 text-xs font-normal">
+                      <Users className="h-3 w-3 text-muted-foreground" />
+                      <span className="tabular-nums font-semibold text-foreground">{sourceCount}</span>
+                      <span className="text-muted-foreground">{sourceCount === 1 ? "call needs this" : "calls need this"}</span>
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" align="start" className="max-w-xs whitespace-pre-line type-label">
+                    {formatLeadTooltip(group.leads)}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
+
+            {/* Title */}
+            <CardTitle className="break-words text-base font-semibold leading-snug">
+              {group.name}
+            </CardTitle>
           </div>
 
+          {/* Top-right actions */}
           <div className="flex shrink-0 items-center gap-1.5">
-            <Button size="sm" disabled={generating} onClick={() => void handleGenerate()}>
+            <Button size="sm" disabled={generating} onClick={() => void handleGenerate()} className="gap-1.5">
               {generating ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Generating…
+                </>
               ) : (
                 <>
-                  Generate in Studio
-                  <ArrowUpRight className="h-3.5 w-3.5" />
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Generate
                 </>
               )}
             </Button>
@@ -514,7 +605,7 @@ function ContentGenerationCard({
               defaultTitle={group.name}
               onAssetReady={(asset) => void handleUploadResolved(asset)}
               trigger={
-                <Button size="icon" variant="outline" className="h-8 w-8" aria-label="Upload instead">
+                <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" aria-label="Upload instead">
                   <Upload className="h-3.5 w-3.5" />
                 </Button>
               }
@@ -525,7 +616,7 @@ function ContentGenerationCard({
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-8 w-8 text-muted-foreground"
+                    className="h-8 w-8 shrink-0 text-muted-foreground"
                     disabled={dismissGap.isPending}
                     aria-label="Dismiss suggestion"
                     onClick={() => void handleDismiss()}
@@ -539,48 +630,63 @@ function ContentGenerationCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3 pt-0">
-        <div className="space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
-            <AiGradientText className="type-label">Why generate it</AiGradientText>
+
+      <CardContent className="space-y-4 pt-0">
+        {/* Impact block */}
+        <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-2.5">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden />
+            <AiGradientText className="type-label font-semibold">Why this matters now</AiGradientText>
           </div>
-          <p className="type-label leading-relaxed text-muted-foreground">{group.reason}</p>
-          {group.kbMatches && group.kbMatches.length > 0 && (
-            <SuggestionKbMatches matches={group.kbMatches} />
+          <p className="type-body text-foreground leading-relaxed">{impactStatement}</p>
+
+          {/* Affected accounts */}
+          {uniqueAccounts.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <span className="type-caption text-muted-foreground shrink-0">Accounts at risk:</span>
+              {uniqueAccounts.slice(0, 4).map((account) => (
+                <Badge key={account} variant="secondary" className="gap-1 type-caption font-normal">
+                  <Building2 className="h-2.5 w-2.5" />
+                  {account}
+                </Badge>
+              ))}
+              {uniqueAccounts.length > 4 && (
+                <Badge variant="outline" className="type-caption font-normal">
+                  +{uniqueAccounts.length - 4} more
+                </Badge>
+              )}
+            </div>
           )}
         </div>
 
-        <p className="type-caption text-muted-foreground">
-          <span className="font-medium text-foreground">Needed for: </span>
-          {group.neededFor}
-        </p>
-        <div className="flex flex-wrap items-center gap-2 type-caption text-muted-foreground">
-          <span className="font-medium text-foreground">Needed at:</span>
-          <Button asChild variant="ghost" size="sm" className="h-7 px-2 type-label">
-            <Link href={sourcePath}>
-              {source === "post-dc" ? "Post-DC follow-up" : "Pre-DC call brief"}
-              <ArrowUpRight className="h-3 w-3" />
-            </Link>
-          </Button>
-        </div>
+        {/* What to create */}
         {contentRequirements && contentRequirements !== group.reason && (
-          <p className="type-caption text-muted-foreground">
-            <span className="font-medium text-foreground">What to create: </span>
-            {contentRequirements}
-          </p>
+          <div className="space-y-1">
+            <p className="type-caption font-medium text-muted-foreground">What to create</p>
+            <p className="type-label text-foreground leading-relaxed">{contentRequirements}</p>
+          </div>
         )}
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2 type-caption text-muted-foreground"
-          onClick={() => setExpanded((v) => !v)}
-        >
-          {expanded ? "Hide plan preview" : "Preview AI slide plan"}
-        </Button>
+        {/* KB matches */}
+        {group.kbMatches && group.kbMatches.length > 0 && (
+          <SuggestionKbMatches matches={group.kbMatches} />
+        )}
 
+        {/* Preview AI plan toggle */}
+        <div className="flex border-t border-border/60 pt-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground"
+            onClick={() => setExpanded((v) => !v)}
+          >
+            {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            {expanded ? "Hide plan" : "Preview AI plan"}
+          </Button>
+        </div>
+
+        {/* Plan preview */}
         {expanded && planLoading && (
           <p className="rounded-md border border-dashed border-border px-3 py-2 type-caption text-muted-foreground">
             Building AI slide plan…
@@ -611,7 +717,7 @@ function SuggestionKbMatches({
 }) {
   return (
     <div className="space-y-1.5">
-      <p className="type-label text-foreground">Related in KB</p>
+      <p className="type-caption font-medium text-muted-foreground">Related in KB</p>
       <div className="flex flex-wrap gap-1.5">
         {matches.map((match) => (
           <Button key={match.id} asChild size="sm" variant="outline" className="h-7 max-w-full px-2 type-label">

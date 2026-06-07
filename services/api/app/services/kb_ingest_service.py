@@ -147,6 +147,9 @@ def process_ingest_job(job: Dict[str, Any], repo: Optional[KbRepository] = None)
             doc = extract_document(tmp.name, mime_type=mime)
 
         if not doc.chunks:
+            from dc_kb.models import TextChunk
+
+            title = row.get("title") or row.get("file_name") or asset_id
             is_image = (mime or "").lower().startswith("image/") or suffix in (
                 ".png",
                 ".jpg",
@@ -154,14 +157,36 @@ def process_ingest_job(job: Dict[str, Any], repo: Optional[KbRepository] = None)
                 ".gif",
                 ".webp",
             )
-            if is_image:
-                from dc_kb.models import TextChunk
+            # Image-based PPTX from Content Studio has no extractable text — use
+            # the source HTML text that was passed from the exporter when available.
+            source_text = (job.get("_source_text") or "").strip()
+            is_image_pptx = suffix.lower() in (".pptx", ".ppt") and not source_text
+            if source_text:
+                from dc_kb.chunking import split_text
 
-                title = row.get("title") or row.get("file_name") or asset_id
+                doc.chunks = split_text(
+                    source_text,
+                    metadata={"source": "studio_html_export", "format": suffix.lstrip(".")},
+                )
+                if not doc.chunks:
+                    doc.chunks = [
+                        TextChunk(
+                            text=source_text[:2000],
+                            metadata={"source": "studio_html_export", "format": suffix.lstrip(".")},
+                        )
+                    ]
+            elif is_image:
                 doc.chunks = [
                     TextChunk(
                         text=f"[Image asset: {title}] Visual content stored for preview; no OCR text detected.",
                         metadata={"source": "image_placeholder", "format": "image"},
+                    )
+                ]
+            elif is_image_pptx:
+                doc.chunks = [
+                    TextChunk(
+                        text=f"[Presentation: {title}] Slides stored as visual content; no text was extracted.",
+                        metadata={"source": "pptx_placeholder", "format": "pptx"},
                     )
                 ]
             else:
@@ -185,6 +210,7 @@ def process_ingest_job(job: Dict[str, Any], repo: Optional[KbRepository] = None)
         client = EmbeddingClient(
             api_key=settings.openai_api_key or os.environ.get("OPENAI_API_KEY"),
             model=settings.kb_embedding_model,
+            dimensions=settings.kb_embedding_dimensions or None,
         )
         result = client.embed(texts)
 

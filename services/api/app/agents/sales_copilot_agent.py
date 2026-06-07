@@ -23,6 +23,7 @@ from app.domain.kb_repository import get_kb_repository
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.live_call_repository import get_live_call_repository
 from app.domain.memory_store import get_memory_store
+from app.domain.content_studio_repository import get_content_studio_repository
 from app.services.company_playbook_service import search_company_playbook
 
 SYSTEM_PROMPT = """You are DC Copilot — the company-aware assistant for a discovery-call sales platform.
@@ -932,6 +933,87 @@ class SalesCopilotAgent:
             self._orch = Orchestrator()
         return self._orch
 
+    def _load_current_screen_entity(
+        self,
+        ctx: Dict[str, Any],
+        lines: List[str],
+    ) -> None:
+        """Load the specific entity the user is currently viewing and inject it
+        into the context lines so the LLM answers about *this* screen, not the
+        generic home dashboard."""
+
+        asset_id: Optional[str] = ctx.get("assetId")
+        project_id: Optional[str] = ctx.get("projectId")
+        agent_id: Optional[str] = ctx.get("agentId")
+
+        if asset_id:
+            try:
+                repo = get_kb_repository()
+                asset = repo.get_asset(self.ctx, asset_id)
+                if asset:
+                    asset_summary = _compact_json(
+                        {
+                            "id": asset.get("id"),
+                            "title": asset.get("title"),
+                            "type": asset.get("type") or asset.get("asset_type"),
+                            "description": asset.get("description"),
+                            "tags": asset.get("tags"),
+                            "createdAt": asset.get("createdAt") or asset.get("created_at"),
+                        },
+                        800,
+                    )
+                    lines.append(f"Currently viewed KB asset: {asset_summary}")
+                    # Include a short text preview from chunk storage
+                    try:
+                        chunks = repo.list_asset_chunk_texts(self.ctx, asset_id, limit=6)
+                        if chunks:
+                            preview = "\n".join(chunks[:3])[:1200]
+                            lines.append(f"Asset content preview:\n{preview}")
+                    except Exception:
+                        pass
+                    self._citations.append(
+                        Citation(
+                            source_type="kb_asset",
+                            source_id=asset_id,
+                            snippet=_field_excerpt(asset.get("title") or asset_id),
+                            confidence=0.88,
+                        )
+                    )
+            except Exception:
+                pass
+
+        if project_id:
+            try:
+                project = get_content_studio_repository().get_project(self.ctx, project_id)
+                if project:
+                    project_summary = _compact_json(
+                        {
+                            "id": project.get("id"),
+                            "title": project.get("title"),
+                            "artifactType": project.get("artifactType") or project.get("artifact_type"),
+                            "status": project.get("status"),
+                            "brief": project.get("brief"),
+                            "callId": project.get("callId") or project.get("call_id"),
+                        },
+                        900,
+                    )
+                    lines.append(f"Currently viewed content project: {project_summary}")
+                    self._citations.append(
+                        Citation(
+                            source_type="content_project",
+                            source_id=project_id,
+                            snippet=_field_excerpt(project.get("title") or project_id),
+                            confidence=0.85,
+                        )
+                    )
+            except Exception:
+                pass
+
+        if agent_id:
+            # agent_id from the URL slug (e.g. "pre-dc", "workflow") — include
+            # it as a hint so the LLM focuses on that specific agent workflow.
+            lines.append(f"Currently viewed agent page: {agent_id}")
+
     def _build_surface_context(
         self,
         message: str,
@@ -948,6 +1030,10 @@ class SalesCopilotAgent:
         ]
         if ctx:
             lines.append(f"UI context: {_compact_json(ctx, 1200)}")
+
+        # Load the specific entity the user is currently viewing so the copilot
+        # can answer questions about it rather than defaulting to generic home context.
+        self._load_current_screen_entity(ctx, lines)
 
         missing: List[str] = []
         call: Optional[Dict[str, Any]] = None

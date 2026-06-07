@@ -128,7 +128,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
     try {
       const saved = isEdit ? await update.mutateAsync(draft) : await create.mutateAsync(draft);
       setLastSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-      if (!isEdit) {
+      if (!isEdit || (isEdit && templateId && saved.id !== templateId)) {
         window.location.href = `/content/templates/${saved.id}/edit`;
       }
     } catch (err) {
@@ -167,6 +167,19 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
     return (
       <div className="p-6">
         <p className="type-body-sm text-muted-foreground">Loading template editor...</p>
+      </div>
+    );
+  }
+
+  if (isEdit && !detail.isLoading && !detail.data) {
+    return (
+      <div className="p-6 space-y-3">
+        <p className="type-body-sm text-destructive">
+          Template not found or request timed out. Please go back to Templates and reopen it.
+        </p>
+        <Link href="/content?tab=templates" className="type-body-sm text-primary underline">
+          Back to templates
+        </Link>
       </div>
     );
   }

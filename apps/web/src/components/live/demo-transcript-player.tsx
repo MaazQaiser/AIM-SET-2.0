@@ -142,14 +142,6 @@ export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
     setLineIndex(0);
   }
 
-  const demoEnabled =
-    process.env.NODE_ENV !== "production" ||
-    process.env.NEXT_PUBLIC_ENABLE_DEMO_TRANSCRIPT === "true";
-
-  if (!demoEnabled) {
-    return null;
-  }
-
   return (
     <div className="flex items-center gap-2">
       {error && (
@@ -170,7 +162,7 @@ export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
           onClick={() => void playDemo()}
         >
           <Play className="h-3 w-3 mr-1" />
-          Play demo transcript
+          Demo
         </Button>
       ) : (
         <Button

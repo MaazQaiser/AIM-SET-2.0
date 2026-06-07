@@ -36,15 +36,17 @@ import {
   useStudioProject,
   useStudioRevision,
 } from "@/lib/data/content-studio-hooks";
+import { useKbAssets } from "@/lib/data/hooks";
 import type { StudioKbSaveFormat, StudioTurnResult } from "@/types/content_studio";
 
 export default function StudioProjectPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = use(params);
   const searchParams = useSearchParams();
   void searchParams.get("suggestionId");
-  const { data, refetch } = useStudioProject(projectId, { includeLatest: false });
+  const { data, refetch, isLoading } = useStudioProject(projectId, { includeLatest: false });
   const project = data?.project;
   const templates = useContentTemplates(project?.artifactType);
+  const kbAssets = useKbAssets();
   const exportMut = useStudioExport(projectId);
   const bootstrapMut = useStudioBootstrap(projectId);
   const restoreMut = useRestoreStudioRevision(projectId);
@@ -151,6 +153,10 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
     void refetch();
   }, [refetch]);
 
+  const onStreamDone = useCallback(() => {
+    setIsGenerating(false);
+  }, []);
+
   // Bootstrap from suggestion context (first load only).
   // Also runs when the only existing messages are seeded user messages (deep-link path),
   // i.e. no assistant reply has been sent yet.
@@ -226,20 +232,23 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
   // Template selection is mandatory; if missing the chat will highlight the picker.
   function handleGenerateClick() {
     if (!chatRef.current?.hasTemplate()) {
-      // The chat component will flash the required indicator on the picker
       chatRef.current?.sendGenerate();
       return;
     }
     setIsGenerating(true);
-    setActionMessage("");
+    setActionMessage("Generating…");
     chatRef.current.sendGenerate();
-    setTimeout(() => setIsGenerating(false), 1000);
   }
 
-  if (!project) {
+  if (isLoading || !project) {
     return (
-      <div className="p-6">
-        <p className="text-sm text-muted-foreground">Loading content…</p>
+      <div className="flex h-[calc(100vh-4rem)] flex-col gap-4 p-6">
+        <div className="h-5 w-32 animate-pulse rounded-md bg-muted" />
+        <div className="h-8 w-64 animate-pulse rounded-md bg-muted" />
+        <div className="grid flex-1 grid-cols-1 gap-4 lg:grid-cols-12">
+          <div className="animate-pulse rounded-lg bg-muted lg:col-span-4" />
+          <div className="animate-pulse rounded-lg bg-muted lg:col-span-8" />
+        </div>
       </div>
     );
   }
@@ -378,6 +387,7 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
             messages={data?.messages ?? []}
             onTurn={onTurn}
             onRefetch={onRefetch}
+            onStreamDone={onStreamDone}
             selectedTemplateId={selectedTemplateId ?? project.templateId ?? undefined}
             onTemplateSelect={setSelectedTemplateId}
             templates={templates.data ?? []}
@@ -386,6 +396,9 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
             hasSuggestionContext={hasSuggestionContext}
             isBootstrapping={bootstrapMut.isPending}
             chatRef={chatRef}
+            kbAssets={kbAssets.data ?? []}
+            artifactType={project.artifactType}
+            projectTitle={project.title}
           />
         </div>
 

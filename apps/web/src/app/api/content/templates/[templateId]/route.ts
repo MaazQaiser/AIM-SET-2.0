@@ -43,6 +43,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ templa
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    // Recover gracefully if the template ID is stale/missing:
+    // create a new template from the current editor payload instead of failing save.
+    if (res.status === 404) {
+      const createRes = await fetch(`${apiBaseUrl()}/api/v1/content/templates`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!createRes.ok) {
+        const createErr = await createRes.text();
+        return new NextResponse(createErr || "Upstream error", { status: createRes.status });
+      }
+      return NextResponse.json(await createRes.json());
+    }
     if (!res.ok) {
       const err = await res.text();
       return new NextResponse(err || "Upstream error", { status: res.status });

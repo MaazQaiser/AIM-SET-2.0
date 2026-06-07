@@ -42,9 +42,7 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
           const metaRes = await fetch(kbSlideMetaUrl(asset.id));
           if (!metaRes.ok) {
             if (!cancelled) {
-              setError(
-                "Visual slide preview is not ready. Click Re-embed on the deployed API (LibreOffice required)."
-              );
+              setError("Visual slide preview is not ready yet. Click Re-embed and refresh in a moment.");
             }
             return;
           }

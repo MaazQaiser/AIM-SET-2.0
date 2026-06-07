@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     kb_storage_bucket: str = "kb-assets"
     kb_max_upload_bytes: int = 52_428_800
     kb_embedding_model: str = "text-embedding-3-small"
+    kb_embedding_dimensions: int = 0
     kb_worker_poll_interval_ms: int = 2000
     kb_ingest_sync: bool = False
     kb_shared_mode: bool = True

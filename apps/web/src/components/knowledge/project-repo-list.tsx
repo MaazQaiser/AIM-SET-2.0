@@ -16,7 +16,6 @@ import {
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent } from "@dc-copilot/ui/components/card";
-import { FilterChip } from "@dc-copilot/ui/components/chip";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { SearchInput } from "@dc-copilot/ui/components/search-input";
 import { PageHeader, PageShell } from "@/components/layout/page-shell";
@@ -251,21 +250,18 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
   const { data: projects = [], isLoading } = useKbProjects();
   const [search, setSearch] = useState("");
   const [industryFilter, setIndustryFilter] = useState("All");
-  const [domainFilter, setDomainFilter] = useState("All");
   const [view, setView] = useState<ProjectRepoView>("table");
 
-  const industryFilters = useMemo(() => ["All", ...uniqueProjectValues(projects, "industry", 7)], [projects]);
-  const domainFilters = useMemo(() => ["All", ...uniqueProjectValues(projects, "domain", 7)], [projects]);
+  const industryOptions = useMemo(() => uniqueProjectValues(projects, "industry", 50), [projects]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return projects.filter((project) => {
       const matchesSearch = !q || projectSearchText(project).includes(q);
       const matchesIndustry = industryFilter === "All" || project.industry === industryFilter;
-      const matchesDomain = domainFilter === "All" || project.domain === domainFilter;
-      return matchesSearch && matchesIndustry && matchesDomain;
+      return matchesSearch && matchesIndustry;
     });
-  }, [domainFilter, industryFilter, projects, search]);
+  }, [industryFilter, projects, search]);
 
   const content = (
     <div className={cn("space-y-5", embedded && "mt-1")}>
@@ -298,6 +294,20 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
             aria-label="Search KB projects"
           />
           <div className="flex flex-wrap items-center gap-2">
+            <select
+              id="project-repo-industry-filter"
+              value={industryFilter}
+              onChange={(event) => setIndustryFilter(event.target.value)}
+              className="flex h-8 min-w-[10rem] rounded-md border border-input bg-background px-3 py-1 type-body ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label="Filter projects by industry"
+            >
+              <option value="All">All industries</option>
+              {industryOptions.map((industry) => (
+                <option key={industry} value={industry}>
+                  {industry}
+                </option>
+              ))}
+            </select>
             <ProjectRepoViewToggle view={view} onChange={setView} />
             {embedded && (
               <Button asChild variant="outline" size="sm">
@@ -308,32 +318,6 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
               </Button>
             )}
           </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className="w-16 shrink-0 type-label text-muted-foreground">Industry</span>
-          {industryFilters.map((filter) => (
-            <FilterChip
-              key={`industry-${filter}`}
-              active={filter === industryFilter}
-              onClick={() => setIndustryFilter(filter)}
-            >
-              {filter === "All" ? "All industries" : filter}
-            </FilterChip>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className="w-16 shrink-0 type-label text-muted-foreground">Domain</span>
-          {domainFilters.map((filter) => (
-            <FilterChip
-              key={`domain-${filter}`}
-              active={filter === domainFilter}
-              onClick={() => setDomainFilter(filter)}
-            >
-              {filter === "All" ? "All domains" : filter}
-            </FilterChip>
-          ))}
         </div>
       </div>
 
