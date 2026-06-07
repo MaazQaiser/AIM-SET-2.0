@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Literal
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -22,14 +22,14 @@ _orch = Orchestrator()
 
 
 class CopilotFeedbackIn(BaseModel):
-    feedback_id: str | None = None
+    feedback_id: Optional[str] = None
     message_id: str
     rating: Literal["up", "down"]
     comment: str = ""
     response: str = ""
     surface: str = "global"
-    call_id: str | None = None
-    created_at: str | None = None
+    call_id: Optional[str] = None
+    created_at: Optional[str] = None
 
 
 @router.get("/agents")
