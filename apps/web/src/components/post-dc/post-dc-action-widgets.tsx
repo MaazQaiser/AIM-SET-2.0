@@ -139,7 +139,7 @@ export function PostDcActionProgress({
     <BriefDetailCard title="Action workflow" className={className}>
       {progressList}
       <p className="mt-2 type-caption text-muted-foreground">
-        Confirm the recommended next step, approve CRM tasks, then review and send follow-up emails.
+        Confirm the recommended next step, then review and send follow-up emails.
       </p>
     </BriefDetailCard>
   );

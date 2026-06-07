@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/cn";
-import { briefBodyClass, briefBodyMutedClass } from "@/components/pre-call/brief-detail-card";
+import { briefBodyForegroundClass } from "@/components/pre-call/brief-detail-card";
 
 function recommendationLines(text: string): string[] {
   return text
@@ -33,7 +33,7 @@ export function PostDcAiNextSteps({
         </h3>
       ) : null}
       {lines.length > 1 ? (
-        <ul className={cn("list-disc space-y-1.5 pl-4 post-dc-copy", briefBodyClass, "text-foreground/90")}>
+        <ul className={cn("list-disc space-y-1.5 pl-4 post-dc-copy", briefBodyForegroundClass)}>
           {lines.map((line) => (
             <li key={line} className="break-words">
               {line}
@@ -41,7 +41,7 @@ export function PostDcAiNextSteps({
           ))}
         </ul>
       ) : (
-        <p className={cn("post-dc-copy whitespace-pre-wrap break-words text-foreground/90", briefBodyClass)}>
+        <p className={cn("post-dc-copy whitespace-pre-wrap break-words", briefBodyForegroundClass)}>
           {trimmed}
         </p>
       )}

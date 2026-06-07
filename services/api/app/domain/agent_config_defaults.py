@@ -385,7 +385,7 @@ def default_agent_config(agent_id: str) -> Dict[str, Any]:
         cfg["post_dc_prompts"] = _default_post_dc_prompts()
         cfg["jira"] = {
             "project_key": "SALES",
-            "issue_type": "Review",
+            "issue_type": "Task",
             "high_priority_threshold_usd": 250000,
         }
 

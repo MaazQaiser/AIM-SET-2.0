@@ -1976,7 +1976,7 @@ def _jira_ticket(
         "status": "draft_pending_approval",
         "summary": f"[{'DC Qualified' if is_qualified else 'DC Follow-up'}] {account_name} — {service_line} opportunity",
         "description": description,
-        "issueType": str(jira_cfg.get("issue_type") or "Review"),
+        "issueType": str(jira_cfg.get("issue_type") or "Task"),
         "priority": priority,
         "labels": labels,
         "projectKey": project_key,

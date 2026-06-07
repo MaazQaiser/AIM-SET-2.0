@@ -22,10 +22,9 @@ import {
   type PostDcWorkflowTaskKind,
   type PostDcWorkflowTaskStatus,
 } from "@/lib/post-dc/workflow-tasks";
-import type { PostCallReview, PostCallTask } from "@/lib/brief-types";
+import type { PostCallReview } from "@/lib/brief-types";
 import type { CustomerLandingPage } from "@dc-copilot/types";
 import { cn } from "@/lib/cn";
-import { TaskList } from "@/components/post-dc/crm-task-list";
 import { PostDcAiNextSteps } from "@/components/post-dc/post-dc-ai-next-steps";
 import { PostDcModalSection } from "@/components/post-dc/post-dc-modal-section";
 import { PostDcTasksProgressBar } from "@/components/post-dc/post-dc-tasks-progress-bar";
@@ -55,14 +54,10 @@ interface PostDcNextStepTasksProps {
   taskStatus: Record<string, PostDcWorkflowTaskStatus>;
   onTaskStatusChange: (taskId: string, status: PostDcWorkflowTaskStatus) => void;
   onScrollToWidget?: (widgetId: string) => void;
-  onOpenEmailDraft?: () => void;
   /** Card title — Overview grid uses "Tasks" */
   title?: string;
   /** Show collapsible AI recommendation above checklist */
   showRecommendation?: boolean;
-  crmTasks?: PostCallTask[];
-  onApproveCrmTasks?: (ids: string[]) => void;
-  onRejectCrmTask?: (id: string) => void;
   /** Render checklist only — outer card supplied by parent */
   bare?: boolean;
   /** Always show hint/detail (expand modal) */
@@ -80,12 +75,8 @@ export function PostDcNextStepTasks({
   taskStatus,
   onTaskStatusChange,
   onScrollToWidget,
-  onOpenEmailDraft,
   title = "Recommended next steps",
   showRecommendation = true,
-  crmTasks = [],
-  onApproveCrmTasks,
-  onRejectCrmTask,
   bare = false,
   detailed = false,
   variant = "default",
@@ -100,7 +91,7 @@ export function PostDcNextStepTasks({
     statusOverrides: taskStatus,
   });
 
-  if (tasks.length === 0 && !recommendation && crmTasks.length === 0) return null;
+  if (tasks.length === 0 && !recommendation) return null;
 
   const isHighlight = title === "Recommended next steps";
 
@@ -131,23 +122,6 @@ export function PostDcNextStepTasks({
           ))}
         </ul>
       ) : null}
-      {crmTasks.length > 0 ? (
-        <div className={cn(tasks.length > 0 && "mt-4 border-t border-border/60 pt-3")}>
-          <p className="type-kicker text-muted-foreground mb-2">
-            CRM follow-ups
-          </p>
-          <TaskList
-            bare
-            tasks={crmTasks}
-            onApprove={onApproveCrmTasks}
-            onReject={onRejectCrmTask}
-            onOpenEmailDraft={
-              onOpenEmailDraft ??
-              (onScrollToWidget ? () => onScrollToWidget("post.email_jira_handoff") : undefined)
-            }
-          />
-        </div>
-      ) : null}
     </>
   );
 
@@ -174,10 +148,6 @@ export function PostDcTasksDetailView({
   taskStatus,
   onTaskStatusChange,
   onScrollToWidget,
-  onOpenEmailDraft,
-  crmTasks = [],
-  onApproveCrmTasks,
-  onRejectCrmTask,
 }: Omit<PostDcNextStepTasksProps, "bare" | "detailed" | "title" | "showRecommendation">) {
   const recommendation = getPostDcRecommendation(review);
   const tasks = buildPostDcWorkflowTasks({
@@ -216,21 +186,6 @@ export function PostDcTasksDetailView({
               />
             ))}
           </div>
-        </PostDcModalSection>
-      ) : null}
-
-      {crmTasks.length > 0 ? (
-        <PostDcModalSection title="CRM follow-ups">
-          <TaskList
-            bare
-            tasks={crmTasks}
-            onApprove={onApproveCrmTasks}
-            onReject={onRejectCrmTask}
-            onOpenEmailDraft={
-              onOpenEmailDraft ??
-              (onScrollToWidget ? () => onScrollToWidget("post.email_jira_handoff") : undefined)
-            }
-          />
         </PostDcModalSection>
       ) : null}
     </div>
