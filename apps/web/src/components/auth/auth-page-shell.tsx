@@ -20,36 +20,36 @@ export function AuthBrandPanel({ className }: { className?: string }) {
   return (
     <aside
       className={cn(
-        "flex flex-col justify-center px-4 py-10 lg:px-8 lg:py-16",
+        "auth-brand-panel flex flex-col justify-center px-4 py-10 lg:px-8 lg:py-16",
         className
       )}
     >
       <SummitLogo />
 
       <div className="mt-10 max-w-md">
-        <p className="type-caption font-medium text-muted-foreground">
+        <p className="auth-brand-kicker text-xs font-medium uppercase tracking-wide">
           Discovery Call platform
         </p>
-        <h1 className="mt-2 type-page-title leading-tight text-foreground lg:text-[1.75rem]">
+        <h1 className="auth-brand-heading mt-2 text-[1.75rem] font-semibold leading-tight tracking-tight">
           AI-native sales discovery, from brief to follow-up
         </h1>
-        <p className="app-muted mt-3">
+        <p className="auth-brand-body mt-3 text-sm leading-relaxed">
           Prepare smarter, run cleaner live calls, and close the loop with structured post-DC
           workflows.
         </p>
       </div>
 
-      <ul className="mt-10 hidden max-w-md space-y-0 lg:block">
+      <ul className="mt-10 max-w-md space-y-0">
         {highlights.map((item, index) => (
           <li
             key={item.title}
             className={cn(
               "py-4",
-              index > 0 && "border-t border-border"
+              index > 0 && "border-t border-[rgba(26,26,24,0.1)]"
             )}
           >
-            <p className="type-panel-title text-foreground">{item.title}</p>
-            <p className="mt-1 type-body leading-relaxed text-muted-foreground">
+            <p className="auth-brand-feature-title text-sm font-semibold">{item.title}</p>
+            <p className="auth-brand-feature-body mt-1 text-sm leading-relaxed">
               {item.description}
             </p>
           </li>
@@ -79,9 +79,12 @@ export function AuthFormPanel({
   description,
   children,
   className,
+  headerInCard = false,
 }: AuthFormHeaderProps & {
   children: React.ReactNode;
   className?: string;
+  /** When true, title/description render inside the Clerk card instead of above it. */
+  headerInCard?: boolean;
 }) {
   return (
     <div
@@ -90,12 +93,19 @@ export function AuthFormPanel({
         className
       )}
     >
-      <div className="hidden w-full max-w-md lg:block">
-        <h2 className="type-screen-title text-foreground">{title}</h2>
-        <p className="app-muted mt-1">{description}</p>
-      </div>
-
-      <AuthFormHeader title={title} description={description} />
+      {!headerInCard ? (
+        <>
+          <div className="hidden w-full max-w-md lg:block">
+            <h2 className="type-screen-title text-foreground">{title}</h2>
+            <p className="app-muted mt-1">{description}</p>
+          </div>
+          <AuthFormHeader title={title} description={description} />
+        </>
+      ) : (
+        <div className="mb-6 w-full max-w-md lg:hidden">
+          <SummitLogo />
+        </div>
+      )}
 
       <div className="w-full max-w-md">{children}</div>
     </div>

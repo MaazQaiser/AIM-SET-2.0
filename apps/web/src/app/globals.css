@@ -770,3 +770,72 @@ main:has(.live-call-page) > * {
   background: hsl(var(--card)) !important;
   box-shadow: none !important;
 }
+
+/* Auth — readable Clerk sign-in card on warm canvas */
+.auth-brand-panel {
+  color: #1a1a18;
+}
+
+.auth-brand-panel .auth-brand-kicker {
+  color: #5a5850 !important;
+}
+
+.auth-brand-panel .auth-brand-heading {
+  color: #1a1a18 !important;
+  font-family: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
+}
+
+.auth-brand-panel .auth-brand-body,
+.auth-brand-panel .auth-brand-feature-body {
+  color: #3a3830 !important;
+}
+
+.auth-brand-panel .auth-brand-feature-title {
+  color: #1a1a18 !important;
+}
+
+.cl-signIn-root .cl-headerTitle,
+.cl-signUp-root .cl-headerTitle {
+  color: #1a1a18 !important;
+}
+
+.cl-signIn-root .cl-headerSubtitle,
+.cl-signUp-root .cl-headerSubtitle {
+  color: #5a5850 !important;
+}
+
+.cl-signIn-root .cl-socialButtonsBlockButton,
+.cl-signUp-root .cl-socialButtonsBlockButton {
+  background-color: #fff !important;
+  color: #1a1a18 !important;
+  border-color: rgba(26, 26, 24, 0.18) !important;
+}
+
+.cl-signIn-root .cl-socialButtonsBlockButton:hover,
+.cl-signUp-root .cl-socialButtonsBlockButton:hover {
+  background-color: rgba(26, 26, 24, 0.04) !important;
+}
+
+.cl-signIn-root .cl-socialButtonsBlockButtonText,
+.cl-signUp-root .cl-socialButtonsBlockButtonText {
+  color: #1a1a18 !important;
+  font-weight: 500;
+}
+
+.cl-signIn-root .cl-formFieldLabel,
+.cl-signUp-root .cl-formFieldLabel {
+  color: #1a1a18 !important;
+}
+
+.cl-signIn-root .cl-formFieldInput,
+.cl-signUp-root .cl-formFieldInput {
+  color: #1a1a18 !important;
+}
+
+.cl-signIn-root .cl-footerActionText,
+.cl-signUp-root .cl-footerActionText,
+.cl-signIn-root .cl-dividerText,
+.cl-signUp-root .cl-dividerText {
+  color: #5a5850 !important;
+}
+

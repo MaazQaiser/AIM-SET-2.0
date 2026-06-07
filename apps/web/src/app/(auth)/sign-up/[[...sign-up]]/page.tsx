@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AuthFormPanel, AuthSetupNotice } from "@/components/auth/auth-page-shell";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
-import { clerkAppearance } from "@/lib/clerk-appearance";
+import { authClerkAppearance } from "@/lib/clerk-appearance";
 import { isClerkConfigured } from "@/lib/public-env";
 
 export const metadata: Metadata = { title: "Sign up" };
@@ -23,8 +23,8 @@ export default function SignUpPage() {
   }
 
   return (
-    <AuthFormPanel title="Create your account" description="Join your team on the DC platform.">
-      <SignUp appearance={clerkAppearance} />
+    <AuthFormPanel headerInCard title="Create your account" description="Join your team on the DC platform.">
+      <SignUp appearance={authClerkAppearance} />
     </AuthFormPanel>
   );
 }

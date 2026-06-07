@@ -52,3 +52,31 @@ export const clerkAppearance = {
     formResendCodeLink: "text-primary text-sm",
   },
 };
+
+/** Sign-in / sign-up card: header inside Clerk card, stronger contrast. */
+export const authClerkAppearance = {
+  ...clerkAppearance,
+  elements: {
+    ...clerkAppearance.elements,
+    card: "shadow-none rounded-xl border border-[rgba(26,26,24,0.12)] bg-white w-full",
+    cardBox: "shadow-none gap-4",
+    header: "flex flex-col gap-1 items-start pb-2 text-left",
+    headerTitle:
+      "text-2xl font-semibold tracking-tight text-[#1A1A18] !text-[#1A1A18]",
+    headerSubtitle: "text-sm font-normal text-[#5A5850] !text-[#5A5850]",
+    socialButtonsBlockButton:
+      "border border-[rgba(26,26,24,0.18)] !bg-white !text-[#1A1A18] hover:!bg-[rgba(26,26,24,0.04)] rounded-lg shadow-none h-10 transition-colors",
+    socialButtonsBlockButtonText:
+      "text-sm font-medium !text-[#1A1A18]",
+    socialButtonsBlockButtonArrow: "hidden",
+    dividerLine: "bg-[rgba(26,26,24,0.12)]",
+    dividerText: "text-xs text-[#888780]",
+    formFieldLabel: "text-xs font-semibold text-[#1A1A18]",
+    formFieldInput:
+      "rounded-lg border-[rgba(26,26,24,0.18)] bg-white text-sm text-[#1A1A18] shadow-none h-10 focus:ring-1 focus:ring-[rgba(26,26,24,0.2)]",
+    formButtonPrimary:
+      "!bg-[#1A1A18] !text-white hover:!bg-[#333] rounded-lg text-sm font-medium shadow-none h-10",
+    footerActionText: "text-sm text-[#5A5850]",
+    footerActionLink: "text-[#1A1A18] font-medium hover:text-[#333]",
+  },
+};

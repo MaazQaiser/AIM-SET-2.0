@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AuthFormPanel, AuthSetupNotice } from "@/components/auth/auth-page-shell";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
-import { clerkAppearance } from "@/lib/clerk-appearance";
+import { authClerkAppearance } from "@/lib/clerk-appearance";
 import { isClerkConfigured } from "@/lib/public-env";
 
 export const metadata: Metadata = { title: "Sign in" };
@@ -26,8 +26,8 @@ export default function SignInPage() {
   }
 
   return (
-    <AuthFormPanel title="Welcome back" description="Sign in to continue to your workspace.">
-      <SignIn appearance={clerkAppearance} />
+    <AuthFormPanel headerInCard title="Welcome back" description="Sign in to continue to your workspace.">
+      <SignIn appearance={authClerkAppearance} />
     </AuthFormPanel>
   );
 }

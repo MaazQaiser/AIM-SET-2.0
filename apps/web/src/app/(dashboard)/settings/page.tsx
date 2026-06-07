@@ -1,4 +1,4 @@
-import { Users, FileSpreadsheet, Plug } from "lucide-react";
+import { Users, FileSpreadsheet, Plug, UserRound } from "lucide-react";
 import type { Metadata } from "next";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@dc-copilot/ui/components/card";
@@ -9,6 +9,7 @@ import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { AeNotificationPrefs } from "@/components/settings/ae-notification-prefs";
 import { DcNotesCsvImport } from "@/components/settings/dc-notes-csv-import";
 import { IntegrationsTab } from "@/components/integrations/integrations-tab";
+import { SettingsAccountPanel } from "@/components/settings/settings-account-panel";
 import Link from "next/link";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -61,6 +62,10 @@ export default function SettingsPage() {
             <FileSpreadsheet className="h-3.5 w-3.5" />
             Data import
           </TabsTrigger>
+          <TabsTrigger value="account" className="gap-1.5">
+            <UserRound className="h-3.5 w-3.5" />
+            Account
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="integrations" className="mt-4">
@@ -90,6 +95,10 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="account" className="mt-4">
+          <SettingsAccountPanel />
         </TabsContent>
       </Tabs>
     </PageShell>
