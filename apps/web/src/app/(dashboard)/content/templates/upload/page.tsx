@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Input } from "@dc-copilot/ui/components/input";
 import { Label } from "@dc-copilot/ui/components/label";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import type { ContentTemplate } from "@/types/content_studio";
 
 type UploadPhase = "idle" | "uploading" | "processing" | "done";
@@ -126,20 +127,24 @@ export default function TemplateUploadPage() {
   }
 
   return (
-    <div className="p-6 max-w-lg mx-auto space-y-6">
-      <Link
-        href="/content?tab=templates"
-        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        Templates
-      </Link>
+    <PageShell size="narrow">
+      <PageHeader className="space-y-3">
+        <Link
+          href="/content?tab=templates"
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Templates
+        </Link>
 
-      <h1 className="text-2xl font-semibold">Upload template</h1>
-      <p className="text-sm text-muted-foreground">
-        Upload a PPT or PPTX file. Content Studio extracts the original slide preview, slide
-        structure, colors, text, and generated HTML/CSS before the template can be edited or used.
-      </p>
+        <div>
+          <h1 className="text-2xl font-semibold">Upload template</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Upload a PPT or PPTX file. Content Studio extracts the original slide preview, slide
+            structure, colors, text, and generated HTML/CSS before the template can be edited or used.
+          </p>
+        </div>
+      </PageHeader>
 
       <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
         <div>
@@ -204,6 +209,6 @@ export default function TemplateUploadPage() {
         </Button>
         {error && <p className="text-sm text-destructive">{error}</p>}
       </form>
-    </div>
+    </PageShell>
   );
 }

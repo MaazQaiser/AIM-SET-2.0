@@ -64,11 +64,14 @@ def generate_pre_dc_brief(
     )
     cfg = get_agent_config_repository().get_config(ctx, "content")
     model_policy = cfg.get("model_policy") or {}
-    completion = LlmClient(api_key=settings.llm_api_key or None).complete(
+    completion = LlmClient(
+        api_key=settings.llm_api_key or None,
+        openai_api_key=settings.openai_api_key or None,
+    ).complete(
         system=system,
         user=user,
-        model=model_policy.get("model_name") or "claude-opus-4-1-20250805",
-        fallback_model=model_policy.get("fallback_model_name") or "claude-sonnet-4-20250514",
+        model=model_policy.get("model_name") or "gpt-5.4-mini",
+        fallback_model=model_policy.get("fallback_model_name") or "gpt-5.4-mini",
     )
 
     citations: List[Citation] = []

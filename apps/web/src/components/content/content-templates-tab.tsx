@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Code2, Eye, LayoutTemplate, Trash2, Upload } from "lucide-react";
+import { Code2, Eye, LayoutTemplate, Plus, Trash2, Upload } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import { Badge } from "@dc-copilot/ui/components/badge";
@@ -46,11 +46,16 @@ export function ContentTemplatesTab() {
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-foreground">Templates</h2>
           <p className="text-xs text-muted-foreground mt-0.5 max-w-2xl">
-            Upload PPT or PPTX decks. Content Studio extracts their structure and generated
-            HTML/CSS before using them as starting layouts.
+            Upload PPT or PPTX decks, or build a reusable slide skeleton from scratch.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/content/templates/scratch">
+              <Plus className="h-4 w-4 mr-1" />
+              Create from scratch
+            </Link>
+          </Button>
           <Button size="sm" asChild>
             <Link href="/content/templates/upload">
               <Upload className="h-4 w-4 mr-1" />
@@ -107,8 +112,8 @@ export function ContentTemplatesTab() {
         <EmptyState
           icon={LayoutTemplate}
           title="No templates yet"
-          description="Upload a PPT or PPTX deck. Content Studio will extract the design and recommend it when drafting new content."
-          action={{ label: "Upload template", href: "/content/templates/upload" }}
+          description="Create a slide skeleton or upload a PPT/PPTX deck. Content Studio will recommend templates when drafting new content."
+          action={{ label: "Create from scratch", href: "/content/templates/scratch" }}
         />
       )}
 

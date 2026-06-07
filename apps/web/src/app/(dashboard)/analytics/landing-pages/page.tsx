@@ -1,9 +1,10 @@
 import { LandingPageDashboard } from "@/components/analytics/landing-page-dashboard";
+import { PageShell } from "@/components/layout/page-shell";
 
 export default function LandingPagesAnalyticsPage() {
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <PageShell>
       <LandingPageDashboard />
-    </div>
+    </PageShell>
   );
 }

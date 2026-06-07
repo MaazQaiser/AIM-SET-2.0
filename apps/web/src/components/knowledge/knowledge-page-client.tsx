@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { BookOpen, FolderKanban } from "lucide-react";
 import { SearchInput } from "@dc-copilot/ui/components/search-input";
-import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { KBAssetCard } from "@/components/kb-asset-card";
 import { KbUploadButton } from "@/components/knowledge/kb-upload-button";
 import { KnowledgePreviewDialog } from "@/components/knowledge/knowledge-preview-dialog";
@@ -39,7 +39,7 @@ export function KnowledgePageClient() {
 
   return (
     <PageShell size="wide">
-      <div className="flex items-center justify-between">
+      <PageHeader className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Knowledge base</h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -58,7 +58,7 @@ export function KnowledgePageClient() {
           </Button>
           <KbUploadButton />
         </div>
-      </div>
+      </PageHeader>
 
       <Tabs defaultValue={persona === "content-owner" ? "watchlist" : "library"} variant="underline">
         <TabsList>

@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
-import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { KbUploadButton } from "@/components/knowledge/kb-upload-button";
 import { ContentProjectsTab } from "@/components/content/content-projects-tab";
 import { ContentLibraryTab } from "@/components/content/content-library-tab";
@@ -93,7 +93,7 @@ export function ContentHub() {
       className={hideHubChrome ? "!max-w-none !p-0 !space-y-0 h-full min-h-0" : undefined}
     >
       {!hideHubChrome ? (
-        <div className="flex items-start justify-between gap-4">
+        <PageHeader className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Knowledge Base</h1>
             <p className="text-sm text-muted-foreground mt-1">
@@ -112,7 +112,7 @@ export function ContentHub() {
           <div className="flex flex-wrap items-center justify-end gap-2">
             <KbUploadButton />
           </div>
-        </div>
+        </PageHeader>
       ) : null}
 
       <Tabs value={activeTab} onValueChange={onTabChange} variant="underline">

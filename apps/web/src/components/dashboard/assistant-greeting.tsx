@@ -3,6 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { format, isSameDay, startOfDay } from "date-fns";
 import { useClerkGate } from "@/components/providers/clerk-gate";
+import { PageHeader } from "@/components/layout/page-shell";
 import { useCalls, usePostCallTasks } from "@/lib/data/hooks";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
 
@@ -69,7 +70,7 @@ function AssistantGreetingBody({
     statParts.length > 0 ? `${dateLine} · ${statParts.join(", ")}` : dateLine;
 
   return (
-    <header className="pt-2">
+    <PageHeader>
       <h1 className="type-headline sm:type-display text-foreground">
         {isLoaded ? (
           <>
@@ -81,7 +82,7 @@ function AssistantGreetingBody({
         )}
       </h1>
       <p className="mt-2 type-body-sm text-muted-foreground">{subLine}</p>
-    </header>
+    </PageHeader>
   );
 }
 

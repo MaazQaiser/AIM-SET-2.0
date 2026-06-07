@@ -1,6 +1,7 @@
 "use client";
 
 import { useClpOrgAnalytics } from "@/lib/data/clp-hooks";
+import { PageHeader } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import { Skeleton } from "@dc-copilot/ui/components/skeleton";
 
@@ -15,12 +16,12 @@ export function LandingPageDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <PageHeader>
         <h1 className="text-xl font-semibold">Landing page analytics</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Engagement across published customer landing pages
         </p>
-      </div>
+      </PageHeader>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Published pages" value={data?.publishedCount ?? 0} />

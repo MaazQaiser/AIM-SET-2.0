@@ -122,18 +122,21 @@ def _invoke_llm_json(
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     settings = get_settings()
     system = (runtime.get("system_prompt") or "") + f"\n\nRespond with JSON only:\n{schema_hint}"
-    if not settings.llm_configured:
+    if not settings.openai_configured and not settings.llm_configured:
         return {"content": "Review the latest transcript segment and respond when ready."}, {
             "tokens": 0,
             "usd": 0.0,
             "model": "stub",
             "trace_id": str(uuid.uuid4()),
         }
-    completion = LlmClient(api_key=settings.llm_api_key or None).complete(
+    completion = LlmClient(
+        api_key=settings.llm_api_key or None,
+        openai_api_key=settings.openai_api_key or None,
+    ).complete(
         system=system,
         user=user,
-        model=runtime.get("model_name") or "claude-3-haiku-20240307",
-        fallback_model=runtime.get("fallback_model_name") or "claude-sonnet-4-20250514",
+        model=runtime.get("model_name") or "gpt-5.4-mini",
+        fallback_model=runtime.get("fallback_model_name") or "gpt-5.4-mini",
         max_tokens=512,
     )
     parsed = _parse_json_block(completion.text)

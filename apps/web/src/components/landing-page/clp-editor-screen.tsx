@@ -92,8 +92,8 @@ export function ClpEditorScreen({ callId }: ClpEditorScreenProps) {
   }
 
   return (
-    <div className="min-h-0 flex flex-col">
-      <div className="border-b px-6 py-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="sticky top-0 z-30 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b bg-background/90 px-6 py-4 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="icon">
             <Link href={`/calls/${callId}/post-dc`}>

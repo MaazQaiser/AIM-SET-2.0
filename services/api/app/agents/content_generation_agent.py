@@ -305,7 +305,7 @@ def _generate_deck_from_plan(
         if isinstance(item, dict) and str(item.get("mode") or "generate").lower() in ("generate", "hybrid")
     ]
 
-    if slides_to_generate and (settings.llm_api_key or settings.openai_configured):
+    if slides_to_generate and settings.openai_configured:
         suggestion_plan = _get_suggestion_plan(brief) or {}
         template_context = _template_context(chosen_template)
         system = runtime["system_prompt"]
@@ -322,7 +322,7 @@ def _generate_deck_from_plan(
             indent=2,
         )
         try:
-            completion = LlmClient(api_key=settings.llm_api_key or None).complete(
+            completion = LlmClient(openai_api_key=settings.openai_api_key or None).complete(
                 system=system,
                 user=(
                     "Generate ONLY the slides listed in slides_to_generate. "
@@ -816,8 +816,7 @@ def run_studio_turn(
         f"Latest user message: {clean_msg}"
     )
 
-    api_key = settings.llm_api_key or None
-    completion = LlmClient(api_key=api_key).complete(
+    completion = LlmClient(openai_api_key=settings.openai_api_key or None).complete(
         system=system,
         user=user_payload,
         max_tokens=4096,

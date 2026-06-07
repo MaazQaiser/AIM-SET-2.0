@@ -211,78 +211,80 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
   }
 
   return (
-    <div className="p-6 space-y-4 h-[calc(100vh-4rem)] flex flex-col">
-      <Link
-        href="/content?tab=studio"
-        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground shrink-0"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        Knowledge Base
-      </Link>
+    <div className="flex h-[calc(100vh-4rem)] flex-col space-y-4 p-6">
+      <div className="sticky top-0 z-30 -mx-6 shrink-0 space-y-4 border-b border-border/60 bg-background/90 px-6 py-4 backdrop-blur-md">
+        <Link
+          href="/content?tab=studio"
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Knowledge Base
+        </Link>
 
-      {!hideSuggestion && Boolean(brief.generation_reason || brief.asset_name || suggestionPlan) ? (
-        <SuggestionContextBar brief={brief} onDismiss={() => setHideSuggestion(true)} />
-      ) : null}
+        {!hideSuggestion && Boolean(brief.generation_reason || brief.asset_name || suggestionPlan) ? (
+          <SuggestionContextBar brief={brief} onDismiss={() => setHideSuggestion(true)} />
+        ) : null}
 
-      <div className="flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-xl font-semibold">{project.title}</h1>
-          <p className="text-xs text-muted-foreground capitalize">
-            {project.artifactType} · ${project.costUsd.toFixed(2)} spent · cap $1.50
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            disabled={generateMut.isPending || !canGenerateDeck}
-            onClick={() => void handleGenerateSlides()}
-          >
-            <Sparkles className="h-3 w-3 mr-1" />
-            {generateMut.isPending ? "Generating..." : `Generate ${artifactLabel}`}
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={!revisionId || submitMut.isPending}
-            onClick={() => void handleSubmitReview()}
-          >
-            <Send className="h-3 w-3 mr-1" />
-            {submitMut.isPending ? "Submitting…" : "Submit for review"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!revisionId || exportMut.isPending}
-            onClick={() => void handleExport("pdf")}
-          >
-            <Download className="h-3 w-3 mr-1" />
-            PDF
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!revisionId || exportMut.isPending}
-            onClick={() => void handleExport("png")}
-          >
-            PNG
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!revisionId || exportMut.isPending}
-            onClick={() => void handleExport("pptx")}
-          >
-            PPTX
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!revisionId || saveToKbMut.isPending}
-            onClick={openSaveDialog}
-          >
-            <BookOpenCheck className="h-3 w-3 mr-1" />
-            Save to KB
-          </Button>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-semibold">{project.title}</h1>
+            <p className="text-xs text-muted-foreground capitalize">
+              {project.artifactType} · ${project.costUsd.toFixed(2)} spent · cap $1.50
+            </p>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              size="sm"
+              disabled={generateMut.isPending || !canGenerateDeck}
+              onClick={() => void handleGenerateSlides()}
+            >
+              <Sparkles className="h-3 w-3 mr-1" />
+              {generateMut.isPending ? "Generating..." : `Generate ${artifactLabel}`}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={!revisionId || submitMut.isPending}
+              onClick={() => void handleSubmitReview()}
+            >
+              <Send className="h-3 w-3 mr-1" />
+              {submitMut.isPending ? "Submitting…" : "Submit for review"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!revisionId || exportMut.isPending}
+              onClick={() => void handleExport("pdf")}
+            >
+              <Download className="h-3 w-3 mr-1" />
+              PDF
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!revisionId || exportMut.isPending}
+              onClick={() => void handleExport("png")}
+            >
+              PNG
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!revisionId || exportMut.isPending}
+              onClick={() => void handleExport("pptx")}
+            >
+              PPTX
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!revisionId || saveToKbMut.isPending}
+              onClick={openSaveDialog}
+            >
+              <BookOpenCheck className="h-3 w-3 mr-1" />
+              Save to KB
+            </Button>
+          </div>
         </div>
       </div>
 

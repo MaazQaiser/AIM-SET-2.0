@@ -15,6 +15,10 @@ export interface SuggestionKbMatch {
 }
 
 const GENERIC_INDUSTRY_PHRASES = [
+  "industry",
+  "industry case study",
+  "service one-pager",
+  "services overview",
   "their industry",
   "this call",
   "the call",
@@ -51,7 +55,7 @@ function stripAccountFromName(name: string | undefined, accountName: string | un
 function isGenericIndustry(value: string) {
   const normalized = value.trim().toLowerCase();
   if (!normalized || normalized.length < 3) return true;
-  return GENERIC_INDUSTRY_PHRASES.some((phrase) => normalized.includes(phrase));
+  return GENERIC_INDUSTRY_PHRASES.some((phrase) => normalized === phrase);
 }
 
 function normalizeIndustryLabel(value: string) {
@@ -128,9 +132,6 @@ function extractIndustryFromAssetName(name: string, type: PreDcContentGeneration
 }
 
 export function extractIndustryFromGap(lead: GroupLeadContext): string | undefined {
-  const fromCall = lead.industry?.trim();
-  if (fromCall && !isGenericIndustry(fromCall)) return normalizeIndustryLabel(fromCall);
-
   const fromNeededFor = extractIndustryFromNeededFor(lead.neededFor ?? "");
   if (fromNeededFor) return fromNeededFor;
 
@@ -138,7 +139,13 @@ export function extractIndustryFromGap(lead: GroupLeadContext): string | undefin
   if (fromReason) return fromReason;
 
   const strippedName = stripAccountFromName(lead.name, lead.accountName);
-  return extractIndustryFromAssetName(strippedName || lead.name, lead.type);
+  const fromName = extractIndustryFromAssetName(strippedName || lead.name, lead.type);
+  if (fromName) return fromName;
+
+  const fromCall = lead.industry?.trim();
+  if (fromCall && !isGenericIndustry(fromCall)) return normalizeIndustryLabel(fromCall);
+
+  return undefined;
 }
 
 export function resolveDominantIndustry(leads: GroupLeadContext[]): string | undefined {

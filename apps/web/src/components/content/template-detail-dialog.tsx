@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Check, Code2, FileText, Layers, LayoutTemplate, Palette, Type } from "lucide-react";
+import { BookOpen, Check, Code2, FileText, Image, Layers, LayoutTemplate, Palette, Pencil, Table, Type } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import {
@@ -287,7 +287,7 @@ function TemplateUnderstandingPanel({
   const slideCount = metadata.slideCount ?? template.previewSlideCount ?? template.pageCount;
   const design = metadata.design ?? {};
   const conversion = metadata.conversion ?? {};
-  const visibleSlides = compact ? slides.slice(0, 6) : slides;
+  const visibleSlides = compact ? slides.slice(0, 5) : slides;
   const hasUnderstanding =
     slides.length > 0 ||
     Boolean(design.colors?.length) ||
@@ -299,114 +299,127 @@ function TemplateUnderstandingPanel({
     <div
       className={
         compact
-          ? "h-[62vh] overflow-auto rounded-md border bg-background p-3"
-          : "rounded-md border bg-background p-3"
+          ? "flex h-[62vh] flex-col gap-0 overflow-hidden rounded-md border bg-background"
+          : "rounded-md border bg-background"
       }
     >
-      <div className="flex items-start justify-between gap-3">
+      {/* ── header ── */}
+      <div className="flex shrink-0 items-start justify-between gap-3 border-b px-3 py-2.5">
         <div>
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold">
             <Layers className="h-4 w-4 text-muted-foreground" />
             Deck understanding
           </h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {slideCount} {slideCount === 1 ? "slide" : "slides"}
-            {metadata.source?.extension ? ` / ${metadata.source.extension.toUpperCase()}` : ""}
+            {metadata.source?.extension ? ` · ${metadata.source.extension.toUpperCase()}` : ""}
           </p>
         </div>
-        <Badge variant={conversion.htmlGenerated ? "success" : "outline"}>
+        <Badge variant={conversion.htmlGenerated ? "success" : "outline"} className="shrink-0">
           {conversion.htmlGenerated ? "HTML ready" : "Source read"}
         </Badge>
       </div>
 
       {!hasUnderstanding ? (
-        <p className="mt-4 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+        <p className="p-3 text-sm text-muted-foreground">
           Slide structure has not been extracted for this template yet.
         </p>
       ) : (
-        <div className="mt-4 space-y-4">
-          {metadata.sourceFormatNote ? (
-            <p className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
-              {metadata.sourceFormatNote}
-            </p>
-          ) : null}
-          {metadata.extractionError ? (
-            <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-              {metadata.extractionError}
-            </p>
-          ) : null}
-
-          <TemplateDesignSummary design={design} />
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <FileText className="h-3.5 w-3.5" />
-              Slides
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {/* ── errors / notes ── */}
+          {(metadata.sourceFormatNote || metadata.extractionError) ? (
+            <div className="space-y-1.5 border-b px-3 py-2">
+              {metadata.sourceFormatNote ? (
+                <p className="rounded bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+                  {metadata.sourceFormatNote}
+                </p>
+              ) : null}
+              {metadata.extractionError ? (
+                <p className="rounded bg-destructive/10 px-2 py-1 text-xs text-destructive">
+                  {metadata.extractionError}
+                </p>
+              ) : null}
             </div>
-            {visibleSlides.length > 0 ? (
-              visibleSlides.map((slide) => (
-                <div key={slide.slide} className="space-y-2 rounded-md border p-3">
-                  <div className="flex items-start gap-2">
-                    <Badge variant="secondary" className="shrink-0">
-                      {slide.slide}
-                    </Badge>
-                    <div className="min-w-0">
-                      <p className="break-words text-sm font-medium">
-                        {slide.title || slide.name || `Slide ${slide.slide}`}
-                      </p>
-                      {slide.layout ? (
-                        <p className="mt-0.5 text-xs text-muted-foreground">Layout: {slide.layout}</p>
-                      ) : null}
-                    </div>
-                  </div>
-                  {slide.text ? (
-                    <p className="max-h-20 overflow-hidden text-xs leading-5 text-muted-foreground">
-                      {slide.text}
-                    </p>
-                  ) : null}
-                  <SlideDesignBits slide={slide} />
-                </div>
-              ))
-            ) : (
-              <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-                No slide text was found in the source file.
+          ) : null}
+
+          {/* ── overall deck summary ── */}
+          <DeckOverallSummary design={design} slides={slides} slideCount={Number(slideCount)} conversion={conversion ?? {}} />
+
+          {/* ── slide-by-slide ── */}
+          {visibleSlides.length > 0 ? (
+            <div className="px-3 pb-3">
+              <p className="mb-2 flex items-center gap-1.5 pt-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                <FileText className="h-3 w-3" />
+                Slide breakdown
               </p>
-            )}
-            {compact && slides.length > visibleSlides.length ? (
-              <p className="text-xs text-muted-foreground">
-                +{slides.length - visibleSlides.length} more slides in Details
-              </p>
-            ) : null}
-          </div>
+              <div className="space-y-2">
+                {visibleSlides.map((slide) => (
+                  <SlideUnderstandingCard key={slide.slide} slide={slide} />
+                ))}
+              </div>
+              {compact && slides.length > visibleSlides.length ? (
+                <p className="mt-2 text-center text-xs text-muted-foreground">
+                  +{slides.length - visibleSlides.length} more slides — see Details tab
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="px-3 py-4 text-xs text-muted-foreground">
+              No slide text was found in the source file.
+            </p>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function TemplateDesignSummary({
+function DeckOverallSummary({
   design,
+  slides,
+  slideCount,
+  conversion,
 }: {
   design: NonNullable<ContentTemplate["metadata"]>["design"];
+  slides: ContentTemplateSlideMetadata[];
+  slideCount: number;
+  conversion: NonNullable<NonNullable<ContentTemplate["metadata"]>["conversion"]>;
 }) {
   const colors = design?.colors ?? [];
   const fonts = design?.fonts ?? [];
   const layouts = design?.layouts ?? [];
+
+  // Derive a short purpose sentence from layout names
+  const purposeHints: string[] = [];
+  const layoutStr = layouts.join(" ").toLowerCase();
+  if (layoutStr.includes("cover") || layoutStr.includes("title")) purposeHints.push("cover slide");
+  if (layoutStr.includes("content") || layoutStr.includes("body")) purposeHints.push("content slides");
+  if (layoutStr.includes("blank")) purposeHints.push("blank layouts");
+  if (layoutStr.includes("section")) purposeHints.push("section dividers");
+  if (layoutStr.includes("comparison") || layoutStr.includes("two")) purposeHints.push("comparison layouts");
+  if (layoutStr.includes("chart") || layoutStr.includes("table")) purposeHints.push("data slides");
+  const totalImages = slides.reduce((s, sl) => s + (sl.imageCount ?? 0), 0);
+  const totalCharts = slides.reduce((s, sl) => s + (sl.chartCount ?? 0), 0);
+  const totalTables = slides.reduce((s, sl) => s + (sl.tableCount ?? 0), 0);
+
   if (!colors.length && !fonts.length && !layouts.length) return null;
 
   return (
-    <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+    <div className="space-y-3 border-b px-3 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+        Overall
+      </p>
+
+      {/* palette */}
       {colors.length > 0 ? (
-        <div>
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Palette className="h-3.5 w-3.5" />
-            Colors
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {colors.map((color) => (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Palette className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">Palette</span>
+          <div className="flex flex-wrap gap-1">
+            {colors.slice(0, 10).map((color) => (
               <span
                 key={color}
-                className="h-6 w-6 rounded border"
+                className="h-5 w-5 rounded-full border shadow-sm"
                 style={isCssColor(color) ? { backgroundColor: color } : undefined}
                 title={color}
                 aria-label={color}
@@ -415,29 +428,89 @@ function TemplateDesignSummary({
           </div>
         </div>
       ) : null}
+
+      {/* fonts */}
       {fonts.length > 0 ? (
-        <div>
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Type className="h-3.5 w-3.5" />
-            Fonts
-          </p>
-          <div className="flex flex-wrap gap-1">
-            {fonts.slice(0, 8).map((font) => (
-              <Badge key={font} variant="outline" className="font-normal">
-                {font}
-              </Badge>
-            ))}
-          </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Type className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">Fonts</span>
+          {fonts.slice(0, 5).map((font) => (
+            <Badge key={font} variant="outline" className="text-[10px] font-normal">
+              {font}
+            </Badge>
+          ))}
         </div>
       ) : null}
+
+      {/* layouts */}
       {layouts.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <BookOpen className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">Layouts</span>
+          {layouts.slice(0, 6).map((l) => (
+            <Badge key={l} variant="secondary" className="text-[10px] font-normal">
+              {l}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
+
+      {/* asset counts */}
+      {(totalImages > 0 || totalCharts > 0 || totalTables > 0) ? (
+        <div className="flex flex-wrap gap-2">
+          {totalImages > 0 ? (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Image className="h-3.5 w-3.5" />
+              {totalImages} {totalImages === 1 ? "image" : "images"}
+            </span>
+          ) : null}
+          {totalCharts > 0 ? (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Layers className="h-3.5 w-3.5" />
+              {totalCharts} {totalCharts === 1 ? "chart" : "charts"}
+            </span>
+          ) : null}
+          {totalTables > 0 ? (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Table className="h-3.5 w-3.5" />
+              {totalTables} {totalTables === 1 ? "table" : "tables"}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* inferred purpose */}
+      {purposeHints.length > 0 ? (
+        <p className="rounded bg-muted/30 px-2 py-1.5 text-xs leading-5 text-muted-foreground">
+          {slideCount}-slide deck including {purposeHints.join(", ")}.
+          {conversion.htmlGenerated ? " HTML/CSS generated." : ""}
+        </p>
+      ) : null}
+
+      {/* content slots */}
+      {conversion.slots && conversion.slots.length > 0 ? (
         <div>
-          <p className="mb-2 text-xs font-medium text-muted-foreground">Layouts</p>
+          <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Pencil className="h-3.5 w-3.5" />
+            Content slots
+            <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums">
+              {conversion.slots.length}
+            </span>
+          </p>
           <div className="flex flex-wrap gap-1">
-            {layouts.slice(0, 8).map((layout) => (
-              <Badge key={layout} variant="outline" className="font-normal">
-                {layout}
-              </Badge>
+            {conversion.slots.map((slot) => (
+              <span
+                key={slot.id}
+                title={slot.id}
+                className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                  slot.type === "image"
+                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                    : "bg-primary/8 text-primary"
+                }`}
+              >
+                {slot.type === "image" ? <Image className="h-2.5 w-2.5" /> : <Pencil className="h-2.5 w-2.5" />}
+                {slot.label}
+              </span>
             ))}
           </div>
         </div>
@@ -446,42 +519,84 @@ function TemplateDesignSummary({
   );
 }
 
-function SlideDesignBits({
-  slide,
-}: {
-  slide: ContentTemplateSlideMetadata;
-}) {
+function SlideUnderstandingCard({ slide }: { slide: ContentTemplateSlideMetadata }) {
   const colors = slide.colors ?? [];
   const fonts = slide.fonts ?? [];
-  const stats = [
-    slide.imageCount ? `${slide.imageCount} images` : "",
-    slide.tableCount ? `${slide.tableCount} tables` : "",
-    slide.chartCount ? `${slide.chartCount} charts` : "",
-  ].filter(Boolean);
 
-  if (!colors.length && !fonts.length && !stats.length) return null;
+  // Derive a role label from the layout name
+  const layout = (slide.layout ?? "").toLowerCase();
+  let roleLabel = "";
+  if (layout.includes("cover") || layout.includes("title slide")) roleLabel = "Cover";
+  else if (layout.includes("section")) roleLabel = "Section";
+  else if (layout.includes("blank")) roleLabel = "Blank";
+  else if (layout.includes("comparison") || layout.includes("two content")) roleLabel = "Comparison";
+  else if (layout.includes("content") || layout.includes("body")) roleLabel = "Content";
+  else if (layout.includes("picture") || layout.includes("image")) roleLabel = "Visual";
+  else if (layout.includes("table")) roleLabel = "Table";
+  else if (layout.includes("chart")) roleLabel = "Chart";
+  else if (slide.imageCount && slide.imageCount > 0 && !slide.text) roleLabel = "Visual";
+  else if (slide.slide === 1) roleLabel = "Cover";
+
+  // Truncate text snippet
+  const snippet = (slide.text ?? "").slice(0, 120).trim();
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {colors.slice(0, 6).map((color) => (
-        <span
-          key={color}
-          className="h-4 w-4 rounded border"
-          style={isCssColor(color) ? { backgroundColor: color } : undefined}
-          title={color}
-          aria-label={color}
-        />
-      ))}
-      {fonts.slice(0, 3).map((font) => (
-        <Badge key={font} variant="outline" className="text-[10px] font-normal">
-          {font}
-        </Badge>
-      ))}
-      {stats.map((stat) => (
-        <Badge key={stat} variant="secondary" className="text-[10px] font-normal">
-          {stat}
-        </Badge>
-      ))}
+    <div className="rounded-md border bg-muted/10 p-2.5">
+      <div className="flex items-start gap-2">
+        {/* slide number bubble */}
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold tabular-nums">
+          {slide.slide}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <p className="truncate text-xs font-medium leading-tight">
+              {slide.title || slide.name || `Slide ${slide.slide}`}
+            </p>
+            {roleLabel ? (
+              <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide">
+                {roleLabel}
+              </Badge>
+            ) : null}
+          </div>
+
+          {/* text snippet */}
+          {snippet && snippet.toLowerCase() !== (slide.title ?? "").toLowerCase() ? (
+            <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+              {snippet}
+            </p>
+          ) : null}
+
+          {/* per-slide design bits */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {colors.slice(0, 5).map((color) => (
+              <span
+                key={color}
+                className="h-3.5 w-3.5 rounded-full border"
+                style={isCssColor(color) ? { backgroundColor: color } : undefined}
+                title={color}
+                aria-label={color}
+              />
+            ))}
+            {fonts.slice(0, 2).map((font) => (
+              <Badge key={font} variant="outline" className="px-1 py-0 text-[9px] font-normal">
+                {font}
+              </Badge>
+            ))}
+            {slide.imageCount ? (
+              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                <Image className="h-3 w-3" />
+                {slide.imageCount}
+              </span>
+            ) : null}
+            {slide.tableCount ? (
+              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                <Table className="h-3 w-3" />
+                {slide.tableCount}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

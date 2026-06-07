@@ -1,5 +1,5 @@
 import type { PreDcContentGenerationGap } from "@/lib/data/hooks";
-import { resolveContextualGroupTitle } from "@/lib/content/suggestion-context";
+import { extractIndustryFromGap, resolveContextualGroupTitle } from "@/lib/content/suggestion-context";
 import type {
   ContentSuggestionEvidenceSource,
   ContentSuggestionSlidePlan,
@@ -82,9 +82,24 @@ function stripAccountFromName(name: string, accountName: string) {
   return normalized;
 }
 
+function normalizeKeyPart(value: string | undefined) {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[^\w\s,-]+/g, "")
+    .slice(0, 120);
+}
+
 export function normalizeDocumentKey(item: PreDcContentGenerationGap) {
   const artifactId = item.sourceArtifactId?.trim();
-  if (artifactId) return `artifact:${artifactId}`;
+  const contextKey = normalizeKeyPart(
+    extractIndustryFromGap(item) ||
+      stripAccountFromName(item.name, item.accountName) ||
+      item.neededFor ||
+      item.reason
+  );
+  if (artifactId) return contextKey ? `artifact:${artifactId}:${contextKey}` : `artifact:${artifactId}`;
 
   const strippedName = stripAccountFromName(item.name, item.accountName);
   const normalizedName = (strippedName || item.type).toLowerCase();
@@ -135,11 +150,14 @@ export function groupPreDcGaps(items: PreDcContentGenerationGap[]): PreDcGenerat
         if (accountCompare !== 0) return accountCompare;
         return (a.leadName ?? "").localeCompare(b.leadName ?? "");
       });
+      const representative = leads[0];
       const resolvedTitle = resolveContextualGroupTitle(leads);
       const resolved = {
         ...group,
         name: resolvedTitle.name,
         industryLabel: resolvedTitle.industryLabel,
+        reason: representative?.reason ?? group.reason,
+        neededFor: representative?.neededFor ?? group.neededFor,
         leads,
       };
       return {

@@ -157,7 +157,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col gap-4 p-6">
-      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
+      <div className="sticky top-0 z-30 -mx-6 flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-border/60 bg-background/90 px-6 py-4 backdrop-blur-md">
         <div className="space-y-1">
           <Link
             href="/content?tab=templates"

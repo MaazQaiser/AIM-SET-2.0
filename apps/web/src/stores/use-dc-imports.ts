@@ -89,6 +89,8 @@ const emptyState = {
   importsHydrated: false,
 };
 
+const LOAD_FROM_DB_TIMEOUT_MS = 8_000;
+
 function applyBuilt(
   preDcRecords: PreDCRecord[],
   postDcRecords: PostDCRecord[],
@@ -168,8 +170,10 @@ export const useDcImportsStore = create<DcImportsState>()((set, get) => ({
       discoverySnapshotsByCallId: { ...s.discoverySnapshotsByCallId, [callId]: snapshot },
     })),
   loadFromDb: async () => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), LOAD_FROM_DB_TIMEOUT_MS);
     try {
-      const res = await fetch("/api/dc-notes");
+      const res = await fetch("/api/dc-notes", { signal: controller.signal });
       if (!res.ok) {
         const err = (await res.json().catch(() => null)) as { detail?: string; error?: string } | null;
         throw new Error(err?.detail ?? err?.error ?? `Failed to load DC notes (${res.status})`);
@@ -192,7 +196,12 @@ export const useDcImportsStore = create<DcImportsState>()((set, get) => ({
       });
     } catch (error) {
       set({ importsHydrated: true });
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new Error("Loading DC notes timed out. The dashboard will keep using local demo data.");
+      }
       throw error;
+    } finally {
+      window.clearTimeout(timeoutId);
     }
   },
   clearImports: async () => {

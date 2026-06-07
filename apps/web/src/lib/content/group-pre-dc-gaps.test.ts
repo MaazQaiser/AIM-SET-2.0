@@ -20,7 +20,7 @@ function gap(
 }
 
 describe("groupPreDcGaps", () => {
-  it("groups leads by shared sourceArtifactId even when display names differ", () => {
+  it("groups leads by shared sourceArtifactId and content context", () => {
     const groups = groupPreDcGaps([
       gap({
         callId: "call-1",
@@ -28,19 +28,41 @@ describe("groupPreDcGaps", () => {
         sourceArtifactId: "art-case",
         accountName: "Health Co",
         leadName: "Omar",
+        neededFor: "Social proof aligned to Healthcare.",
       }),
       gap({
         callId: "call-2",
-        name: "Edtech case study",
+        name: "Healthcare proof story",
         sourceArtifactId: "art-case",
         accountName: "Edu Co",
         leadName: "Shaun",
+        neededFor: "Social proof aligned to Healthcare.",
       }),
     ]);
 
     expect(groups).toHaveLength(1);
     expect(groups[0]?.leads).toHaveLength(2);
-    expect(groups[0]?.name).toBe("Industry case study");
+    expect(groups[0]?.name).toBe("Healthcare case study");
+  });
+
+  it("splits the same artifact id when the needed context differs", () => {
+    const groups = groupPreDcGaps([
+      gap({
+        callId: "call-1",
+        name: "Healthcare case study",
+        sourceArtifactId: "art-case",
+        neededFor: "Social proof aligned to Healthcare.",
+      }),
+      gap({
+        callId: "call-2",
+        name: "Retail case study",
+        sourceArtifactId: "art-case",
+        neededFor: "Social proof aligned to Retail.",
+      }),
+    ]);
+
+    expect(groups).toHaveLength(2);
+    expect(groups.map((group) => group.name).sort()).toEqual(["Healthcare case study", "Retail case study"]);
   });
 
   it("uses industry from neededFor for artifact-backed groups", () => {
@@ -68,5 +90,42 @@ describe("groupPreDcGaps", () => {
         })
       )
     ).toBe("one_pager:follow-up one-pager");
+  });
+
+  it("includes context in artifact-backed document keys", () => {
+    expect(
+      normalizeDocumentKey(
+        gap({
+          callId: "call-1",
+          name: "Healthcare case study",
+          sourceArtifactId: "art-case",
+          neededFor: "Social proof aligned to Healthcare.",
+        })
+      )
+    ).toBe("artifact:art-case:healthcare");
+  });
+
+  it("uses the displayed representative lead for reason and neededFor", () => {
+    const groups = groupPreDcGaps([
+      gap({
+        callId: "call-2",
+        accountName: "Zulu Co",
+        name: "Healthcare case study",
+        sourceArtifactId: "art-case",
+        neededFor: "Social proof aligned to Healthcare.",
+        reason: "Reason from Zulu",
+      }),
+      gap({
+        callId: "call-1",
+        accountName: "Alpha Co",
+        name: "Healthcare case study",
+        sourceArtifactId: "art-case",
+        neededFor: "Social proof aligned to Healthcare.",
+        reason: "Reason from Alpha",
+      }),
+    ]);
+
+    expect(groups[0]?.reason).toBe("Reason from Alpha");
+    expect(groups[0]?.leads[0]?.accountName).toBe("Alpha Co");
   });
 });

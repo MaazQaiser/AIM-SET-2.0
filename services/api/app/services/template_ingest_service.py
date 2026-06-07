@@ -142,11 +142,13 @@ def process_template_ingest(
             all_vars = _metadata_css_vars(metadata)
             merged = _metadata_to_template_html(metadata, css_variables=all_vars)
             metadata.setdefault("conversion", {})["fallbackGenerated"] = True
+        slots = _extract_slots(merged)
         metadata = _with_conversion_metadata(
             metadata,
             html_generated=True,
             section_count=len(sections),
             css_variables=all_vars,
+            slots=slots,
         )
         metadata = _with_processing_metadata(
             metadata,
@@ -548,6 +550,7 @@ def _with_conversion_metadata(
     section_count: int,
     css_variables: Dict[str, str],
     error: Optional[str] = None,
+    slots: Optional[List[Dict[str, str]]] = None,
 ) -> Dict[str, Any]:
     out = dict(metadata)
     conversion = dict(out.get("conversion") or {})
@@ -558,6 +561,8 @@ def _with_conversion_metadata(
             "cssVariables": sorted(css_variables.keys()),
         }
     )
+    if slots is not None:
+        conversion["slots"] = slots
     if error:
         conversion["error"] = error
     out["conversion"] = conversion
@@ -1026,6 +1031,33 @@ def _extract_css_vars(html: str) -> Dict[str, str]:
     for m in re.finditer(r"--([a-zA-Z0-9\-]+)\s*:\s*([^;]+);", html):
         vars_found[f"--{m.group(1)}"] = m.group(2).strip()
     return vars_found
+
+
+def _extract_slots(html: str) -> List[Dict[str, str]]:
+    """Return ordered list of {id, type, label} for every data-slot in the HTML."""
+    slots: List[Dict[str, str]] = []
+    seen: set = set()
+    # Match data-slot attributes with optional data-slot-type / data-slot-label on the same tag.
+    tag_pattern = re.compile(r"<[^>]+>", re.DOTALL)
+    for tag_match in tag_pattern.finditer(html):
+        tag = tag_match.group(0)
+        slot_id_m = re.search(r'data-slot=["\']([^"\']+)["\']', tag)
+        if not slot_id_m:
+            continue
+        slot_id = slot_id_m.group(1)
+        if slot_id in seen:
+            continue
+        seen.add(slot_id)
+        slot_type_m = re.search(r'data-slot-type=["\']([^"\']+)["\']', tag)
+        slot_label_m = re.search(r'data-slot-label=["\']([^"\']+)["\']', tag)
+        slots.append(
+            {
+                "id": slot_id,
+                "type": slot_type_m.group(1) if slot_type_m else "text",
+                "label": slot_label_m.group(1) if slot_label_m else slot_id,
+            }
+        )
+    return slots
 
 
 def _merge_template_html(sections: List[str], css_variables: Dict[str, str]) -> str:

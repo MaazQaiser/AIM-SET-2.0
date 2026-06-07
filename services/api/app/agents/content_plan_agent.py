@@ -382,7 +382,7 @@ def run_content_plan(
     cost_usd = 0.0
     tokens = 0
 
-    if settings.llm_api_key or settings.openai_configured:
+    if settings.openai_configured:
         system = load_prompt("content/plan/v1.0.0.md")
         user_payload = json.dumps(
             {
@@ -406,10 +406,12 @@ def run_content_plan(
             indent=2,
         )
         try:
-            completion = LlmClient(api_key=settings.llm_api_key or None).complete(
+            completion = LlmClient(openai_api_key=settings.openai_api_key or None).complete(
                 system=system,
                 user=user_payload,
                 max_tokens=2048,
+                model="gpt-5.4-mini",
+                fallback_model="gpt-5.4-mini",
             )
             parsed = _parse_llm_plan(completion.text)
             if parsed and isinstance(parsed.get("slide_plan"), list):

@@ -54,6 +54,31 @@ function formatArtifactType(value: string) {
   return value.replace(/_/g, " ");
 }
 
+function titleCaseArtifactType(value: string) {
+  return formatArtifactType(value)
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function isGenericUploadInstruction(value: string | undefined) {
+  return /^upload\s+or\s+tag\s+kb\s+content\s+for:/i.test((value ?? "").trim());
+}
+
+function buildContentRequirements(
+  group: PreDcGenerationGroup,
+  primaryLead: ContentGenerationLead | undefined
+) {
+  const explicit = primaryLead?.contentRequirements?.trim();
+  if (explicit && !isGenericUploadInstruction(explicit)) return explicit;
+
+  const audience = group.industryLabel || primaryLead?.industry || primaryLead?.accountName || "this call";
+  const purpose = (group.neededFor || group.reason || "support the upcoming conversation").replace(/\s+/g, " ").trim();
+  const artifactType = titleCaseArtifactType(group.type).toLowerCase();
+  return `Create a ${artifactType} titled "${group.name}" for ${audience}. It should cover: ${purpose} Include reusable proof points, relevant KB/project evidence, and a clear call next step.`;
+}
+
 function buildGapKey(
   group: { id: string; name: string },
   lead: { callId: string; sourceArtifactId?: string; sourceItemId?: string } | undefined,
@@ -313,12 +338,12 @@ function ContentGenerationCard({
 }) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const dismissGap = useDismissContentGap();
   const resolveGap = useResolveContentGap();
   const primaryLead = group.leads[0];
   const gapKey = buildGapKey(group, primaryLead, source);
-  const leadCount = group.leads.length;
+  const sourceCount = group.leads.length;
   const sourceArtifactId =
     primaryLead?.sourceArtifactId || (group.id.startsWith("artifact:") ? group.id.slice("artifact:".length) : undefined);
   const sourcePath =
@@ -328,10 +353,7 @@ function ContentGenerationCard({
         ? `/calls/${primaryLead.callId}/post-dc`
         : `/calls/${primaryLead.callId}`
       : "/content?tab=suggestions");
-  const contentRequirements =
-    group.leads.find((lead) => lead.contentRequirements)?.contentRequirements ||
-    group.reason ||
-    group.neededFor;
+  const contentRequirements = buildContentRequirements(group, primaryLead);
   const suggestionContext = {
     ...(primaryLead?.context ?? {}),
     source: source === "post-dc" ? "post_dc" : "pre_dc",
@@ -369,7 +391,11 @@ function ContentGenerationCard({
     })),
     kbAssetIds: (group.kbMatches ?? []).map((m) => m.id),
   };
-  const { data: planPreview } = useContentPlan(expanded ? planInput : null);
+  const {
+    data: planPreview,
+    isLoading: planLoading,
+    isError: planError,
+  } = useContentPlan(expanded ? planInput : null);
 
   async function handleDismiss() {
     try {
@@ -459,9 +485,9 @@ function ContentGenerationCard({
                     <TooltipTrigger asChild>
                       <Badge variant="outline" className="cursor-default font-normal">
                         <span className="font-medium tabular-nums text-destructive">
-                          {leadCount} Lead{leadCount === 1 ? "" : "s"}
+                          {sourceCount} call brief{sourceCount === 1 ? "" : "s"}
                         </span>
-                        <span className="text-muted-foreground">needing this asset</span>
+                        <span className="text-muted-foreground">need this asset</span>
                       </Badge>
                     </TooltipTrigger>
                     <TooltipContent side="bottom" align="start" className="max-w-xs whitespace-pre-line text-xs">
@@ -555,8 +581,23 @@ function ContentGenerationCard({
           {expanded ? "Hide plan preview" : "Preview AI slide plan"}
         </Button>
 
-        {expanded && planPreview?.suggestion_plan && (
+        {expanded && planLoading && (
+          <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+            Building AI slide plan…
+          </p>
+        )}
+        {expanded && planError && (
+          <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            Could not load the slide plan preview.
+          </p>
+        )}
+        {expanded && !planLoading && !planError && planPreview?.suggestion_plan && (
           <SuggestionPlanPreview plan={planPreview.suggestion_plan} />
+        )}
+        {expanded && !planLoading && !planError && !planPreview?.suggestion_plan && (
+          <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+            No slide plan came back for this suggestion yet.
+          </p>
         )}
       </CardContent>
     </Card>
@@ -628,6 +669,11 @@ function SuggestionPlanPreview({
         <p className="text-xs text-muted-foreground">
           <span className="font-medium text-foreground">Default template: </span>
           {plan.template.name}
+        </p>
+      )}
+      {slides.length === 0 && (
+        <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+          No slide rows were returned for this plan.
         </p>
       )}
       {slides.length > 0 && (

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Lightbulb } from "lucide-react";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { useContentGaps } from "@/lib/data/hooks";
 
 export default function ContentGapDetailPage({ params }: { params: Promise<{ gapId: string }> }) {
@@ -21,35 +22,39 @@ export default function ContentGapDetailPage({ params }: { params: Promise<{ gap
 
   if (!gap) {
     return (
-      <div className="p-6">
-        <Link href="/content" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
-          <ChevronLeft className="h-4 w-4" />
-          Content
-        </Link>
+      <PageShell size="narrow">
+        <PageHeader>
+          <Link href="/content" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <ChevronLeft className="h-4 w-4" />
+            Content
+          </Link>
+        </PageHeader>
         <EmptyState icon={Lightbulb} title="Content gap not found" description="No gap data is available yet." />
-      </div>
+      </PageShell>
     );
   }
 
   if (gap.studioProjectId) {
     return (
-      <div className="p-6 text-sm text-muted-foreground">
+      <PageShell size="narrow" className="text-sm text-muted-foreground">
         Opening linked Studio project…
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl mx-auto">
-      <Link href="/content?tab=suggestions" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ChevronLeft className="h-4 w-4" />
-        Content suggestions
-      </Link>
+    <PageShell size="narrow">
+      <PageHeader>
+        <Link href="/content?tab=suggestions" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="h-4 w-4" />
+          Content suggestions
+        </Link>
+      </PageHeader>
       <EmptyState
         icon={Lightbulb}
         title={gap.topic}
         description="Generate this asset from the Content suggestions tab to open it in Studio with a full evidence-backed plan."
       />
-    </div>
+    </PageShell>
   );
 }

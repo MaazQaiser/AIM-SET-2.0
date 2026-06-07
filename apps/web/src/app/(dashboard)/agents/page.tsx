@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { CheckCircle2, AlertTriangle, XCircle, Activity, Zap } from "lucide-react";
 import { AgentStatusCard } from "@/components/agents/agent-status-card";
 import { AgentActivityFeed } from "@/components/agents/agent-activity-feed";
-import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { StatCard } from "@dc-copilot/ui/components/stat-card";
 import { useAgentAudit, useAgentRuns } from "@/lib/data/hooks";
@@ -58,12 +58,12 @@ export default function AgentsPage() {
 
   return (
     <PageShell size="wide" className="space-y-6">
-      <div>
+      <PageHeader>
         <h1 className="text-2xl font-semibold">Agent Control Panel</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Five orchestrator-backed agents — spend and runs come from the API; configure caps and models per agent.
         </p>
-      </div>
+      </PageHeader>
 
       <SystemHealthBanner hasOutage={hasOutage} hasDegraded={hasDegraded} />
 

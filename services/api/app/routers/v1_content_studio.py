@@ -127,10 +127,27 @@ def create_template(
     body: TemplateBody,
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> Dict[str, Any]:
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Templates must be created by uploading a PPT or PPTX file. Edit HTML/CSS after extraction.",
-    )
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Template name is required")
+    if body.artifactType not in ARTIFACT_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid artifactType")
+
+    try:
+        validate_template_html(body.html, body.css)
+        document = build_template_document(body.html, body.css)
+        _, resolved_css = split_template_parts(document)
+        return get_content_studio_repository().create_manual_template(
+            ctx,
+            name=name,
+            artifact_type=body.artifactType,
+            html=document,
+            css_variables=extract_css_variables(resolved_css),
+            tags=body.tags,
+            page_count=count_template_pages(document, body.artifactType),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post("/templates/assist")

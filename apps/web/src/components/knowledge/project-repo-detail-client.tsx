@@ -17,7 +17,7 @@ import {
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
-import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { useKbProject } from "@/lib/data/hooks";
 import type { KBProject } from "@/types";
 import {
@@ -170,43 +170,45 @@ export function ProjectRepoDetailClient({ projectId }: { projectId: string }) {
 
   return (
     <PageShell size="wide">
-      <Link href="/content?tab=projects" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ChevronLeft className="h-4 w-4" />
-        Projects
-      </Link>
+      <PageHeader className="space-y-3">
+        <Link href="/content?tab=projects" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="h-4 w-4" />
+          Projects
+        </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-            <BriefcaseBusiness className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              {project.industry && <Badge variant="outline">{project.industry}</Badge>}
-              {project.domain && <Badge variant="outline">{project.domain}</Badge>}
-              {project.companyStage && <Badge variant="outline">{project.companyStage}</Badge>}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <BriefcaseBusiness className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                {project.industry && <Badge variant="outline">{project.industry}</Badge>}
+                {project.domain && <Badge variant="outline">{project.domain}</Badge>}
+                {project.companyStage && <Badge variant="outline">{project.companyStage}</Badge>}
+              </div>
+              <h1 className="break-words text-2xl font-semibold text-foreground">{project.title}</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                {project.summary}
+              </p>
             </div>
-            <h1 className="break-words text-2xl font-semibold text-foreground">{project.title}</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-              {project.summary}
-            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link href="/content?tab=projects">
+                <FolderKanban className="h-4 w-4" />
+                Projects
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href={`/knowledge/${project.sourceAssetId}`}>
+                <Database className="h-4 w-4" />
+                Source asset
+              </Link>
+            </Button>
           </div>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <Link href="/content?tab=projects">
-              <FolderKanban className="h-4 w-4" />
-              Projects
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href={`/knowledge/${project.sourceAssetId}`}>
-              <Database className="h-4 w-4" />
-              Source asset
-            </Link>
-          </Button>
-        </div>
-      </div>
+      </PageHeader>
 
       <div className="grid gap-3 md:grid-cols-4">
         <MetricTile icon={Building2} label="Company" value={project.companyName || "Not listed"} />

@@ -47,6 +47,7 @@ export interface ContentTemplateMetadata {
     htmlGenerated?: boolean;
     sectionCount?: number;
     cssVariables?: string[];
+    slots?: Array<{ id: string; type: string; label: string }>;
     error?: string;
     fallbackGenerated?: boolean;
   };

@@ -8,7 +8,7 @@ import { CallsViewToggle, type CallsViewMode } from "@/components/calls/calls-vi
 import { Card, CardContent } from "@dc-copilot/ui/components/card";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
-import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { CallsListPageLoader } from "@/components/layout/page-loaders";
 import { useCalls } from "@/lib/data/hooks";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
@@ -119,7 +119,7 @@ export function CallsListClient() {
 
   return (
     <PageShell size="wide" className="flex min-h-0 flex-1 flex-col space-y-6 overflow-hidden">
-      <header className="shrink-0 pt-2">
+      <PageHeader>
         <h1 className="type-headline sm:type-display text-foreground">Calls</h1>
         <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="type-body-sm text-muted-foreground">
@@ -129,7 +129,7 @@ export function CallsListClient() {
           </p>
           {hasImport && <CallsViewToggle view={view} onChange={setView} />}
         </div>
-      </header>
+      </PageHeader>
 
       {!hasImport ? (
         <EmptyState

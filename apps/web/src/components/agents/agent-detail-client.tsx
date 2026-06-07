@@ -9,6 +9,7 @@ import { Card, CardContent } from "@dc-copilot/ui/components/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import { AgentActivityFeed } from "@/components/agents/agent-activity-feed";
 import { AgentRunTable } from "@/components/agents/agent-run-table";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { ModelPolicyBadge } from "@/components/agents/model-policy-badge";
 import { CostGaugeBar } from "@/components/agents/cost-gauge-bar";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
@@ -93,39 +94,41 @@ export function AgentDetailClient({ agentId }: { agentId: AgentId }) {
   ];
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-2">
-        <Link
-          href="/agents"
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Agents
-        </Link>
-        <span className="text-muted-foreground">/</span>
-        <span className="text-sm font-medium">{meta.display_name}</span>
-      </div>
-
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold">{meta.display_name}</h1>
-            <Badge variant="outline" className="text-xs font-medium capitalize">
-              {health}
-            </Badge>
-          </div>
-          <p className="text-sm text-muted-foreground max-w-2xl">{meta.purpose}</p>
-          <p className="text-xs text-muted-foreground font-mono">
-            Operations: {meta.operations.join(", ")}
-          </p>
+    <PageShell size="wide">
+      <PageHeader className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/agents"
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Agents
+          </Link>
+          <span className="text-muted-foreground">/</span>
+          <span className="text-sm font-medium">{meta.display_name}</span>
         </div>
-        <Link href={`/agents/${agentId}/config`}>
-          <Button variant="outline" className="gap-2 shrink-0">
-            <Settings className="h-4 w-4" />
-            Configure
-          </Button>
-        </Link>
-      </div>
+
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold">{meta.display_name}</h1>
+              <Badge variant="outline" className="text-xs font-medium capitalize">
+                {health}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground max-w-2xl">{meta.purpose}</p>
+            <p className="text-xs text-muted-foreground font-mono">
+              Operations: {meta.operations.join(", ")}
+            </p>
+          </div>
+          <Link href={`/agents/${agentId}/config`}>
+            <Button variant="outline" className="gap-2 shrink-0">
+              <Settings className="h-4 w-4" />
+              Configure
+            </Button>
+          </Link>
+        </div>
+      </PageHeader>
 
       {modelPolicy && (
         <div className="flex items-center gap-6 flex-wrap">
@@ -176,6 +179,6 @@ export function AgentDetailClient({ agentId }: { agentId: AgentId }) {
           )}
         </TabsContent>
       </Tabs>
-    </div>
+    </PageShell>
   );
 }

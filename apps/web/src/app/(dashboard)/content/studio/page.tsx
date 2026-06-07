@@ -17,6 +17,7 @@ import {
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { Input } from "@dc-copilot/ui/components/input";
 import { Label } from "@dc-copilot/ui/components/label";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import {
   useCreateStudioProject,
   useDeleteStudioProject,
@@ -148,8 +149,8 @@ function ContentStudioPageInner() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <PageShell>
+      <PageHeader className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Content Studio</h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -165,7 +166,7 @@ function ContentStudioPageInner() {
             New project
           </Button>
         </div>
-      </div>
+      </PageHeader>
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading projects…</p>
@@ -273,7 +274,7 @@ function ContentStudioPageInner() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 }
 

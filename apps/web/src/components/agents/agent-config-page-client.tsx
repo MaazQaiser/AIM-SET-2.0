@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { AgentConfigForm } from "@/components/agents/agent-config-form";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { useAgentConfig, useSaveAgentConfig } from "@/lib/data/agent-config-hooks";
 import type { AgentConfig, AgentId } from "@/types/agents";
 
@@ -28,32 +29,34 @@ export function AgentConfigPageClient({ agentId, label }: AgentConfigPageClientP
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl mx-auto">
-      <div className="flex items-center gap-2">
-        <Link
-          href="/agents"
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Agents
-        </Link>
-        <span className="text-muted-foreground">/</span>
-        <Link
-          href={`/agents/${agentId}`}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {label}
-        </Link>
-        <span className="text-muted-foreground">/</span>
-        <span className="text-sm font-medium">Configuration</span>
-      </div>
+    <PageShell size="narrow">
+      <PageHeader className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/agents"
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Agents
+          </Link>
+          <span className="text-muted-foreground">/</span>
+          <Link
+            href={`/agents/${agentId}`}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {label}
+          </Link>
+          <span className="text-muted-foreground">/</span>
+          <span className="text-sm font-medium">Configuration</span>
+        </div>
 
-      <div>
-        <h1 className="text-2xl font-semibold">{label} — Configuration</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Model policy, cost caps, throttle, and prompts from this repo. Settings are saved per tenant and apply on the next agent run.
-        </p>
-      </div>
+        <div>
+          <h1 className="text-2xl font-semibold">{label} — Configuration</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Model policy, cost caps, throttle, and prompts from this repo. Settings are saved per tenant and apply on the next agent run.
+          </p>
+        </div>
+      </PageHeader>
 
       {isLoading || (isFetching && !data) ? (
         <p className="text-sm text-muted-foreground">Loading agent settings…</p>
@@ -91,6 +94,6 @@ export function AgentConfigPageClient({ agentId, label }: AgentConfigPageClientP
           />
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

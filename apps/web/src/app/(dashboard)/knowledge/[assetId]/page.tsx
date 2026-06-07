@@ -7,6 +7,7 @@ import { ChevronLeft, RefreshCw, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { KbAssetPreview } from "@/components/knowledge/kb-asset-preview";
 import { KbFileFormatBadge } from "@/components/knowledge/kb-file-format-badge";
 import { useKbAsset } from "@/lib/data/hooks";
@@ -18,22 +19,24 @@ export default function KnowledgeAssetPage({ params }: { params: Promise<{ asset
 
   if (isLoading) {
     return (
-      <div className="p-6 flex items-center gap-2 text-muted-foreground">
+      <PageShell size="wide" className="flex items-center gap-2 text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
         Loading…
-      </div>
+      </PageShell>
     );
   }
 
   if (!asset) {
     return (
-      <div className="p-6 space-y-4 max-w-5xl mx-auto">
-        <Link href="/content?tab=library" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="h-4 w-4" />
-          Knowledge Base
-        </Link>
+      <PageShell size="wide">
+        <PageHeader>
+          <Link href="/content?tab=library" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <ChevronLeft className="h-4 w-4" />
+            Knowledge Base
+          </Link>
+        </PageHeader>
         <p className="text-muted-foreground">Asset not found or could not be loaded.</p>
-      </div>
+      </PageShell>
     );
   }
 
@@ -59,37 +62,39 @@ export default function KnowledgeAssetPage({ params }: { params: Promise<{ asset
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      <Link href="/content?tab=library" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ChevronLeft className="h-4 w-4" />
-        Knowledge Base
-      </Link>
+    <PageShell size="wide">
+      <PageHeader className="space-y-3">
+        <Link href="/content?tab=library" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="h-4 w-4" />
+          Knowledge Base
+        </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 space-y-2">
-          <h1 className="text-2xl font-semibold truncate">{asset.title}</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <KbFileFormatBadge fileName={asset.fileName} mimeType={asset.mimeType} />
-            <span className="text-xs text-muted-foreground capitalize">{asset.type} · v{asset.version}</span>
-            {asset.status && asset.status !== "ready" && (
-              <Badge variant="outline" className="capitalize text-[10px]">
-                {asset.status}
-              </Badge>
-            )}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 space-y-2">
+            <h1 className="text-2xl font-semibold truncate">{asset.title}</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <KbFileFormatBadge fileName={asset.fileName} mimeType={asset.mimeType} />
+              <span className="text-xs text-muted-foreground capitalize">{asset.type} · v{asset.version}</span>
+              {asset.status && asset.status !== "ready" && (
+                <Badge variant="outline" className="capitalize text-[10px]">
+                  {asset.status}
+                </Badge>
+              )}
+            </div>
+            {asset.fileName && <p className="text-xs text-muted-foreground">{asset.fileName}</p>}
           </div>
-          {asset.fileName && <p className="text-xs text-muted-foreground">{asset.fileName}</p>}
+          <div className="flex gap-2 shrink-0">
+            <Button variant="outline" size="sm" onClick={() => void onReEmbed()}>
+              <RefreshCw className="h-4 w-4" />
+              Re-embed
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => void onDelete()}>
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2 shrink-0">
-          <Button variant="outline" size="sm" onClick={() => void onReEmbed()}>
-            <RefreshCw className="h-4 w-4" />
-            Re-embed
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => void onDelete()}>
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </Button>
-        </div>
-      </div>
+      </PageHeader>
 
       <KbAssetPreview asset={asset} />
 
@@ -105,6 +110,6 @@ export default function KnowledgeAssetPage({ params }: { params: Promise<{ asset
           </Badge>
         ))}
       </div>
-    </div>
+    </PageShell>
   );
 }

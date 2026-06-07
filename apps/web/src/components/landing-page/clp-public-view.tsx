@@ -45,26 +45,28 @@ export function ClpPublicView({
 
   return (
     <div className={cn("min-h-screen", preview && embedded && "rounded-xl border")}>
-      <header className="border-b bg-card px-6 py-8">
-        <p className="text-xs text-muted-foreground">Lead hub</p>
-        <h1 className="text-2xl font-semibold mt-1">{branding.accountName}</h1>
-        {branding.leadName && (
-          <p className="text-muted-foreground mt-1">Prepared for {branding.leadName}</p>
-        )}
-      </header>
+      <div className="sticky top-0 z-20 border-b bg-card/95 backdrop-blur">
+        <header className="px-6 py-8">
+          <p className="text-xs text-muted-foreground">Lead hub</p>
+          <h1 className="text-2xl font-semibold mt-1">{branding.accountName}</h1>
+          {branding.leadName && (
+            <p className="text-muted-foreground mt-1">Prepared for {branding.leadName}</p>
+          )}
+        </header>
 
-      <nav className="sticky top-0 z-10 border-b bg-card/95 backdrop-blur px-6 py-2 flex gap-4 text-sm overflow-x-auto">
-        {sections.map((s) => (
-          <a key={s.id} href={`#${s.id}`} className="text-muted-foreground hover:text-foreground whitespace-nowrap">
-            {sectionTitle(s)}
-          </a>
-        ))}
-        {proposal && (
-          <a href="#proposal" className="text-muted-foreground hover:text-foreground" onClick={() => onProposalOpen?.()}>
-            Proposal
-          </a>
-        )}
-      </nav>
+        <nav className="flex gap-4 overflow-x-auto border-t px-6 py-2 text-sm">
+          {sections.map((s) => (
+            <a key={s.id} href={`#${s.id}`} className="text-muted-foreground hover:text-foreground whitespace-nowrap">
+              {sectionTitle(s)}
+            </a>
+          ))}
+          {proposal && (
+            <a href="#proposal" className="text-muted-foreground hover:text-foreground" onClick={() => onProposalOpen?.()}>
+              Proposal
+            </a>
+          )}
+        </nav>
+      </div>
 
       <main className="max-w-3xl mx-auto px-6 py-8 space-y-10">
         {sections.map((section) => (

@@ -55,7 +55,7 @@ describe("resolveContextualGroupTitle", () => {
 });
 
 describe("extractIndustryFromGap", () => {
-  it("prefers call industry over neededFor", () => {
+  it("prefers asset-specific neededFor over broad call industry", () => {
     expect(
       extractIndustryFromGap(
         gap({
@@ -65,7 +65,7 @@ describe("extractIndustryFromGap", () => {
           neededFor: "Anchor the conversation for Retail.",
         })
       )
-    ).toBe("Healthcare");
+    ).toBe("Retail");
   });
 });
 

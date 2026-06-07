@@ -4,6 +4,7 @@ import { use } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { useLandingPageActivity } from "@/lib/data/clp-hooks";
 import { formatDistanceToNow } from "date-fns";
 
@@ -16,15 +17,15 @@ export default function LandingPageActivityPage({ params }: PageParams) {
   const { data, isLoading } = useLandingPageActivity(callId);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
+    <PageShell size="wide">
+      <PageHeader className="flex items-center gap-3">
         <Button asChild variant="ghost" size="icon">
           <Link href={`/calls/${callId}/post-dc`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <h1 className="text-xl font-semibold">Landing page activity</h1>
-      </div>
+      </PageHeader>
 
       {isLoading && <p className="text-muted-foreground text-sm">Loading…</p>}
 
@@ -67,7 +68,7 @@ export default function LandingPageActivityPage({ params }: PageParams) {
           ))}
         </ul>
       </section>
-    </div>
+    </PageShell>
   );
 }
 

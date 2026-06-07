@@ -19,7 +19,7 @@ import { Card, CardContent } from "@dc-copilot/ui/components/card";
 import { FilterChip } from "@dc-copilot/ui/components/chip";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { SearchInput } from "@dc-copilot/ui/components/search-input";
-import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { useKbProjects } from "@/lib/data/hooks";
 import { cn } from "@/lib/cn";
 import type { KBProject } from "@/types";
@@ -270,7 +270,7 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
   const content = (
     <div className={cn("space-y-5", embedded && "mt-1")}>
       {!embedded && (
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <PageHeader className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Project repo</h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -283,7 +283,7 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
               Knowledge Base
             </Link>
           </Button>
-        </div>
+        </PageHeader>
       )}
 
       <ProjectRepoStats projects={projects} />

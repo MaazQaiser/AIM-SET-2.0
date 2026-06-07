@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@dc-c
 import { Button } from "@dc-copilot/ui/components/button";
 import { DataTable } from "@dc-copilot/ui/components/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
-import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { AeNotificationPrefs } from "@/components/settings/ae-notification-prefs";
 import { DcNotesCsvImport } from "@/components/settings/dc-notes-csv-import";
 import { IntegrationsTab } from "@/components/integrations/integrations-tab";
@@ -36,7 +36,7 @@ const memberColumns: ColumnDef<MemberRow>[] = [
 export default function SettingsPage() {
   return (
     <PageShell>
-      <div>
+      <PageHeader>
         <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Team and personal preferences ·{" "}
@@ -44,7 +44,7 @@ export default function SettingsPage() {
             Governance &amp; AI cost →
           </Link>
         </p>
-      </div>
+      </PageHeader>
 
       <Tabs defaultValue="integrations">
         <TabsList>
