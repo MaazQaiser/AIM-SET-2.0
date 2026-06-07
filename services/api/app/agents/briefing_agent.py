@@ -76,8 +76,7 @@ def run_daily_briefing(
     """Generate a daily briefing paragraph; falls back to template when LLM unavailable."""
     settings = get_settings()
     fallback = _fallback_paragraph(context)
-    api_key = settings.llm_api_key or None
-    if not api_key:
+    if not settings.openai_configured:
         return {
             "paragraph": fallback,
             "source": "template",
@@ -93,11 +92,11 @@ def run_daily_briefing(
     user = json.dumps(context, indent=2, default=str)
 
     try:
-        completion = LlmClient(api_key=api_key).complete(
+        completion = LlmClient(openai_api_key=settings.openai_api_key or None).complete(
             system=system,
             user=user,
-            model=model_policy.get("model_name") or "claude-sonnet-4-20250514",
-            fallback_model=model_policy.get("fallback_model_name") or "claude-haiku-4-5-20251001",
+            model=model_policy.get("model_name") or "gpt-5.4-mini",
+            fallback_model=model_policy.get("fallback_model_name") or "gpt-5.4-mini",
             max_tokens=400,
         )
         text = (completion.text or "").strip()

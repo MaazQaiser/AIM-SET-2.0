@@ -192,10 +192,10 @@ def _model_policy(agent_id: str) -> Dict[str, Any]:
         }
     if agent_id in ("workflow", "post_dc"):
         return {
-            "primary": "opus",
-            "fallback": "sonnet",
-            "model_name": "claude-opus-4-1-20250805",
-            "fallback_model_name": "claude-sonnet-4-20250514",
+            "primary": "mini",
+            "fallback": "mini",
+            "model_name": "gpt-5.4-mini",
+            "fallback_model_name": "gpt-5.4-mini",
         }
     if agent_id == "live-call":
         return {

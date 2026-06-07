@@ -81,7 +81,7 @@ def assist_template_edit(
     validate_template_html(current_html, current_css)
 
     runtime = get_content_generation_runtime(ctx)
-    model = _sonnet_model(runtime)
+    model = _chat_model(runtime)
     system = (
         "You are a precise HTML/CSS template editor for a sales content studio. "
         "Modify the provided template according to the user's instruction. "
@@ -105,12 +105,13 @@ def assist_template_edit(
         ensure_ascii=False,
     )
 
-    completion = LlmClient(api_key=get_settings().llm_api_key or None).complete(
+    settings = get_settings()
+    completion = LlmClient(openai_api_key=settings.openai_api_key or None).complete(
         system=system,
         user=user,
         max_tokens=4096,
         model=model,
-        fallback_model=runtime["fallback_model_name"],
+        fallback_model=runtime.get("fallback_model_name") or "gpt-5.4-mini",
     )
     data = _parse_json_object(completion.text)
     if not data:
@@ -176,12 +177,12 @@ def _parse_json_object(text: str) -> Dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
-def _sonnet_model(runtime: Dict[str, Any]) -> str:
-    for key in ("fallback_model_name", "model_name"):
+def _chat_model(runtime: Dict[str, Any]) -> str:
+    for key in ("model_name", "fallback_model_name"):
         model = str(runtime.get(key) or "")
-        if "sonnet" in model.lower():
+        if model.startswith("gpt-"):
             return model
-    return "claude-sonnet-4-20250514"
+    return "gpt-5.4-mini"
 
 
 def _fallback_template_edit(html: str, css: str, instruction: str) -> Dict[str, str]:

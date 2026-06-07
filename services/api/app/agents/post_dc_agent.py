@@ -2074,9 +2074,9 @@ def run_post_dc_pipeline(
     settings = get_settings()
     cfg = get_agent_config_repository().get_config(ctx, "post_dc")
     model_policy = cfg.get("model_policy") or {}
-    model = model_policy.get("model_name") or "claude-sonnet-4-20250514"
-    fallback = model_policy.get("fallback_model_name") or "claude-sonnet-4-20250514"
-    llm = LlmClient(api_key=settings.llm_api_key or None)
+    model = model_policy.get("model_name") or "gpt-5.4-mini"
+    fallback = model_policy.get("fallback_model_name") or "gpt-5.4-mini"
+    llm = LlmClient(openai_api_key=settings.openai_api_key or None)
 
     account_name = _account_name(call, pre_dc_fields, call_id)
     transcript_excerpt = _transcript_excerpt(transcript_events)
@@ -2157,7 +2157,7 @@ def run_post_dc_pipeline(
     coaching_prompt = resolve_prompt(cfg, "coaching", "post_dc/coaching.txt")
 
     summary_json: Dict[str, Any] = {}
-    if settings.anthropic_configured:
+    if settings.openai_configured:
         completion = llm.complete(
             system=summary_prompt,
             user=json.dumps(context, ensure_ascii=False),
@@ -2201,7 +2201,7 @@ def run_post_dc_pipeline(
     )
 
     email_json: Dict[str, Any] = {}
-    if settings.anthropic_configured:
+    if settings.openai_configured:
         email_context = {
             **context,
             "summary": summary_json,
@@ -2276,7 +2276,7 @@ def run_post_dc_pipeline(
     )
 
     scorecard = _scorecard_fallback(discovery_snapshot, live_snapshot, pod_talk_time)
-    if settings.anthropic_configured:
+    if settings.openai_configured:
         coaching_context = {
             **context,
             "summary": summary_json,

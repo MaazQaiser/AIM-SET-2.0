@@ -895,9 +895,9 @@ def run_pre_dc_pipeline(
     plan_prompt = resolve_prompt(cfg, "artifact_plan", "workflow/artifact_plan/v1.0.0.md")
     fulfill_prompt = resolve_prompt(cfg, "artifact_fulfill", "workflow/artifact_fulfill/v1.0.0.md")
 
-    llm = LlmClient(api_key=settings.llm_api_key or None)
-    model = model_policy.get("model_name") or "claude-sonnet-4-20250514"
-    fallback = model_policy.get("fallback_model_name") or "claude-sonnet-4-20250514"
+    llm = LlmClient(openai_api_key=settings.openai_api_key or None)
+    model = model_policy.get("model_name") or "gpt-5.4-mini"
+    fallback = model_policy.get("fallback_model_name") or "gpt-5.4-mini"
 
     fields_blob = json.dumps(fields, ensure_ascii=False)
     total_tokens = 0
@@ -906,7 +906,7 @@ def run_pre_dc_pipeline(
     model_used = "heuristic"
     summary_sections: List[Dict[str, str]] = []
 
-    if settings.anthropic_configured:
+    if settings.openai_configured:
         summary_user = f"Account: {account_name}\nCall ID: {call_id}\nTrigger: {trigger}\nCSV row:\n{fields_blob}"
         summary_completion = llm.complete(
             system=summary_prompt,
@@ -945,7 +945,7 @@ def run_pre_dc_pipeline(
     hits, _ = _kb_search(ctx, kb_query, limit=6)
 
     fulfillments: List[Dict[str, Any]] = []
-    if settings.anthropic_configured and artifact_plan:
+    if settings.openai_configured and artifact_plan:
         per_artifact_hits: List[Dict[str, Any]] = []
         for art in artifact_plan[:6]:
             art_hits, _ = _kb_search(

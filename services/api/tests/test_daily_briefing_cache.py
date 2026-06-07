@@ -14,7 +14,7 @@ CTX = TenantContext(tenant_id="t-brief-cache", user_id="u1")
 
 
 def test_daily_briefing_post_caches_without_refresh(monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("OPENAI_API_KEY", "")
     from app.config import get_settings
 
     get_settings.cache_clear()
@@ -50,7 +50,7 @@ def test_daily_briefing_post_caches_without_refresh(monkeypatch):
 
 
 def test_daily_briefing_refresh_regenerates(monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("OPENAI_API_KEY", "")
     from app.config import get_settings
 
     get_settings.cache_clear()
