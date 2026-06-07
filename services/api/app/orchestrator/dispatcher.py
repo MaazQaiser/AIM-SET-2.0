@@ -23,7 +23,7 @@ from app.domain.content_studio_repository import get_content_studio_repository
 from app.domain.agent_runs_repository import get_agent_runs_repository
 from app.domain.live_call_repository import get_live_call_repository
 from app.domain.memory_store import get_memory_store
-from app.agents.live_call_agent import bot_chat_response, build_call_agent_handoff
+from app.agents.live_call_agent import build_call_agent_handoff
 from app.agents.sales_copilot_agent import copilot_chat_response
 from app.services.content_export_service import export_revision
 from app.services.template_ingest_service import process_template_ingest
@@ -269,8 +269,18 @@ class Orchestrator:
         from app.domain.live_call_session import clear_live_session
         from app.domain.live_call_repository import get_live_call_repository
 
-        _, clerk_key = resolve_kb_tenant(ctx)
-        live_snapshot = clear_live_session(clerk_key, call_id)
+        tenant_keys: List[str] = []
+        try:
+            _, clerk_key = resolve_kb_tenant(ctx)
+            tenant_keys.append(clerk_key)
+        except Exception:
+            pass
+        tenant_keys.append(ctx.clerk_org_id or ctx.tenant_id or ctx.user_id or "local-dev")
+        live_snapshot = None
+        for clerk_key in dict.fromkeys(tenant_keys):
+            live_snapshot = clear_live_session(clerk_key, call_id)
+            if live_snapshot:
+                break
         if live_snapshot:
             self.calls.save_live_signals(ctx, call_id, live_snapshot)
 
@@ -352,12 +362,16 @@ class Orchestrator:
         history: Optional[List[Dict[str, str]]] = None,
         *,
         call_id: Optional[str] = None,
+        surface: str = "global",
+        context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         env = copilot_chat_response(
             ctx,
             message,
             history,
             call_id=call_id,
+            surface=surface,
+            context=context,
             orchestrator=self,
         )
         validate_envelope(env)
@@ -370,6 +384,9 @@ class Orchestrator:
             "citations": [c.model_dump() for c in env.citations],
             "actions_taken": env.result.get("actions_taken") or [],
             "call_exports": env.result.get("call_exports") or [],
+            "suggestions": env.result.get("suggestions") or [],
+            "confidence": env.confidence,
+            "missing_evidence": env.result.get("missing_evidence") or [],
         }
 
     def dispatch_bot_chat(
@@ -381,17 +398,28 @@ class Orchestrator:
         mode: str = "group",
         sender_name: Optional[str] = None,
         sender_role: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         from app.domain.live_call_repository import get_live_call_repository
         from app.orchestrator.live_broadcast import envelope_to_ws_messages
 
-        env = bot_chat_response(
+        live_context: Dict[str, Any] = {
+            "mode": mode,
+            "senderName": sender_name,
+            "senderRole": sender_role,
+            "private": mode == "direct",
+        }
+        if isinstance(context, dict):
+            live_context.update(context)
+
+        env = copilot_chat_response(
             ctx,
-            call_id,
             message,
-            mode=mode,
-            sender_name=sender_name,
-            sender_role=sender_role,
+            history=None,
+            call_id=call_id,
+            surface="live_dc",
+            context=live_context,
+            orchestrator=self,
         )
         validate_envelope(env)
         self._log_run(ctx, env)
@@ -405,7 +433,26 @@ class Orchestrator:
             trace_id=env.trace_id,
             suggestion_id=sid,
         )
-        ws_messages = envelope_to_ws_messages(env, suggestion_id=sid, shown_at=None)
+        if env.operation == "bot_chat_response":
+            broadcast_env = env
+        else:
+            broadcast_env = AgentEnvelope(
+                agent=env.agent,
+                operation="bot_chat_response",
+                result={
+                    "answer": env.result.get("answer"),
+                    "asset_refs": [
+                        c.source_id
+                        for c in env.citations
+                        if c.source_type == "kb_document" and c.source_id
+                    ],
+                },
+                citations=env.citations,
+                confidence=env.confidence,
+                cost=env.cost,
+                trace_id=env.trace_id,
+            )
+        ws_messages = envelope_to_ws_messages(broadcast_env, suggestion_id=sid, shown_at=None)
         if mode == "group":
             for msg in ws_messages:
                 if msg.get("type") == "bot_chat":
@@ -418,6 +465,11 @@ class Orchestrator:
             "content": env.result.get("answer"),
             "message_id": sid,
             "citations": [c.model_dump() for c in env.citations],
+            "actions_taken": env.result.get("actions_taken") or [],
+            "call_exports": env.result.get("call_exports") or [],
+            "suggestions": env.result.get("suggestions") or [],
+            "confidence": env.confidence,
+            "missing_evidence": env.result.get("missing_evidence") or [],
             "ws_messages": ws_messages if mode == "group" else [],
         }
 

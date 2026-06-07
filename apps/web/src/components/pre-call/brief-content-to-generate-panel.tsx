@@ -38,7 +38,7 @@ export function BriefContentToGeneratePanel({ items }: BriefContentToGeneratePan
           "If the workflow planned an asset but KB has no strong match, it lists that content here and explains why creating it would improve call prep.",
       }}
       headerExtra={
-        <span className="text-xs text-muted-foreground shrink-0">
+        <span className="type-caption text-muted-foreground shrink-0">
           {gaps.length} gap{gaps.length === 1 ? "" : "s"}
         </span>
       }
@@ -65,7 +65,7 @@ export function BriefContentToGeneratePanel({ items }: BriefContentToGeneratePan
                   <Badge
                     variant="outline"
                     className={cn(
-                      "text-[10px]",
+                      "type-caption",
                       item.status === "missing"
                         ? "border-rose-200 bg-rose-50 text-rose-950"
                         : "border-amber-200 bg-amber-50 text-amber-950"

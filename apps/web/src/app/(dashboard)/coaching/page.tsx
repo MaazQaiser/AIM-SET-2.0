@@ -36,8 +36,8 @@ export default function CoachingPage() {
   return (
     <PageShell className="space-y-8">
       <PageHeader>
-        <h1 className="text-2xl font-semibold text-foreground">Coaching</h1>
-        <p className="text-sm text-muted-foreground mt-1">Team performance</p>
+        <h1 className="type-page-title text-foreground">Coaching</h1>
+        <p className="mt-1 type-body-sm text-muted-foreground">Team performance</p>
       </PageHeader>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -49,7 +49,7 @@ export default function CoachingPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Individual scorecards</CardTitle>
+          <CardTitle>Individual scorecards</CardTitle>
         </CardHeader>
         <CardContent>
           {teamRows.length > 0 ? (
@@ -72,7 +72,7 @@ export default function CoachingPage() {
       <WeeklyPatterns />
 
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-foreground">Coaching recommendations</h2>
+        <h2 className="type-section-title text-foreground">Coaching recommendations</h2>
         {insights.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {insights.map((insight) => (

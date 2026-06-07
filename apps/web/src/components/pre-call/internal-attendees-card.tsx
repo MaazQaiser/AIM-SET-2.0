@@ -67,7 +67,7 @@ function InternalAttendeeDetailDialog({
               </DialogDescription>
               <span
                 className={cn(
-                  "inline-flex mt-2 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                  "inline-flex mt-2 rounded-full border px-2 py-0.5 type-caption font-medium",
                   role.className
                 )}
               >
@@ -80,11 +80,11 @@ function InternalAttendeeDetailDialog({
         <section className="pt-2">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            <h4 className="text-[10px] font-semibold text-muted-foreground">
+            <h4 className="type-caption font-medium text-muted-foreground">
               Why they&apos;re on this call
             </h4>
           </div>
-          <p className="text-sm text-foreground/90 leading-relaxed">{attendee.fitReason}</p>
+          <p className="type-body text-foreground/90 leading-relaxed">{attendee.fitReason}</p>
         </section>
       </DialogContent>
     </Dialog>
@@ -112,7 +112,7 @@ export function InternalAttendeesCard({
             "The pod list is selected from account context such as industry, needs, tech stack, and delivery angle, so the right internal roles are prepared for the call.",
         }}
         headerExtra={
-          <span className="text-xs text-muted-foreground shrink-0">{attendees.length} pod</span>
+          <span className="type-caption text-muted-foreground shrink-0">{attendees.length} pod</span>
         }
       >
         <ul className="divide-y divide-border">
@@ -134,18 +134,18 @@ export function InternalAttendeesCard({
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-semibold text-foreground">{member.name}</p>
+                    <p className="type-panel-title text-foreground">{member.name}</p>
                     <span
                       className={cn(
-                        "inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
+                        "inline-flex rounded-full border px-1.5 py-0.5 type-caption font-medium",
                         role.className
                       )}
                     >
                       {role.label}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{member.designation}</p>
-                  <p className="text-xs text-foreground/80 leading-snug mt-1.5 line-clamp-2">
+                  <p className="type-caption text-muted-foreground mt-0.5">{member.designation}</p>
+                  <p className="type-label text-foreground/80 leading-snug mt-1.5 line-clamp-2">
                     {member.fitReason}
                   </p>
                 </div>
@@ -153,7 +153,7 @@ export function InternalAttendeesCard({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="shrink-0 h-8 text-xs mt-0.5"
+                  className="shrink-0 h-8 type-label mt-0.5"
                   onClick={() => setSelectedId(member.id)}
                 >
                   Details

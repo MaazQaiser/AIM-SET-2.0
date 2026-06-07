@@ -28,8 +28,8 @@ export function EmptyState({ icon: Icon, title, description, action, className }
         </div>
       )}
       <div className="space-y-1">
-        <h3 className="text-sm font-medium text-foreground">{title}</h3>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+        <h3 className="type-panel-title text-foreground">{title}</h3>
+        {description && <p className="type-body-sm text-muted-foreground">{description}</p>}
       </div>
       {action && (
         action.href ? (

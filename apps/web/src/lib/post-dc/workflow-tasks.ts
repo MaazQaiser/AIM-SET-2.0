@@ -23,6 +23,8 @@ export interface PostDcWorkflowTask {
   actionLabel: string;
   scrollTarget?: string;
   actionDisabled?: boolean;
+  /** Informational rows, e.g. coming-soon features, do not affect checklist progress. */
+  countsTowardProgress?: boolean;
   badge?: string;
   status: PostDcWorkflowTaskStatus;
 }
@@ -47,7 +49,7 @@ function withStatus(
 ): PostDcWorkflowTask {
   return {
     ...task,
-    status: statusOverrides?.[task.id] ?? "pending",
+    status: task.countsTowardProgress === false ? "pending" : statusOverrides?.[task.id] ?? "pending",
   };
 }
 
@@ -160,6 +162,7 @@ export function buildPostDcWorkflowTasks({
           hint: "Scope and engagement model",
           actionLabel: "Preview",
           actionDisabled: true,
+          countsTowardProgress: false,
           badge: "Coming soon",
           scrollTarget: "post.clp_status",
         },
@@ -171,10 +174,19 @@ export function buildPostDcWorkflowTasks({
   return tasks;
 }
 
+export function workflowTasksForProgress(tasks: PostDcWorkflowTask[]): PostDcWorkflowTask[] {
+  return tasks.filter((t) => t.countsTowardProgress !== false);
+}
+
+export function countWorkflowTasksTotal(tasks: PostDcWorkflowTask[]): number {
+  return workflowTasksForProgress(tasks).length;
+}
+
 export function countWorkflowTasksDone(tasks: PostDcWorkflowTask[]): number {
-  return tasks.filter((t) => t.status === "done").length;
+  return workflowTasksForProgress(tasks).filter((t) => t.status === "done").length;
 }
 
 export function workflowTasksComplete(tasks: PostDcWorkflowTask[]): boolean {
-  return tasks.length > 0 && tasks.every((t) => t.status === "done" || t.status === "skipped");
+  const countedTasks = workflowTasksForProgress(tasks);
+  return countedTasks.length > 0 && countedTasks.every((t) => t.status === "done" || t.status === "skipped");
 }

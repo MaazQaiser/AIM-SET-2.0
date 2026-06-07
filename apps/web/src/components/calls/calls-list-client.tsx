@@ -110,6 +110,7 @@ export function CallsListClient() {
   const hasImport = useDcImportsStore((s) => s.preDcRecords.length > 0);
   const [view, setView] = useState<CallsViewMode>("list");
 
+  const hasCalls = calls.length > 0;
   const upcoming = calls.filter((c) => c.status === "upcoming" || c.status === "live");
   const past = calls.filter((c) => c.status === "completed" || c.status === "no-show");
 
@@ -120,18 +121,20 @@ export function CallsListClient() {
   return (
     <PageShell size="wide" className="flex min-h-0 flex-1 flex-col space-y-6 overflow-hidden">
       <PageHeader>
-        <h1 className="type-headline sm:type-display text-foreground">Calls</h1>
+        <h1 className="type-page-title text-foreground">Calls</h1>
         <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="type-body-sm text-muted-foreground">
             {hasImport
               ? `${calls.length} Pre-DC leads — scheduled from Discovery Call Date & Time (PKT) in your CSV`
-              : "Import Pre-DC CSV in Settings to populate discovery calls and briefs."}
+              : hasCalls
+                ? `${calls.length} discovery calls loaded from your workspace.`
+                : "Import Pre-DC CSV in Settings to populate discovery calls and briefs."}
           </p>
-          {hasImport && <CallsViewToggle view={view} onChange={setView} />}
+          {hasCalls && <CallsViewToggle view={view} onChange={setView} />}
         </div>
       </PageHeader>
 
-      {!hasImport ? (
+      {!hasCalls ? (
         <EmptyState
           icon={Phone}
           title="No leads yet"
@@ -143,19 +146,19 @@ export function CallsListClient() {
           <TabsList className="h-auto w-full shrink-0 justify-start gap-4 rounded-none border-b border-border/60 bg-transparent p-0">
             <TabsTrigger value="all">
               All
-              <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
+              <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 type-caption font-medium tabular-nums text-primary">
                 {calls.length}
               </span>
             </TabsTrigger>
             <TabsTrigger value="upcoming">
               Upcoming
-              <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium">
+              <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 type-caption font-medium tabular-nums">
                 {upcoming.length}
               </span>
             </TabsTrigger>
             <TabsTrigger value="past">
               Past
-              <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium">
+              <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 type-caption font-medium tabular-nums">
                 {past.length}
               </span>
             </TabsTrigger>

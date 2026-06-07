@@ -101,19 +101,19 @@ function AgendaRow({ item, isLast }: { item: AgendaItem; isLast?: boolean }) {
       <MeetIconChip meetingUrl={item.meetingUrl} isLive={item.status === "live"} />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="truncate text-sm font-semibold text-foreground">{item.title}</p>
+          <p className="truncate type-panel-title text-foreground">{item.title}</p>
           {item.status === "live" && (
-            <Badge variant="live" className="h-4 text-[10px]">
+            <Badge variant="live" className="h-4 type-caption">
               Live
             </Badge>
           )}
         </div>
         {item.subtitle && (
-          <p className="truncate text-xs text-muted-foreground">{item.subtitle}</p>
+          <p className="truncate type-caption text-muted-foreground">{item.subtitle}</p>
         )}
       </div>
       <div className="shrink-0 text-right">
-        <span className="text-xs font-mono text-muted-foreground">{time}</span>
+        <span className="type-mono text-muted-foreground">{time}</span>
       </div>
     </div>
   );
@@ -176,27 +176,27 @@ export function UnifiedAgenda() {
   return (
     <Card className="flex h-[380px] flex-col">
       <CardHeader className="shrink-0 pb-3 pt-5 px-5">
-        <CardTitle className="!text-[24px] !leading-[1.2] flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <Clock className="h-[18px] w-[18px] shrink-0 text-muted-foreground" />
           Your agenda
         </CardTitle>
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="mt-1 type-caption text-muted-foreground">
           Today and tomorrow — discovery calls
         </p>
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col px-5 pb-5 pt-0">
         <div className="min-h-0 flex-1 overflow-y-auto pr-0.5 space-y-4">
           {grouped.length === 0 ? (
-            <div className="rounded-lg border border-dashed py-10 px-4 text-center text-sm text-muted-foreground space-y-2">
+            <div className="space-y-2 rounded-lg border border-dashed px-4 py-10 text-center type-body-sm text-muted-foreground">
               <p>Nothing scheduled for today or tomorrow.</p>
-              <Link href="/calls" className="text-xs text-primary hover:underline">
+              <Link href="/calls" className="type-caption text-primary hover:underline">
                 View full calendar
               </Link>
             </div>
           ) : (
             grouped.map(({ day, label, items }) => (
               <section key={day.toISOString()}>
-                <h3 className="mb-2 text-xs font-semibold text-muted-foreground">
+                <h3 className="mb-2 type-label text-muted-foreground">
                   {label}
                   <span className="font-normal normal-case ml-2">
                     {format(day, "MMM d")}

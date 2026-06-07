@@ -59,9 +59,9 @@ export function SignalRoutingTable({ rules, onChange, readOnly = false }: Signal
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">Signal → Nudge Routing Rules</span>
+        <span className="type-body font-medium">Signal → Nudge Routing Rules</span>
         {!readOnly && (
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={addRule}>
+          <Button variant="outline" size="sm" className="h-7 type-label" onClick={addRule}>
             <Plus className="h-3 w-3 mr-1" />
             Add rule
           </Button>
@@ -69,7 +69,7 @@ export function SignalRoutingTable({ rules, onChange, readOnly = false }: Signal
       </div>
 
       <div className="rounded-md border divide-y overflow-hidden">
-        <div className="grid grid-cols-[2fr_1fr_1fr_auto_auto] gap-2 px-4 py-2 bg-muted/50 text-xs font-medium text-muted-foreground">
+        <div className="grid grid-cols-[2fr_1fr_1fr_auto_auto] gap-2 px-4 py-2 bg-muted/50 type-label text-muted-foreground">
           <span>Keyword pattern</span>
           <span>Nudge type</span>
           <span>Target role</span>
@@ -78,7 +78,7 @@ export function SignalRoutingTable({ rules, onChange, readOnly = false }: Signal
         </div>
 
         {local.length === 0 && (
-          <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+          <div className="px-4 py-6 text-center type-body text-muted-foreground">
             No routing rules defined
           </div>
         )}
@@ -92,10 +92,10 @@ export function SignalRoutingTable({ rules, onChange, readOnly = false }: Signal
             )}
           >
             {readOnly ? (
-              <span className="text-xs font-mono">{rule.keyword_pattern || "—"}</span>
+              <span className="type-label font-mono">{rule.keyword_pattern || "—"}</span>
             ) : (
               <Input
-                className="h-7 text-xs font-mono"
+                className="h-7 type-label font-mono"
                 value={rule.keyword_pattern}
                 placeholder="e.g. competitor|pricing"
                 onChange={(e) =>
@@ -104,15 +104,15 @@ export function SignalRoutingTable({ rules, onChange, readOnly = false }: Signal
               />
             )}
 
-            <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium w-fit", NUDGE_COLORS[rule.nudge_type])}>
+            <span className={cn("inline-flex rounded-full border px-2 py-0.5 type-caption font-medium w-fit", NUDGE_COLORS[rule.nudge_type])}>
               {rule.nudge_type.replace("_", " ")}
             </span>
 
-            <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium w-fit", ROLE_COLORS[rule.target_role])}>
+            <span className={cn("inline-flex rounded-full px-2 py-0.5 type-caption font-medium w-fit", ROLE_COLORS[rule.target_role])}>
               {rule.target_role}
             </span>
 
-            <span className="text-xs text-muted-foreground">{(rule.confidence_threshold * 100).toFixed(0)}%</span>
+            <span className="type-caption text-muted-foreground">{(rule.confidence_threshold * 100).toFixed(0)}%</span>
 
             {!readOnly && (
               <div className="flex items-center gap-1">

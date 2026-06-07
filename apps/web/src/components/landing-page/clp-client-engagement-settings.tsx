@@ -26,10 +26,10 @@ export function ClpClientEngagementSettings({
   return (
     <BriefDetailCard title="Client engagement">
       <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">
+      <p className="type-caption text-muted-foreground">
         When launched, clients can chat with you and leave comments on sections.
       </p>
-      <label className="flex items-center justify-between gap-3 text-sm cursor-pointer">
+      <label className="flex items-center justify-between gap-3 type-body cursor-pointer">
         <span>Allow live chat</span>
         <input
           type="checkbox"
@@ -39,7 +39,7 @@ export function ClpClientEngagementSettings({
           className="h-4 w-4 rounded border-border"
         />
       </label>
-      <label className="flex items-center justify-between gap-3 text-sm cursor-pointer">
+      <label className="flex items-center justify-between gap-3 type-body cursor-pointer">
         <span>Allow section comments</span>
         <input
           type="checkbox"

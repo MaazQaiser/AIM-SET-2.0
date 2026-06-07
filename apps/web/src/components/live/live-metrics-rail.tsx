@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type RefObject } from "react";
 import { ChevronDown } from "lucide-react";
 import { SignalLog } from "@/components/live/signal-log";
 import { SuggestionLog } from "@/components/live/suggestion-log";
@@ -85,13 +85,15 @@ interface LiveMetricsRailProps {
   bantInHeader?: boolean;
   /** Rendered in the scroll region when layout is copilot-panel */
   panelChildren?: React.ReactNode;
+  /** Scroll container for the copilot panel body. */
+  panelScrollRef?: RefObject<HTMLDivElement | null>;
   className?: string;
 }
 
 export function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistState | null }) {
   if (!checklist) {
     return (
-      <p className="text-xs text-muted-foreground">
+      <p className="type-caption text-muted-foreground">
         BANT signals will appear as the conversation progresses.
       </p>
     );
@@ -129,12 +131,12 @@ export function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistStat
               variant === "neutral" && "border-border bg-muted/20"
             )}
           >
-            <p className="text-[9px] font-semibold text-muted-foreground">
+            <p className="type-caption font-medium text-muted-foreground">
               {bantLabels[key]}
             </p>
             <p
               className={cn(
-                "text-[10px] font-bold mt-0.5",
+                "type-caption font-bold mt-0.5",
                 variant === "good" && "text-success",
                 variant === "warn" && "text-destructive",
                 variant === "neutral" && "text-foreground"
@@ -143,7 +145,7 @@ export function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistStat
               {bantStatusLabel(status, key)}
             </p>
             {evidence?.text && (
-              <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2 leading-snug">
+              <p className="type-caption text-muted-foreground mt-1 line-clamp-2 leading-snug">
                 {evidence.sentiment === "negative" ? "Concern: " : ""}
                 {evidence.text}
               </p>
@@ -183,8 +185,8 @@ function SentimentMetricRow({
       data-sentiment-label={normalizedDataLabel}
       data-sentiment-tone={tone}
     >
-      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
-      <span className={cn("min-w-0 truncate text-right text-xs font-semibold", scoreTextClass(score, tone))}>
+      <span className="shrink-0 type-caption text-muted-foreground">{label}</span>
+      <span className={cn("min-w-0 truncate text-right type-label", scoreTextClass(score, tone))}>
         {value ?? formatSentimentScore(score)}
       </span>
     </div>
@@ -206,11 +208,11 @@ function KeywordPills({ keywords }: { keywords: { term: string; count: number }[
       {keywords.map(({ term, count }) => (
         <span
           key={term}
-          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted/40 py-0.5 pl-2 pr-1.5 text-[11px] font-medium text-foreground"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted/40 py-0.5 pl-2 pr-1.5 type-caption font-medium text-foreground"
         >
           <span className="whitespace-nowrap">{term}</span>
           <span
-            className="min-w-[1.125rem] shrink-0 rounded-full bg-muted/70 px-1 text-center text-[10px] font-semibold tabular-nums text-muted-foreground"
+            className="min-w-[1.125rem] shrink-0 rounded-full bg-muted/70 px-1 text-center type-caption font-medium tabular-nums text-muted-foreground"
             aria-label={`${count} mentions`}
           >
             {count}
@@ -242,7 +244,7 @@ function KeywordsRow({
         <KeywordPills keywords={keywords} />
       </div>
     ) : (
-      <p className="text-xs text-muted-foreground">Topics appear as the call progresses.</p>
+      <p className="type-caption text-muted-foreground">Topics appear as the call progresses.</p>
     );
 
   if (layout === "stack-content") {
@@ -252,7 +254,7 @@ function KeywordsRow({
   if (layout === "stack") {
     return (
       <div className="flex min-w-0 flex-col gap-2">
-        <span className="text-xs font-semibold text-foreground">Keywords</span>
+        <span className="type-label text-foreground">Keywords</span>
         {body}
       </div>
     );
@@ -260,7 +262,7 @@ function KeywordsRow({
 
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <span className="shrink-0 text-xs font-semibold text-foreground">Keywords</span>
+      <span className="shrink-0 type-label text-foreground">Keywords</span>
       {keywords.length > 0 ? (
         <div className="min-w-0 flex-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
           <div className="flex w-max flex-nowrap items-center justify-start gap-1.5">
@@ -268,7 +270,7 @@ function KeywordsRow({
           </div>
         </div>
       ) : (
-        <p className="min-w-0 text-xs text-muted-foreground">Topics appear as the call progresses.</p>
+        <p className="min-w-0 type-caption text-muted-foreground">Topics appear as the call progresses.</p>
       )}
     </div>
   );
@@ -341,7 +343,7 @@ function SentimentSection({
   const customerCue = resolveCustomerSentimentCue(sentimentCustomer, customerSentiment);
 
   const shiftMessage = sentimentShift ? (
-    <p className="border-b border-border/50 py-2.5 text-[11px] leading-snug text-muted-foreground last:border-b-0">
+    <p className="border-b border-border/50 py-2.5 type-caption leading-snug text-muted-foreground last:border-b-0">
       Shift:{" "}
       <span className={scoreTextClass(sentimentShift.to_score)}>
         {sentimentShift.message ||
@@ -354,7 +356,7 @@ function SentimentSection({
   const decision = sentimentDecisionCue(customerCue);
   const decisionCue = (
     <p
-      className="border-b border-border/50 py-2.5 text-[11px] leading-snug text-muted-foreground last:border-b-0"
+      className="border-b border-border/50 py-2.5 type-caption leading-snug text-muted-foreground last:border-b-0"
       data-testid="sentiment-decision-cue"
       data-sentiment-decision={decision.id}
     >
@@ -382,6 +384,9 @@ function SentimentSection({
         toneOverride={repToneCue.tone}
       />
       <div className="border-b border-border/50 py-2.5 last:border-b-0">
+        <p className="mb-1 type-kicker text-muted-foreground">
+          Sentiment trend
+        </p>
         <LiveSentimentLineChart
           compact
           transcript={transcript}
@@ -402,7 +407,7 @@ function SentimentSection({
         ))}
       </div>
     ) : (
-      <p className="border-t border-border/50 py-2.5 text-xs text-muted-foreground">
+      <p className="border-t border-border/50 py-2.5 type-caption text-muted-foreground">
         Sentiment signals will appear as the conversation progresses.
       </p>
     );
@@ -422,7 +427,7 @@ function SentimentSection({
     return (
       <div className={cn("px-3 py-2.5", className)}>
         <div className="flex min-w-0 flex-col">
-          <span className="mb-2 text-xs font-semibold text-foreground">Sentiment</span>
+          <span className="mb-2 type-label text-foreground">Sentiment</span>
           {stackBody}
         </div>
       </div>
@@ -432,7 +437,7 @@ function SentimentSection({
   return (
     <div className={cn("px-3 py-2.5", className)}>
       <div className="flex min-w-0 flex-col">
-        <span className="mb-2 shrink-0 text-xs font-semibold text-foreground">Sentiment</span>
+        <span className="mb-2 shrink-0 type-label text-foreground">Sentiment</span>
         {stackBody}
       </div>
     </div>
@@ -534,8 +539,8 @@ function SentimentSignalRow({ signal }: { signal: SentimentSignal }) {
             className="mt-0.5 shrink-0"
           />
           <div className="min-w-0">
-            <p className="text-xs font-medium text-foreground">{signal.label}</p>
-            <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
+            <p className="type-label text-foreground">{signal.label}</p>
+            <p className="mt-0.5 type-caption capitalize text-muted-foreground">
               {signal.speakerName ?? signal.speakerRole}
             </p>
           </div>
@@ -551,7 +556,7 @@ function SentimentSignalRow({ signal }: { signal: SentimentSignal }) {
         )}
       </button>
       {open && signal.snippet && (
-        <p className="pb-2.5 pl-8 text-xs leading-relaxed text-muted-foreground">{signal.snippet}</p>
+        <p className="pb-2.5 pl-8 type-label leading-relaxed text-muted-foreground">{signal.snippet}</p>
       )}
     </div>
   );
@@ -592,7 +597,7 @@ export function LiveSignalLogs({ bantSignals }: { bantSignals: BantSignal[] }) {
 function UncoveredBlock({ uncovered }: { uncovered: string[] }) {
   if (uncovered.length > 0) {
     return (
-      <ul className="space-y-1.5 text-xs text-foreground">
+      <ul className="space-y-1.5 type-label text-foreground">
         {uncovered.map((item) => (
           <li key={item} className="flex gap-2 leading-snug">
             <span className="text-muted-foreground shrink-0">•</span>
@@ -602,7 +607,7 @@ function UncoveredBlock({ uncovered }: { uncovered: string[] }) {
       </ul>
     );
   }
-  return <p className="text-xs text-muted-foreground">Discovery gaps will list here.</p>;
+  return <p className="type-caption text-muted-foreground">Discovery gaps will list here.</p>;
 }
 
 export function LiveMetricsRail({
@@ -622,6 +627,7 @@ export function LiveMetricsRail({
   layout = "stack",
   bantInHeader = false,
   panelChildren,
+  panelScrollRef,
   className,
 }: LiveMetricsRailProps) {
   const keywordEntries = useMemo(
@@ -648,7 +654,10 @@ export function LiveMetricsRail({
           className
         )}
       >
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:thin]">
+        <div
+          ref={panelScrollRef}
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:thin]"
+        >
           <div className={cn("flex flex-col gap-4", liveColumnContentPadding)}>{panelChildren}</div>
         </div>
       </div>

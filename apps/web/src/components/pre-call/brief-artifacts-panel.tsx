@@ -73,7 +73,7 @@ function ArtifactGenerateButton({
   });
 
   return (
-    <Button asChild variant="ghost" size="sm" className="h-7 shrink-0 gap-1 px-2.5 text-xs font-medium">
+    <Button asChild variant="ghost" size="sm" className="h-7 shrink-0 gap-1 px-2.5 type-label">
       <Link href={href} className="inline-flex items-center gap-1">
         Generate content
         <ArrowUpRight className="h-3 w-3 shrink-0" aria-hidden />
@@ -119,7 +119,7 @@ export function BriefArtifactsPanel({
   const body = (
     <div className="space-y-4 min-w-0">
       {brief.agentStatus === "failed" && (section === "all" || section === "plan") && (
-        <p className="text-xs text-warning rounded-md border border-warning/30 bg-warning/10 px-3 py-2">
+        <p className="type-label text-warning rounded-md border border-warning/30 bg-warning/10 px-3 py-2">
           PRE-DC Workflow could not complete artifact planning. Re-import the lead or re-run from
           Agents → PRE-DC Workflow.
         </p>
@@ -128,7 +128,7 @@ export function BriefArtifactsPanel({
       {visiblePlan.length > 0 && (
         <div className="space-y-2">
           {section === "all" ? (
-            <p className="text-xs font-medium text-muted-foreground">Planned for this call</p>
+            <p className="type-label text-muted-foreground">Planned for this call</p>
           ) : null}
           <ol className="list-none space-y-3">
             {visiblePlan
@@ -152,9 +152,9 @@ export function BriefArtifactsPanel({
       {visibleFulfillment.length > 0 && (
         <div className="space-y-2">
           {section === "all" ? (
-            <p className="text-xs font-medium text-muted-foreground">Missing Artifacts</p>
+            <p className="type-label text-muted-foreground">Missing Artifacts</p>
           ) : null}
-          <p className={cn(briefMainMuted, "text-sm")}>
+          <p className={cn(briefMainMuted, "type-body")}>
             Suggested content by Sales Co-pilot for this call.
           </p>
           <ul className="space-y-3">
@@ -196,10 +196,10 @@ export function BriefArtifactsPanel({
                     </p>
                   ) : null}
                   {whyNeeded ? (
-                    <p className="text-xs text-muted-foreground line-clamp-1">{whyNeeded}</p>
+                    <p className="type-caption text-muted-foreground line-clamp-1">{whyNeeded}</p>
                   ) : null}
                   {row.assetId ? (
-                    <p className="text-[10px] font-mono text-muted-foreground">KB: {row.assetId}</p>
+                    <p className="type-caption font-mono text-muted-foreground">KB: {row.assetId}</p>
                   ) : null}
                 </li>
               );
@@ -209,7 +209,7 @@ export function BriefArtifactsPanel({
       )}
 
       {isEmpty && embedded ? (
-        <p className="text-sm text-muted-foreground">{artifactsEmptyMessage(section)}</p>
+        <p className="type-body text-muted-foreground">{artifactsEmptyMessage(section)}</p>
       ) : null}
     </div>
   );

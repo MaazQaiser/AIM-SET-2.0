@@ -28,24 +28,24 @@ export function PostDcClpStatusCard({ callId, page }: PostDcClpStatusCardProps) 
   return (
     <Card className="app-card">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
+        <CardTitle className="type-panel-title flex items-center gap-2">
           <Globe className="h-4 w-4" />
           Customer landing page
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
+      <CardContent className="space-y-3 type-body">
         {status === "none" && (
-          <p className="text-muted-foreground text-xs">
+          <p className="text-muted-foreground type-label">
             Publish a personalized page for your lead with shared materials and optional proposal.
           </p>
         )}
         {status !== "none" && (
-          <Badge variant={status === "published" ? "success" : "secondary"} className="text-[10px]">
+          <Badge variant={status === "published" ? "success" : "secondary"} className="type-caption">
             {status === "published" ? "Published" : status === "draft" ? "Draft" : "Revoked"}
           </Badge>
         )}
         {stats && status === "published" && (
-          <ul className="text-xs text-muted-foreground space-y-1">
+          <ul className="type-caption text-muted-foreground space-y-1">
             <li>{stats.uniqueVisitors} visitors</li>
             <li>{stats.documentOpens} document opens</li>
             <li>{stats.proposalOpens} proposal views</li>

@@ -53,7 +53,7 @@ export function QuickActions() {
 
   return (
     <section className="space-y-1.5">
-      <h2 className="text-sm font-semibold text-muted-foreground">
+      <h2 className="type-section-title text-muted-foreground">
         Quick actions
       </h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1.5">
@@ -81,8 +81,8 @@ export function QuickActions() {
                   >
                     <Icon className="h-4 w-4" />
                   </div>
-                  <p className="text-sm font-semibold text-foreground">{action.label}</p>
-                  <p className="text-xs text-muted-foreground leading-snug">
+                  <p className="type-panel-title text-foreground">{action.label}</p>
+                  <p className="type-caption text-muted-foreground">
                     {action.description}
                   </p>
                 </CardContent>

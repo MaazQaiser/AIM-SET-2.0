@@ -53,15 +53,15 @@ export function JiraTicketCard({ ticket, onCreate }: JiraTicketCardProps) {
           <Badge variant={ticket.status === "created" ? "success" : ticket.status === "failed" ? "destructive" : "secondary"}>
             {ticket.status === "created" ? "Created" : ticket.status === "failed" ? "Failed" : "Draft"}
           </Badge>
-          <Badge variant="outline" className="text-[10px]">
+          <Badge variant="outline" className="type-caption">
             {ticket.priority} priority
           </Badge>
           {!allBantConfirmed ? (
-            <Badge variant="warning" className="text-[10px]">
+            <Badge variant="warning" className="type-caption">
               BANT review needed
             </Badge>
           ) : (
-            <Badge variant="success" className="text-[10px]">
+            <Badge variant="success" className="type-caption">
               BANT qualified
             </Badge>
           )}
@@ -72,7 +72,7 @@ export function JiraTicketCard({ ticket, onCreate }: JiraTicketCardProps) {
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+                className="h-7 gap-1.5 px-2 type-caption text-muted-foreground"
                 onClick={() => void handleCopy()}
               >
                 {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -88,7 +88,7 @@ export function JiraTicketCard({ ticket, onCreate }: JiraTicketCardProps) {
             <span
               key={key}
               className={cn(
-                "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                "inline-flex items-center rounded-full border px-2 py-0.5 type-caption font-medium",
                 ticket.bantSnapshot[key]
                   ? "border-success/30 bg-success/10 text-success"
                   : "border-border bg-muted/40 text-muted-foreground"
@@ -100,33 +100,33 @@ export function JiraTicketCard({ ticket, onCreate }: JiraTicketCardProps) {
         </div>
 
         <div className="space-y-2">
-          <p className="text-sm font-medium text-foreground">{ticket.summary}</p>
-          <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
+          <p className="type-body font-medium text-foreground">{ticket.summary}</p>
+          <p className="whitespace-pre-wrap type-label leading-relaxed text-muted-foreground">
             {ticket.description}
           </p>
         </div>
 
         {ticket.error ? (
-          <p className="flex items-start gap-1.5 text-xs text-destructive">
+          <p className="flex items-start gap-1.5 type-label text-destructive">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {ticket.error}
           </p>
         ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
-          <p className="text-xs text-muted-foreground">
+          <p className="type-caption text-muted-foreground">
             Project {ticket.projectKey} · {ticket.issueType}
             {!allBantConfirmed ? " · Review draft before creating in Jira." : ""}
           </p>
           {ticket.status === "created" && ticket.externalUrl ? (
-            <Button asChild size="sm" variant="outline" className="h-7 text-xs">
+            <Button asChild size="sm" variant="outline" className="h-7 type-label">
               <a href={ticket.externalUrl} target="_blank" rel="noreferrer">
                 <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                 Open in Jira
               </a>
             </Button>
           ) : (
-            <Button size="sm" className="h-7 text-xs" disabled={loading} onClick={handleCreate}>
+            <Button size="sm" className="h-7 type-label" disabled={loading} onClick={handleCreate}>
               {loading ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               ) : (

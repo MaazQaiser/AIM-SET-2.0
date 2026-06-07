@@ -19,7 +19,7 @@ interface BotChatSuggestedActionsProps {
 const categoryLabel: Record<SuggestedAction["category"], string> = {
   prepare: "Prepare",
   live: "During call",
-  "follow-up": "Follow-up",
+  "follow-up": "Next steps",
 };
 
 export function BotChatSuggestedActions({
@@ -37,7 +37,7 @@ export function BotChatSuggestedActions({
       <div className={cn("shrink-0 border-b border-border/60", className)}>
         <div
           className={cn(
-            "px-4 py-2 text-[10px] font-semibold uppercase tracking-wide",
+            "px-4 py-2 type-kicker",
             buttonClassName ? "call-detail-copilot-muted" : "text-muted-foreground"
           )}
         >
@@ -60,10 +60,10 @@ export function BotChatSuggestedActions({
               onClick={() => onSelect(action)}
               title={action.prompt}
             >
-              <span className="text-[10px] font-medium text-muted-foreground">
+              <span className="type-caption font-medium text-muted-foreground">
                 {categoryLabel[action.category]}
               </span>
-              <span className="text-xs text-foreground leading-snug">{action.label}</span>
+              <span className="type-label text-foreground leading-snug">{action.label}</span>
             </button>
           ))}
         </div>
@@ -75,7 +75,7 @@ export function BotChatSuggestedActions({
     <div className={cn("shrink-0 border-b border-border px-3 py-2.5 space-y-2", className)}>
       <div
         className={cn(
-          "flex items-center gap-1.5 text-[10px] font-semibold",
+          "flex items-center gap-1.5 type-caption font-medium",
           buttonClassName ? "call-detail-copilot-muted" : "text-muted-foreground"
         )}
       >
@@ -91,7 +91,7 @@ export function BotChatSuggestedActions({
             size="sm"
             disabled={disabled}
             className={cn(
-              "h-auto min-h-7 py-1 px-2 text-[11px] font-normal text-left whitespace-normal max-w-full",
+              "h-auto min-h-7 py-1 px-2 type-caption font-normal text-left whitespace-normal max-w-full",
               buttonClassName
             )}
             onClick={() => onSelect(action)}

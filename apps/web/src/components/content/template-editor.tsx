@@ -166,7 +166,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
   if (isEdit && detail.isLoading) {
     return (
       <div className="p-6">
-        <p className="text-sm text-muted-foreground">Loading template editor...</p>
+        <p className="type-body-sm text-muted-foreground">Loading template editor...</p>
       </div>
     );
   }
@@ -177,13 +177,13 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
         <div className="space-y-1">
           <Link
             href="/content?tab=templates"
-            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            className="flex items-center gap-1 type-body-sm text-muted-foreground hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
             Templates
           </Link>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold">
+            <h1 className="type-page-title">
               {isEdit ? "Edit template" : "Create template"}
             </h1>
             <Badge variant="secondary">HTML/CSS</Badge>
@@ -191,7 +191,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
         </div>
         <div className="flex items-center gap-2">
           {lastSavedAt ? (
-            <span className="text-xs text-muted-foreground">Saved {lastSavedAt}</span>
+            <span className="type-caption text-muted-foreground">Saved {lastSavedAt}</span>
           ) : null}
           <Button type="button" onClick={() => void handleSave()} disabled={isSaving}>
             {isSaving ? (
@@ -204,12 +204,12 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
         </div>
       </div>
 
-      {saveError ? <p className="shrink-0 text-sm text-destructive">{saveError}</p> : null}
+      {saveError ? <p className="shrink-0 type-body-sm text-destructive">{saveError}</p> : null}
 
       <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-12">
         <Card className="min-h-0 xl:col-span-4">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
+            <CardTitle className="flex items-center gap-2">
               <Code2 className="h-4 w-4" />
               Template source
             </CardTitle>
@@ -230,7 +230,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
                   id="template-type"
                   value={artifactType}
                   onChange={(event) => setArtifactType(event.target.value as TemplateArtifactType)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 type-body ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   {TEMPLATE_ARTIFACT_TYPES.map((type) => (
                     <option key={type.value} value={type.value}>
@@ -260,7 +260,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
                   value={html}
                   onChange={(event) => setHtml(event.target.value)}
                   spellCheck={false}
-                  className="h-full min-h-[320px] resize-none font-mono text-xs"
+                  className="h-full min-h-[320px] resize-none font-mono type-label"
                 />
               </TabsContent>
               <TabsContent value="css" className="min-h-0 flex-1">
@@ -268,7 +268,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
                   value={css}
                   onChange={(event) => setCss(event.target.value)}
                   spellCheck={false}
-                  className="h-full min-h-[320px] resize-none font-mono text-xs"
+                  className="h-full min-h-[320px] resize-none font-mono type-label"
                 />
               </TabsContent>
             </Tabs>
@@ -277,7 +277,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
 
         <Card className="min-h-0 xl:col-span-5">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
+            <CardTitle className="flex items-center gap-2 type-body">
               <Eye className="h-4 w-4" />
               Live preview
             </CardTitle>
@@ -296,7 +296,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
 
         <Card className="min-h-0 xl:col-span-3">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
+            <CardTitle className="flex items-center gap-2 type-body">
               <Bot className="h-4 w-4" />
               Template agent
             </CardTitle>
@@ -312,7 +312,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
                       : "mr-5 rounded-md border bg-background p-2"
                   }
                 >
-                  <div className="mb-1 flex items-center gap-1 text-[11px] font-medium opacity-80">
+                  <div className="mb-1 flex items-center gap-1 type-caption font-medium opacity-80">
                     {message.role === "user" ? (
                       <MessageSquareText className="h-3 w-3" />
                     ) : (
@@ -320,11 +320,11 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
                     )}
                     {message.role === "user" ? "You" : "Agent"}
                   </div>
-                  <p className="whitespace-pre-wrap text-xs leading-relaxed">{message.content}</p>
+                  <p className="whitespace-pre-wrap type-label leading-relaxed">{message.content}</p>
                 </div>
               ))}
               {assist.isPending ? (
-                <div className="mr-5 flex items-center gap-2 rounded-md border bg-background p-2 text-xs text-muted-foreground">
+                <div className="mr-5 flex items-center gap-2 rounded-md border bg-background p-2 type-caption text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   Updating draft...
                 </div>
@@ -346,7 +346,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-auto whitespace-normal px-2 py-1 text-left text-[11px]"
+                    className="h-auto whitespace-normal px-2 py-1 text-left type-caption"
                     onClick={() => setInstruction(prompt)}
                     disabled={assist.isPending}
                   >

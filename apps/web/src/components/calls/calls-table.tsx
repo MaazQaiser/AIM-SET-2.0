@@ -42,7 +42,7 @@ const columns: ColumnDef<Call>[] = [
             {call.accountName}
           </Link>
           {call.leadName && (
-            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 type-caption text-muted-foreground">
               <ParticipantAvatar
                 name={call.leadName}
                 kind="external"
@@ -79,7 +79,7 @@ const columns: ColumnDef<Call>[] = [
       const call = row.original;
       const scheduled = new Date(call.scheduledAt);
       return (
-        <span className="whitespace-nowrap text-sm">
+        <span className="whitespace-nowrap type-body">
           {call.discoveryCallDatePkt ?? format(scheduled, "MMM d, yyyy")}
           {call.discoveryCallDatePkt && (
             <span className="text-muted-foreground ml-1">PKT</span>
@@ -96,7 +96,7 @@ const columns: ColumnDef<Call>[] = [
       const call = row.original;
       const scheduled = new Date(call.scheduledAt);
       return (
-        <span className="whitespace-nowrap text-sm">
+        <span className="whitespace-nowrap type-body">
           {call.discoveryCallTimePkt ?? format(scheduled, "h:mm a")}
         </span>
       );
@@ -106,7 +106,7 @@ const columns: ColumnDef<Call>[] = [
     accessorKey: "industry",
     header: "Industry",
     cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground max-w-[120px] truncate block">
+      <span className="type-body text-muted-foreground max-w-[120px] truncate block">
         {row.original.industry ?? "—"}
       </span>
     ),
@@ -121,7 +121,7 @@ const columns: ColumnDef<Call>[] = [
         <Badge
           variant="outline"
           className={cn(
-            "text-[11px] font-medium max-w-[128px] truncate",
+            "type-caption font-medium max-w-[128px] truncate",
             stage === "Enterprise" && "border-violet-300/80 bg-violet-50/80 text-violet-900",
             stage === "Startup" && "border-sky-300/80 bg-sky-50/80 text-sky-900",
             stage === "Funded Startup" &&
@@ -143,7 +143,7 @@ const columns: ColumnDef<Call>[] = [
     cell: ({ row }) => {
       const score = companyRatingForCall(row.original);
       return (
-        <span className="text-sm font-medium tabular-nums text-foreground">
+        <span className="type-body font-medium tabular-nums text-foreground">
           {formatCompanyRating(score)}
         </span>
       );
@@ -156,7 +156,7 @@ const columns: ColumnDef<Call>[] = [
     cell: ({ row }) => {
       const call = row.original;
       if (call.status === "no-show") {
-        return <span className="text-xs text-muted-foreground">—</span>;
+        return <span className="type-caption text-muted-foreground">—</span>;
       }
       return (
         <Button asChild size="sm" variant="outline" className="h-8">

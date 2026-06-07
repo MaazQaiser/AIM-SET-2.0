@@ -5,26 +5,26 @@
   --font-title: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
-  --text-display: 2rem;
-  --text-display--line-height: 1.1;
+  --text-display: 1.5rem;
+  --text-display--line-height: 1.2;
   --text-display--font-weight: 600;
-  --text-headline: 1.75rem;
-  --text-headline--line-height: 1.2;
+  --text-headline: 1.375rem;
+  --text-headline--line-height: 1.25;
   --text-headline--font-weight: 600;
-  --text-title: 1.125rem;
+  --text-title: 1rem;
   --text-title--line-height: 1.35;
-  --text-title--font-weight: 600;
+  --text-title--font-weight: 500;
   --text-subtitle: 0.9375rem;
   --text-subtitle--line-height: 1.45;
   --text-subtitle--font-weight: 500;
-  --text-body: 0.8125rem;
+  --text-body: 0.875rem;
   --text-body--line-height: 1.55;
-  --text-body-sm: 0.75rem;
+  --text-body-sm: 0.8125rem;
   --text-body-sm--line-height: 1.5;
   --text-label: 0.75rem;
   --text-label--line-height: 1.35;
-  --text-label--font-weight: 600;
-  --text-caption: 0.75rem;
+  --text-label--font-weight: 500;
+  --text-caption: 0.6875rem;
   --text-caption--line-height: 1.45;
 
   --color-background: hsl(var(--background));

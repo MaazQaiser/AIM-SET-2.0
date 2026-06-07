@@ -13,7 +13,7 @@ export function PersonaSwitcher() {
     <select
       value={persona}
       onChange={(e) => setOverride(e.target.value as Persona)}
-      className="h-10 rounded-full border border-border bg-card px-4 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="h-10 rounded-full border border-border bg-card px-4 type-body font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       aria-label="Switch persona (dev)"
     >
       {PERSONAS.map((p) => (

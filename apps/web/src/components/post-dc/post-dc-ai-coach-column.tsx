@@ -24,7 +24,7 @@ export function PostDcAiCoachColumn({ review, className }: PostDcAiCoachColumnPr
   if (!hasCoach) {
     return (
       <BriefDetailCard title="AI Coach" icon={GraduationCap} className={className}>
-        <p className="text-sm text-muted-foreground">
+        <p className="type-body text-muted-foreground">
           Coaching scorecards and call analytics appear here after wrap-up completes.
         </p>
       </BriefDetailCard>
@@ -33,7 +33,7 @@ export function PostDcAiCoachColumn({ review, className }: PostDcAiCoachColumnPr
 
   return (
     <div className={cn("flex min-w-0 flex-col gap-4", className)}>
-      <p className="text-sm text-muted-foreground">
+      <p className="type-body text-muted-foreground">
         Call analytics, individual pod performance, and discovery outcomes from this session.
       </p>
       <PostDcCallAnalyticsCard review={review} />

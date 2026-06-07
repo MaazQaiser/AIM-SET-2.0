@@ -42,7 +42,7 @@ export function PostDcCallAnalyticsContent({ review }: PostDcCallAnalyticsCardPr
 
       {scorecard.length > 0 ? (
         <div className="mt-4 space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="type-kicker text-muted-foreground">
             Talk time by participant
           </p>
           <ul className="space-y-2">
@@ -57,13 +57,13 @@ export function PostDcCallAnalyticsContent({ review }: PostDcCallAnalyticsCardPr
                       size="sm"
                     />
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{row.member}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">
+                      <p className="type-body font-medium text-foreground truncate">{row.member}</p>
+                      <p className="type-caption text-muted-foreground truncate">
                         {row.roleInCall || row.role}
                       </p>
                     </div>
                   </div>
-                  <p className="text-xs font-medium text-foreground shrink-0">
+                  <p className="type-label text-foreground shrink-0">
                     {row.talkTimeLabel?.trim() ||
                       (typeof row.talkTimeSeconds === "number"
                         ? formatSeconds(row.talkTimeSeconds)
@@ -82,10 +82,10 @@ export function PostDcCallAnalyticsContent({ review }: PostDcCallAnalyticsCardPr
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <BriefDetailRow className="py-2">
-      <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <dt className="type-kicker text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-1 text-sm font-semibold text-foreground">{value}</dd>
+      <dd className="mt-1 type-panel-title text-foreground">{value}</dd>
     </BriefDetailRow>
   );
 }

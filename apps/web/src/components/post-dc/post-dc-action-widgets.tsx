@@ -20,7 +20,7 @@ export function PostNextStepTeaserCard({ proposal, onGoToActions }: PostNextStep
 
   return (
     <BriefDetailCard title="Next up" variant="highlight">
-      <p className="text-sm text-muted-foreground leading-relaxed break-words">{preview}</p>
+      <p className="type-body text-muted-foreground leading-relaxed break-words">{preview}</p>
       {onGoToActions ? (
         <Button
           type="button"
@@ -93,7 +93,7 @@ export function PostDcActionProgress({
           <span
             className={cn(
               "inline-flex items-center justify-center rounded-full border font-semibold",
-              compact ? "h-5 w-5" : "h-6 w-6 text-[10px]",
+              compact ? "h-5 w-5" : "h-6 w-6 type-caption",
               step.state === "done" &&
                 "border-success/40 bg-success/10 text-success",
               step.state === "current" &&
@@ -110,7 +110,7 @@ export function PostDcActionProgress({
           </span>
           <span
             className={cn(
-              compact ? "text-[10px] sm:text-xs" : "text-xs",
+              compact ? "type-caption" : "type-label",
               "font-medium",
               step.state === "upcoming" ? "text-muted-foreground" : "text-foreground"
             )}
@@ -138,7 +138,7 @@ export function PostDcActionProgress({
   return (
     <BriefDetailCard title="Action workflow" className={className}>
       {progressList}
-      <p className="mt-2 text-[11px] text-muted-foreground">
+      <p className="mt-2 type-caption text-muted-foreground">
         Confirm the recommended next step, approve CRM tasks, then review and send follow-up emails.
       </p>
     </BriefDetailCard>

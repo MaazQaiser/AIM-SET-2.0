@@ -39,11 +39,11 @@ export function AeNotificationPrefs() {
           />
         </div>
 
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <label className="flex items-center gap-2 type-body cursor-pointer">
           <input type="checkbox" checked={quietDuringSpeech} onChange={(e) => setQuietDuringSpeech(e.target.checked)} />
           Quiet during customer speech
         </label>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <label className="flex items-center gap-2 type-body cursor-pointer">
           <input type="checkbox" checked={roleOnly} onChange={(e) => setRoleOnly(e.target.checked)} />
           Role-specific cues only
         </label>
@@ -51,20 +51,20 @@ export function AeNotificationPrefs() {
         <Separator />
 
         <div className="space-y-2">
-          <p className="text-sm font-medium">Customer landing page</p>
-          <label className="flex items-center gap-2 text-sm">
+          <p className="type-body font-medium">Customer landing page</p>
+          <label className="flex items-center gap-2 type-body">
             <input type="checkbox" checked={clpFirstVisit} onChange={(e) => setClpFirstVisit(e.target.checked)} />
             First visitor on a published page
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 type-body">
             <input type="checkbox" checked={clpProposalOpen} onChange={(e) => setClpProposalOpen(e.target.checked)} />
             Proposal opened
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 type-body">
             <input type="checkbox" checked={clpChat} onChange={(e) => setClpChat(e.target.checked)} />
             New chat message
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 type-body">
             <input type="checkbox" checked={clpComments} onChange={(e) => setClpComments(e.target.checked)} />
             New comment
           </label>
@@ -73,18 +73,18 @@ export function AeNotificationPrefs() {
         <Separator />
 
         <div className="space-y-2">
-          <p className="text-sm font-medium">Customize nudge types</p>
-          <label className="flex items-center gap-2 text-sm">
+          <p className="type-body font-medium">Customize nudge types</p>
+          <label className="flex items-center gap-2 type-body">
             <input type="checkbox" checked={objectionReminders} onChange={(e) => setObjectionReminders(e.target.checked)} />
             Objection handler reminders
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 type-body">
             <input type="checkbox" checked={designPatterns} onChange={(e) => setDesignPatterns(e.target.checked)} />
             Design-pattern reference surfacing (high priority)
           </label>
         </div>
 
-        <div className="rounded-md border border-dashed bg-muted/40 p-3 text-xs text-muted-foreground">
+        <div className="rounded-md border border-dashed bg-muted/40 p-3 type-caption text-muted-foreground">
           Your previous settings led to 47 nudges across 23 calls. You acted on 19 ({acceptanceRate}% acceptance).
           Team median is {teamMedian}%. Consider raising signal threshold rather than reducing frequency.
         </div>

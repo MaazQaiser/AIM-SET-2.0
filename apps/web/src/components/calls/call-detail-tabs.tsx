@@ -91,10 +91,10 @@ export function CallDetailTabs({
     <div className="mt-3 pb-28 focus-visible:outline-none">
       {postDcReady && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
-          <p className="text-xs text-muted-foreground">
+          <p className="type-caption text-muted-foreground">
             This call has been wrapped. Post-DC review is ready.
           </p>
-          <Button asChild variant="outline" size="sm" className="h-8 shrink-0 text-xs">
+          <Button asChild variant="outline" size="sm" className="h-8 shrink-0 type-label">
             <Link href={`/calls/${callId}/post-dc`}>
               <ExternalLink className="mr-1 h-3 w-3" />
               Open Post-DC
@@ -106,7 +106,7 @@ export function CallDetailTabs({
       {leadershipPreview && (
         <div
           className={cn(
-            "mb-2 px-4 py-2 text-xs",
+            "mb-2 px-4 py-2 type-label",
             isIntercom
               ? "rounded-md border border-border bg-muted/30 text-muted-foreground"
               : "rounded-md border border-dashed border-primary/40 bg-primary/5 text-muted-foreground"
@@ -143,6 +143,7 @@ export function CallDetailTabs({
         callId={callId}
         variant="floating"
         phase="prep"
+        surface="pre_dc"
         accountName={call.accountName}
         brief={brief}
         checklist={seedChecklistFromCall(call)}

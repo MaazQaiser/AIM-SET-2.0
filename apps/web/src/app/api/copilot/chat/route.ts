@@ -1,4 +1,5 @@
 import { auth } from "@/lib/api/auth";
+import { buildSimpleGreetingResponse } from "@/lib/copilot/simple-greeting-response";
 import { type NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -12,11 +13,27 @@ export async function POST(request: NextRequest) {
     history?: { role: "user" | "assistant"; content: string }[];
     callId?: string;
     call_id?: string;
+    surface?:
+      | "home"
+      | "pre_dc"
+      | "live_dc"
+      | "post_dc"
+      | "knowledge"
+      | "content"
+      | "agents"
+      | "settings"
+      | "global";
+    context?: Record<string, unknown>;
   };
 
   const message = body.message?.trim();
   if (!message) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
+  }
+  const surface = body.surface ?? "global";
+  const greetingResponse = buildSimpleGreetingResponse(message, surface);
+  if (greetingResponse) {
+    return NextResponse.json(greetingResponse);
   }
 
   const res = await fetch(
@@ -32,6 +49,8 @@ export async function POST(request: NextRequest) {
         message,
         history: body.history ?? [],
         call_id: body.callId ?? body.call_id,
+        surface,
+        context: body.context ?? {},
       }),
     }
   );
@@ -55,6 +74,9 @@ export async function POST(request: NextRequest) {
     }[];
     actions_taken?: Record<string, unknown>[];
     call_exports?: Record<string, unknown>[];
+    suggestions?: string[];
+    confidence?: number;
+    missing_evidence?: string[];
   };
 
   return NextResponse.json({
@@ -68,5 +90,8 @@ export async function POST(request: NextRequest) {
     })),
     actions_taken: data.actions_taken ?? [],
     call_exports: data.call_exports ?? [],
+    suggestions: data.suggestions ?? [],
+    confidence: data.confidence ?? 0,
+    missing_evidence: data.missing_evidence ?? [],
   });
 }

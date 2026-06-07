@@ -38,27 +38,27 @@ function MetricCard({
   return (
     <Card>
       <CardContent className="space-y-2 p-4 pt-4">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <div className="flex items-end gap-2">
-        <span className={cn("text-2xl font-bold", passing ? "text-success" : "text-warning")}>
-          {value}
-          {unit === "%" ? "%" : unit === "s" ? "s" : ""}
-        </span>
-        {target > 0 && (
-          <span className="text-xs text-muted-foreground mb-1">
-            target {target}
+        <p className="type-label text-muted-foreground">{label}</p>
+        <div className="flex items-end gap-2">
+          <span className={cn("type-screen-title", passing ? "text-success" : "text-warning")}>
+            {value}
             {unit === "%" ? "%" : unit === "s" ? "s" : ""}
           </span>
-        )}
-      </div>
-      {target > 0 && (
-        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-          <div
-            className={cn("h-full rounded-full transition-all", passing ? "bg-success" : "bg-warning")}
-            style={{ width: `${Math.min(pct, 100)}%` }}
-          />
+          {target > 0 && (
+            <span className="mb-1 type-caption text-muted-foreground">
+              target {target}
+              {unit === "%" ? "%" : unit === "s" ? "s" : ""}
+            </span>
+          )}
         </div>
-      )}
+        {target > 0 && (
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn("h-full rounded-full transition-all", passing ? "bg-success" : "bg-warning")}
+              style={{ width: `${Math.min(pct, 100)}%` }}
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -99,25 +99,25 @@ export function AgentDetailClient({ agentId }: { agentId: AgentId }) {
         <div className="flex items-center gap-2">
           <Link
             href="/agents"
-            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1 type-body-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
             Agents
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="text-sm font-medium">{meta.display_name}</span>
+          <span className="type-body-sm font-medium">{meta.display_name}</span>
         </div>
 
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold">{meta.display_name}</h1>
-              <Badge variant="outline" className="text-xs font-medium capitalize">
+              <h1 className="type-page-title">{meta.display_name}</h1>
+              <Badge variant="outline" className="capitalize">
                 {health}
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground max-w-2xl">{meta.purpose}</p>
-            <p className="text-xs text-muted-foreground font-mono">
+            <p className="max-w-2xl type-body-sm text-muted-foreground">{meta.purpose}</p>
+            <p className="type-mono text-muted-foreground">
               Operations: {meta.operations.join(", ")}
             </p>
           </div>
@@ -133,17 +133,17 @@ export function AgentDetailClient({ agentId }: { agentId: AgentId }) {
       {modelPolicy && (
         <div className="flex items-center gap-6 flex-wrap">
           <div>
-            <p className="text-xs text-muted-foreground mb-1">Model</p>
+            <p className="mb-1 type-label text-muted-foreground">Model</p>
             <ModelPolicyBadge policy={modelPolicy} showFallback />
           </div>
           <div className="min-w-[200px]">
-            <p className="text-xs text-muted-foreground mb-1">Spend vs {projectCap ? "project" : "per-run"} cap</p>
+            <p className="mb-1 type-label text-muted-foreground">Spend vs {projectCap ? "project" : "per-run"} cap</p>
             <CostGaugeBar
               spentUsd={costToday}
               capUsd={gaugeCap}
               capLabel={projectCap ? "project cap" : "per-run cap"}
             />
-            <p className="text-[10px] text-muted-foreground mt-1">
+            <p className="mt-1 type-caption text-muted-foreground">
               Per-run ${perRunCap.toFixed(2)}
               {projectCap != null ? ` · Project $${projectCap.toFixed(2)}` : ""}
             </p>

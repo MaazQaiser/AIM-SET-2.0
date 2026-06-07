@@ -69,7 +69,7 @@ export function TaskList({
   const body = (
     <div className="flex w-full min-w-0 flex-col divide-y divide-border/60">
       {tasks.length === 0 && (
-        <div className="py-6 text-center text-sm text-muted-foreground">No CRM tasks generated</div>
+        <div className="py-6 text-center type-body text-muted-foreground">No CRM tasks generated</div>
       )}
 
       {tasks.map((task) => {
@@ -110,24 +110,24 @@ export function TaskList({
                       <button
                         type="button"
                         onClick={onOpenEmailDraft}
-                        className="inline-flex min-w-0 items-center gap-1.5 text-left text-xs font-semibold text-primary transition-colors hover:text-primary/80"
+                        className="inline-flex min-w-0 items-center gap-1.5 text-left type-label text-primary transition-colors hover:text-primary/80"
                       >
                         <Mail className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{label}</span>
                       </button>
                     ) : (
-                      <span className="text-xs font-semibold text-foreground">{label}</span>
+                      <span className="type-label text-foreground">{label}</span>
                     )}
-                    <span className="text-[10px] text-muted-foreground">→ {task.owner}</span>
+                    <span className="type-caption text-muted-foreground">→ {task.owner}</span>
                     {task.isInternalAuto ? (
-                      <Badge variant="secondary" className="text-[10px]">
+                      <Badge variant="secondary" className="type-caption">
                         Auto · internal
                       </Badge>
                     ) : null}
                   </div>
                   <p
                     className={cn(
-                      "text-xs leading-relaxed text-muted-foreground break-words",
+                      "type-label leading-relaxed text-muted-foreground break-words",
                       isDone && "line-through decoration-muted-foreground/50"
                     )}
                   >
@@ -147,7 +147,7 @@ export function TaskList({
                       <button
                         type="button"
                         onClick={onOpenEmailDraft}
-                        className="text-xs text-primary hover:text-primary/80"
+                        className="type-label text-primary hover:text-primary/80"
                       >
                         Review draft
                       </button>
@@ -156,7 +156,7 @@ export function TaskList({
                       <button
                         type="button"
                         onClick={() => onReject(task.id)}
-                        className="text-xs text-muted-foreground hover:text-destructive"
+                        className="type-caption text-muted-foreground hover:text-destructive"
                       >
                         Skip
                       </button>

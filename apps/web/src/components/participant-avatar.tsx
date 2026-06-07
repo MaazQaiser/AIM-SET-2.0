@@ -23,11 +23,11 @@ const SIZE_CLASS = {
 } as const;
 
 const FALLBACK_TEXT_CLASS = {
-  xs: "text-[9px]",
-  sm: "text-[10px]",
-  md: "text-[11px]",
-  lg: "text-xs",
-  xl: "text-sm",
+  xs: "type-caption",
+  sm: "type-caption",
+  md: "type-caption",
+  lg: "type-label",
+  xl: "type-body",
 } as const;
 
 const EXTERNAL_ICON_CLASS = {
@@ -125,11 +125,11 @@ export function ParticipantNameRow({
       <ParticipantAvatar name={name} size={size} {...avatarProps} />
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2 flex-wrap">
-          <p className="text-sm font-semibold text-foreground truncate">{name}</p>
+          <p className="type-panel-title text-foreground truncate">{name}</p>
           {meta}
         </div>
         {subtitle ? (
-          <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
+          <p className="type-caption text-muted-foreground truncate">{subtitle}</p>
         ) : null}
       </div>
     </div>

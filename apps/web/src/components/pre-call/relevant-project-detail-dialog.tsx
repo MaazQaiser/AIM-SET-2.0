@@ -44,7 +44,7 @@ export function RelevantProjectDetailDialog({
           <DialogDescription className="flex flex-wrap items-center gap-2">
             {project && (
               <>
-                <Badge variant="outline" className="gap-1 text-[10px] capitalize">
+                <Badge variant="outline" className="gap-1 type-caption capitalize">
                   <SourceIcon source={project.source} />
                   {SOURCE_LABEL[project.source]}
                 </Badge>
@@ -54,12 +54,12 @@ export function RelevantProjectDetailDialog({
           </DialogDescription>
         </DialogHeader>
         {project?.summary ? (
-          <p className="text-sm text-muted-foreground border-l-2 border-primary/40 pl-3">
+          <p className="type-body text-muted-foreground border-l-2 border-primary/40 pl-3">
             {project.summary}
           </p>
         ) : null}
         <div className="flex-1 min-h-0 overflow-auto rounded-lg border bg-muted/20 p-4">
-          <pre className="text-xs leading-relaxed whitespace-pre-wrap break-words text-foreground/90">
+          <pre className="type-label leading-relaxed whitespace-pre-wrap break-words text-foreground/90">
             {project?.details ?? "No additional detail indexed for this entry."}
           </pre>
         </div>

@@ -42,7 +42,7 @@ export function GovernanceAuditTable() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading audit events…</p>
+          <p className="type-body text-muted-foreground">Loading audit events…</p>
         ) : rows.length > 0 ? (
           <DataTable
             columns={auditColumns}

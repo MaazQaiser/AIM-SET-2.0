@@ -20,7 +20,7 @@ export function CostGaugeBar({ spentUsd, capUsd, capLabel = "cap", className }: 
     <Tooltip>
       <TooltipTrigger asChild>
         <div className={cn("space-y-1", className)}>
-          <div className="flex justify-between text-xs text-muted-foreground">
+          <div className="flex justify-between type-caption text-muted-foreground">
             <span>${spentUsd.toFixed(2)} today</span>
             <span>
               ${safeCap.toFixed(2)} {capLabel}

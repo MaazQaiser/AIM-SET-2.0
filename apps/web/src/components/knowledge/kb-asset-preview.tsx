@@ -105,7 +105,7 @@ export function KbAssetPreview({
     return (
       <div
         className={cn(
-          "flex items-center justify-center gap-2 text-sm text-muted-foreground rounded-lg border bg-muted/20",
+          "flex items-center justify-center gap-2 type-body text-muted-foreground rounded-lg border bg-muted/20",
           briefMainNestedSurfaceClass,
           compact ? "min-h-[200px]" : "min-h-[420px]",
           className
@@ -121,14 +121,14 @@ export function KbAssetPreview({
     return (
       <div
         className={cn(
-          "flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground",
+          "flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center type-body text-muted-foreground",
           briefMainNestedSurfaceClass,
           className
         )}
       >
         <p>{error}</p>
         {textPreview ? (
-          <pre className="mt-4 max-h-64 w-full overflow-auto text-left text-xs whitespace-pre-wrap rounded border bg-card p-3">
+          <pre className="mt-4 max-h-64 w-full overflow-auto text-left type-label whitespace-pre-wrap rounded border bg-card p-3">
             {textPreview.slice(0, 2000)}
           </pre>
         ) : null}
@@ -166,13 +166,13 @@ export function KbAssetPreview({
 
   return (
     <div className={cn("flex min-h-[420px] flex-col gap-3 rounded-lg border bg-muted/10 p-4", briefMainNestedSurfaceClass, className)}>
-      <p className="text-sm text-muted-foreground shrink-0">Text preview from the knowledge base index.</p>
+      <p className="type-body text-muted-foreground shrink-0">Text preview from the knowledge base index.</p>
       {textPreview ? (
-        <pre className="glass-insight-card flex-1 min-h-0 overflow-auto whitespace-pre-wrap p-4 text-xs leading-relaxed shadow-none">
+        <pre className="glass-insight-card flex-1 min-h-0 overflow-auto whitespace-pre-wrap p-4 type-label leading-relaxed shadow-none">
           {textPreview}
         </pre>
       ) : (
-        <p className="text-sm text-muted-foreground">No indexed text yet.</p>
+        <p className="type-body text-muted-foreground">No indexed text yet.</p>
       )}
       {blobUrl ? (
         <Button variant="outline" size="sm" className="w-fit" asChild>

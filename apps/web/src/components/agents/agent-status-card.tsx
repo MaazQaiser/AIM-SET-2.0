@@ -37,11 +37,11 @@ export function AgentStatusCard({ status }: AgentStatusCardProps) {
           <div className="min-w-0 space-y-1">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-              <h2 className="truncate text-sm font-semibold text-foreground">{status.display_name}</h2>
+              <h2 className="truncate type-panel-title text-foreground">{status.display_name}</h2>
             </div>
-            <p className="line-clamp-2 text-sm text-muted-foreground">{status.description}</p>
+            <p className="line-clamp-2 type-body-sm text-muted-foreground">{status.description}</p>
           </div>
-          <div className={cn("flex shrink-0 items-center gap-1 text-xs font-medium", health.className)}>
+          <div className={cn("flex shrink-0 items-center gap-1 type-label", health.className)}>
             <HealthIcon className="h-3.5 w-3.5" />
             <span>{health.label}</span>
           </div>
@@ -49,19 +49,19 @@ export function AgentStatusCard({ status }: AgentStatusCardProps) {
 
         <div className="space-y-4">
           <div>
-            <p className="mb-1 text-xs text-muted-foreground">Model</p>
+            <p className="mb-1 type-label text-muted-foreground">Model</p>
             <ModelPolicyBadge policy={status.model_policy} />
           </div>
 
           <div>
-            <p className="mb-1 text-xs text-muted-foreground">Spend today</p>
+            <p className="mb-1 type-label text-muted-foreground">Spend today</p>
             <CostGaugeBar
               spentUsd={status.cost_today_usd}
               capUsd={status.cost_cap_usd}
               capLabel={status.project_cap_usd ? "project cap" : "per-run cap"}
             />
             {status.per_run_cap_usd != null && (
-              <p className="mt-1 text-[10px] text-muted-foreground">
+              <p className="mt-1 type-caption text-muted-foreground">
                 Per-run ceiling ${status.per_run_cap_usd.toFixed(2)}
                 {status.project_cap_usd != null
                   ? ` · Project ceiling $${status.project_cap_usd.toFixed(2)}`
@@ -70,7 +70,7 @@ export function AgentStatusCard({ status }: AgentStatusCardProps) {
             )}
           </div>
 
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center justify-between type-caption text-muted-foreground">
             <span>{status.runs_today} runs today</span>
             {status.last_run_at && <span>Last: {formatRelative(status.last_run_at)}</span>}
           </div>
@@ -80,14 +80,14 @@ export function AgentStatusCard({ status }: AgentStatusCardProps) {
       <CardFooter className="flex gap-2 border-t border-border px-5 pb-5 pt-0">
         <Link
           href={`/agents/${status.agent_id}`}
-          className="flex flex-1 items-center justify-center gap-1 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          className="flex flex-1 items-center justify-center gap-1 py-1 type-caption text-muted-foreground transition-colors hover:text-foreground"
         >
           <span>View detail</span>
           <ChevronRight className="h-3 w-3" />
         </Link>
         <Link
           href={`/agents/${status.agent_id}/config`}
-          className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          className="flex items-center gap-1 px-2 py-1 type-caption text-muted-foreground transition-colors hover:text-foreground"
         >
           <Settings className="h-3.5 w-3.5" />
           <span>Config</span>

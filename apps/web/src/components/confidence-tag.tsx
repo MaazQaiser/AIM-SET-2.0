@@ -14,7 +14,7 @@ export function ConfidenceTag({ score, className }: ConfidenceTagProps) {
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1 rounded-sm border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-xs font-medium text-warning-foreground",
+          "inline-flex items-center gap-1 rounded-sm border border-warning/30 bg-warning/10 px-1.5 py-0.5 type-label text-warning-foreground",
           className
         )}
         title={`Confidence score: ${Math.round(score * 100)}%`}
@@ -28,7 +28,7 @@ export function ConfidenceTag({ score, className }: ConfidenceTagProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-sm border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-xs font-medium text-destructive",
+        "inline-flex items-center gap-1 rounded-sm border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 type-label text-destructive",
         className
       )}
       title={`Confidence score: ${Math.round(score * 100)}%`}

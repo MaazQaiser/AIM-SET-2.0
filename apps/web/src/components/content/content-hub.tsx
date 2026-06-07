@@ -95,8 +95,8 @@ export function ContentHub() {
       {!hideHubChrome ? (
         <PageHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Knowledge Base</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h1 className="type-page-title text-foreground">Knowledge Base</h1>
+            <p className="mt-1 type-body-sm text-muted-foreground">
               {assets.length} approved assets
               {templates.length > 0 && (
                 <span> · {templates.length} template{templates.length === 1 ? "" : "s"}</span>
@@ -123,7 +123,7 @@ export function ContentHub() {
             <TabsTrigger value="suggestions">
               {TAB_LABELS.suggestions}
               {toGenerateCount > 0 && (
-                <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium tabular-nums text-primary">
+                <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 type-caption font-medium tabular-nums text-primary">
                   {toGenerateCount}
                 </span>
               )}

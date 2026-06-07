@@ -131,15 +131,15 @@ export default function TemplateUploadPage() {
       <PageHeader className="space-y-3">
         <Link
           href="/content?tab=templates"
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-1 type-body-sm text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4" />
           Templates
         </Link>
 
         <div>
-          <h1 className="text-2xl font-semibold">Upload template</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="type-page-title">Upload template</h1>
+          <p className="mt-1 type-body-sm text-muted-foreground">
             Upload a PPT or PPTX file. Content Studio extracts the original slide preview, slide
             structure, colors, text, and generated HTML/CSS before the template can be edited or used.
           </p>
@@ -176,11 +176,11 @@ export default function TemplateUploadPage() {
             onChange={(e) => setTagsText(e.target.value)}
             placeholder="transportation, logistics, vertical"
           />
-          <p className="mt-1 text-xs text-muted-foreground">Comma-separated — used for matching in Content Studio.</p>
+          <p className="mt-1 type-caption text-muted-foreground">Comma-separated — used for matching in Content Studio.</p>
         </div>
         {phase !== "idle" ? (
           <div className="rounded-xl border bg-muted/20 p-4">
-            <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+            <div className="mb-2 flex items-center justify-between gap-3 type-body-sm">
               <span className="font-medium">{stageLabel || "Preparing..."}</span>
               <span className="tabular-nums text-muted-foreground">{progress}%</span>
             </div>
@@ -190,7 +190,7 @@ export default function TemplateUploadPage() {
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">
+            <div className="mt-3 grid grid-cols-3 gap-2 type-caption text-muted-foreground">
               <span className={progress >= 10 ? "text-foreground" : ""}>Upload</span>
               <span className={progress >= 45 ? "text-foreground" : ""}>Extract</span>
               <span className={progress >= 75 ? "text-foreground" : ""}>Generate HTML/CSS</span>
@@ -207,7 +207,7 @@ export default function TemplateUploadPage() {
           )}
           {busy ? "Processing..." : phase === "done" ? "Ready" : "Upload & extract"}
         </Button>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="type-body-sm text-destructive">{error}</p>}
       </form>
     </PageShell>
   );

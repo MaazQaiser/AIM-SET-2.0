@@ -70,7 +70,7 @@ export function PostDcBantPanel({ bant, review }: PostDcBantPanelProps) {
       expandLabel="Expand BANT analysis"
       headerExtra={
         coveragePct !== null ? (
-          <Badge variant="secondary" className="text-[10px] tabular-nums shrink-0">
+          <Badge variant="secondary" className="type-caption tabular-nums shrink-0">
             {coveragePct}% covered
           </Badge>
         ) : null
@@ -83,7 +83,7 @@ export function PostDcBantPanel({ bant, review }: PostDcBantPanelProps) {
               description="How much of BANT was validated by end of call."
             >
               <div className="space-y-1.5 max-w-md">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <div className="flex items-center justify-between type-caption text-muted-foreground">
                   <span className="font-medium">BANT validated</span>
                   <span className="tabular-nums">{coveragePct}%</span>
                 </div>
@@ -116,14 +116,14 @@ export function PostDcBantPanel({ bant, review }: PostDcBantPanelProps) {
                 {review.learned.map((item) => (
                   <li key={item.label} className="py-3 first:pt-0 last:pb-0">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                      <p className="type-panel-title text-foreground">{item.label}</p>
                       {item.from !== undefined && item.to !== undefined ? (
-                        <span className="text-xs tabular-nums text-muted-foreground shrink-0">
+                        <span className="type-label tabular-nums text-muted-foreground shrink-0">
                           {formatLearnedPct(item.from)}% → {formatLearnedPct(item.to)}%
                         </span>
                       ) : null}
                     </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed mt-1 break-words">
+                    <p className="type-body text-muted-foreground leading-relaxed mt-1 break-words">
                       {item.note}
                     </p>
                   </li>
@@ -137,7 +137,7 @@ export function PostDcBantPanel({ bant, review }: PostDcBantPanelProps) {
               title="Open discovery gaps"
               description="Areas still unclear — address in follow-up or next call."
             >
-              <ul className="list-disc pl-5 space-y-1.5 text-sm text-muted-foreground">
+              <ul className="list-disc pl-5 space-y-1.5 type-body text-muted-foreground">
                 {openGaps.map((gap) => (
                   <li key={gap} className="leading-relaxed break-words">
                     {gap}

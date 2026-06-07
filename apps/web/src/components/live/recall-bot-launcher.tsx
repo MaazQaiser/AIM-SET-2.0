@@ -5,7 +5,7 @@ import { Input } from "@dc-copilot/ui/components/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLiveCall } from "@/stores/use-live-call";
 import type { TranscriptEvent } from "@/types";
-import { AlertCircle, CheckCircle2, Send } from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 
@@ -155,23 +155,23 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
           onChange={(event) => setValue(event.target.value)}
           onPaste={handlePaste}
           placeholder="Meeting URL"
-          className="h-8 w-[132px] min-w-0 rounded-lg pr-9 text-xs sm:w-[168px]"
+          className="h-8 w-[148px] min-w-0 rounded-lg pr-14 type-label sm:w-[188px]"
           disabled={loading || status === "ready"}
         />
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               type="submit"
-              size="icon-sm"
+              size="sm"
               className={cn(
-                "absolute right-0.5 top-1/2 h-6 w-6 -translate-y-1/2 rounded-md",
+                "absolute right-1 top-1/2 h-6 -translate-y-1/2 rounded-md px-2 type-caption",
                 "bg-foreground text-background hover:bg-foreground/90"
               )}
               loading={loading}
               disabled={loading || status === "ready"}
               aria-label="Join meeting with Recall bot"
             >
-              {!loading && <Send className="h-3 w-3" />}
+              Join
             </Button>
           </TooltipTrigger>
           <TooltipContent>Join with Recall bot</TooltipContent>
@@ -181,8 +181,8 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
         <span
           className={
             status === "ready"
-              ? "flex max-w-[160px] items-center gap-1 truncate text-xs text-emerald-600"
-              : "flex max-w-[180px] items-center gap-1 truncate text-xs text-destructive"
+              ? "flex max-w-[160px] items-center gap-1 truncate type-label text-emerald-600"
+              : "flex max-w-[180px] items-center gap-1 truncate type-label text-destructive"
           }
           title={message}
         >

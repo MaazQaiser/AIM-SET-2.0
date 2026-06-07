@@ -28,7 +28,7 @@ export function PostDcAiNextSteps({
   return (
     <section className={cn("w-full min-w-0 pt-4 mt-3 border-t border-border/60", className)}>
       {showLabel ? (
-        <h3 className="mb-2 text-xs font-semibold text-muted-foreground">
+        <h3 className="mb-2 type-label text-muted-foreground">
           AI recommended next steps
         </h3>
       ) : null}

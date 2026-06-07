@@ -17,20 +17,20 @@ export default function CoachingAePage({ params }: { params: Promise<{ aeId: str
       <PageHeader className="space-y-3">
         <Link
           href="/coaching"
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-1 type-body-sm text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4" />
           Coaching
         </Link>
 
         <div>
-          <h1 className="text-2xl font-semibold capitalize">{displayName}</h1>
-          <p className="text-sm text-muted-foreground mt-1">Individual scorecard · transcript evidence</p>
+          <h1 className="type-page-title capitalize">{displayName}</h1>
+          <p className="mt-1 type-body-sm text-muted-foreground">Individual scorecard · transcript evidence</p>
         </div>
       </PageHeader>
 
       {insights.length > 0 ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="type-body-sm text-muted-foreground">
           {insights.length} coaching recommendation(s) available on the team coaching page.
         </p>
       ) : (

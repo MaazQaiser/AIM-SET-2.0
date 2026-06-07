@@ -48,11 +48,11 @@ export function FocusAreasBar({ areas, intentLabel, bantSignals = [] }: FocusAre
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10">
           <Activity className="h-3.5 w-3.5 text-primary" aria-hidden />
         </div>
-        <span className="text-[10px] font-semibold text-muted-foreground">
+        <span className="type-caption font-medium text-muted-foreground">
           Live signals
         </span>
         {intentLabel && (
-          <Badge variant="secondary" className="text-[10px] font-normal capitalize ml-auto shrink-0">
+          <Badge variant="secondary" className="type-caption font-normal capitalize ml-auto shrink-0">
             <Target className="h-3 w-3 mr-1 inline" aria-hidden />
             {intentLabel.includes("_") ? intentLabel.replace(/_/g, " ") : intentLabel}
           </Badge>
@@ -64,7 +64,7 @@ export function FocusAreasBar({ areas, intentLabel, bantSignals = [] }: FocusAre
           {areas.map((area) => (
             <span
               key={area}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-foreground shadow-sm"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 type-caption text-foreground shadow-sm"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
               {area}
@@ -78,7 +78,7 @@ export function FocusAreasBar({ areas, intentLabel, bantSignals = [] }: FocusAre
               <span
                 key={s.id}
                 className={cn(
-                  "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] shadow-sm",
+                  "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 type-caption shadow-sm",
                   style.className
                 )}
                 title={label}

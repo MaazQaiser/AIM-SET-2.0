@@ -243,7 +243,7 @@ function ColumnSectionLabel({ label }: { label: string }) {
   if (!isIntercom || !label.trim()) return null;
 
   return (
-    <p className="text-xs font-medium text-muted-foreground pb-1 border-b border-border mb-1">
+    <p className="type-label text-muted-foreground pb-1 border-b border-border mb-1">
       {label}
     </p>
   );

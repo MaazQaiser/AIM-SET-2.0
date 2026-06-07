@@ -298,7 +298,7 @@ function ValueBadge({
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
+        "inline-flex min-w-0 max-w-full items-center rounded-full border px-2.5 py-0.5 type-label",
         className
       )}
     >
@@ -413,18 +413,23 @@ export function BriefAISummary({ brief, call }: BriefAISummaryProps) {
   const stats = summaryStatsContext(brief, call);
 
   const statsBadges = (
-    <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0 max-w-[min(100%,20rem)]">
-      <ValueBadge className={STAGE_BADGE_CLASS[stats.stage] ?? "border-border bg-muted/40 text-foreground"}>
+    <div className="ml-auto flex min-w-0 max-w-[min(72%,44rem)] flex-nowrap items-center justify-end gap-1.5 overflow-hidden whitespace-nowrap">
+      <ValueBadge
+        className={cn(
+          "shrink-0",
+          STAGE_BADGE_CLASS[stats.stage] ?? "border-border bg-muted/40 text-foreground"
+        )}
+      >
         {stats.stage}
       </ValueBadge>
-      <ValueBadge className="bg-warning/10 border-warning/25 text-foreground">
+      <ValueBadge className="shrink-0 bg-warning/10 border-warning/25 text-foreground">
         {stats.agentRating}
       </ValueBadge>
-      <ValueBadge className="border-border bg-muted/40 text-foreground">
+      <ValueBadge className="min-w-0 flex-1 border-border bg-muted/40 text-foreground">
         {stats.companyType}
       </ValueBadge>
       {stats.revenue !== "—" && (
-        <ValueBadge className="bg-warning/15 border-warning/20 text-foreground font-semibold">
+        <ValueBadge className="shrink-0 bg-warning/15 border-warning/20 text-foreground font-semibold">
           {stats.revenue}
         </ValueBadge>
       )}
@@ -450,7 +455,7 @@ export function BriefAISummary({ brief, call }: BriefAISummaryProps) {
               key={section.id}
               className="space-y-2 border-t border-border/60 pt-3 first:border-t-0 first:pt-0"
             >
-              <p className="text-xs font-semibold text-muted-foreground">
+              <p className="type-label text-muted-foreground">
                 {section.title}
               </p>
               <HighlightedSummary

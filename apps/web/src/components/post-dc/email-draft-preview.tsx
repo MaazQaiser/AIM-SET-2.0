@@ -40,7 +40,7 @@ export function EmailDraftPreview({ draft, showCopy = true }: EmailDraftPreviewP
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 text-sm">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 type-body">
       {showCopy ? (
         <div className="flex justify-end -mt-1">
           <Tooltip>
@@ -49,7 +49,7 @@ export function EmailDraftPreview({ draft, showCopy = true }: EmailDraftPreviewP
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+                className="h-7 gap-1.5 px-2 type-caption text-muted-foreground"
                 onClick={() => void handleCopy()}
               >
                 {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -61,16 +61,16 @@ export function EmailDraftPreview({ draft, showCopy = true }: EmailDraftPreviewP
         </div>
       ) : null}
       <div className="space-y-1.5">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">To</p>
-        <p className="text-xs text-foreground break-words">{draft.to.join(", ")}</p>
+        <p className="type-kicker text-muted-foreground">To</p>
+        <p className="type-label text-foreground break-words">{draft.to.join(", ")}</p>
       </div>
       <div className="space-y-1.5">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Subject</p>
-        <p className="text-xs font-medium text-foreground break-words">{draft.subject}</p>
+        <p className="type-kicker text-muted-foreground">Subject</p>
+        <p className="type-label text-foreground break-words">{draft.subject}</p>
       </div>
       <div className="min-h-0 flex-1 space-y-1.5">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Body</p>
-        <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap break-words line-clamp-[10]">
+        <p className="type-kicker text-muted-foreground">Body</p>
+        <div className="type-caption text-muted-foreground leading-relaxed whitespace-pre-wrap break-words line-clamp-[10]">
           {bodyLines.join("\n")}
           {draft.body_markdown.split("\n").filter((l) => l.trim()).length > bodyLines.length ? "\n…" : ""}
         </div>

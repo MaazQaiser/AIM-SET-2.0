@@ -2,13 +2,20 @@
 
 import { useState } from "react";
 import { Download, FileText } from "lucide-react";
-import type { ClpAssetRef, ClpComment, ClpProposal, ClpSection, CustomerLandingPage } from "@dc-copilot/types";
+import type {
+  ClpAssetRef,
+  ClpComment,
+  ClpProposal,
+  ClpSection,
+  CustomerLandingPage,
+} from "@dc-copilot/types";
 import { cn } from "@/lib/cn";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Input } from "@dc-copilot/ui/components/input";
 import { Textarea } from "@dc-copilot/ui/components/textarea";
 import { KbFileTypeIcon } from "@/components/knowledge/kb-file-type-icon";
 import { briefBodyClass, briefBodyForegroundClass } from "@/components/pre-call/brief-detail-card";
+import { isCompanyPlaybookLandingAsset } from "@/lib/landing-page/clp-editor-utils";
 
 interface ClpPublicViewProps {
   page: CustomerLandingPage;
@@ -47,21 +54,29 @@ export function ClpPublicView({
     <div className={cn("min-h-screen", preview && embedded && "rounded-xl border")}>
       <div className="sticky top-0 z-20 border-b bg-card/95 backdrop-blur">
         <header className="px-6 py-8">
-          <p className="text-xs text-muted-foreground">Lead hub</p>
-          <h1 className="text-2xl font-semibold mt-1">{branding.accountName}</h1>
+          <p className="type-caption text-muted-foreground">Lead hub</p>
+          <h1 className="type-page-title mt-1">{branding.accountName}</h1>
           {branding.leadName && (
             <p className="text-muted-foreground mt-1">Prepared for {branding.leadName}</p>
           )}
         </header>
 
-        <nav className="flex gap-4 overflow-x-auto border-t px-6 py-2 text-sm">
+        <nav className="flex gap-4 overflow-x-auto border-t px-6 py-2 type-body">
           {sections.map((s) => (
-            <a key={s.id} href={`#${s.id}`} className="text-muted-foreground hover:text-foreground whitespace-nowrap">
+            <a
+              key={s.id}
+              href={`#${s.id}`}
+              className="text-muted-foreground hover:text-foreground whitespace-nowrap"
+            >
               {sectionTitle(s)}
             </a>
           ))}
           {proposal && (
-            <a href="#proposal" className="text-muted-foreground hover:text-foreground" onClick={() => onProposalOpen?.()}>
+            <a
+              href="#proposal"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => onProposalOpen?.()}
+            >
               Proposal
             </a>
           )}
@@ -73,13 +88,15 @@ export function ClpPublicView({
           <section key={section.id} id={section.id} className="scroll-mt-20">
             {section.type !== "hero" && (
               <div className="flex items-start justify-between gap-2">
-                <h2 className="text-lg font-semibold">{sectionTitle(section)}</h2>
+                <h2 className="type-section-title">{sectionTitle(section)}</h2>
                 {!preview && page.settings?.allowComments !== false && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-xs h-7"
-                    onClick={() => setCommentSection(commentSection === section.id ? null : section.id)}
+                    className="type-label h-7"
+                    onClick={() =>
+                      setCommentSection(commentSection === section.id ? null : section.id)
+                    }
                   >
                     Comment
                   </Button>
@@ -112,7 +129,7 @@ export function ClpPublicView({
             {comments
               .filter((c) => c.sectionId === section.id)
               .map((c) => (
-                <div key={c.id} className="mt-2 text-sm rounded-md border bg-muted/30 px-3 py-2">
+                <div key={c.id} className="mt-2 type-body rounded-md border bg-muted/30 px-3 py-2">
                   <span className="font-medium">{c.authorName}</span>: {c.body}
                 </div>
               ))}
@@ -121,7 +138,7 @@ export function ClpPublicView({
 
         {proposal && (
           <section id="proposal" className="scroll-mt-20" onMouseEnter={() => onProposalOpen?.()}>
-            <h2 className="text-lg font-semibold mb-4">{proposal.title}</h2>
+            <h2 className="type-section-title mb-4">{proposal.title}</h2>
             <div
               className="prose prose-sm max-w-none rounded-lg border bg-card p-6"
               dangerouslySetInnerHTML={{ __html: proposal.html }}
@@ -130,7 +147,7 @@ export function ClpPublicView({
         )}
 
         {branding.aeName && !sections.some((s) => s.type === "ae_contact") && (
-          <section className="rounded-lg border bg-muted/20 p-4 text-sm">
+          <section className="rounded-lg border bg-muted/20 p-4 type-body">
             <p className="font-medium">Your account team</p>
             <p>{branding.aeName}</p>
             {branding.aeEmail && <p className="text-muted-foreground">{branding.aeEmail}</p>}
@@ -142,13 +159,17 @@ export function ClpPublicView({
         <div className="fixed bottom-6 right-6 z-20">
           {chatOpen ? (
             <div className="w-80 rounded-xl border bg-card shadow-lg flex flex-col max-h-96">
-              <div className="px-3 py-2 border-b font-medium text-sm flex justify-between">
+              <div className="px-3 py-2 border-b font-medium type-body flex justify-between">
                 Chat with {branding.aeName ?? "your team"}
-                <button type="button" className="text-muted-foreground" onClick={() => setChatOpen(false)}>
+                <button
+                  type="button"
+                  className="text-muted-foreground"
+                  onClick={() => setChatOpen(false)}
+                >
                   ×
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-2 text-sm">
+              <div className="flex-1 overflow-y-auto p-3 space-y-2 type-body">
                 {chatMessages.map((m, i) => (
                   <div
                     key={i}
@@ -157,7 +178,7 @@ export function ClpPublicView({
                       m.authorType === "visitor" ? "bg-primary/10 ml-4" : "bg-muted mr-4"
                     )}
                   >
-                    <span className="text-xs font-medium">{m.authorName}</span>
+                    <span className="type-label">{m.authorName}</span>
                     <p>{m.body}</p>
                   </div>
                 ))}
@@ -167,7 +188,7 @@ export function ClpPublicView({
                   value={chatText}
                   onChange={(e) => setChatText(e.target.value)}
                   placeholder="Message…"
-                  className="h-8 text-sm"
+                  className="h-8 type-body"
                 />
                 <Button
                   size="sm"
@@ -197,15 +218,23 @@ function sectionTitle(s: ClpSection): string {
 }
 
 function assetRefsForSection(section: ClpSection, page: CustomerLandingPage): ClpAssetRef[] {
+  const blockedAssetIds = new Set(
+    [...(page.selectedAssets ?? []), ...(page.aiSuggestions ?? [])]
+      .filter((asset) => isCompanyPlaybookLandingAsset(asset))
+      .map((asset) => asset.assetId)
+  );
   const ids = section.assetIds?.length
     ? section.assetIds
     : section.assetId
       ? [section.assetId]
       : [];
-  return ids.map((id) => {
-    const fromSelected = page.selectedAssets.find((a) => a.assetId === id);
-    return fromSelected ?? { assetId: id, title: "Document", displayMode: "embed" as const };
-  });
+  return ids
+    .filter((id) => !blockedAssetIds.has(id))
+    .map((id) => {
+      const fromSelected = page.selectedAssets.find((a) => a.assetId === id);
+      return fromSelected ?? { assetId: id, title: "Document", displayMode: "embed" as const };
+    })
+    .filter((ref) => !isCompanyPlaybookLandingAsset(ref));
 }
 
 function renderSection(
@@ -217,9 +246,9 @@ function renderSection(
     return (
       <div className="mt-2 space-y-2">
         {section.headline && (
-          <p className="text-xl font-semibold text-foreground leading-snug">{section.headline}</p>
+          <p className="type-screen-title text-foreground leading-snug">{section.headline}</p>
         )}
-        {section.subhead && <p className="text-sm text-muted-foreground">{section.subhead}</p>}
+        {section.subhead && <p className="type-body text-muted-foreground">{section.subhead}</p>}
       </div>
     );
   }
@@ -227,7 +256,7 @@ function renderSection(
   if (section.type === "ae_contact") {
     const { branding } = page;
     return (
-      <div className="mt-3 rounded-lg border bg-muted/20 p-4 text-sm">
+      <div className="mt-3 rounded-lg border bg-muted/20 p-4 type-body">
         {branding.aeName && <p className="font-medium">{branding.aeName}</p>}
         {branding.aeEmail && <p className="text-muted-foreground">{branding.aeEmail}</p>}
       </div>
@@ -256,9 +285,7 @@ function renderSection(
   if (assetRefs.length > 0) {
     return (
       <div className="mt-3 space-y-2">
-        {section.caption && (
-          <p className="text-sm text-muted-foreground">{section.caption}</p>
-        )}
+        {section.caption && <p className="type-body text-muted-foreground">{section.caption}</p>}
         <ul className="space-y-2">
           {assetRefs.map((ref) => (
             <li
@@ -266,7 +293,7 @@ function renderSection(
               className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5"
             >
               <KbFileTypeIcon fileName={ref.title} size="sm" />
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">{ref.title}</span>
+              <span className="min-w-0 flex-1 truncate type-body font-medium">{ref.title}</span>
               <div className="flex shrink-0 gap-0.5">
                 <Button
                   type="button"
@@ -300,7 +327,12 @@ function renderSection(
       <ul className="mt-3 space-y-1">
         {section.links.map((l, i) => (
           <li key={i}>
-            <a href={l.url} className="text-sm text-primary hover:underline" target="_blank" rel="noopener noreferrer">
+            <a
+              href={l.url}
+              className="type-body text-primary hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               {l.label}
             </a>
           </li>
@@ -310,7 +342,7 @@ function renderSection(
   }
 
   if (section.subhead) {
-    return <p className="mt-2 text-sm text-muted-foreground">{section.subhead}</p>;
+    return <p className="mt-2 type-body text-muted-foreground">{section.subhead}</p>;
   }
 
   return null;

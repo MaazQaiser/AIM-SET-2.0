@@ -20,10 +20,10 @@ export function ContentLibraryAssetDetail({
       <header className="shrink-0 border-b border-border px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
-            <h2 className="truncate text-base font-semibold text-foreground">{asset.title}</h2>
+            <h2 className="truncate type-section-title text-foreground">{asset.title}</h2>
             <div className="flex flex-wrap items-center gap-2">
               <KbFileFormatBadge fileName={asset.fileName} mimeType={asset.mimeType} />
-              <span className="text-xs capitalize text-muted-foreground">
+              <span className="type-caption capitalize text-muted-foreground">
                 {asset.type.replace(/-/g, " ")}
               </span>
             </div>

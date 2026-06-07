@@ -38,24 +38,24 @@ export function LiveKbAssetCard({ asset, className }: LiveKbAssetCardProps) {
           <Icon className="h-4 w-4 text-accent-foreground" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-foreground truncate">{asset.title}</p>
-          <p className="text-[10px] text-muted-foreground">{config.label}</p>
+          <p className="type-body font-medium text-foreground truncate">{asset.title}</p>
+          <p className="type-caption text-muted-foreground">{config.label}</p>
         </div>
       </div>
       {asset.tags.length > 0 && (
         <div className="px-3 pb-2 flex flex-wrap gap-1">
           {asset.tags.slice(0, 3).map((tag) => (
-            <Chip key={tag} variant="tag" className="text-[9px]">
+            <Chip key={tag} variant="tag" className="type-caption">
               {tag}
             </Chip>
           ))}
         </div>
       )}
       <div className="flex gap-1.5 border-t border-border/60 p-2 bg-muted/20">
-        <Button asChild variant="secondary" size="sm" className="h-7 flex-1 text-xs">
+        <Button asChild variant="secondary" size="sm" className="h-7 flex-1 type-label">
           <Link href={href}>Open</Link>
         </Button>
-        <Button asChild variant="outline" size="sm" className="h-7 flex-1 text-xs">
+        <Button asChild variant="outline" size="sm" className="h-7 flex-1 type-label">
           <Link href={href} target="_blank" rel="noopener noreferrer">
             <ExternalLink className="h-3 w-3 mr-1" aria-hidden />
             New tab

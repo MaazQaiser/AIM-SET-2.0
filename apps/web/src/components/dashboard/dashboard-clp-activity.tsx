@@ -28,7 +28,7 @@ export function DashboardClpActivity() {
   if (topCallId && (page?.status === "published" || page?.status === "draft")) {
     return (
       <section className="space-y-1.5">
-        <h2 className="text-sm font-semibold text-muted-foreground">
+        <h2 className="type-section-title text-muted-foreground">
           Landing page activity
         </h2>
         <div className="max-w-md">
@@ -42,17 +42,17 @@ export function DashboardClpActivity() {
 
   return (
     <section className="space-y-1.5">
-      <h2 className="text-sm font-semibold text-muted-foreground">
+      <h2 className="type-section-title text-muted-foreground">
         Landing page activity
       </h2>
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <Globe className="h-4 w-4" />
             Lead hubs
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm">
+        <CardContent className="space-y-3 type-body-sm">
           <dl className="grid grid-cols-2 gap-3">
             <Metric label="Published pages" value={analytics.publishedCount} />
             <Metric label="Unique visitors" value={analytics.totalUniqueVisitors} />
@@ -77,8 +77,8 @@ export function DashboardClpActivity() {
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
     <div>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="font-semibold tabular-nums">{value}</dd>
+      <dt className="type-caption text-muted-foreground">{label}</dt>
+      <dd className="font-medium tabular-nums">{value}</dd>
     </div>
   );
 }

@@ -15,19 +15,19 @@ function formatTime(ts: number) {
 export function SuggestionLog({ entries, compact }: SuggestionLogProps) {
   if (entries.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground">AI suggestions will appear here with timestamps.</p>
+      <p className="type-caption text-muted-foreground">AI suggestions will appear here with timestamps.</p>
     );
   }
 
   return (
     <div className="space-y-1 max-h-32 overflow-y-auto">
       {!compact && (
-        <p className="text-xs font-semibold text-muted-foreground">
+        <p className="type-label text-muted-foreground">
           AI suggestion log
         </p>
       )}
       {[...entries].reverse().slice(0, 12).map((e, i) => (
-        <div key={e.id ?? `${e.operation}-${i}`} className="text-[10px] text-muted-foreground flex gap-2">
+        <div key={e.id ?? `${e.operation}-${i}`} className="type-caption text-muted-foreground flex gap-2">
           <span className="font-mono shrink-0">{formatTime(e.timestamp)}</span>
           <span className="truncate">
             <span className="text-foreground/80">{e.operation.replace(/_/g, " ")}</span>

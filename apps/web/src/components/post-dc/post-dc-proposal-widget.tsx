@@ -30,20 +30,20 @@ export function PostDcProposalWidget({ callId }: PostDcProposalWidgetProps) {
   return (
     <Card className="app-card">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
+        <CardTitle className="type-panel-title flex items-center gap-2">
           <FileText className="h-4 w-4" />
           Quick proposal (TCS)
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        <p className="text-xs text-muted-foreground">
+      <CardContent className="space-y-3 type-body">
+        <p className="type-caption text-muted-foreground">
           AI-drafted proposal from discovery outcomes, BANT signals, and timeline — review before
           attaching to the landing page.
         </p>
 
         {proposal ? (
           <div className="space-y-3 rounded-md border border-border">
-            <div className="border-b border-border px-3 py-2 text-xs">
+            <div className="border-b border-border px-3 py-2 type-label">
               <p className="font-medium text-foreground">{proposal.title}</p>
               <p className="mt-0.5 text-muted-foreground">
                 v{proposal.version} · {proposal.status.replaceAll("_", " ")}
@@ -54,9 +54,9 @@ export function PostDcProposalWidget({ callId }: PostDcProposalWidgetProps) {
               <ul className="divide-y divide-border">
                 {proposal.sections.map((section) => (
                   <li key={section.id} className="px-3 py-2.5">
-                    <p className="text-xs font-medium text-foreground">{section.title}</p>
+                    <p className="type-label text-foreground">{section.title}</p>
                     {section.bodyHtml ? (
-                      <p className="mt-1 line-clamp-3 text-[11px] leading-snug text-muted-foreground">
+                      <p className="mt-1 line-clamp-3 type-caption leading-snug text-muted-foreground">
                         {stripHtml(section.bodyHtml)}
                       </p>
                     ) : null}
@@ -64,7 +64,7 @@ export function PostDcProposalWidget({ callId }: PostDcProposalWidgetProps) {
                 ))}
               </ul>
             ) : (
-              <p className="px-3 pb-3 text-[11px] leading-snug text-muted-foreground line-clamp-4">
+              <p className="px-3 pb-3 type-caption leading-snug text-muted-foreground line-clamp-4">
                 {proposalPreviewText(proposal)}
               </p>
             )}

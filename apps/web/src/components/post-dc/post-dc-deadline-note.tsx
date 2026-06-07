@@ -21,7 +21,7 @@ export function PostDcDeadlineNote({
   return (
     <section className={cn("w-full min-w-0 pt-4 mt-3 border-t border-border/60", className)}>
       {showLabel ? (
-        <h3 className="mb-1.5 text-xs font-semibold text-muted-foreground">Deadline / key note</h3>
+        <h3 className="mb-1.5 type-label text-muted-foreground">Deadline / key note</h3>
       ) : null}
       <p
         className={cn(

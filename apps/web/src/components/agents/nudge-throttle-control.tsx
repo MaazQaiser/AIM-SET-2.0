@@ -26,14 +26,14 @@ export function NudgeThrottleControl({ config, onChange, readOnly = false }: Nud
     <div className="space-y-5">
       <div className="flex items-center gap-2">
         <Gauge className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium">Throttle Settings</span>
+        <span className="type-body font-medium">Throttle Settings</span>
       </div>
 
       {/* Nudge rate */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-sm">Max nudges per window</Label>
-          <span className="text-sm font-semibold text-primary">{local.max_nudges_per_window}</span>
+          <Label className="type-body">Max nudges per window</Label>
+          <span className="type-panel-title text-primary">{local.max_nudges_per_window}</span>
         </div>
         {readOnly ? (
           <div className="h-2 rounded-full bg-muted relative">
@@ -51,14 +51,14 @@ export function NudgeThrottleControl({ config, onChange, readOnly = false }: Nud
             onValueChange={([v]) => update({ max_nudges_per_window: v })}
           />
         )}
-        <p className="text-xs text-muted-foreground">
+        <p className="type-caption text-muted-foreground">
           Spec default: 3 per 5-minute window. Increase carefully — nudge fatigue degrades adoption.
         </p>
       </div>
 
       {/* Window size */}
       <div className="space-y-2">
-        <Label className="text-sm">Window size (seconds)</Label>
+        <Label className="type-body">Window size (seconds)</Label>
         <Input
           type="number"
           value={local.window_seconds}
@@ -67,13 +67,13 @@ export function NudgeThrottleControl({ config, onChange, readOnly = false }: Nud
           step={30}
           readOnly={readOnly}
           onChange={(e) => update({ window_seconds: Number(e.target.value) })}
-          className="w-36 h-8 text-sm"
+          className="w-36 h-8 type-body"
         />
       </div>
 
       {/* Max concurrent */}
       <div className="space-y-2">
-        <Label className="text-sm">Max concurrent runs</Label>
+        <Label className="type-body">Max concurrent runs</Label>
         <Input
           type="number"
           value={local.max_concurrent_runs}
@@ -81,7 +81,7 @@ export function NudgeThrottleControl({ config, onChange, readOnly = false }: Nud
           max={20}
           readOnly={readOnly}
           onChange={(e) => update({ max_concurrent_runs: Number(e.target.value) })}
-          className="w-36 h-8 text-sm"
+          className="w-36 h-8 type-body"
         />
       </div>
     </div>

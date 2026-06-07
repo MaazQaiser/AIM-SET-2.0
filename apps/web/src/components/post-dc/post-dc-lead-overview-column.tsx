@@ -18,7 +18,7 @@ export function PostDcLeadOverviewColumn({ widgetProps, className }: PostDcLeadO
 
   if (!hasLeadDetails) {
     return (
-      <p className={cn("text-sm text-muted-foreground", className)}>
+      <p className={cn("type-body text-muted-foreground", className)}>
         Lead details appear here when account snapshot or company metrics are available.
       </p>
     );

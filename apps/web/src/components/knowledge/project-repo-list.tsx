@@ -87,8 +87,8 @@ function ProjectRepoStats({ projects }: { projects: KBProject[] }) {
         { label: "KB sources", value: sourceCount.toLocaleString() },
       ].map((stat) => (
         <div key={stat.label} className="rounded-lg border border-border bg-card px-4 py-3">
-          <p className="text-xs font-medium text-muted-foreground">{stat.label}</p>
-          <p className="mt-1 text-xl font-semibold text-foreground">{stat.value}</p>
+          <p className="type-label text-muted-foreground">{stat.label}</p>
+          <p className="mt-1 type-screen-title text-foreground">{stat.value}</p>
         </div>
       ))}
     </div>
@@ -99,8 +99,8 @@ function ProjectRepoTable({ projects }: { projects: KBProject[] }) {
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[980px] border-collapse text-sm">
-          <thead className="bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+        <table className="w-full min-w-[980px] border-collapse type-table">
+          <thead className="bg-muted/40 text-left type-table-header text-muted-foreground">
             <tr className="border-b border-border">
               <th scope="col" className="px-4 py-3">Project</th>
               <th scope="col" className="px-4 py-3">Company</th>
@@ -121,11 +121,11 @@ function ProjectRepoTable({ projects }: { projects: KBProject[] }) {
                     <div className="min-w-0">
                       <Link
                         href={`/knowledge/projects/${project.id}`}
-                        className="font-semibold text-foreground hover:underline"
+                        className="font-medium text-foreground hover:underline"
                       >
                         {project.title}
                       </Link>
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                      <p className="mt-1 line-clamp-2 type-body-sm text-muted-foreground">
                         {compactText(primarySolution(project), 180)}
                       </p>
                     </div>
@@ -157,7 +157,7 @@ function ProjectRepoTable({ projects }: { projects: KBProject[] }) {
                     <span className="truncate">{project.sourceAssetTitle}</span>
                   </div>
                   {project.sourceUploadedAt && (
-                    <p className="mt-1 text-xs">Indexed {formatProjectDate(project.sourceUploadedAt)}</p>
+                    <p className="mt-1 type-label">Indexed {formatProjectDate(project.sourceUploadedAt)}</p>
                   )}
                 </td>
                 <td className="px-4 py-3">
@@ -193,8 +193,8 @@ function ProjectCard({ project }: { project: KBProject }) {
               <BriefcaseBusiness className="h-4 w-4" />
             </span>
             <div className="min-w-0">
-              <h3 className="line-clamp-2 text-sm font-semibold text-foreground">{project.title}</h3>
-              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+              <h3 className="line-clamp-2 type-panel-title text-foreground">{project.title}</h3>
+              <p className="mt-1 flex items-center gap-1 type-caption text-muted-foreground">
                 <Building2 className="h-3 w-3" />
                 {project.companyName || "Company not listed"}
               </p>
@@ -207,7 +207,7 @@ function ProjectCard({ project }: { project: KBProject }) {
           )}
         </div>
 
-        <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
+        <p className="line-clamp-3 type-body-sm text-muted-foreground">
           {compactText(primarySolution(project), 320)}
         </p>
 
@@ -218,7 +218,7 @@ function ProjectCard({ project }: { project: KBProject }) {
           {project.sourceCount > 1 && <Badge variant="secondary">{project.sourceCount} sources</Badge>}
         </div>
 
-        <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+        <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 type-caption text-muted-foreground">
           <div className="flex items-center gap-1.5">
             <Database className="h-3.5 w-3.5" />
             <span className="truncate">{project.sourceAssetTitle}</span>
@@ -229,13 +229,13 @@ function ProjectCard({ project }: { project: KBProject }) {
         </div>
 
         <div className="mt-auto flex gap-2 border-t border-border/60 pt-3">
-          <Button asChild size="sm" variant="secondary" className="h-8 flex-1 text-xs">
+          <Button asChild size="sm" variant="secondary" className="h-8 flex-1">
             <Link href={`/knowledge/projects/${project.id}`}>
               <ArrowUpRight className="h-3.5 w-3.5" />
               Details
             </Link>
           </Button>
-          <Button asChild size="sm" variant="outline" className="h-8 flex-1 text-xs">
+          <Button asChild size="sm" variant="outline" className="h-8 flex-1">
             <Link href={`/knowledge/${project.sourceAssetId}`}>
               <Database className="h-3.5 w-3.5" />
               Source
@@ -272,8 +272,8 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
       {!embedded && (
         <PageHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Project repo</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <h1 className="type-page-title text-foreground">Project repo</h1>
+            <p className="mt-1 type-body-sm text-muted-foreground">
               Projects parsed from project data stored in the knowledge base.
             </p>
           </div>
@@ -311,7 +311,7 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">Industry</span>
+          <span className="w-16 shrink-0 type-label text-muted-foreground">Industry</span>
           {industryFilters.map((filter) => (
             <FilterChip
               key={`industry-${filter}`}
@@ -324,7 +324,7 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">Domain</span>
+          <span className="w-16 shrink-0 type-label text-muted-foreground">Domain</span>
           {domainFilters.map((filter) => (
             <FilterChip
               key={`domain-${filter}`}
@@ -338,7 +338,7 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center gap-2 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-card p-4 type-body-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading KB projects...
         </div>

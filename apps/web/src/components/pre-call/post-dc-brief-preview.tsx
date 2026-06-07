@@ -31,7 +31,7 @@ export function PostDcBriefPreviewCard({
       }}
       headerExtra={
         preview.leadStage ? (
-          <Badge variant="outline" className="text-[10px] capitalize font-normal shrink-0">
+          <Badge variant="outline" className="type-caption capitalize font-normal shrink-0">
             {preview.leadStage}
           </Badge>
         ) : null
@@ -42,24 +42,24 @@ export function PostDcBriefPreviewCard({
       <div className="space-y-2">
         {preview.bottomLineContext && (
           <BriefDetailAccordion title="Bottom line" summary="Imported context">
-            <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap break-words">
+            <p className="type-body text-foreground/90 leading-relaxed whitespace-pre-wrap break-words">
               {preview.bottomLineContext}
             </p>
           </BriefDetailAccordion>
         )}
         {preview.salesStrategy && (
           <BriefDetailAccordion title="Sales strategy" summary="Go-to-call plan">
-            <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap break-words">
+            <p className="type-body text-foreground/90 leading-relaxed whitespace-pre-wrap break-words">
               {preview.salesStrategy}
             </p>
           </BriefDetailAccordion>
         )}
         {preview.engagementModel && (
           <BriefDetailRow>
-            <p className="text-[10px] font-semibold text-muted-foreground">
+            <p className="type-caption font-medium text-muted-foreground">
               Engagement model
             </p>
-            <p className="text-sm text-foreground/90 break-words mt-0.5">{preview.engagementModel}</p>
+            <p className="type-body text-foreground/90 break-words mt-0.5">{preview.engagementModel}</p>
           </BriefDetailRow>
         )}
         {preview.bant.length > 0 && (
@@ -70,8 +70,8 @@ export function PostDcBriefPreviewCard({
             <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
               {preview.bant.map((row) => (
                 <BriefDetailRow key={row.label}>
-                  <p className="text-[10px] text-muted-foreground truncate">{row.label}</p>
-                  <p className="text-xs font-medium text-foreground mt-0.5 break-words">{row.value}</p>
+                  <p className="type-caption text-muted-foreground truncate">{row.label}</p>
+                  <p className="type-label text-foreground mt-0.5 break-words">{row.value}</p>
                 </BriefDetailRow>
               ))}
             </div>

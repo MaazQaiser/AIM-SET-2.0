@@ -49,14 +49,14 @@ function SentimentChip({
         {scoreEmoji(score)}
       </span>
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold text-muted-foreground">
+        <p className="type-caption font-medium text-muted-foreground">
           {label}
         </p>
-        <p className="text-xs font-medium text-foreground leading-snug">
+        <p className="type-label text-foreground leading-snug">
           {toneEmoji(tone)} {value ?? formatSentimentScore(score)}
         </p>
         {helper && (
-          <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">{helper}</p>
+          <p className="mt-0.5 type-caption leading-snug text-muted-foreground">{helper}</p>
         )}
       </div>
     </div>
@@ -94,7 +94,7 @@ export function SentimentDisplayPanel({
       {shift && (
         <output
           className={cn(
-            "rounded-md border px-2.5 py-2 text-xs",
+            "rounded-md border px-2.5 py-2 type-label",
             shift.direction === "negative"
               ? "border-amber-200/80 bg-amber-50/50 dark:border-amber-900/50 dark:bg-amber-950/25"
               : "border-success/30 bg-success/5"

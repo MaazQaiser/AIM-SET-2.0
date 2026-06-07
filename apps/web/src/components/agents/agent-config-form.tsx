@@ -72,13 +72,13 @@ export function AgentConfigForm({
   return (
     <div className="space-y-8">
       <section className="rounded-md border bg-muted/30 p-4 space-y-2">
-        <h3 className="text-sm font-semibold">Agent in this project</h3>
-        <p className="text-xs text-muted-foreground">
+        <h3 className="type-panel-title">Agent in this project</h3>
+        <p className="type-caption text-muted-foreground">
           {local.profile?.identity?.role ?? "Specialist agent"} — domains:{" "}
           {(local.profile?.identity?.allowed_domains ?? []).join(", ") || "—"}
         </p>
         {operations.length > 0 ? (
-          <p className="text-xs text-muted-foreground">
+          <p className="type-caption text-muted-foreground">
             Operations: <span className="font-mono">{operations.join(", ")}</span>
           </p>
         ) : null}
@@ -87,13 +87,13 @@ export function AgentConfigForm({
       <Separator />
 
       <section className="space-y-4">
-        <h3 className="text-sm font-semibold">Model policy</h3>
-        <p className="text-xs text-muted-foreground">
+        <h3 className="type-panel-title">Model policy</h3>
+        <p className="type-caption text-muted-foreground">
           Primary and fallback models used when this agent calls the LLM.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Primary model</Label>
+            <Label className="type-caption text-muted-foreground">Primary model</Label>
             {readOnly ? (
               <ModelPolicyBadge policy={local.model_policy} />
             ) : (
@@ -108,7 +108,7 @@ export function AgentConfigForm({
                     model_name: opt.model,
                   });
                 }}
-                className="flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                className="flex h-9 w-full rounded-md border bg-background px-3 py-1 type-body shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 {MODEL_OPTIONS.map((m) => (
                   <option key={m.tier + m.model} value={m.tier}>
@@ -119,7 +119,7 @@ export function AgentConfigForm({
             )}
           </div>
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Fallback model</Label>
+            <Label className="type-caption text-muted-foreground">Fallback model</Label>
             {readOnly ? (
               <ModelPolicyBadge
                 policy={{
@@ -140,7 +140,7 @@ export function AgentConfigForm({
                     fallback_model_name: opt.model,
                   });
                 }}
-                className="flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                className="flex h-9 w-full rounded-md border bg-background px-3 py-1 type-body shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 {MODEL_OPTIONS.map((m) => (
                   <option key={m.tier + m.model} value={m.tier}>
@@ -156,13 +156,13 @@ export function AgentConfigForm({
       <Separator />
 
       <section className="space-y-4">
-        <h3 className="text-sm font-semibold">Cost controls</h3>
-        <p className="text-xs text-muted-foreground">
+        <h3 className="type-panel-title">Cost controls</h3>
+        <p className="type-caption text-muted-foreground">
           Enforced per agent run. Studio also tracks cumulative project spend against the project ceiling.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Per-run ceiling (USD)</Label>
+            <Label className="type-caption text-muted-foreground">Per-run ceiling (USD)</Label>
             <Input
               type="number"
               min={0.01}
@@ -175,12 +175,12 @@ export function AgentConfigForm({
                   per_run_ceiling_usd: Number.parseFloat(e.target.value) || 0,
                 })
               }
-              className="w-36 h-8 text-sm"
+              className="w-36 h-8 type-body"
             />
           </div>
           {agentId === "content_generation" && (
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Project ceiling (USD)</Label>
+              <Label className="type-caption text-muted-foreground">Project ceiling (USD)</Label>
               <Input
                 type="number"
                 min={0.1}
@@ -193,14 +193,14 @@ export function AgentConfigForm({
                     project_ceiling_usd: Number.parseFloat(e.target.value) || 0,
                   })
                 }
-                className="w-36 h-8 text-sm"
+                className="w-36 h-8 type-body"
               />
             </div>
           )}
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">When cap is hit</Label>
+            <Label className="type-caption text-muted-foreground">When cap is hit</Label>
             {readOnly ? (
-              <span className="text-sm font-mono">{local.cost_cap.abort_strategy}</span>
+              <span className="type-body font-mono">{local.cost_cap.abort_strategy}</span>
             ) : (
               <select
                 value={local.cost_cap.abort_strategy}
@@ -210,7 +210,7 @@ export function AgentConfigForm({
                     abort_strategy: e.target.value as CostAbortStrategy,
                   })
                 }
-                className="flex h-9 w-48 rounded-md border bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                className="flex h-9 w-48 rounded-md border bg-background px-3 py-1 type-body shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 {ABORT_OPTIONS.map((o) => (
                   <option key={o} value={o}>
@@ -226,7 +226,7 @@ export function AgentConfigForm({
       <Separator />
 
       <section className="space-y-4">
-        <h3 className="text-sm font-semibold">Throttle</h3>
+        <h3 className="type-panel-title">Throttle</h3>
         <NudgeThrottleControl
           config={local.throttle}
           readOnly={readOnly}
@@ -238,7 +238,7 @@ export function AgentConfigForm({
         <>
           <Separator />
           <section>
-            <h3 className="text-sm font-semibold mb-3">Signal routing</h3>
+            <h3 className="type-panel-title mb-3">Signal routing</h3>
             <SignalRoutingTable
               rules={local.signal_routing}
               readOnly={readOnly}
@@ -251,10 +251,10 @@ export function AgentConfigForm({
       <Separator />
 
       <section className="space-y-4">
-        <h3 className="text-sm font-semibold">Failure behaviour</h3>
+        <h3 className="type-panel-title">Failure behaviour</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Max retries</Label>
+            <Label className="type-caption text-muted-foreground">Max retries</Label>
             <Input
               type="number"
               min={0}
@@ -267,11 +267,11 @@ export function AgentConfigForm({
                   max_retries: Number.parseInt(e.target.value, 10) || 0,
                 })
               }
-              className="w-24 h-8 text-sm"
+              className="w-24 h-8 type-body"
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Retry delay (ms)</Label>
+            <Label className="type-caption text-muted-foreground">Retry delay (ms)</Label>
             <Input
               type="number"
               min={100}
@@ -284,13 +284,13 @@ export function AgentConfigForm({
                   retry_delay_ms: Number.parseInt(e.target.value, 10) || 0,
                 })
               }
-              className="w-24 h-8 text-sm"
+              className="w-24 h-8 type-body"
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
-            <Label className="text-xs text-muted-foreground">Fallback strategy</Label>
+            <Label className="type-caption text-muted-foreground">Fallback strategy</Label>
             {readOnly ? (
-              <span className="text-sm font-mono">{local.failure_behaviour.fallback_strategy}</span>
+              <span className="type-body font-mono">{local.failure_behaviour.fallback_strategy}</span>
             ) : (
               <select
                 value={local.failure_behaviour.fallback_strategy}
@@ -300,7 +300,7 @@ export function AgentConfigForm({
                     fallback_strategy: e.target.value as FallbackStrategy,
                   })
                 }
-                className="flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                className="flex h-9 w-full rounded-md border bg-background px-3 py-1 type-body shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 {FALLBACK_OPTIONS.map((o) => (
                   <option key={o} value={o}>
@@ -330,40 +330,40 @@ export function AgentConfigForm({
       <Separator />
 
       <section className="space-y-4">
-        <h3 className="text-sm font-semibold">Prompts</h3>
-        <p className="text-xs text-muted-foreground">
+        <h3 className="type-panel-title">Prompts</h3>
+        <p className="type-caption text-muted-foreground">
           Active prompt files from the repository. Override below applies on the next run when supported.
         </p>
         {prompts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No prompt files on disk for this agent yet.</p>
+          <p className="type-body text-muted-foreground">No prompt files on disk for this agent yet.</p>
         ) : (
           <ul className="space-y-2">
             {prompts.map((p) => (
-              <li key={`${p.label}-${p.version}`} className="rounded-md border p-3 text-sm">
+              <li key={`${p.label}-${p.version}`} className="rounded-md border p-3 type-body">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">
                     {p.label} <span className="text-muted-foreground font-mono">v{p.version}</span>
                   </span>
                   {p.is_active ? (
-                    <span className="text-xs rounded bg-primary/10 text-primary px-2 py-0.5">active</span>
+                    <span className="type-label rounded bg-primary/10 text-primary px-2 py-0.5">active</span>
                   ) : null}
                 </div>
                 {"path" in p && p.path ? (
-                  <p className="text-xs font-mono text-muted-foreground mt-1">prompts/{String(p.path)}</p>
+                  <p className="type-label font-mono text-muted-foreground mt-1">prompts/{String(p.path)}</p>
                 ) : null}
               </li>
             ))}
           </ul>
         )}
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">System prompt override (optional)</Label>
+          <Label className="type-caption text-muted-foreground">System prompt override (optional)</Label>
           <textarea
             value={local.system_prompt_override ?? ""}
             readOnly={readOnly}
             rows={4}
             onChange={(e) => patch("system_prompt_override", e.target.value)}
             placeholder="Leave empty to use the repository prompt file."
-            className="flex w-full rounded-md border bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring font-mono"
+            className="flex w-full rounded-md border bg-background px-3 py-2 type-body shadow-sm focus:outline-none focus:ring-1 focus:ring-ring font-mono"
           />
         </div>
       </section>

@@ -46,10 +46,10 @@ export function LiveRunningSummaryBar({
   if (embedded) {
     return (
       <div className={cn("shrink-0", className)} data-testid="running-summary">
-        <AiGradientText as="p" className="mb-1.5 text-[10px] font-semibold">
+        <AiGradientText as="p" className="mb-1.5 type-caption font-medium">
           Running summary
         </AiGradientText>
-        <p className="text-sm leading-relaxed text-foreground break-words">
+        <p className="type-body leading-relaxed text-foreground break-words">
           <TypingText text={summary} />
         </p>
       </div>
@@ -64,7 +64,7 @@ export function LiveRunningSummaryBar({
         className="border-t border-border"
       />
       <div className={liveColumnContentPadding}>
-        <p className="text-sm leading-relaxed text-foreground">{summary}</p>
+        <p className="type-body leading-relaxed text-foreground">{summary}</p>
       </div>
     </div>
   );

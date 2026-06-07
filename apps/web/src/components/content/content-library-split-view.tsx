@@ -66,10 +66,10 @@ export function ContentLibrarySplitView({
               <section key={columnId} className="mb-4 last:mb-0">
                 <div className="sticky top-0 z-[1] mb-1.5 flex items-center gap-2 bg-card px-2 py-1.5">
                   <Icon className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <h3 className="type-kicker text-muted-foreground">
                     {meta.title}
                   </h3>
-                  <span className="text-[10px] tabular-nums text-muted-foreground">{assets.length}</span>
+                  <span className="type-caption tabular-nums text-muted-foreground">{assets.length}</span>
                 </div>
                 <div className="space-y-1">
                   {assets.map((asset) => (

@@ -38,14 +38,14 @@ const columns: ColumnDef<AgentRun>[] = [
     accessorKey: "triggered_at",
     header: "Time",
     cell: ({ row }) => (
-      <span className="text-xs text-muted-foreground">{fmtTime(row.original.triggered_at)}</span>
+      <span className="type-caption text-muted-foreground">{fmtTime(row.original.triggered_at)}</span>
     ),
   },
   {
     accessorKey: "trigger",
     header: "Trigger",
     cell: ({ row }) => (
-      <Badge variant="outline" className="text-xs font-mono">
+      <Badge variant="outline" className="type-label font-mono">
         {row.original.trigger}
       </Badge>
     ),
@@ -53,7 +53,7 @@ const columns: ColumnDef<AgentRun>[] = [
   {
     accessorKey: "operation",
     header: "Operation",
-    cell: ({ row }) => <span className="text-xs font-mono">{row.original.operation}</span>,
+    cell: ({ row }) => <span className="type-label font-mono">{row.original.operation}</span>,
   },
   {
     accessorKey: "outcome",
@@ -62,7 +62,7 @@ const columns: ColumnDef<AgentRun>[] = [
       const cfg = OUTCOME_CONFIG[row.original.outcome];
       const Icon = cfg.icon;
       return (
-        <div className={cn("flex items-center gap-1 text-xs font-medium", cfg.className)}>
+        <div className={cn("flex items-center gap-1 type-label", cfg.className)}>
           <Icon className="h-3.5 w-3.5" />
           <span>{cfg.label}</span>
         </div>
@@ -73,21 +73,21 @@ const columns: ColumnDef<AgentRun>[] = [
     accessorKey: "duration_ms",
     header: "Duration",
     cell: ({ row }) => (
-      <span className="text-xs text-muted-foreground">{fmt(row.original.duration_ms)}</span>
+      <span className="type-caption text-muted-foreground">{fmt(row.original.duration_ms)}</span>
     ),
   },
   {
     accessorKey: "cost_usd",
     header: "Cost",
     cell: ({ row }) => (
-      <span className="text-xs font-mono">${row.original.cost_usd.toFixed(4)}</span>
+      <span className="type-label font-mono">${row.original.cost_usd.toFixed(4)}</span>
     ),
   },
   {
     accessorKey: "model_used",
     header: "Model",
     cell: ({ row }) => (
-      <span className="text-[10px] text-muted-foreground font-mono">
+      <span className="type-caption text-muted-foreground font-mono">
         {row.original.model_used.split("-").slice(0, 3).join("-")}
       </span>
     ),
@@ -97,7 +97,7 @@ const columns: ColumnDef<AgentRun>[] = [
 export function AgentRunTable({ runs }: AgentRunTableProps) {
   if (runs.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+      <div className="rounded-lg border border-dashed p-8 text-center type-body text-muted-foreground">
         No runs recorded yet
       </div>
     );

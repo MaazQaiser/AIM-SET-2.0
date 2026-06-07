@@ -24,7 +24,7 @@ export default function ContentGapDetailPage({ params }: { params: Promise<{ gap
     return (
       <PageShell size="narrow">
         <PageHeader>
-          <Link href="/content" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <Link href="/content" className="flex items-center gap-1 type-body text-muted-foreground hover:text-foreground">
             <ChevronLeft className="h-4 w-4" />
             Content
           </Link>
@@ -36,7 +36,7 @@ export default function ContentGapDetailPage({ params }: { params: Promise<{ gap
 
   if (gap.studioProjectId) {
     return (
-      <PageShell size="narrow" className="text-sm text-muted-foreground">
+      <PageShell size="narrow" className="type-body text-muted-foreground">
         Opening linked Studio project…
       </PageShell>
     );
@@ -45,7 +45,7 @@ export default function ContentGapDetailPage({ params }: { params: Promise<{ gap
   return (
     <PageShell size="narrow">
       <PageHeader>
-        <Link href="/content?tab=suggestions" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <Link href="/content?tab=suggestions" className="flex items-center gap-1 type-body text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-4 w-4" />
           Content suggestions
         </Link>

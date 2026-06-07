@@ -154,8 +154,8 @@ export function ContentSuggestionsTab() {
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold text-foreground">Tracked suggestions</h2>
-              <p className="text-xs text-muted-foreground">
+              <h2 className="type-section-title text-foreground">Tracked suggestions</h2>
+              <p className="type-caption text-muted-foreground">
                 Gaps persisted in the content workflow with linked drafts.
               </p>
             </div>
@@ -169,18 +169,18 @@ export function ContentSuggestionsTab() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-2">
                       <Lightbulb className="h-4 w-4 text-warning mt-0.5 shrink-0" />
-                      <CardTitle className="text-sm font-medium">{gap.topic}</CardTitle>
+                      <CardTitle>{gap.topic}</CardTitle>
                     </div>
                     <Badge variant={config.variant}>{config.label}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0 space-y-3">
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1 type-caption text-muted-foreground">
                     <CalendarClock className="h-3 w-3" />
                     Detected from: {gap.sourcedFrom}
                   </span>
                   {gap.sourcePath && (
-                    <Button asChild variant="ghost" size="sm" className="h-7 w-fit px-2 text-xs">
+                    <Button asChild variant="ghost" size="sm" className="h-7 w-fit px-2">
                       <Link href={gap.sourcePath}>
                         Needed at
                         <ArrowUpRight className="h-3 w-3" />
@@ -188,17 +188,17 @@ export function ContentSuggestionsTab() {
                     </Button>
                   )}
                   {(gap.reason || gap.neededFor) && (
-                    <p className="text-xs leading-relaxed text-muted-foreground">
+                    <p className="type-caption text-muted-foreground">
                       {[gap.reason, gap.neededFor].filter(Boolean).join(" ")}
                     </p>
                   )}
                   <div className="rounded-md border border-border bg-muted/40 p-3">
                     <div className="flex items-center gap-2 mb-2">
                       <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="text-xs font-medium capitalize">AI draft {gap.draftType}</span>
+                      <span className="type-label capitalize">AI draft {gap.draftType}</span>
                       <AIGeneratedBadge />
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="type-caption text-muted-foreground">
                       Review evidence chain and route priority back to the content agent.
                     </p>
                   </div>
@@ -245,23 +245,23 @@ function ContentAgentInputsSection({
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-foreground">AI suggestions</h2>
-            <p className="text-xs text-muted-foreground">{description}</p>
+            <h2 className="type-section-title text-foreground">AI suggestions</h2>
+            <p className="type-caption text-muted-foreground">{description}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <TabsList className="h-9 rounded-lg bg-muted/50 p-1">
-              <TabsTrigger value="pre-dc" className="text-xs px-3">
+              <TabsTrigger value="pre-dc" className="px-3">
                 Pre-DC
                 {preDcAssetCount > 0 && (
-                  <span className="ml-1.5 rounded-full bg-background px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
+                  <span className="ml-1.5 rounded-full bg-background px-1.5 py-0.5 type-caption font-medium tabular-nums">
                     {preDcAssetCount}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="post-dc" className="text-xs px-3">
+              <TabsTrigger value="post-dc" className="type-label px-3">
                 Post-DC
                 {postDcAssetCount > 0 && (
-                  <span className="ml-1.5 rounded-full bg-background px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
+                  <span className="ml-1.5 rounded-full bg-background px-1.5 py-0.5 type-caption font-medium tabular-nums">
                     {postDcAssetCount}
                   </span>
                 )}
@@ -305,7 +305,7 @@ function ContentGenerationGrid({
 }) {
   if (groups.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+      <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center type-body text-muted-foreground">
         {emptyMessage}
       </p>
     );
@@ -475,7 +475,7 @@ function ContentGenerationCard({
           <div className="flex min-w-0 items-start gap-2">
             <FilePlus2 className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <div className="min-w-0 space-y-2">
-              <CardTitle className="break-words text-sm font-medium">{group.name}</CardTitle>
+              <CardTitle className="break-words type-body font-medium">{group.name}</CardTitle>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="capitalize">
                   {formatArtifactType(group.type)}
@@ -490,7 +490,7 @@ function ContentGenerationCard({
                         <span className="text-muted-foreground">need this asset</span>
                       </Badge>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom" align="start" className="max-w-xs whitespace-pre-line text-xs">
+                    <TooltipContent side="bottom" align="start" className="max-w-xs whitespace-pre-line type-label">
                       {formatLeadTooltip(group.leads)}
                     </TooltipContent>
                   </Tooltip>
@@ -543,21 +543,21 @@ function ContentGenerationCard({
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
-            <AiGradientText className="text-xs">Why generate it</AiGradientText>
+            <AiGradientText className="type-label">Why generate it</AiGradientText>
           </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">{group.reason}</p>
+          <p className="type-label leading-relaxed text-muted-foreground">{group.reason}</p>
           {group.kbMatches && group.kbMatches.length > 0 && (
             <SuggestionKbMatches matches={group.kbMatches} />
           )}
         </div>
 
-        <p className="text-xs text-muted-foreground">
+        <p className="type-caption text-muted-foreground">
           <span className="font-medium text-foreground">Needed for: </span>
           {group.neededFor}
         </p>
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2 type-caption text-muted-foreground">
           <span className="font-medium text-foreground">Needed at:</span>
-          <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs">
+          <Button asChild variant="ghost" size="sm" className="h-7 px-2 type-label">
             <Link href={sourcePath}>
               {source === "post-dc" ? "Post-DC follow-up" : "Pre-DC call brief"}
               <ArrowUpRight className="h-3 w-3" />
@@ -565,7 +565,7 @@ function ContentGenerationCard({
           </Button>
         </div>
         {contentRequirements && contentRequirements !== group.reason && (
-          <p className="text-xs text-muted-foreground">
+          <p className="type-caption text-muted-foreground">
             <span className="font-medium text-foreground">What to create: </span>
             {contentRequirements}
           </p>
@@ -575,19 +575,19 @@ function ContentGenerationCard({
           type="button"
           variant="ghost"
           size="sm"
-          className="h-7 px-2 text-xs text-muted-foreground"
+          className="h-7 px-2 type-caption text-muted-foreground"
           onClick={() => setExpanded((v) => !v)}
         >
           {expanded ? "Hide plan preview" : "Preview AI slide plan"}
         </Button>
 
         {expanded && planLoading && (
-          <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+          <p className="rounded-md border border-dashed border-border px-3 py-2 type-caption text-muted-foreground">
             Building AI slide plan…
           </p>
         )}
         {expanded && planError && (
-          <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 type-label text-destructive">
             Could not load the slide plan preview.
           </p>
         )}
@@ -595,7 +595,7 @@ function ContentGenerationCard({
           <SuggestionPlanPreview plan={planPreview.suggestion_plan} />
         )}
         {expanded && !planLoading && !planError && !planPreview?.suggestion_plan && (
-          <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+          <p className="rounded-md border border-dashed border-border px-3 py-2 type-caption text-muted-foreground">
             No slide plan came back for this suggestion yet.
           </p>
         )}
@@ -611,10 +611,10 @@ function SuggestionKbMatches({
 }) {
   return (
     <div className="space-y-1.5">
-      <p className="text-xs font-medium text-foreground">Related in KB</p>
+      <p className="type-label text-foreground">Related in KB</p>
       <div className="flex flex-wrap gap-1.5">
         {matches.map((match) => (
-          <Button key={match.id} asChild size="sm" variant="outline" className="h-7 max-w-full px-2 text-xs">
+          <Button key={match.id} asChild size="sm" variant="outline" className="h-7 max-w-full px-2 type-label">
             <Link href={`/content?tab=library&asset=${encodeURIComponent(match.id)}`}>
               <FileText className="h-3 w-3 shrink-0" />
               <span className="truncate">{match.title}</span>
@@ -638,14 +638,14 @@ function SuggestionPlanPreview({
   return (
     <div className="space-y-3 rounded-md border border-border bg-muted/30 p-3">
       {plan.plan_summary && (
-        <p className="text-xs leading-relaxed text-muted-foreground">{plan.plan_summary}</p>
+        <p className="type-label leading-relaxed text-muted-foreground">{plan.plan_summary}</p>
       )}
       {projects.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs font-medium text-foreground">Matching projects</p>
+          <p className="type-label text-foreground">Matching projects</p>
           <div className="flex flex-wrap gap-1.5">
             {projects.map((proj) => (
-              <Badge key={proj.asset_id} variant="secondary" className="text-[10px] font-normal">
+              <Badge key={proj.asset_id} variant="secondary" className="type-caption font-normal">
                 {proj.title}
               </Badge>
             ))}
@@ -654,10 +654,10 @@ function SuggestionPlanPreview({
       )}
       {kbAssets.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs font-medium text-foreground">Reusable KB assets</p>
+          <p className="type-label text-foreground">Reusable KB assets</p>
           <div className="flex flex-wrap gap-1.5">
             {kbAssets.map((asset) => (
-              <Badge key={asset.asset_id} variant="outline" className="text-[10px] font-normal">
+              <Badge key={asset.asset_id} variant="outline" className="type-caption font-normal">
                 {asset.title}
                 {asset.slide_count ? ` · ${asset.slide_count} slides` : ""}
               </Badge>
@@ -666,31 +666,31 @@ function SuggestionPlanPreview({
         </div>
       )}
       {plan.template?.name && (
-        <p className="text-xs text-muted-foreground">
+        <p className="type-caption text-muted-foreground">
           <span className="font-medium text-foreground">Default template: </span>
           {plan.template.name}
         </p>
       )}
       {slides.length === 0 && (
-        <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+        <p className="rounded-md border border-dashed border-border px-3 py-2 type-caption text-muted-foreground">
           No slide rows were returned for this plan.
         </p>
       )}
       {slides.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-xs font-medium text-foreground">Proposed slides</p>
-          <ol className="space-y-1 text-xs text-muted-foreground">
+          <p className="type-label text-foreground">Proposed slides</p>
+          <ol className="space-y-1 type-caption text-muted-foreground">
             {slides.map((slide) => (
               <li key={slide.slide} className="flex flex-wrap items-center gap-1.5">
                 <span className="font-medium text-foreground">{slide.slide}. {slide.heading}</span>
                 {slide.mode === "reuse" && (
-                  <Badge variant="outline" className="h-5 text-[10px]">Reuse</Badge>
+                  <Badge variant="outline" className="h-5 type-caption">Reuse</Badge>
                 )}
                 {slide.mode === "hybrid" && (
-                  <Badge variant="outline" className="h-5 text-[10px]">Hybrid</Badge>
+                  <Badge variant="outline" className="h-5 type-caption">Hybrid</Badge>
                 )}
                 {slide.reuse && (
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="type-caption text-muted-foreground">
                     from {slide.reuse.source_vertical || "KB"} slide {slide.reuse.source_slide_index}
                   </span>
                 )}

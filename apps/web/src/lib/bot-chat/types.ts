@@ -16,6 +16,9 @@ export interface BotChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   citations?: Citation[];
+  suggestions?: string[];
+  confidence?: number;
+  missingEvidence?: string[];
   authorName?: string;
   authorRole?: PodRole;
   authorInitials?: string;

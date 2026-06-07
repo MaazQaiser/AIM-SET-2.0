@@ -90,7 +90,7 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
     return (
       <div
         className={cn(
-          "flex items-center justify-center gap-2 text-sm text-muted-foreground rounded-lg border bg-muted/20",
+          "flex items-center justify-center gap-2 type-body text-muted-foreground rounded-lg border bg-muted/20",
           briefMainNestedSurfaceClass,
           compact ? "min-h-[200px]" : "min-h-[420px]",
           className
@@ -106,7 +106,7 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
     return (
       <div
         className={cn(
-          "flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground",
+          "flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center type-body text-muted-foreground",
           briefMainNestedSurfaceClass,
           className
         )}
@@ -137,7 +137,7 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-sm tabular-nums min-w-[5rem] text-center">
+          <span className="type-body tabular-nums min-w-[5rem] text-center">
             Slide {currentSlide} / {slideCount}
           </span>
           <Button

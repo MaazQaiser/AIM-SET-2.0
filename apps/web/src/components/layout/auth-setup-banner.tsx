@@ -16,7 +16,7 @@ export function AuthSetupBanner() {
   return (
     <div
       role="alert"
-      className="mx-6 mt-4 rounded-lg border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-foreground dark:border-amber-500/30 dark:bg-amber-950/40"
+      className="mx-6 mt-4 rounded-lg border border-amber-200/80 bg-amber-50/90 px-4 py-3 type-body text-foreground dark:border-amber-500/30 dark:bg-amber-950/40"
     >
       <p className="font-medium text-amber-900 dark:text-amber-100">
         Deployment setup incomplete
@@ -29,16 +29,16 @@ export function AuthSetupBanner() {
         <ul className="mt-2 list-disc pl-5 text-muted-foreground space-y-0.5">
           {status.missing.map((name) => (
             <li key={name}>
-              <code className="text-xs bg-muted px-1 rounded">{name}</code>
+              <code className="type-label bg-muted px-1 rounded">{name}</code>
             </li>
           ))}
         </ul>
       )}
-      <p className="mt-2 text-xs text-muted-foreground">
+      <p className="mt-2 type-caption text-muted-foreground">
         Publishable: {hints.publishable} · Secret: {hints.secret}
         {status.apiUrlHost ? ` · API_URL host: ${status.apiUrlHost}` : null}
       </p>
-      <p className="mt-2 text-xs">
+      <p className="mt-2 type-label">
         Vercel → Project → Settings → Environment Variables → enable for{" "}
         <strong>Production</strong> → <strong>Redeploy</strong> (required after adding{" "}
         <code className="bg-muted px-1 rounded">NEXT_PUBLIC_*</code> keys). Add your Vercel

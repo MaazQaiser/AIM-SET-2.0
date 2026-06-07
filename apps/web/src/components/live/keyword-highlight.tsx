@@ -52,11 +52,11 @@ export function KeywordHighlight({ text, definitions = EMPTY_DEFINITIONS }: Keyw
                 {part.value}
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-72 text-sm">
+            <PopoverContent className="w-72 type-body">
               <p className="font-medium">{def.title}</p>
               <p className="text-muted-foreground mt-1">{def.definition}</p>
               {def.assetHint && (
-                <p className="text-xs text-primary mt-2">KB: {def.assetHint}</p>
+                <p className="type-label text-primary mt-2">KB: {def.assetHint}</p>
               )}
             </PopoverContent>
           </Popover>

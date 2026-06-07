@@ -48,7 +48,7 @@ function EmailAudienceToggle({
         aria-selected={value === "client"}
         disabled={!hasClient}
         className={cn(
-          "inline-flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-medium transition-colors",
+          "inline-flex items-center gap-1 rounded px-2.5 py-1 type-caption font-medium transition-colors",
           value === "client"
             ? "bg-background text-foreground shadow-sm"
             : "text-muted-foreground hover:text-foreground",
@@ -64,7 +64,7 @@ function EmailAudienceToggle({
         aria-selected={value === "internal"}
         disabled={!hasInternal}
         className={cn(
-          "inline-flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-medium transition-colors",
+          "inline-flex items-center gap-1 rounded px-2.5 py-1 type-caption font-medium transition-colors",
           value === "internal"
             ? "bg-background text-foreground shadow-sm"
             : "text-muted-foreground hover:text-foreground",
@@ -80,7 +80,7 @@ function EmailAudienceToggle({
 
 function JiraPlaceholder() {
   return (
-    <p className="text-sm text-muted-foreground py-6 text-center px-2">
+    <p className="type-body text-muted-foreground py-6 text-center px-2">
       No Jira handoff for this lead stage — focus on client email and CRM tasks.
     </p>
   );
@@ -98,7 +98,7 @@ function JiraPreview({ ticket }: { ticket: PostCallJiraTicket }) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 text-sm">
+    <div className="flex min-h-0 flex-1 flex-col gap-2 type-body">
       <div className="flex justify-end -mt-1">
         <Tooltip>
           <TooltipTrigger asChild>
@@ -106,7 +106,7 @@ function JiraPreview({ ticket }: { ticket: PostCallJiraTicket }) {
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+              className="h-7 gap-1.5 px-2 type-caption text-muted-foreground"
               onClick={() => void handleCopy()}
             >
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -116,11 +116,11 @@ function JiraPreview({ ticket }: { ticket: PostCallJiraTicket }) {
           <TooltipContent>Copy ticket text</TooltipContent>
         </Tooltip>
       </div>
-      <p className="text-xs font-medium text-foreground break-words">{ticket.summary}</p>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <p className="type-label text-foreground break-words">{ticket.summary}</p>
+      <p className="type-kicker text-muted-foreground">
         {ticket.issueType} · {ticket.priority}
       </p>
-      <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words line-clamp-[12]">
+      <p className="type-caption text-muted-foreground whitespace-pre-wrap break-words line-clamp-[12]">
         {ticket.description}
       </p>
     </div>
@@ -168,7 +168,7 @@ export function PostDcEmailJiraPanel({
         activeDraft ? (
           <EmailEditor draft={activeDraft} title={emailTitle} description={emailDescription} />
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="type-body text-muted-foreground">
             {audience === "client"
               ? "Client follow-up draft will appear here after wrap-up."
               : "Internal handoff draft will appear here after wrap-up."}
@@ -179,7 +179,7 @@ export function PostDcEmailJiraPanel({
       {activeDraft ? (
         <EmailDraftPreview draft={activeDraft} />
       ) : (
-        <p className="text-sm text-muted-foreground py-4 text-center">
+        <p className="type-body text-muted-foreground py-4 text-center">
           {audience === "client"
             ? "Client follow-up draft will appear here after wrap-up."
             : "Internal handoff draft will appear here after wrap-up."}

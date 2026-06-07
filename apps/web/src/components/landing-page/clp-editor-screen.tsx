@@ -101,8 +101,8 @@ export function ClpEditorScreen({ callId }: ClpEditorScreenProps) {
             </Link>
           </Button>
           <div>
-            <h1 className="text-lg font-semibold">Customer landing page</h1>
-            <p className="text-sm text-muted-foreground">{call?.accountName}</p>
+            <h1 className="type-section-title">Customer landing page</h1>
+            <p className="type-body text-muted-foreground">{call?.accountName}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -129,7 +129,7 @@ export function ClpEditorScreen({ callId }: ClpEditorScreenProps) {
 
       <div className="flex-1 grid lg:grid-cols-2 min-h-0">
         <div className="overflow-y-auto border-r bg-muted/20 p-4">
-          <p className="text-xs text-muted-foreground mb-2">Preview as customer</p>
+          <p className="type-caption text-muted-foreground mb-2">Preview as customer</p>
           <ClpPublicView page={draft} proposal={proposal ?? null} preview />
         </div>
         <div className="p-6 space-y-5 overflow-y-auto">
@@ -137,7 +137,7 @@ export function ClpEditorScreen({ callId }: ClpEditorScreenProps) {
           <ClpSectionEditor draft={draft} onChange={saveDraft} />
           <ClpKbAssetsPanel draft={draft} onChange={saveDraft} />
           {proposal && (
-            <div className="rounded-md border px-3 py-2 text-xs">
+            <div className="rounded-md border px-3 py-2 type-label">
               <p className="font-medium">Proposal attached</p>
               <p className="text-muted-foreground mt-1">{proposal.title}</p>
             </div>

@@ -148,10 +148,19 @@ def _first_citation_dict(envelope: AgentEnvelope) -> Dict[str, Any]:
 
 
 def _citation_to_dict(c: Any) -> Dict[str, Any]:
+    title_by_type = {
+        "company_playbook": "Company knowledge base",
+        "kb_document": "Knowledge base",
+        "transcript": "Transcript",
+        "call_brief": "Call brief",
+        "post_call_review": "Post-call review",
+        "call_record": "Call record",
+    }
+    source_type = c.source_type
     return {
         "id": c.source_id,
-        "title": c.source_type,
-        "type": c.source_type,
+        "title": title_by_type.get(source_type, "Knowledge base"),
+        "type": source_type,
         "excerpt": c.snippet,
     }
 

@@ -92,23 +92,23 @@ export function BANTScorecard({
       >
         <Icon className={cn("shrink-0", expanded ? "h-5 w-5 mt-0.5" : "h-4 w-4", config.color)} />
         <div className="min-w-0 flex-1 text-left">
-          <p className="text-left text-xs font-medium text-muted-foreground">
+          <p className="text-left type-label text-muted-foreground">
             {bantLabels[key]}
           </p>
-          <p className={cn("text-left font-semibold", expanded ? "text-sm" : "text-xs", config.color)}>
+          <p className={cn("text-left font-semibold", expanded ? "type-body" : "type-label", config.color)}>
             {config.label}
           </p>
           {evidence && key !== "need" ? (
             <p
               className={cn(
                 "text-muted-foreground mt-1 leading-relaxed",
-                expanded ? "text-sm" : "text-[10px] line-clamp-2"
+                expanded ? "type-body" : "type-caption line-clamp-2"
               )}
             >
               &ldquo;{evidence}&rdquo;
             </p>
           ) : expanded && key !== "need" ? (
-            <p className="text-xs text-muted-foreground/70 mt-1 italic">No transcript evidence captured.</p>
+            <p className="type-caption text-muted-foreground/70 mt-1 italic">No transcript evidence captured.</p>
           ) : null}
         </div>
       </div>
@@ -139,8 +139,8 @@ export function BANTScorecard({
         >
           <div className="flex items-center gap-2 mb-1.5">
             <NeedIcon className={cn("h-4 w-4 shrink-0", needConfig.color)} />
-            <p className="text-xs font-medium text-muted-foreground">Need</p>
-            <span className={cn("text-xs font-semibold", needConfig.color)}>{needConfig.label}</span>
+            <p className="type-label text-muted-foreground">Need</p>
+            <span className={cn("type-label", needConfig.color)}>{needConfig.label}</span>
           </div>
           {resolvedNeedItems.length > 0 ? (
             <ul className={cn("space-y-1.5", resolvedNeedItems.length > 1 && "list-none")}>
@@ -149,7 +149,7 @@ export function BANTScorecard({
                   key={item}
                   className={cn(
                     "text-muted-foreground leading-relaxed break-words",
-                    expanded ? "text-sm" : "text-xs",
+                    expanded ? "type-body" : "type-label",
                     resolvedNeedItems.length > 1 &&
                       "relative pl-3 before:absolute before:left-0 before:top-[0.55em] before:h-1 before:w-1 before:rounded-full before:bg-muted-foreground/50"
                   )}
@@ -159,7 +159,7 @@ export function BANTScorecard({
               ))}
             </ul>
           ) : (
-            <p className="text-[10px] text-muted-foreground/70 italic">No need captured.</p>
+            <p className="type-caption text-muted-foreground/70 italic">No need captured.</p>
           )}
         </div>
       </div>
@@ -188,13 +188,13 @@ export function BANTScorecard({
                 className={cn("shrink-0", md ? "h-4 w-4" : "h-3.5 w-3.5", config.color)}
               />
               <div className="min-w-0 leading-none text-left">
-                <p className="text-left text-xs font-medium text-muted-foreground">
+                <p className="text-left type-label text-muted-foreground">
                   {bantLabels[key]}
                 </p>
                 <p
                   className={cn(
                     "text-left font-bold",
-                    md ? "text-xs" : "text-[11px]",
+                    md ? "type-label" : "type-caption",
                     config.color
                   )}
                 >
@@ -218,7 +218,7 @@ export function BANTScorecard({
           return (
             <span
               key={key}
-              className={cn("flex items-center gap-0.5 text-xs font-medium", config.color)}
+              className={cn("flex items-center gap-0.5 type-label", config.color)}
               title={`${bantLabels[key]}: ${config.label}`}
             >
               <Icon className="h-3 w-3" />

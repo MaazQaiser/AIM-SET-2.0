@@ -86,13 +86,13 @@ function BantDimensionBlock({
       <div className="flex items-center justify-between gap-3 py-2.5">
         <span
           className={cn(
-            "shrink-0 text-xs",
+            "shrink-0 type-label",
             detailsOpen ? "font-semibold text-foreground" : "text-muted-foreground"
           )}
         >
           {bantLabels[dimension]}
         </span>
-        <span className={cn("truncate text-xs font-semibold", bantStatusClass(status, dimension))}>
+        <span className={cn("truncate type-label", bantStatusClass(status, dimension))}>
           {bantStatusLabel(status, dimension)}
         </span>
       </div>
@@ -107,12 +107,12 @@ function BantDimensionBlock({
             if (value) {
               return (
                 <>
-                  <p className="text-[11px] font-medium leading-snug text-foreground">
+                  <p className="type-caption font-medium leading-snug text-foreground">
                     {concernPrefix}
                     {formatEvidenceValue(dimension, value)}
                   </p>
                   {snippet && snippet !== value && (
-                    <p className="text-[11px] leading-relaxed text-muted-foreground">{snippet}</p>
+                    <p className="type-caption leading-relaxed text-muted-foreground">{snippet}</p>
                   )}
                 </>
               );
@@ -120,7 +120,7 @@ function BantDimensionBlock({
 
             if (snippet) {
               return (
-                <p className="text-[11px] font-medium leading-snug text-foreground">
+                <p className="type-caption font-medium leading-snug text-foreground">
                   {concernPrefix}
                   {snippet}
                 </p>
@@ -137,13 +137,13 @@ function BantDimensionBlock({
             return (
               <div key={signal.id} className="space-y-0.5">
                 {headline && (
-                  <p className="text-[11px] font-medium leading-snug text-foreground">{headline}</p>
+                  <p className="type-caption font-medium leading-snug text-foreground">{headline}</p>
                 )}
                 {showSnippet && (
-                  <p className="text-[11px] leading-relaxed text-muted-foreground">{snippet}</p>
+                  <p className="type-caption leading-relaxed text-muted-foreground">{snippet}</p>
                 )}
                 {!headline && snippet && (
-                  <p className="text-[11px] font-medium leading-snug text-foreground">{snippet}</p>
+                  <p className="type-caption font-medium leading-snug text-foreground">{snippet}</p>
                 )}
               </div>
             );
@@ -224,7 +224,7 @@ export function BantLiveWidget({
       >
         <div className="flex min-w-0 items-center gap-2">
           <Target className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="truncate text-[11px] font-semibold text-muted-foreground">
+          <span className="truncate type-caption font-medium text-muted-foreground">
             BANT live
           </span>
         </div>
@@ -239,12 +239,12 @@ export function BantLiveWidget({
       >
           {detailsOpen && hasDetailContent && (
             <div className={cn("flex shrink-0 items-center justify-between gap-2 border-b border-border/50 py-2", liveColumnHorizontalPadding)}>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="type-kicker text-muted-foreground">
                 Details
               </span>
               <button
                 type="button"
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                className="inline-flex items-center gap-1 type-caption font-medium text-muted-foreground transition-colors hover:text-foreground"
                 data-testid="bant-hide-details"
                 aria-label="Hide BANT details"
                 onClick={() => setDetailsOpen(false)}
@@ -263,7 +263,7 @@ export function BantLiveWidget({
             )}
           >
             {!checklist ? (
-              <p className="py-2 text-xs text-muted-foreground">
+              <p className="py-2 type-caption text-muted-foreground">
                 BANT signals will appear as the conversation progresses.
               </p>
             ) : (
@@ -284,7 +284,7 @@ export function BantLiveWidget({
                 {hasDetailContent && !detailsOpen && (
                   <button
                     type="button"
-                    className="mt-2 text-left text-[11px] font-semibold text-primary hover:underline"
+                    className="mt-2 text-left type-caption font-medium text-primary hover:underline"
                     data-testid="bant-see-details"
                     aria-expanded={false}
                     onClick={() => setDetailsOpen(true)}

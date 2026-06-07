@@ -82,13 +82,13 @@ export function LiveCallPageHeader({
           </Button>
 
           <div className="min-w-0 flex-1">
-            <h1 className="type-headline truncate text-foreground">{accountName}</h1>
+            <h1 className="type-screen-title truncate text-foreground">{accountName}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 type-body-sm">
-              <Badge variant="live" className="shrink-0 text-xs">
+              <Badge variant="live" className="shrink-0 type-label">
                 Live
               </Badge>
               {leadName && (
-                <span className="inline-flex items-center gap-1.5 font-semibold text-foreground/90">
+                <span className="inline-flex items-center gap-1.5 font-medium text-foreground/90">
                   <ParticipantAvatar name={leadName} kind="external" size="xs" />
                   {leadName}
                 </span>
@@ -108,7 +108,7 @@ export function LiveCallPageHeader({
           <PodAvatars pod={call?.pod ?? []} />
           <span
             className={cn(
-              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium",
+              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 type-caption font-medium",
               sentimentTone === "positive" && "bg-success/10 text-success",
               sentimentTone === "negative" && "bg-destructive/10 text-destructive",
               sentimentTone === "neutral" && "bg-muted text-muted-foreground"

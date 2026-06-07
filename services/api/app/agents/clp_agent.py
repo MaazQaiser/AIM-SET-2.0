@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -25,17 +26,37 @@ def _kb_entry_title(entry: Dict[str, Any], asset_id: str) -> str:
     return asset_id.replace("dc:", "").replace(":", " ").strip() or "Reference"
 
 
+def _is_company_playbook_label(value: Any) -> bool:
+    return bool(re.search(r"\bcompany[\s_-]+playbook\b", str(value or ""), re.IGNORECASE))
+
+
+def _is_company_playbook_entry(entry: Dict[str, Any], title: str = "") -> bool:
+    labels = [
+        title,
+        entry.get("title"),
+        entry.get("name"),
+        entry.get("fileName"),
+        entry.get("file_name"),
+    ]
+    return any(_is_company_playbook_label(label) for label in labels)
+
+
 def _apply_kb_entries(
     sections: List[Dict[str, Any]],
     selected_assets: List[Dict[str, Any]],
     ai_suggestions: List[Dict[str, Any]],
     entries: List[Dict[str, Any]],
 ) -> None:
-    for entry in entries[:8]:
+    added = 0
+    for entry in entries:
+        if added >= 8:
+            break
         asset_id = _kb_entry_asset_id(entry)
         if not asset_id:
             continue
         title = _kb_entry_title(entry, asset_id)
+        if _is_company_playbook_entry(entry, title):
+            continue
         reason = str(
             entry.get("reason")
             or entry.get("suggestedUse")
@@ -59,6 +80,7 @@ def _apply_kb_entries(
                     "displayMode": "embed",
                 }
             )
+        added += 1
 
 
 def _ensure_asset_section(sections: List[Dict[str, Any]], selected_assets: List[Dict[str, Any]]) -> None:
@@ -193,6 +215,8 @@ def run_clp_generate(
     if isinstance(attachments, dict):
         for found in (attachments.get("found") or [])[:3]:
             aid = found.get("assetId") or found.get("asset_id")
+            if _is_company_playbook_entry(found, str(found.get("name") or found.get("title") or "")):
+                continue
             if aid and not any(a["assetId"] == str(aid) for a in selected_assets):
                 selected_assets.append(
                     {
@@ -206,7 +230,11 @@ def run_clp_generate(
         _ensure_asset_section(sections, selected_assets)
 
     deck = (brief or {}).get("recommendedDeck")
-    if deck and deck.get("assetId"):
+    if (
+        deck
+        and deck.get("assetId")
+        and not _is_company_playbook_entry(deck, str(deck.get("title") or ""))
+    ):
         sections.append(
             {
                 "id": _section_id(),

@@ -69,7 +69,7 @@ export function PostDcCloseDealAction({
               <Badge
                 variant="outline"
                 className={cn(
-                  "h-6 gap-1 text-xs font-semibold",
+                  "h-6 gap-1 type-label",
                   closure.outcome === "won"
                     ? "border-success/40 bg-success/10 text-success"
                     : "border-destructive/40 bg-destructive/10 text-destructive"
@@ -84,7 +84,7 @@ export function PostDcCloseDealAction({
               </Badge>
             </TooltipTrigger>
             {closure.outcome === "lost" && closure.lostReason ? (
-              <TooltipContent side="bottom" className="max-w-xs text-xs">
+              <TooltipContent side="bottom" className="max-w-xs type-label">
                 {closure.lostReason}
               </TooltipContent>
             ) : null}
@@ -95,7 +95,7 @@ export function PostDcCloseDealAction({
           type="button"
           size="sm"
           variant={isClosed ? "outline" : "default"}
-          className={cn(compact && "h-8 rounded-full px-4 text-sm font-bold")}
+          className={cn(compact && "h-8 rounded-full px-4 type-body font-bold")}
           onClick={() => {
             if (isClosed) {
               reopenDeal();

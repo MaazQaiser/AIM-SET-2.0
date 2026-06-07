@@ -134,7 +134,7 @@ export function PostDcTabbedContent({
             <Fragment key={tab.id}>
               {showGroupLabel ? (
                 <span
-                  className="px-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground self-center shrink-0 select-none"
+                  className="px-2 type-kicker text-muted-foreground self-center shrink-0 select-none"
                   aria-hidden
                 >
                   {POST_DC_TAB_GROUP_LABELS[tab.group]}
@@ -142,7 +142,7 @@ export function PostDcTabbedContent({
               ) : null}
               <TabsTrigger
                 value={tab.id}
-                className={cn("text-xs", !tabHasContent(tab.id) && "opacity-60")}
+                className={cn("type-label", !tabHasContent(tab.id) && "opacity-60")}
               >
                 {tab.label}
               </TabsTrigger>
@@ -151,7 +151,7 @@ export function PostDcTabbedContent({
         })}
       </TabsList>
 
-      <p className="text-xs text-muted-foreground">{POST_DC_TAB_JOURNEY[resolvedTab]}</p>
+      <p className="type-caption text-muted-foreground">{POST_DC_TAB_JOURNEY[resolvedTab]}</p>
 
       <TabsContent value="summary" className="m-0 space-y-4 focus-visible:outline-none">
         <PostDcWidgetRail
@@ -210,7 +210,7 @@ export function PostDcTabbedContent({
         {jiraTicket ? (
           <JiraTicketCard ticket={jiraTicket} onCreate={onCreateJiraTicket} />
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="type-body text-muted-foreground">
             Run wrap-up to generate a Jira ticket draft for this call.
           </p>
         )}
@@ -245,7 +245,7 @@ function PostDcWidgetRail<P>({
 }) {
   if (widgets.length === 0) {
     if (!emptyMessage) return null;
-    return <p className="text-sm text-muted-foreground">{emptyMessage}</p>;
+    return <p className="type-body text-muted-foreground">{emptyMessage}</p>;
   }
 
   return (

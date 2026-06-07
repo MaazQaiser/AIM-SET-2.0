@@ -31,10 +31,10 @@ export function WorkflowOutputSection({ brief }: WorkflowOutputSectionProps) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <Workflow className="h-4 w-4 text-primary shrink-0" />
-          <h2 id="workflow-output-heading" className="text-sm font-semibold text-foreground">
+          <h2 id="workflow-output-heading" className="type-panel-title text-foreground">
             PRE-DC Workflow
           </h2>
-          <span className="text-xs text-muted-foreground hidden sm:inline">
+          <span className="type-caption text-muted-foreground hidden sm:inline">
             Summary, artifacts &amp; KB fulfillment
           </span>
         </div>
@@ -42,7 +42,7 @@ export function WorkflowOutputSection({ brief }: WorkflowOutputSectionProps) {
       </div>
 
       {brief.agentStatus === "failed" && (
-        <p className="text-xs text-warning rounded-md border border-warning/30 bg-warning/10 px-3 py-2">
+        <p className="type-label text-warning rounded-md border border-warning/30 bg-warning/10 px-3 py-2">
           PRE-DC Workflow could not complete for this lead. Re-import or run again from Agents →
           PRE-DC Workflow.
         </p>

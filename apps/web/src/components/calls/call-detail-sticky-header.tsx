@@ -48,7 +48,7 @@ function HeaderIconTooltip({
   return (
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="bottom" className="text-xs">
+      <TooltipContent side="bottom" className="type-label">
         {label}
       </TooltipContent>
     </Tooltip>
@@ -132,6 +132,7 @@ export function CallDetailStickyHeader({
   const isLive = call.status === "live";
   const isPostDc = phase === "post-dc";
   const showPreDcActionBar = !isPostDc && (Boolean(bant) || showJoinCall);
+  const showPreDcPrepAction = !isPostDc && showJoinCall;
   const showPostDcActionBar = isPostDc && Boolean(postDcWorkflow);
   const resolvedBackHref = backHref ?? (isPostDc ? `/calls/${call.id}` : "/calls");
   const resolvedBackLabel =
@@ -154,7 +155,7 @@ export function CallDetailStickyHeader({
           <div className="min-w-0 flex-1">
             <h1
               className={cn(
-                "type-headline truncate text-foreground sm:type-display",
+                "truncate type-page-title text-foreground",
                 isIntercom && "text-[#111111]"
               )}
             >
@@ -167,7 +168,7 @@ export function CallDetailStickyHeader({
               )}
             >
               {call.leadName && (
-                <span className="inline-flex items-center gap-1.5 font-semibold text-foreground/90">
+                <span className="inline-flex items-center gap-1.5 font-medium text-foreground/90">
                   <ParticipantAvatar
                     name={call.leadName}
                     kind="external"
@@ -182,17 +183,17 @@ export function CallDetailStickyHeader({
               )}
               <span>{scheduleText}</span>
               {!isIntercom && (
-                <Badge variant="secondary" className="h-5 text-xs font-bold">
+                <Badge variant="secondary" className="h-5">
                   {isPostDc ? "Post-DC wrap-up" : "Pre-DC"}
                 </Badge>
               )}
               {isPostDc && leadStage ? (
-                <Badge variant="outline" className="h-5 text-xs capitalize">
+                <Badge variant="outline" className="h-5 capitalize">
                   {leadStage}
                 </Badge>
               ) : null}
               {call.annualRevenue && !isIntercom && !isPostDc && (
-                <Badge variant="outline" className="h-5 font-mono text-xs">
+                <Badge variant="outline" className="h-5 font-mono">
                   {call.annualRevenue}
                 </Badge>
               )}
@@ -203,7 +204,7 @@ export function CallDetailStickyHeader({
         <div className="flex shrink-0 items-center gap-2">
           {trailingActions}
           {isPostDc ? <PostDcCloseDealAction callId={call.id} /> : null}
-          {!isPostDc ? <PreDcPrepReadyAction callId={call.id} /> : null}
+          {showPreDcPrepAction ? <PreDcPrepReadyAction callId={call.id} /> : null}
           {showPostDcActionBar && postDcWorkflow ? (
             <PostDcActionStrip
               hasNextSteps={postDcWorkflow.hasNextSteps}

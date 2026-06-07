@@ -19,7 +19,7 @@ function EffectivenessBar({ score }: { score: number }) {
           style={{ width: `${score * 100}%` }}
         />
       </div>
-      <span className="text-xs text-muted-foreground">{Math.round(score * 100)}%</span>
+      <span className="type-caption text-muted-foreground">{Math.round(score * 100)}%</span>
     </div>
   );
 }
@@ -40,7 +40,7 @@ export function KBAssetCard({ asset, onPreview }: KBAssetCardProps) {
           {status !== "ready" && (
             <Badge
               variant={status === "failed" ? "destructive" : "secondary"}
-              className="text-[9px] capitalize shrink-0"
+              className="type-caption capitalize shrink-0"
             >
               {status}
             </Badge>
@@ -48,12 +48,12 @@ export function KBAssetCard({ asset, onPreview }: KBAssetCardProps) {
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-foreground line-clamp-2">{asset.title}</p>
-          <p className="text-xs text-muted-foreground mt-0.5 capitalize">
+          <p className="type-body font-medium text-foreground line-clamp-2">{asset.title}</p>
+          <p className="type-caption text-muted-foreground mt-0.5 capitalize">
             {asset.type} · v{asset.version}
           </p>
           {asset.fileName && (
-            <p className="text-[10px] text-muted-foreground mt-1 truncate" title={asset.fileName}>
+            <p className="type-caption text-muted-foreground mt-1 truncate" title={asset.fileName}>
               {asset.fileName}
             </p>
           )}
@@ -70,7 +70,7 @@ export function KBAssetCard({ asset, onPreview }: KBAssetCardProps) {
 
         {asset.effectivenessScore !== undefined && (
           <div className="space-y-1">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1 type-caption text-muted-foreground">
               <TrendingUp className="h-3 w-3" />
               Effectiveness
             </div>
@@ -79,7 +79,7 @@ export function KBAssetCard({ asset, onPreview }: KBAssetCardProps) {
         )}
 
         {asset.lastUsed && (
-          <p className="text-xs text-muted-foreground">
+          <p className="type-caption text-muted-foreground">
             Last used {format(new Date(asset.lastUsed), "MMM d")}
           </p>
         )}
@@ -89,14 +89,14 @@ export function KBAssetCard({ asset, onPreview }: KBAssetCardProps) {
             type="button"
             variant="secondary"
             size="sm"
-            className="h-8 flex-1 text-xs"
+            className="h-8 flex-1 type-label"
             disabled={status === "pending" || status === "processing"}
             onClick={() => onPreview?.(asset)}
           >
             <Eye className="h-3.5 w-3.5 mr-1" />
             Preview
           </Button>
-          <Button variant="outline" size="sm" className="h-8 flex-1 text-xs" asChild>
+          <Button variant="outline" size="sm" className="h-8 flex-1 type-label" asChild>
             <Link href={`/knowledge/${asset.id}`}>
               <ExternalLink className="h-3.5 w-3.5 mr-1" />
               Open

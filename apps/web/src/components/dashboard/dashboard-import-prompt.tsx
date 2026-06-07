@@ -14,8 +14,8 @@ export function DashboardImportPrompt() {
             <Upload className="h-4 w-4" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-foreground">Import your leads to unlock the full dashboard</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="type-panel-title text-foreground">Import your leads to unlock the full dashboard</p>
+            <p className="mt-0.5 type-caption text-muted-foreground">
               Upload pre_dc_notes_data.csv in Settings. Calls, agenda, and AI todos use your imported data.
             </p>
           </div>

@@ -118,14 +118,14 @@ export function ContentLibraryTab({ onDetailModeChange }: ContentLibraryTabProps
           </TabsContent>
           <TabsContent value="watchlist" className="mt-4 space-y-3">
             {watchlist.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No assets flagged for review.</p>
+              <p className="type-body text-muted-foreground">No assets flagged for review.</p>
             ) : (
               watchlist.map((item) => (
                 <Card key={item.assetId}>
                   <CardContent className="p-4 flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-sm font-medium">{item.title}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{item.reason}</p>
+                      <p className="type-body font-medium">{item.title}</p>
+                      <p className="type-caption text-muted-foreground mt-1">{item.reason}</p>
                     </div>
                     <Badge
                       variant={

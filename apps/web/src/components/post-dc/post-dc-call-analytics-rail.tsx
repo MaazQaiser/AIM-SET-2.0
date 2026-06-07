@@ -50,8 +50,8 @@ export function PostDcCallAnalyticsRail({ review, className }: PostDcCallAnalyti
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-medium text-muted-foreground leading-tight">{label}</dt>
-      <dd className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{value}</dd>
+      <dt className="type-caption font-medium text-muted-foreground leading-tight">{label}</dt>
+      <dd className="mt-0.5 type-panel-title tabular-nums text-foreground">{value}</dd>
     </div>
   );
 }

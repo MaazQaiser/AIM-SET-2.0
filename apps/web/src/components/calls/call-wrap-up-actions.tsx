@@ -97,12 +97,12 @@ export function CallWrapUpActions({
     return (
       <div className={cn("flex items-center gap-1.5", className)}>
         {showLiveLink && (
-          <Button asChild variant="ghost" size="sm" className="h-8 text-xs">
+          <Button asChild variant="ghost" size="sm" className="h-8 type-label">
             <Link href={`/calls/${callId}/live`}>Live</Link>
           </Button>
         )}
         {showPostDcLink && (hasReview || isDemo) && (
-          <Button asChild variant="outline" size="sm" className="h-8 text-xs">
+          <Button asChild variant="outline" size="sm" className="h-8 type-label">
             <Link href={previewHref}>Post-DC</Link>
           </Button>
         )}
@@ -111,7 +111,7 @@ export function CallWrapUpActions({
             type="button"
             size="sm"
             variant="secondary"
-            className="h-8 text-xs"
+            className="h-8 type-label"
             disabled={creatingDeck}
             onClick={() => void handleCreateDeck()}
           >
@@ -127,7 +127,7 @@ export function CallWrapUpActions({
           <Button
             type="button"
             size="sm"
-            className="h-8 text-xs"
+            className="h-8 type-label"
             disabled={wrapUp.isPending}
             onClick={() => void handleEndAndReview()}
           >

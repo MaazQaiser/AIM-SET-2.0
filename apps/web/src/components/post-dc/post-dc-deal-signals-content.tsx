@@ -37,7 +37,7 @@ function SignalField({ label, value, highlight = "default", compact = false }: S
       <dt
         className={cn(
           "font-semibold text-muted-foreground leading-none",
-          compact ? "text-[10px]" : "text-xs"
+          compact ? "type-caption" : "type-label"
         )}
       >
         {label}
@@ -45,7 +45,7 @@ function SignalField({ label, value, highlight = "default", compact = false }: S
       <dd
         className={cn(
           "font-medium leading-snug break-words capitalize",
-          compact ? "text-[11px] mt-0.5" : "text-[0.9375rem] mt-0.5",
+          compact ? "type-caption mt-0.5" : "text-[0.9375rem] mt-0.5",
           highlight === "success" && "text-success",
           highlight === "destructive" && "text-destructive",
           highlight === "default" && "text-foreground"
@@ -115,7 +115,7 @@ export function PostDcDealSignalsContent({
         <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/10 px-3 py-2">
           <Users className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-muted-foreground">On the call</p>
+            <p className="type-label text-muted-foreground">On the call</p>
             <p className="text-[0.9375rem] text-foreground leading-relaxed break-words mt-0.5">
               {attendees}
             </p>
@@ -140,7 +140,7 @@ export function PostDcDealSignalsContent({
         <div className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5">
           <AlertTriangle className="h-4 w-4 shrink-0 text-destructive mt-0.5" />
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-destructive">
+            <p className="type-kicker text-destructive">
               Reason not a fit
             </p>
             <p className="text-[0.9375rem] leading-relaxed text-foreground/90 break-words mt-0.5">
@@ -152,7 +152,7 @@ export function PostDcDealSignalsContent({
 
       {!hideDeadlineNote && signals.additionalInfo ? (
         <div className="rounded-lg border border-border/60 bg-muted/10 px-3 py-2.5">
-          <p className="text-xs font-semibold text-muted-foreground">Deadline / note</p>
+          <p className="type-label text-muted-foreground">Deadline / note</p>
           <p className="text-[0.9375rem] leading-relaxed text-foreground break-words mt-0.5">
             {signals.additionalInfo}
           </p>
@@ -160,7 +160,7 @@ export function PostDcDealSignalsContent({
       ) : null}
 
       {expanded && leadStage && notFit ? (
-        <Badge variant="destructive" className="text-[10px]">
+        <Badge variant="destructive" className="type-caption">
           Not a fit — nurture or close-out path
         </Badge>
       ) : null}

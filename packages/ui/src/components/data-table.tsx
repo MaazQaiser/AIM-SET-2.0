@@ -106,7 +106,7 @@ export function DataTablePagination<TData>({
 }) {
   return (
     <div className={cn("flex shrink-0 items-center justify-between border-t border-border/60 bg-card pt-3", className)}>
-      <p className="text-sm text-muted-foreground">
+      <p className="type-body-sm text-muted-foreground">
         Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
       </p>
       <div className="flex items-center gap-2">
@@ -156,7 +156,7 @@ export function DataTableView<TData, TValue>({
   className,
 }: DataTableViewProps<TData, TValue>) {
   const tableClasses = cn(
-    "w-full border-collapse bg-card text-sm",
+    "w-full border-collapse bg-card type-table",
     scrollable && "min-w-max",
     tableClassName
   );
@@ -254,7 +254,7 @@ function DataTableHeader<TData>({
               <th
                 key={header.id}
                 className={cn(
-                  "h-10 whitespace-nowrap px-4 text-left align-middle text-xs font-semibold text-muted-foreground",
+                  "h-10 whitespace-nowrap px-4 text-left align-middle type-table-header text-muted-foreground",
                   scrollable && "relative z-0",
                   meta?.headerClassName
                 )}
@@ -329,7 +329,7 @@ function DataTableBody<TData>({
                 <td
                   key={cell.id}
                   className={cn(
-                    "px-4 py-2.5 align-middle text-sm text-foreground",
+                    "px-4 py-2.5 align-middle type-table text-foreground",
                     scrollable && "relative z-0",
                     meta?.cellClassName
                   )}

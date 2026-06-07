@@ -26,11 +26,11 @@ export function IntegrationsTab() {
       {/* Section: Calendar */}
       <section className="space-y-3">
         <div>
-          <h2 className="text-sm font-semibold flex items-center gap-2">
+          <h2 className="type-panel-title flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
             Calendar
           </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="type-caption text-muted-foreground mt-0.5">
             Connect your calendar to auto-import client calls and pre-fill attendee details in briefs.
           </p>
         </div>
@@ -49,7 +49,7 @@ export function IntegrationsTab() {
       {/* Calendar events preview (only when connected) */}
       {isGoogleConnected && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground">
+          <h2 className="type-panel-title text-muted-foreground">
             Upcoming calls from Google Calendar
           </h2>
           <CalendarEventList />
@@ -59,11 +59,11 @@ export function IntegrationsTab() {
       {/* Section: CRM */}
       <section className="space-y-3">
         <div>
-          <h2 className="text-sm font-semibold flex items-center gap-2">
+          <h2 className="type-panel-title flex items-center gap-2">
             <Database className="h-4 w-4 text-muted-foreground" />
             CRM
           </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="type-caption text-muted-foreground mt-0.5">
             Connect external systems for account updates and approved handoffs after each call.
           </p>
         </div>
@@ -97,11 +97,11 @@ export function IntegrationsTab() {
       {/* Section: Messaging */}
       <section className="space-y-3">
         <div>
-          <h2 className="text-sm font-semibold flex items-center gap-2">
+          <h2 className="type-panel-title flex items-center gap-2">
             <Slack className="h-4 w-4 text-muted-foreground" />
             Messaging
           </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="type-caption text-muted-foreground mt-0.5">
             Receive call summaries, coaching alerts, and task notifications in Slack.
           </p>
         </div>
@@ -116,7 +116,7 @@ export function IntegrationsTab() {
       </section>
 
       {/* Env variable reminder */}
-      <div className="rounded-lg border border-dashed border-muted-foreground/30 px-4 py-3 text-xs text-muted-foreground space-y-1">
+      <div className="rounded-lg border border-dashed border-muted-foreground/30 px-4 py-3 type-caption text-muted-foreground space-y-1">
         <p className="font-medium">To enable Google Calendar:</p>
         <p className="font-mono">GOOGLE_CLIENT_ID=your_client_id</p>
         <p className="font-mono">GOOGLE_CLIENT_SECRET=your_secret</p>

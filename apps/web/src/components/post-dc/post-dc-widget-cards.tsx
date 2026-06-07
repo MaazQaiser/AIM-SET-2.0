@@ -187,8 +187,8 @@ export function PostScorecardCard({ scorecard }: { scorecard: PostCallReview["po
             <BriefDetailRow>
               <div className="flex items-start justify-between gap-3 min-w-0">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{row.member}</p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                  <p className="type-body font-medium text-foreground truncate">{row.member}</p>
+                  <p className="mt-0.5 type-caption text-muted-foreground">
                     Role in call: {row.roleInCall || row.role}
                   </p>
                 </div>
@@ -201,30 +201,30 @@ export function PostScorecardCard({ scorecard }: { scorecard: PostCallReview["po
                   {row.label || "Review"}
                 </Badge>
               </div>
-              <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+              <div className="mt-3 grid gap-2 type-label sm:grid-cols-2">
                 <MetricPill label="Performance" value={formatPerformance(row)} />
                 <MetricPill label="Talk time" value={formatTalkTime(row)} />
               </div>
               {row.strengths ? (
-                <p className="text-xs text-foreground break-words mt-3">
+                <p className="type-label text-foreground break-words mt-3">
                   <span className="font-medium">What worked:</span> {row.strengths}
                 </p>
               ) : null}
               {areasToWork(row).length > 0 ? (
                 <div className="mt-3 space-y-1">
-                  <p className="text-[10px] font-semibold text-muted-foreground">
+                  <p className="type-caption font-medium text-muted-foreground">
                     Areas to work
                   </p>
                   <ul className="space-y-1">
                     {areasToWork(row).map((item) => (
-                      <li key={item} className="text-xs text-muted-foreground break-words">
+                      <li key={item} className="type-caption text-muted-foreground break-words">
                         {item}
                       </li>
                     ))}
                   </ul>
                 </div>
               ) : (
-                <p className="mt-3 text-xs text-muted-foreground">
+                <p className="mt-3 type-caption text-muted-foreground">
                   No coaching area was flagged for this member.
                 </p>
               )}
@@ -239,8 +239,8 @@ export function PostScorecardCard({ scorecard }: { scorecard: PostCallReview["po
 function MetricPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-border bg-muted/30 px-2.5 py-2">
-      <p className="text-[10px] font-semibold text-muted-foreground">{label}</p>
-      <p className="mt-0.5 text-xs font-medium text-foreground">{value}</p>
+      <p className="type-caption font-medium text-muted-foreground">{label}</p>
+      <p className="mt-0.5 type-label text-foreground">{value}</p>
     </div>
   );
 }
@@ -300,13 +300,13 @@ export function PostLearnedCard({
               <li key={item.label}>
                 <BriefDetailRow>
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-[10px] font-semibold text-muted-foreground">{item.label}</p>
+                    <p className="type-caption font-medium text-muted-foreground">{item.label}</p>
                     <Badge variant={bantBadgeVariant(item.status)} className="shrink-0">
                       {item.statusLabel ?? item.status}
                     </Badge>
                   </div>
                   {item.value ? (
-                    <p className="mt-2 text-sm text-foreground/90 whitespace-pre-wrap break-words">
+                    <p className="mt-2 type-body text-foreground/90 whitespace-pre-wrap break-words">
                       {item.value}
                     </p>
                   ) : null}
@@ -320,10 +320,10 @@ export function PostLearnedCard({
           {learned.map((item) => (
             <li key={item.label}>
               <BriefDetailRow>
-                <p className="text-[10px] font-semibold text-muted-foreground">
+                <p className="type-caption font-medium text-muted-foreground">
                   {item.label}
                 </p>
-                <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words mt-1">
+                <p className="type-body text-foreground/90 whitespace-pre-wrap break-words mt-1">
                   {item.note}
                 </p>
               </BriefDetailRow>
@@ -360,8 +360,8 @@ export function PostDealSignalsCard({ signals }: { signals?: PostCallReview["dea
         {rows.map((row) => (
           <li key={row.key}>
             <BriefDetailRow>
-              <p className="text-[10px] font-semibold text-muted-foreground">{row.label}</p>
-              <p className="mt-1 text-sm font-medium text-foreground whitespace-pre-wrap break-words">
+              <p className="type-caption font-medium text-muted-foreground">{row.label}</p>
+              <p className="mt-1 type-body font-medium text-foreground whitespace-pre-wrap break-words">
                 {row.value}
               </p>
             </BriefDetailRow>
@@ -384,7 +384,7 @@ export function PostDcContentSuggestionsCard({
 
   if (found.length === 0 && missing.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
+      <p className="type-body text-muted-foreground">
         Suggested KB content and missing assets appear here after wrap-up.
       </p>
     );
@@ -393,7 +393,7 @@ export function PostDcContentSuggestionsCard({
   return (
     <div className="flex w-full min-w-0 flex-col gap-4">
       <BriefDetailCard title="Suggest Content" icon={FileSearch} className="w-full">
-        <p className="text-xs text-muted-foreground">
+        <p className="type-caption text-muted-foreground">
           Content available in the knowledge base that matches this call.
         </p>
         {found.length > 0 ? (
@@ -405,14 +405,14 @@ export function PostDcContentSuggestionsCard({
             ))}
           </div>
         ) : (
-          <p className="mt-3 text-xs text-muted-foreground">
+          <p className="mt-3 type-caption text-muted-foreground">
             No matching KB assets were found for this call yet.
           </p>
         )}
       </BriefDetailCard>
 
       <BriefDetailCard title="Missing content" className="w-full">
-        <p className="text-xs text-muted-foreground">
+        <p className="type-caption text-muted-foreground">
           Content not available in the KB — suggested to generate before follow-up or proposal.
         </p>
         {missing.length > 0 ? (
@@ -424,7 +424,7 @@ export function PostDcContentSuggestionsCard({
             ))}
           </div>
         ) : (
-          <p className="mt-3 text-xs text-muted-foreground">
+          <p className="mt-3 type-caption text-muted-foreground">
             No missing content was flagged for generation.
           </p>
         )}
@@ -454,8 +454,8 @@ function MissingContentItem({ asset }: { asset: PostCallEmailAttachmentMissing }
       <FilePlus2 className="h-6 w-6 shrink-0 text-muted-foreground" aria-hidden />
 
       <div className="min-w-0 flex-1 space-y-0.5">
-        <p className="truncate text-sm font-medium text-foreground">{asset.name}</p>
-        <p className="text-[11px] leading-snug text-muted-foreground">
+        <p className="truncate type-body font-medium text-foreground">{asset.name}</p>
+        <p className="type-caption leading-snug text-muted-foreground">
           <span className="font-medium text-foreground/80">Why need to generate:</span> {reason}
         </p>
       </div>

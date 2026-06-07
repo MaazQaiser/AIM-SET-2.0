@@ -25,50 +25,83 @@ export interface CopilotMessage {
   citations?: Citation[];
   actions?: CopilotAgentAction[];
   callExports?: CopilotCallExport[];
+  suggestions?: string[];
+  confidence?: number;
+  missingEvidence?: string[];
   createdAt: number;
 }
 
 interface SalesCopilotStore {
   messages: CopilotMessage[];
+  byThreadId: Record<string, CopilotMessage[]>;
   isLoading: boolean;
+  loadingByThreadId: Record<string, boolean>;
   pendingFile: File | null;
-  appendMessage: (message: CopilotMessage) => void;
-  setLoading: (loading: boolean) => void;
+  appendMessage: (message: CopilotMessage, threadId?: string) => void;
+  setLoading: (loading: boolean, threadId?: string) => void;
   setPendingFile: (file: File | null) => void;
-  clearHistory: () => void;
-  seedWelcome: () => void;
+  clearHistory: (threadId?: string) => void;
+  seedWelcome: (threadId?: string) => void;
 }
+
+const DEFAULT_THREAD_ID = "global";
 
 export const useSalesCopilotStore = create<SalesCopilotStore>()(
   persist(
     (set, get) => ({
       messages: [],
+      byThreadId: {},
       isLoading: false,
+      loadingByThreadId: {},
       pendingFile: null,
 
-      appendMessage: (message) =>
-        set((s) => ({ messages: [...s.messages, message] })),
+      appendMessage: (message, threadId = DEFAULT_THREAD_ID) =>
+        set((s) => {
+          const prev = s.byThreadId[threadId] ?? [];
+          return {
+            messages: threadId === DEFAULT_THREAD_ID ? [...s.messages, message] : s.messages,
+            byThreadId: {
+              ...s.byThreadId,
+              [threadId]: [...prev, message],
+            },
+          };
+        }),
 
-      setLoading: (isLoading) => set({ isLoading }),
+      setLoading: (isLoading, threadId = DEFAULT_THREAD_ID) =>
+        set((s) => ({
+          isLoading: threadId === DEFAULT_THREAD_ID ? isLoading : s.isLoading,
+          loadingByThreadId: {
+            ...s.loadingByThreadId,
+            [threadId]: isLoading,
+          },
+        })),
 
       setPendingFile: (pendingFile) => set({ pendingFile }),
 
-      clearHistory: () => set({ messages: [] }),
+      clearHistory: (threadId = DEFAULT_THREAD_ID) =>
+        set((s) => {
+          if (threadId === DEFAULT_THREAD_ID) return { messages: [], byThreadId: {} };
+          const next = { ...s.byThreadId };
+          delete next[threadId];
+          return { byThreadId: next };
+        }),
 
-      seedWelcome: () => {
-        if (get().messages.length > 0) return;
+      seedWelcome: (threadId = DEFAULT_THREAD_ID) => {
+        const state = get();
+        const messages = state.byThreadId[threadId] ?? (threadId === DEFAULT_THREAD_ID ? state.messages : []);
+        if (messages.length > 0) return;
         get().appendMessage({
           id: "copilot-welcome",
           role: "system",
           content:
             "**Sales Co-pilot** — search your knowledge base, inspect any call, run agents (brief, post-call, relevant content), or upload files to KB.",
           createdAt: Date.now(),
-        });
+        }, threadId);
       },
     }),
     {
       name: "sales-copilot-v1",
-      partialize: (s) => ({ messages: s.messages }),
+      partialize: (s) => ({ messages: s.messages, byThreadId: s.byThreadId }),
     }
   )
 );

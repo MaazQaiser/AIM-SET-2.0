@@ -15,8 +15,8 @@ export default function DashboardError({ error, reset }: ErrorPageProps) {
         <AlertTriangle className="h-6 w-6 text-destructive" />
       </div>
       <div className="space-y-1">
-        <h2 className="text-base font-semibold text-foreground">Something went wrong</h2>
-        <p className="text-sm text-muted-foreground">{error.message}</p>
+        <h2 className="type-panel-title text-foreground">Something went wrong</h2>
+        <p className="type-body text-muted-foreground">{error.message}</p>
       </div>
       <Button onClick={reset} variant="outline">Try again</Button>
     </div>

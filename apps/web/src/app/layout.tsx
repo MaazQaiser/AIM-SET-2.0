@@ -43,7 +43,7 @@ function AppDocument({ children }: { children: React.ReactNode }) {
       suppressHydrationWarning
     >
       <body
-        className="page-hue min-h-svh font-sans antialiased"
+        className="page-hue app-typography min-h-svh font-sans antialiased"
         suppressHydrationWarning
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>

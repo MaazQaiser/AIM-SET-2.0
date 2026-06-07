@@ -25,7 +25,7 @@ export function LiveColumnHeader({
     >
       <div className="flex min-w-0 items-center gap-2">
         <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-        <span className="truncate text-[11px] font-semibold text-muted-foreground">
+        <span className="truncate type-label text-muted-foreground">
           {title}
         </span>
       </div>
@@ -58,7 +58,7 @@ export function LiveSubsectionHeader({
   return (
     <h3
       className={cn(
-        "mb-2 text-[10px] font-semibold text-muted-foreground",
+        "mb-2 type-caption font-medium text-muted-foreground",
         className
       )}
     >

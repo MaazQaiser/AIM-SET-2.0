@@ -153,19 +153,19 @@ export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
   return (
     <div className="flex items-center gap-2">
       {error && (
-        <span className="text-xs text-destructive max-w-[200px] truncate" title={error}>
+        <span className="type-label text-destructive max-w-[200px] truncate" title={error}>
           {error}
         </span>
       )}
       {mode === "client" && playing && (
-        <span className="text-[10px] text-muted-foreground hidden sm:inline">Offline demo</span>
+        <span className="type-caption text-muted-foreground hidden sm:inline">Offline demo</span>
       )}
       {!playing ? (
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="h-7 text-xs"
+          className="h-7 type-label"
           title="Replay scripted discovery call — uses API when available, otherwise local simulation"
           onClick={() => void playDemo()}
         >
@@ -177,7 +177,7 @@ export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
           type="button"
           variant="outline"
           size="sm"
-          className="h-7 text-xs"
+          className="h-7 type-label"
           onClick={stopDemo}
         >
           <Square className="h-3 w-3 mr-1" />

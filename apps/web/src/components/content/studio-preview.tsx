@@ -7,7 +7,7 @@ export function StudioPreview({ html }: { html?: string }) {
 
   if (!html) {
     return (
-      <div className="flex h-full min-h-[400px] items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 text-sm text-muted-foreground">
+      <div className="flex h-full min-h-[400px] items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 type-body text-muted-foreground">
         Preview will appear after the agent generates HTML.
       </div>
     );

@@ -17,7 +17,7 @@ export function UnansweredQuestionsList({ questions, compact }: UnansweredQuesti
   return (
     <div className="space-y-2">
       {!compact && (
-        <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+        <p className="type-label text-muted-foreground flex items-center gap-1">
           <AlertCircle className="h-3 w-3 text-amber-600" />
           Unanswered prospect questions
         </p>
@@ -25,7 +25,7 @@ export function UnansweredQuestionsList({ questions, compact }: UnansweredQuesti
       {questions.map((q, i) => (
         <div
           key={q.id ?? q.question_id ?? i}
-          className="rounded-md border border-amber-100 bg-amber-50/50 dark:bg-amber-950/20 px-2 py-1.5 text-xs"
+          className="rounded-md border border-amber-100 bg-amber-50/50 dark:bg-amber-950/20 px-2 py-1.5 type-label"
         >
           <p className="text-foreground">{q.text}</p>
           {q.seconds_unanswered != null && (

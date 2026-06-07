@@ -23,7 +23,7 @@ export function PostDcTasksProgressBar({
   return (
     <div className={cn(compact ? "space-y-0" : "space-y-1.5", className)} aria-label="Task progress">
       {!compact ? (
-        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center justify-between gap-2 type-caption text-muted-foreground">
           <span className="font-medium">Wrap-up progress</span>
           <span className="tabular-nums shrink-0">
             {done} of {total} complete

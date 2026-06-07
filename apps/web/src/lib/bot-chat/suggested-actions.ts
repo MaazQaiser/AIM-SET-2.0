@@ -30,9 +30,31 @@ const COPILOT_STARTERS: SuggestedAction[] = [
   },
 ];
 
+const HOME_COMMON: SuggestedAction[] = [
+  {
+    id: "home-priorities",
+    label: "Today's priorities",
+    prompt: "Today's priorities",
+    category: "prepare",
+  },
+  {
+    id: "home-missing-briefs",
+    label: "Missing briefs",
+    prompt: "Missing briefs",
+    category: "prepare",
+  },
+  {
+    id: "home-upcoming-prep",
+    label: "Upcoming prep",
+    prompt: "Upcoming prep",
+    category: "prepare",
+  },
+];
+
 export interface SuggestedActionsContext {
   phase: BotChatPhase;
   mode?: BotChatMode;
+  surface?: string;
   persona: PodRole | "leadership";
   accountName?: string;
   brief?: CallBrief | null;
@@ -143,9 +165,9 @@ const LIVE_COMMON: SuggestedAction[] = [
 const WRAPUP_COMMON: SuggestedAction[] = [
   {
     id: "wrapup-email",
-    label: "Polish follow-up email",
+    label: "Polish client email",
     prompt:
-      "Review the draft follow-up email for tone and clarity. Suggest improvements and flag anything that should not go to the client.",
+      "Review the draft client email for tone and clarity. Suggest improvements and flag anything that should not go to the client.",
     category: "follow-up",
   },
   {
@@ -166,12 +188,25 @@ const WRAPUP_COMMON: SuggestedAction[] = [
     id: "wrapup-objections",
     label: "Open objections",
     prompt:
-      "List any unresolved objections or risks from the call and how we should address them in follow-up.",
+      "List any unresolved objections or risks from the call and how we should address them before the next client touch.",
     category: "follow-up",
   },
 ];
 
 export function buildSuggestedActions(ctx: SuggestedActionsContext): SuggestedAction[] {
+  if (ctx.surface === "home") {
+    return HOME_COMMON;
+  }
+
+  if (ctx.surface === "post_dc") {
+    return WRAPUP_COMMON;
+  }
+
+  if (ctx.surface === "pre_dc") {
+    const role = ctx.persona === "leadership" ? "ae" : ctx.persona;
+    return ROLE_PREP[role] ?? ROLE_PREP.ae;
+  }
+
   if (ctx.mode === "copilot") {
     return COPILOT_STARTERS;
   }
@@ -185,7 +220,7 @@ export function buildSuggestedActions(ctx: SuggestedActionsContext): SuggestedAc
       actions.push({
         id: "wrapup-gaps",
         label: "Close discovery gaps",
-        prompt: `We still have open gaps: ${ctx.openGaps.join(", ")}. How should we close them in follow-up?`,
+        prompt: `We still have open gaps: ${ctx.openGaps.join(", ")}. How should we close them before the next client touch?`,
         category: "follow-up",
       });
     }
@@ -264,7 +299,7 @@ export function buildSuggestedActions(ctx: SuggestedActionsContext): SuggestedAc
       id: "live-tech-defer",
       label: "Technical deferral",
       prompt:
-        "Should we defer any technical depth to a follow-up session? Recommend what to park vs answer now.",
+        "Should we defer any technical depth to a separate session? Recommend what to park vs answer now.",
       category: "live",
     });
   }

@@ -39,7 +39,7 @@ export function LayoutControls<P>({ layoutKey, widgets, widgetProps }: LayoutCon
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
-      <p className="w-full text-xs text-muted-foreground sm:w-auto sm:flex-1">
+      <p className="w-full type-caption text-muted-foreground sm:w-auto sm:flex-1">
         Hide, reorder, and resize widgets. Reset restores the state from when you entered Customize.
       </p>
       <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={handleReset}>
@@ -55,13 +55,13 @@ export function LayoutControls<P>({ layoutKey, widgets, widgetProps }: LayoutCon
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-56 p-2">
-            <p className="px-2 pb-2 text-xs font-medium text-muted-foreground">Hidden widgets</p>
+            <p className="px-2 pb-2 type-label text-muted-foreground">Hidden widgets</p>
             <ul className="space-y-1">
               {hiddenWidgets.map((w) => (
                 <li key={w.id}>
                   <button
                     type="button"
-                    className="w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+                    className="w-full rounded-md px-2 py-1.5 text-left type-body hover:bg-muted"
                     onClick={() => showWidget(layoutKey, w.id)}
                   >
                     {w.title}

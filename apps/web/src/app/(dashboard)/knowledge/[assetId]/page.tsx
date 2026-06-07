@@ -30,7 +30,7 @@ export default function KnowledgeAssetPage({ params }: { params: Promise<{ asset
     return (
       <PageShell size="wide">
         <PageHeader>
-          <Link href="/content?tab=library" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <Link href="/content?tab=library" className="flex items-center gap-1 type-body-sm text-muted-foreground hover:text-foreground">
             <ChevronLeft className="h-4 w-4" />
             Knowledge Base
           </Link>
@@ -64,24 +64,24 @@ export default function KnowledgeAssetPage({ params }: { params: Promise<{ asset
   return (
     <PageShell size="wide">
       <PageHeader className="space-y-3">
-        <Link href="/content?tab=library" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <Link href="/content?tab=library" className="flex items-center gap-1 type-body-sm text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-4 w-4" />
           Knowledge Base
         </Link>
 
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 space-y-2">
-            <h1 className="text-2xl font-semibold truncate">{asset.title}</h1>
+            <h1 className="truncate type-page-title">{asset.title}</h1>
             <div className="flex flex-wrap items-center gap-2">
               <KbFileFormatBadge fileName={asset.fileName} mimeType={asset.mimeType} />
-              <span className="text-xs text-muted-foreground capitalize">{asset.type} · v{asset.version}</span>
+              <span className="type-caption text-muted-foreground capitalize">{asset.type} · v{asset.version}</span>
               {asset.status && asset.status !== "ready" && (
-                <Badge variant="outline" className="capitalize text-[10px]">
+                <Badge variant="outline" className="capitalize type-caption">
                   {asset.status}
                 </Badge>
               )}
             </div>
-            {asset.fileName && <p className="text-xs text-muted-foreground">{asset.fileName}</p>}
+            {asset.fileName && <p className="type-caption text-muted-foreground">{asset.fileName}</p>}
           </div>
           <div className="flex gap-2 shrink-0">
             <Button variant="outline" size="sm" onClick={() => void onReEmbed()}>
@@ -99,9 +99,9 @@ export default function KnowledgeAssetPage({ params }: { params: Promise<{ asset
       <KbAssetPreview asset={asset} />
 
       {asset.chunkCount !== undefined && (
-        <p className="text-xs text-muted-foreground">Chunks indexed: {asset.chunkCount}</p>
+        <p className="type-caption text-muted-foreground">Chunks indexed: {asset.chunkCount}</p>
       )}
-      {asset.ingestError && <p className="text-sm text-destructive">Ingest error: {asset.ingestError}</p>}
+      {asset.ingestError && <p className="type-body-sm text-destructive">Ingest error: {asset.ingestError}</p>}
 
       <div className="flex flex-wrap gap-1">
         {asset.tags.map((tag) => (

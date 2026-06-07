@@ -27,10 +27,10 @@ export function AuthBrandPanel({ className }: { className?: string }) {
       <SummitLogo />
 
       <div className="mt-10 max-w-md">
-        <p className="text-[11px] font-semibold text-muted-foreground">
+        <p className="type-caption font-medium text-muted-foreground">
           Discovery Call platform
         </p>
-        <h1 className="mt-2 text-2xl font-semibold leading-tight text-foreground lg:text-[1.75rem]">
+        <h1 className="mt-2 type-page-title leading-tight text-foreground lg:text-[1.75rem]">
           AI-native sales discovery, from brief to follow-up
         </h1>
         <p className="app-muted mt-3">
@@ -48,8 +48,8 @@ export function AuthBrandPanel({ className }: { className?: string }) {
               index > 0 && "border-t border-border"
             )}
           >
-            <p className="text-sm font-semibold text-foreground">{item.title}</p>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+            <p className="type-panel-title text-foreground">{item.title}</p>
+            <p className="mt-1 type-body leading-relaxed text-muted-foreground">
               {item.description}
             </p>
           </li>
@@ -68,7 +68,7 @@ export function AuthFormHeader({ title, description }: AuthFormHeaderProps) {
   return (
     <div className="mb-6 w-full max-w-md text-left lg:hidden">
       <SummitLogo />
-      <h2 className="mt-6 text-xl font-semibold text-foreground">{title}</h2>
+      <h2 className="mt-6 type-screen-title text-foreground">{title}</h2>
       <p className="app-muted mt-1">{description}</p>
     </div>
   );
@@ -91,7 +91,7 @@ export function AuthFormPanel({
       )}
     >
       <div className="hidden w-full max-w-md lg:block">
-        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+        <h2 className="type-screen-title text-foreground">{title}</h2>
         <p className="app-muted mt-1">{description}</p>
       </div>
 
@@ -111,8 +111,8 @@ export function AuthSetupNotice({
 }) {
   return (
     <div className="app-card mx-auto max-w-md space-y-3 p-6 text-center">
-      <h1 className="text-lg font-semibold text-foreground">{title}</h1>
-      <div className="app-muted text-sm [&_code]:rounded [&_code]:bg-muted/50 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs">
+      <h1 className="type-section-title text-foreground">{title}</h1>
+      <div className="app-muted type-body [&_code]:rounded [&_code]:bg-muted/50 [&_code]:px-1 [&_code]:py-0.5 [&_code]:type-caption">
         {children}
       </div>
     </div>

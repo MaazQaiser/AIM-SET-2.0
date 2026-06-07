@@ -32,7 +32,7 @@ const ARTIFACT_TYPES = [
 
 export default function ContentStudioPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading studio...</div>}>
+    <Suspense fallback={<div className="p-6 type-body-sm text-muted-foreground">Loading studio...</div>}>
       <ContentStudioPageInner />
     </Suspense>
   );
@@ -152,8 +152,8 @@ function ContentStudioPageInner() {
     <PageShell>
       <PageHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Content Studio</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="type-page-title">Content Studio</h1>
+          <p className="mt-1 type-body-sm text-muted-foreground">
             Chat-driven generation for decks, one-pagers, and images — preview in HTML, export when ready.
           </p>
         </div>
@@ -169,9 +169,9 @@ function ContentStudioPageInner() {
       </PageHeader>
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading projects…</p>
+        <p className="type-body-sm text-muted-foreground">Loading projects…</p>
       ) : deepLinkStatus ? (
-        <div className="rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+        <div className="rounded-md border border-border bg-muted/30 p-4 type-body-sm text-muted-foreground">
           {deepLinkStatus}
         </div>
       ) : projects.length > 0 ? (
@@ -179,10 +179,10 @@ function ContentStudioPageInner() {
           {projects.map((p) => (
             <Card key={p.id}>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">{p.title}</CardTitle>
+                <CardTitle>{p.title}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <p className="text-xs text-muted-foreground capitalize">
+                <p className="type-caption text-muted-foreground capitalize">
                   {p.artifactType} · {p.status}
                 </p>
                 <div className="flex items-center gap-2">
@@ -242,7 +242,7 @@ function ContentStudioPageInner() {
                   setArtifactType(e.target.value as (typeof ARTIFACT_TYPES)[number]["value"])
                 }
                 disabled={create.isPending}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 type-body ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {ARTIFACT_TYPES.map((type) => (
                   <option key={type.value} value={type.value}>
@@ -252,7 +252,7 @@ function ContentStudioPageInner() {
               </select>
             </div>
 
-            {createError ? <p className="text-sm text-destructive">{createError}</p> : null}
+            {createError ? <p className="type-body text-destructive">{createError}</p> : null}
           </div>
 
           <DialogFooter>

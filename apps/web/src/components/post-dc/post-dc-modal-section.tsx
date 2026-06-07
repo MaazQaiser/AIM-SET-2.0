@@ -23,9 +23,9 @@ export function PostDcModalSection({
       )}
     >
       <div>
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <h3 className="type-panel-title text-foreground">{title}</h3>
         {description ? (
-          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
+          <p className="type-caption text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
         ) : null}
       </div>
       {children}

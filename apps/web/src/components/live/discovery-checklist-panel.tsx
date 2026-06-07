@@ -62,14 +62,14 @@ export function DiscoveryChecklistPanel({
   if (!state) {
     if (embedded) {
       return (
-        <p className={cn("text-sm text-muted-foreground", className)}>
+        <p className={cn("type-body text-muted-foreground", className)}>
           Discovery checklist will populate when the call stream connects.
         </p>
       );
     }
     return (
       <BriefDetailCard title="Discovery coverage" icon={ListChecks} className={className}>
-        <p className="text-sm text-muted-foreground">
+        <p className="type-body text-muted-foreground">
           Discovery checklist will populate when the call stream connects.
         </p>
       </BriefDetailCard>
@@ -112,7 +112,7 @@ function DiscoveryChecklistBriefCard({
   const headerExtra = (
     <div className="flex items-center gap-2 shrink-0">
       <CoverageRing percent={bantPct} label="BANT" />
-      <Badge variant={bantComplete ? "success" : "secondary"} className="text-[10px]">
+      <Badge variant={bantComplete ? "success" : "secondary"} className="type-caption">
         {bantPct}% BANT
       </Badge>
     </div>
@@ -124,7 +124,7 @@ function DiscoveryChecklistBriefCard({
         <ChecklistCoverageProgress percent={allPct} openGapCount={openGapCount} />
       ) : (
         <BriefDetailRow className="bg-primary/5 border-primary/20">
-          <p className="text-sm font-medium text-foreground">
+          <p className="type-body font-medium text-foreground">
             <span className="font-extrabold">{bantPct}%</span> BANT ·{" "}
             <span className="font-extrabold">{allPct}%</span> overall
             {openGapCount > 0 && (
@@ -218,10 +218,10 @@ function ChecklistItemList({
       {items.map((item) => (
         <li
           key={item.id}
-          className="flex items-center justify-between gap-2 text-sm min-w-0 rounded-md border border-border/60 px-2 py-1.5"
+          className="flex items-center justify-between gap-2 type-body min-w-0 rounded-md border border-border/60 px-2 py-1.5"
         >
           <span className="truncate text-foreground">{item.label}</span>
-          <Badge variant="outline" className="text-[10px] shrink-0">
+          <Badge variant="outline" className="type-caption shrink-0">
             {statusLabel[item.status] ?? item.status}
           </Badge>
         </li>
@@ -235,17 +235,17 @@ function ChecklistGapList({ state }: { state: DiscoveryChecklistState }) {
   return (
     <ul className="space-y-1.5">
       {gaps.missing.map((gap) => (
-        <li key={`missing-${gap}`} className="flex items-center justify-between gap-2 text-sm">
+        <li key={`missing-${gap}`} className="flex items-center justify-between gap-2 type-body">
           <span className="text-foreground">{gap}</span>
-          <Badge variant="outline" className="text-[10px] shrink-0">
+          <Badge variant="outline" className="type-caption shrink-0">
             Open
           </Badge>
         </li>
       ))}
       {gaps.partial.map((gap) => (
-        <li key={`partial-${gap}`} className="flex items-center justify-between gap-2 text-sm">
+        <li key={`partial-${gap}`} className="flex items-center justify-between gap-2 type-body">
           <span className="text-foreground">{gap}</span>
-          <Badge variant="secondary" className="text-[10px] shrink-0">
+          <Badge variant="secondary" className="type-caption shrink-0">
             Partial
           </Badge>
         </li>
@@ -274,13 +274,13 @@ function DiscoveryChecklistFullPanel({
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
         <div className="flex items-center gap-2 min-w-0">
           <ListChecks className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-          <span className="text-xs font-semibold text-muted-foreground">
+          <span className="type-label text-muted-foreground">
             Discovery coverage
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <CoverageRing percent={bantPct} label="BANT" />
-          <Badge variant={bantComplete ? "success" : "secondary"} className="text-[10px]">
+          <Badge variant={bantComplete ? "success" : "secondary"} className="type-caption">
             {bantPct}% BANT
           </Badge>
         </div>
@@ -295,18 +295,18 @@ function DiscoveryChecklistFullPanel({
         />
 
         {gapSummary && (
-          <p className="text-xs text-muted-foreground">
+          <p className="type-caption text-muted-foreground">
             {gapSummary}
           </p>
         )}
 
-        <p className="text-[10px] text-muted-foreground">Overall qualification {allPct}%</p>
+        <p className="type-caption text-muted-foreground">Overall qualification {allPct}%</p>
 
         {secondary.length > 0 && (
           <div>
             <button
               type="button"
-              className="flex h-7 w-full items-center justify-between rounded-md px-2 text-xs hover:bg-muted/40"
+              className="flex h-7 w-full items-center justify-between rounded-md px-2 type-label hover:bg-muted/40"
               onClick={() => setShowSecondary((v) => !v)}
             >
               Secondary items ({secondary.filter((i) => i.status === "confirmed").length}/
@@ -336,8 +336,8 @@ function ChecklistCoverageProgress({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-muted-foreground">Discovery coverage</span>
-        <span className="text-sm font-extrabold tabular-nums text-foreground">{percent}%</span>
+        <span className="type-body font-medium text-muted-foreground">Discovery coverage</span>
+        <span className="type-body font-extrabold tabular-nums text-foreground">{percent}%</span>
       </div>
       <div
         className="h-2.5 w-full overflow-hidden rounded-full bg-muted"
@@ -354,7 +354,7 @@ function ChecklistCoverageProgress({
         />
       </div>
       {openGapCount > 0 ? (
-        <p className="text-xs text-muted-foreground">
+        <p className="type-caption text-muted-foreground">
           {openGapCount} open gap{openGapCount === 1 ? "" : "s"} to confirm on the call
         </p>
       ) : null}
@@ -387,7 +387,7 @@ function CoverageRing({ percent, label }: { percent: number; label: string }) {
           strokeLinecap="round"
         />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-[9px] font-medium">
+      <span className="absolute inset-0 flex items-center justify-center type-caption font-medium">
         {percent}
       </span>
     </div>

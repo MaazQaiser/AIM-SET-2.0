@@ -1,6 +1,6 @@
 /* Sidebar layout — visual chrome from app-surfaces utilities (applied in TSX) */
 
-:root {
+:global(:root) {
   --sidebar-rail-width: 64px;
   --sidebar-rail-offset: var(--sidebar-rail-width);
 }

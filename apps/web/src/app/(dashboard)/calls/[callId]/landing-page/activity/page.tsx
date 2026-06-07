@@ -24,13 +24,13 @@ export default function LandingPageActivityPage({ params }: PageParams) {
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <h1 className="text-xl font-semibold">Landing page activity</h1>
+        <h1 className="type-page-title">Landing page activity</h1>
       </PageHeader>
 
-      {isLoading && <p className="text-muted-foreground text-sm">Loading…</p>}
+      {isLoading && <p className="type-body-sm text-muted-foreground">Loading…</p>}
 
       {data?.metrics && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+        <div className="grid grid-cols-2 gap-3 type-body-sm sm:grid-cols-4">
           <Metric label="Link opens" value={data.metrics.linkOpens} />
           <Metric label="Visitors" value={data.metrics.uniqueVisitors} />
           <Metric label="Doc opens" value={data.metrics.documentOpens} />
@@ -39,17 +39,17 @@ export default function LandingPageActivityPage({ params }: PageParams) {
       )}
 
       <section>
-        <h2 className="text-sm font-semibold mb-2">Visitors</h2>
-        <ul className="space-y-2 text-sm">
+        <h2 className="mb-2 type-section-title">Visitors</h2>
+        <ul className="space-y-2 type-body-sm">
           {(data?.visitors ?? []).map((v) => (
             <li key={v.id} className="rounded-md border px-3 py-2">
               <span className="font-medium">{v.name}</span> · {v.email} · {v.visitCount} visits ·
               last {formatDistanceToNow(new Date(v.lastSeenAt), { addSuffix: true })}
               {v.proposalViewed && (
-                <span className="ml-2 text-xs text-primary">· viewed proposal</span>
+                <span className="ml-2 type-caption text-primary">· viewed proposal</span>
               )}
               {(v.documentsOpened?.length ?? 0) > 0 && (
-                <span className="block text-xs text-muted-foreground mt-1">
+                <span className="mt-1 block type-caption text-muted-foreground">
                   Opened {v.documentsOpened!.length} document(s)
                 </span>
               )}
@@ -59,8 +59,8 @@ export default function LandingPageActivityPage({ params }: PageParams) {
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold mb-2">Event timeline</h2>
-        <ul className="space-y-1 text-xs text-muted-foreground">
+        <h2 className="mb-2 type-section-title">Event timeline</h2>
+        <ul className="space-y-1 type-caption text-muted-foreground">
           {(data?.events ?? []).map((e) => (
             <li key={e.id}>
               {e.eventType} · {formatDistanceToNow(new Date(e.createdAt), { addSuffix: true })}
@@ -75,8 +75,8 @@ export default function LandingPageActivityPage({ params }: PageParams) {
 function Metric({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-lg border bg-card px-3 py-2">
-      <p className="text-muted-foreground text-xs">{label}</p>
-      <p className="text-lg font-semibold tabular-nums">{value}</p>
+      <p className="type-label text-muted-foreground">{label}</p>
+      <p className="type-screen-title tabular-nums">{value}</p>
     </div>
   );
 }

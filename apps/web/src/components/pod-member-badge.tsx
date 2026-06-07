@@ -26,7 +26,7 @@ export function PodMemberBadge({ member, showRole = true, size = "sm" }: PodMemb
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5",
         roleColors[member.role],
-        size === "sm" ? "text-xs" : "text-sm"
+        size === "sm" ? "type-label" : "type-body"
       )}
     >
       <ParticipantAvatar

@@ -16,7 +16,7 @@ export function AIGeneratedBadge({ className, model, generatedAt }: AIGeneratedB
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs",
+        "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 type-label",
         isIntercom
           ? "border border-[#ff5600]/20 bg-[#ff5600]/10 text-[#ff5600]"
           : "rounded-sm bg-muted text-muted-foreground",

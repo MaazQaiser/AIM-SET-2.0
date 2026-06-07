@@ -14,7 +14,7 @@ export function PreDcResearchAccordions({ sections }: { sections: BriefResearchS
           <dl className="space-y-3">
             {section.items.map((item) => (
               <div key={item.label} className="min-w-0">
-                <dt className="text-[10px] font-semibold text-muted-foreground truncate">
+                <dt className="type-caption font-medium text-muted-foreground truncate">
                   {item.label}
                 </dt>
                   <dd className="text-[0.9375rem] font-medium text-foreground leading-relaxed whitespace-pre-wrap break-words mt-0.5">

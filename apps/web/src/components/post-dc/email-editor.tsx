@@ -222,10 +222,10 @@ export function EmailEditor({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">{title}</span>
+          <span className="type-body font-medium">{title}</span>
           <AIGeneratedBadge />
           {sent && (
-            <Badge className="text-xs bg-success/10 text-success border-success/30 border">Sent</Badge>
+            <Badge className="type-label bg-success/10 text-success border-success/30 border">Sent</Badge>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -233,7 +233,7 @@ export function EmailEditor({
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1 type-caption text-muted-foreground hover:text-foreground transition-colors"
             >
               <Edit3 className="h-3.5 w-3.5" />
               Edit
@@ -243,7 +243,7 @@ export function EmailEditor({
             <button
               type="button"
               onClick={onRegenerate}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1 type-caption text-muted-foreground hover:text-foreground transition-colors"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               Regenerate
@@ -254,40 +254,40 @@ export function EmailEditor({
 
       {description ? (
         <div className="border-b bg-muted/10 px-4 py-2">
-          <p className="text-xs text-muted-foreground">{description}</p>
+          <p className="type-caption text-muted-foreground">{description}</p>
         </div>
       ) : null}
 
       {/* To / CC */}
       <div className="px-4 py-3 space-y-2 border-b">
         <div className="flex items-start gap-3">
-          <Label className="text-xs text-muted-foreground w-6 shrink-0 mt-1">To</Label>
+          <Label className="type-caption text-muted-foreground w-6 shrink-0 mt-1">To</Label>
           {editing ? (
             <Input
-              className="h-7 text-xs"
+              className="h-7 type-label"
               value={local.to.join(", ")}
               onChange={(e) => setLocal({ ...local, to: e.target.value.split(",").map((s) => s.trim()) })}
             />
           ) : (
-            <span className="text-xs">{local.to.join(", ")}</span>
+            <span className="type-label">{local.to.join(", ")}</span>
           )}
         </div>
         {(local.cc ?? []).length > 0 && (
           <div className="flex items-start gap-3">
-            <Label className="text-xs text-muted-foreground w-6 shrink-0 mt-1">CC</Label>
-            <span className="text-xs text-muted-foreground">{(local.cc ?? []).join(", ")}</span>
+            <Label className="type-caption text-muted-foreground w-6 shrink-0 mt-1">CC</Label>
+            <span className="type-caption text-muted-foreground">{(local.cc ?? []).join(", ")}</span>
           </div>
         )}
         <div className="flex items-start gap-3">
-          <Label className="text-xs text-muted-foreground w-6 shrink-0 mt-1">Sub</Label>
+          <Label className="type-caption text-muted-foreground w-6 shrink-0 mt-1">Sub</Label>
           {editing ? (
             <Input
-              className="h-7 text-xs"
+              className="h-7 type-label"
               value={local.subject}
               onChange={(e) => setLocal({ ...local, subject: e.target.value })}
             />
           ) : (
-            <span className="text-xs font-medium">{local.subject}</span>
+            <span className="type-label">{local.subject}</span>
           )}
         </div>
       </div>
@@ -296,12 +296,12 @@ export function EmailEditor({
       <div className="px-4 py-3">
         {editing ? (
           <Textarea
-            className="min-h-[200px] text-sm font-mono resize-none"
+            className="min-h-[200px] type-body font-mono resize-none"
             value={local.body_markdown}
             onChange={(e) => setLocal({ ...local, body_markdown: e.target.value })}
           />
         ) : (
-          <div className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
+          <div className="whitespace-pre-wrap type-body text-foreground leading-relaxed">
             {local.body_markdown}
           </div>
         )}
@@ -311,7 +311,7 @@ export function EmailEditor({
         <>
           <Separator />
           <div className="space-y-3 px-4 py-3">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+            <div className="flex items-center gap-1.5 type-label text-foreground">
               <Bot className="h-3.5 w-3.5 text-primary" />
               Email assistant
             </div>
@@ -322,8 +322,8 @@ export function EmailEditor({
                     key={message.id}
                     className={
                       message.role === "user"
-                        ? "ml-6 rounded-md bg-background px-2 py-1 text-xs text-foreground"
-                        : "mr-6 rounded-md bg-primary/10 px-2 py-1 text-xs text-primary"
+                        ? "ml-6 rounded-md bg-background px-2 py-1 type-label text-foreground"
+                        : "mr-6 rounded-md bg-primary/10 px-2 py-1 type-label text-primary"
                     }
                   >
                     {message.text}
@@ -333,7 +333,7 @@ export function EmailEditor({
             )}
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
-                className="h-8 text-xs"
+                className="h-8 type-label"
                 value={assistantInput}
                 onChange={(event) => setAssistantInput(event.target.value)}
                 onKeyDown={(event) => {
@@ -348,7 +348,7 @@ export function EmailEditor({
                 type="button"
                 size="sm"
                 variant="secondary"
-                className="h-8 shrink-0 gap-1.5 text-xs"
+                className="h-8 shrink-0 gap-1.5 type-label"
                 onClick={handleAssistantUpdate}
                 disabled={!assistantInput.trim() || assistantBusy}
               >
@@ -372,7 +372,7 @@ export function EmailEditor({
             <button
               type="button"
               onClick={() => setShowCommitments(!showCommitments)}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1 type-caption text-muted-foreground hover:text-foreground transition-colors"
             >
               {showCommitments ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
               {local.commitments_referenced.length} commitment{local.commitments_referenced.length > 1 ? "s" : ""} referenced
@@ -380,7 +380,7 @@ export function EmailEditor({
             {showCommitments && (
               <ul className="mt-2 space-y-1">
                 {local.commitments_referenced.map((c) => (
-                  <li key={c} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                  <li key={c} className="type-caption text-muted-foreground flex items-start gap-1.5">
                     <span className="text-primary mt-0.5">·</span>
                     {c}
                   </li>
@@ -398,10 +398,10 @@ export function EmailEditor({
           <div className={`flex items-center gap-2 px-4 py-3 ${editing ? "justify-between" : "justify-end"}`}>
             {editing && (
               <div className="flex gap-2">
-                <Button size="sm" className="h-7 text-xs" onClick={() => setEditing(false)}>
+                <Button size="sm" className="h-7 type-label" onClick={() => setEditing(false)}>
                   Done editing
                 </Button>
-                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setLocal(draft); setEditing(false); }}>
+                <Button variant="ghost" size="sm" className="h-7 type-label" onClick={() => { setLocal(draft); setEditing(false); }}>
                   Discard edits
                 </Button>
               </div>
@@ -429,7 +429,7 @@ export function EmailEditor({
                       <Button
                         type="button"
                         size="sm"
-                        className="h-8 gap-1.5 text-xs"
+                        className="h-8 gap-1.5 type-label"
                         onClick={handleSendEmail}
                         disabled={!hasRecipient}
                         aria-label="Send email to customer"

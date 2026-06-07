@@ -18,7 +18,7 @@ export function ThemePreviewBanner() {
   const defaultHref = params.toString() ? `${pathname}?${params.toString()}` : pathname;
 
   return (
-    <output className="relative z-[2] flex shrink-0 items-center justify-between gap-3 border-b border-[#d3cec6] bg-white px-4 py-2 text-sm text-[#626260]">
+    <output className="relative z-[2] flex shrink-0 items-center justify-between gap-3 border-b border-[#d3cec6] bg-white px-4 py-2 type-body text-[#626260]">
       <p>
         <span className="font-medium text-[#111111]">Intercom design preview</span>
         {" — "}
@@ -29,7 +29,7 @@ export function ThemePreviewBanner() {
           asChild
           variant="outline"
           size="sm"
-          className="h-7 text-xs border-[#d3cec6] bg-white"
+          className="h-7 type-label border-[#d3cec6] bg-white"
         >
           <Link href={defaultHref}>Exit preview</Link>
         </Button>

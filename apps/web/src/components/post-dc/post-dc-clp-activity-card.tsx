@@ -20,13 +20,13 @@ export function PostDcClpActivityCard({ callId, enabled = true }: PostDcClpActiv
   return (
     <Card className="app-card">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+        <CardTitle className="type-panel-title flex items-center gap-2">
           <Activity className="h-4 w-4" />
           Recent visitor activity
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        <ul className="text-xs text-muted-foreground space-y-1.5">
+        <ul className="type-caption text-muted-foreground space-y-1.5">
           {events.map((ev) => (
             <li key={ev.id}>
               <span className="text-foreground">{ev.eventType.replace(/_/g, " ")}</span>
@@ -37,7 +37,7 @@ export function PostDcClpActivityCard({ callId, enabled = true }: PostDcClpActiv
         </ul>
         <Link
           href={`/calls/${callId}/landing-page/activity`}
-          className="text-xs text-primary hover:underline"
+          className="type-label text-primary hover:underline"
         >
           View all activity
         </Link>

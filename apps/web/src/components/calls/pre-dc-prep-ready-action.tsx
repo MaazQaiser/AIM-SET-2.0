@@ -37,7 +37,7 @@ export function PreDcPrepReadyAction({
       {isReady ? (
         <Badge
           variant="outline"
-          className="h-6 gap-1 border-success/40 bg-success/10 text-success text-xs font-semibold"
+          className="h-6 gap-1 border-success/40 bg-success/10 text-success type-label"
         >
           <CheckCircle2 className="h-3 w-3" aria-hidden />
           Prep ready
@@ -48,7 +48,7 @@ export function PreDcPrepReadyAction({
         size="sm"
         variant={isReady ? "outline" : "default"}
         className={cn(
-          compact ? "h-8 rounded-full px-4 text-sm font-bold" : "",
+          compact ? "h-8 rounded-full px-4 type-body font-bold" : "",
           !isReady && isIntercom && "bg-[#111111] text-white hover:bg-[#111111]/90"
         )}
         onClick={handleClick}

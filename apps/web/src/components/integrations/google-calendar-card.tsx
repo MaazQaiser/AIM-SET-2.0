@@ -52,9 +52,9 @@ function CalendarToggle({
         className="h-2 w-2 rounded-full shrink-0"
         style={{ backgroundColor: calendar.backgroundColor ?? "#4285F4" }}
       />
-      <span className="text-sm truncate">{calendar.summary}</span>
+      <span className="type-body truncate">{calendar.summary}</span>
       {calendar.primary && (
-        <span className="text-[10px] text-muted-foreground ml-auto">primary</span>
+        <span className="type-caption text-muted-foreground ml-auto">primary</span>
       )}
     </button>
   );
@@ -108,14 +108,14 @@ export function GoogleCalendarCard() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground">
+            <span className="type-label text-muted-foreground">
               Calendars synced ({selectedCount}/{displayCalendars.length})
             </span>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Info className="h-3 w-3 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent className="max-w-xs text-xs">
+              <TooltipContent className="max-w-xs type-label">
                 Only events with external attendees (client calls) are imported. Internal meetings are ignored.
               </TooltipContent>
             </Tooltip>
@@ -124,7 +124,7 @@ export function GoogleCalendarCard() {
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 text-xs gap-1 text-muted-foreground"
+            className="h-6 type-label gap-1 text-muted-foreground"
             onClick={() => sync()}
             disabled={isSyncing}
           >
@@ -156,14 +156,14 @@ export function GoogleCalendarCard() {
 
         {/* Last sync result */}
         {lastSyncResult && (
-          <div className="rounded-md bg-success/5 border border-success/20 px-3 py-2 text-xs text-success">
+          <div className="rounded-md bg-success/5 border border-success/20 px-3 py-2 type-label text-success">
             Sync complete — {lastSyncResult.callsFound} events found,{" "}
             {lastSyncResult.callsAdded} added, {lastSyncResult.callsUpdated} updated.
           </div>
         )}
 
         {/* Real-time note */}
-        <p className="text-[10px] text-muted-foreground leading-relaxed">
+        <p className="type-caption text-muted-foreground leading-relaxed">
           Real-time updates are enabled via Google Calendar push notifications.
           Your call list will update automatically when events are created or changed.
         </p>

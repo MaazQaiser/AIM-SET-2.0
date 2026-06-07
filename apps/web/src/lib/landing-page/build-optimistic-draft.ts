@@ -6,7 +6,7 @@ import type {
 } from "@dc-copilot/types";
 import type { Call } from "@/types";
 import { sanitizeClientBullets, sanitizeClientHeadline } from "@/lib/client-facing-safety";
-import { newSectionId } from "@/lib/landing-page/clp-editor-utils";
+import { isCompanyPlaybookLandingAsset, newSectionId } from "@/lib/landing-page/clp-editor-utils";
 
 interface BuildOptimisticLandingDraftInput {
   callId: string;
@@ -68,8 +68,9 @@ export function buildOptimisticLandingDraft({
   const selectedAssets: CustomerLandingPage["selectedAssets"] = [];
   const aiSuggestions: CustomerLandingPage["aiSuggestions"] = [];
 
-  for (const suggestion of kbSuggestions.slice(0, 4)) {
+  for (const suggestion of kbSuggestions) {
     if (!suggestion.assetId) continue;
+    if (isCompanyPlaybookLandingAsset({ title: suggestion.title })) continue;
     aiSuggestions.push({
       assetId: suggestion.assetId,
       title: suggestion.title ?? "Reference",
@@ -83,6 +84,7 @@ export function buildOptimisticLandingDraft({
         displayMode: "embed",
       });
     }
+    if (aiSuggestions.length >= 4) break;
   }
 
   if (selectedAssets.length > 0) {

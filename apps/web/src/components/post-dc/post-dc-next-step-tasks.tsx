@@ -16,6 +16,7 @@ import { BriefDetailCard, briefBodyClass } from "@/components/pre-call/brief-det
 import {
   buildPostDcWorkflowTasks,
   countWorkflowTasksDone,
+  countWorkflowTasksTotal,
   getPostDcRecommendation,
   type PostDcWorkflowTask,
   type PostDcWorkflowTaskKind,
@@ -132,7 +133,7 @@ export function PostDcNextStepTasks({
       ) : null}
       {crmTasks.length > 0 ? (
         <div className={cn(tasks.length > 0 && "mt-4 border-t border-border/60 pt-3")}>
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          <p className="type-kicker text-muted-foreground mb-2">
             CRM follow-ups
           </p>
           <TaskList
@@ -188,10 +189,11 @@ export function PostDcTasksDetailView({
     statusOverrides: taskStatus,
   });
   const done = countWorkflowTasksDone(tasks);
+  const total = countWorkflowTasksTotal(tasks);
 
   return (
     <div className="space-y-6">
-      <PostDcTasksProgressBar done={done} total={tasks.length} />
+      <PostDcTasksProgressBar done={done} total={total} />
 
       {recommendation ? (
         <PostDcModalSection
@@ -246,11 +248,13 @@ function WorkflowTaskDetailCard({
 }) {
   const [busy, setBusy] = useState(false);
   const Icon = KIND_ICONS[task.kind];
+  const countsTowardProgress = task.countsTowardProgress !== false;
   const isDone = task.status === "done";
   const isSkipped = task.status === "skipped";
   const canOpen = Boolean(task.scrollTarget && onScrollToWidget && !task.actionDisabled);
 
   async function toggleDone() {
+    if (!countsTowardProgress) return;
     if (isDone) {
       onStatusChange(task.id, "pending");
       return;
@@ -271,42 +275,42 @@ function WorkflowTaskDetailCard({
 
         <div className="min-w-0 flex-1 space-y-2">
           <div>
-            <p className="text-sm font-semibold leading-snug break-words text-foreground">
+            <p className="type-panel-title leading-snug break-words text-foreground">
               {task.title}
             </p>
             {task.badge ? (
-              <span className="mt-0.5 block text-[10px] text-muted-foreground">{task.badge}</span>
+              <span className="mt-0.5 block type-caption text-muted-foreground">{task.badge}</span>
             ) : null}
             {isSkipped ? (
-              <span className="mt-0.5 block text-[10px] text-muted-foreground">Skipped</span>
+              <span className="mt-0.5 block type-caption text-muted-foreground">Skipped</span>
             ) : null}
           </div>
 
           {task.hint ? (
-            <p className="text-sm leading-relaxed text-muted-foreground">{task.hint}</p>
+            <p className="type-body leading-relaxed text-muted-foreground">{task.hint}</p>
           ) : null}
           {task.detail ? (
-            <p className="text-sm leading-relaxed text-foreground/80">{task.detail}</p>
+            <p className="type-body leading-relaxed text-foreground/80">{task.detail}</p>
           ) : null}
 
-          {(canOpen || (!isDone && !isSkipped)) && (
+          {(canOpen || (countsTowardProgress && !isDone && !isSkipped)) && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
               {canOpen ? (
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-7 text-xs"
+                  className="h-7 type-label"
                   onClick={() => onScrollToWidget?.(task.scrollTarget!)}
                 >
                   {task.actionLabel}
                 </Button>
               ) : null}
-              {!isDone && !isSkipped ? (
+              {countsTowardProgress && !isDone && !isSkipped ? (
                 <button
                   type="button"
                   onClick={() => onStatusChange(task.id, "skipped")}
-                  className="text-xs text-muted-foreground hover:text-destructive"
+                  className="type-caption text-muted-foreground hover:text-destructive"
                 >
                   Skip
                 </button>
@@ -315,26 +319,28 @@ function WorkflowTaskDetailCard({
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => void toggleDone()}
-          disabled={busy || isSkipped}
-          className={cn(
-            "mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-            isDone
-              ? "border-success bg-success text-success-foreground"
-              : isSkipped
-                ? "border-border/50 bg-muted/40 cursor-not-allowed"
-                : "border-border bg-background hover:border-primary/50"
-          )}
-          aria-label={isDone ? `Mark ${task.title} as pending` : `Mark ${task.title} as done`}
-        >
-          {busy ? (
-            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-          ) : isDone ? (
-            <Check className="h-3 w-3" strokeWidth={3} aria-hidden />
-          ) : null}
-        </button>
+        {countsTowardProgress ? (
+          <button
+            type="button"
+            onClick={() => void toggleDone()}
+            disabled={busy || isSkipped}
+            className={cn(
+              "mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+              isDone
+                ? "border-success bg-success text-success-foreground"
+                : isSkipped
+                  ? "border-border/50 bg-muted/40 cursor-not-allowed"
+                  : "border-border bg-background hover:border-primary/50"
+            )}
+            aria-label={isDone ? `Mark ${task.title} as pending` : `Mark ${task.title} as done`}
+          >
+            {busy ? (
+              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+            ) : isDone ? (
+              <Check className="h-3 w-3" strokeWidth={3} aria-hidden />
+            ) : null}
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -356,15 +362,17 @@ function WorkflowTaskRow({
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const Icon = KIND_ICONS[task.kind];
+  const countsTowardProgress = task.countsTowardProgress !== false;
   const isDone = task.status === "done";
   const isSkipped = task.status === "skipped";
   const hasDetail = Boolean(task.hint || task.detail);
   const canOpen = Boolean(task.scrollTarget && onScrollToWidget && !task.actionDisabled);
   const showInlineDetail = detailed || expanded;
-  const showActions = variant !== "rail" && (canOpen || (!isDone && !isSkipped));
+  const showActions = variant !== "rail" && (canOpen || (countsTowardProgress && !isDone && !isSkipped));
   const isRail = variant === "rail";
 
   async function toggleDone() {
+    if (!countsTowardProgress) return;
     if (isDone) {
       onStatusChange(task.id, "pending");
       return;
@@ -430,7 +438,7 @@ function WorkflowTaskRow({
               {task.title}
             </span>
             {task.badge ? (
-              <span className="mt-0.5 block text-[10px] leading-tight text-muted-foreground">
+              <span className="mt-0.5 block type-caption leading-tight text-muted-foreground">
                 {task.badge}
               </span>
             ) : null}
@@ -439,10 +447,10 @@ function WorkflowTaskRow({
           {!isRail && showInlineDetail && hasDetail ? (
             <div className={cn("mt-1.5 space-y-1", detailed && "pl-0")}>
               {task.hint ? (
-                <p className="text-xs leading-relaxed text-muted-foreground">{task.hint}</p>
+                <p className="type-label leading-relaxed text-muted-foreground">{task.hint}</p>
               ) : null}
               {task.detail ? (
-                <p className="text-xs leading-relaxed text-muted-foreground">{task.detail}</p>
+                <p className="type-label leading-relaxed text-muted-foreground">{task.detail}</p>
               ) : null}
             </div>
           ) : null}
@@ -460,17 +468,17 @@ function WorkflowTaskRow({
                 <button
                   type="button"
                   onClick={handleOpen}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  className="inline-flex items-center gap-1 type-label text-primary hover:underline"
                 >
                   {task.actionLabel}
                   <ExternalLink className="h-3 w-3" aria-hidden />
                 </button>
               ) : null}
-              {!isDone && !isSkipped ? (
+              {countsTowardProgress && !isDone && !isSkipped ? (
                 <button
                   type="button"
                   onClick={() => onStatusChange(task.id, "skipped")}
-                  className="text-xs text-muted-foreground hover:text-destructive"
+                  className="type-caption text-muted-foreground hover:text-destructive"
                 >
                   Skip
                 </button>
@@ -479,30 +487,32 @@ function WorkflowTaskRow({
           ) : null}
         </div>
 
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            void toggleDone();
-          }}
-          disabled={busy || isSkipped}
-          className={cn(
-            "inline-flex shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-            isRail ? "mt-0.5 h-4 w-4" : "mt-0.5 h-5 w-5",
-            isDone
-              ? "border-success bg-success text-success-foreground"
-              : isSkipped
-                ? "border-border/50 bg-muted/40 text-transparent cursor-not-allowed"
-                : "border-border bg-background hover:border-primary/50"
-          )}
-          aria-label={isDone ? `Mark ${task.title} as pending` : `Mark ${task.title} as done`}
-        >
-          {busy ? (
-            <Loader2 className={cn("animate-spin text-muted-foreground", isRail ? "h-2.5 w-2.5" : "h-3 w-3")} />
-          ) : isDone ? (
-            <Check className={cn(isRail ? "h-2.5 w-2.5" : "h-3 w-3")} strokeWidth={3} aria-hidden />
-          ) : null}
-        </button>
+        {countsTowardProgress ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              void toggleDone();
+            }}
+            disabled={busy || isSkipped}
+            className={cn(
+              "inline-flex shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+              isRail ? "mt-0.5 h-4 w-4" : "mt-0.5 h-5 w-5",
+              isDone
+                ? "border-success bg-success text-success-foreground"
+                : isSkipped
+                  ? "border-border/50 bg-muted/40 text-transparent cursor-not-allowed"
+                  : "border-border bg-background hover:border-primary/50"
+            )}
+            aria-label={isDone ? `Mark ${task.title} as pending` : `Mark ${task.title} as done`}
+          >
+            {busy ? (
+              <Loader2 className={cn("animate-spin text-muted-foreground", isRail ? "h-2.5 w-2.5" : "h-3 w-3")} />
+            ) : isDone ? (
+              <Check className={cn(isRail ? "h-2.5 w-2.5" : "h-3 w-3")} strokeWidth={3} aria-hidden />
+            ) : null}
+          </button>
+        ) : null}
       </div>
     </div>
   );

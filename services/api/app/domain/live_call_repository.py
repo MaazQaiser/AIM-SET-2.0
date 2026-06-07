@@ -28,6 +28,9 @@ def _memory_keys(ctx: TenantContext, clerk_key: str) -> List[str]:
 
 
 def _resolve_live_tenant(ctx: TenantContext) -> tuple[str, str, bool]:
+    if not get_settings().supabase_configured:
+        fallback = _fallback_tenant_key(ctx)
+        return fallback, fallback, False
     try:
         tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
         return tenant_uuid, clerk_key, True

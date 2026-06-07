@@ -50,7 +50,7 @@ const preDcColumns: ColumnDef<PreDCRecord>[] = [
     header: "ICP bucket",
     accessorFn: (r) => preDcField(r, "icpBucket"),
     cell: ({ row }) => (
-      <span className="text-xs line-clamp-2 max-w-[140px]">{preDcField(row.original, "icpBucket")}</span>
+      <span className="type-label line-clamp-2 max-w-[140px]">{preDcField(row.original, "icpBucket")}</span>
     ),
   },
   {
@@ -66,7 +66,7 @@ const postDcColumns: ColumnDef<PostDCRecord>[] = [
     header: "Stage",
     accessorFn: (r) => postDcField(r, "leadStage"),
     cell: ({ row }) => (
-      <Badge variant="outline" className="capitalize text-[10px]">
+      <Badge variant="outline" className="capitalize type-caption">
         {postDcField(row.original, "leadStage") || "—"}
       </Badge>
     ),
@@ -90,7 +90,7 @@ const postDcColumns: ColumnDef<PostDCRecord>[] = [
       const n = postDcField(row.original, "need");
       const t = postDcField(row.original, "timeline");
       return (
-        <span className="text-[10px] text-muted-foreground font-mono">
+        <span className="type-caption text-muted-foreground font-mono">
           {[b, a, n, t].filter(Boolean).join(" / ") || "—"}
         </span>
       );
@@ -101,11 +101,11 @@ const postDcColumns: ColumnDef<PostDCRecord>[] = [
     header: "Linked call",
     cell: ({ row }) =>
       row.original.matchedCallId ? (
-        <Badge variant="success" className="text-[10px]">
+        <Badge variant="success" className="type-caption">
           Matched
         </Badge>
       ) : (
-        <Badge variant="secondary" className="text-[10px]">
+        <Badge variant="secondary" className="type-caption">
           Unlinked
         </Badge>
       ),
@@ -146,8 +146,8 @@ function UploadZone({
         )}
       >
         <Upload className="h-7 w-7 text-muted-foreground" />
-        <span className="text-sm font-medium text-foreground">{label}</span>
-        <span className="text-xs text-muted-foreground max-w-sm">{description}</span>
+        <span className="type-body font-medium text-foreground">{label}</span>
+        <span className="type-caption text-muted-foreground max-w-sm">{description}</span>
       </button>
       <input
         ref={inputRef}
@@ -332,11 +332,11 @@ export function DcNotesCsvImport() {
 
         {parseErrors.length > 0 && (
           <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 space-y-1">
-            <p className="text-xs font-medium flex items-center gap-1.5">
+            <p className="type-label flex items-center gap-1.5">
               <AlertCircle className="h-3.5 w-3.5" />
               Import warnings
             </p>
-            <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5">
+            <ul className="type-caption text-muted-foreground list-disc pl-4 space-y-0.5">
               {parseErrors.slice(0, 6).map((err) => (
                 <li key={err}>{err}</li>
               ))}
@@ -345,7 +345,7 @@ export function DcNotesCsvImport() {
         )}
 
         {(preDcFileName || postDcFileName) && (
-          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+          <div className="flex flex-wrap gap-3 type-caption text-muted-foreground">
             {preDcFileName && (
               <span className="flex items-center gap-1">
                 <CheckCircle2 className="h-3.5 w-3.5 text-success" />
@@ -400,7 +400,7 @@ export function DcNotesCsvImport() {
         )}
 
         {preDcRecords.length === 0 && postDcRecords.length === 0 && (
-          <p className="text-xs text-muted-foreground flex items-center gap-2">
+          <p className="type-caption text-muted-foreground flex items-center gap-2">
             <ClipboardList className="h-3.5 w-3.5" />
             Tip: import Pre-DC first so Post-DC rows can auto-link to companies mentioned in the notes.
           </p>

@@ -45,10 +45,10 @@ export function ContentLibraryAssetRow({
         className={compact ? "scale-90" : undefined}
       />
       <div className="min-w-0 flex-1">
-        <p className={cn("truncate font-medium text-foreground", compact ? "text-xs" : "text-sm")}>
+        <p className={cn("truncate font-medium text-foreground", compact ? "type-label" : "type-body")}>
           {asset.title}
         </p>
-        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+        <p className="mt-0.5 truncate type-caption text-muted-foreground">
           {formatMeta.label}
           {asset.previewSlideCount ? ` · ${asset.previewSlideCount} slides` : ""}
           {!compact && asset.effectivenessScore !== undefined

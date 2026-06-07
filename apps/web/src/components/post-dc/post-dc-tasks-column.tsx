@@ -15,6 +15,7 @@ import { PostDcCallAnalyticsContent } from "@/components/post-dc/post-dc-call-an
 import {
   buildPostDcWorkflowTasks,
   countWorkflowTasksDone,
+  countWorkflowTasksTotal,
 } from "@/lib/post-dc/workflow-tasks";
 import type { PostDcWorkflowTaskStatus } from "@/lib/post-dc/workflow-tasks";
 import { resolveLeadStage } from "@/lib/post-dc/deal-signals";
@@ -57,7 +58,7 @@ export function PostDcTasksColumn({
     statusOverrides: workflowTaskStatus ?? {},
   });
   const tasksDone = countWorkflowTasksDone(tasks);
-  const tasksTotal = tasks.length;
+  const tasksTotal = countWorkflowTasksTotal(tasks);
 
   const taskProps = {
     review,
@@ -92,7 +93,7 @@ export function PostDcTasksColumn({
         className="shadow-none w-full"
         headerExtra={
           tasksTotal > 0 ? (
-            <span className="text-xs tabular-nums text-muted-foreground shrink-0 font-medium">
+            <span className="type-label tabular-nums text-muted-foreground shrink-0 font-medium">
               {tasksDone}/{tasksTotal}
             </span>
           ) : null

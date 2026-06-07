@@ -16,7 +16,7 @@ export function PostDiscoveryGapsCard({ gaps, bantCoverage }: PostDiscoveryGapsC
     <BriefDetailCard title="Discovery gaps" icon={AlertCircle} variant="warning">
       {bantCoverage !== undefined && (
         <BriefDetailRow className="mb-2">
-          <p className="text-sm text-foreground">
+          <p className="type-body text-foreground">
             BANT coverage at call end:{" "}
             <span className="font-semibold">{Math.round(bantCoverage * 100)}%</span>
           </p>
@@ -26,14 +26,14 @@ export function PostDiscoveryGapsCard({ gaps, bantCoverage }: PostDiscoveryGapsC
         <ul className="flex flex-wrap gap-1.5">
           {gaps.map((gap) => (
             <li key={gap}>
-              <Badge variant="outline" className="text-xs capitalize">
+              <Badge variant="outline" className="type-label capitalize">
                 {gap.replace(/_/g, " ")}
               </Badge>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-muted-foreground">All core discovery items were covered.</p>
+        <p className="type-body text-muted-foreground">All core discovery items were covered.</p>
       )}
     </BriefDetailCard>
   );

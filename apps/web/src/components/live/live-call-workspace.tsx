@@ -132,7 +132,7 @@ export function LiveCallWorkspace({
             type="button"
             variant="ghost"
             size="sm"
-            className="h-7 gap-1 px-2 text-[10px] text-muted-foreground"
+            className="h-7 gap-1 px-2 type-caption text-muted-foreground"
             aria-label="Hide transcript"
             onClick={() => setTranscriptOpen(false)}
           >
@@ -150,7 +150,7 @@ export function LiveCallWorkspace({
             className="flex-1 min-h-0"
           />
         ) : (
-          <p className={cn(liveColumnHorizontalPadding, "py-8 text-center text-sm text-muted-foreground")}>
+          <p className={cn(liveColumnHorizontalPadding, "py-8 text-center type-body text-muted-foreground")}>
             Waiting for transcript. Start Recall above or play a demo transcript.
           </p>
         )}
@@ -250,7 +250,7 @@ export function LiveCallWorkspace({
           onClick={() => setTranscriptOpen(true)}
         >
           <ChevronRight className="h-4 w-4" aria-hidden />
-          <span className="text-[10px] font-semibold [writing-mode:vertical-rl] rotate-180">
+          <span className="type-caption font-medium [writing-mode:vertical-rl] rotate-180">
             Transcript
           </span>
         </button>
@@ -270,7 +270,7 @@ export function LiveCallWorkspace({
     | "wrap-up";
 
   return (
-    <div className="live-call-page call-detail-page flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="live-call-page call-detail-page flex h-full max-h-full min-h-0 flex-1 flex-col overflow-hidden">
       <LiveCallPageHeader
         callId={callId}
         call={call}
@@ -296,19 +296,19 @@ export function LiveCallWorkspace({
               className="flex min-h-0 flex-1 flex-col overflow-hidden"
             >
               <TabsList className="h-10 w-full shrink-0 justify-start overflow-x-auto rounded-none border-b border-border/60 bg-transparent px-0">
-                <TabsTrigger value="transcript" className="text-xs">
+                <TabsTrigger value="transcript" className="type-label">
                   Transcript
                 </TabsTrigger>
-                <TabsTrigger value="signals" className="text-xs">
+                <TabsTrigger value="signals" className="type-label">
                   Signals
                 </TabsTrigger>
-                <TabsTrigger value="insights" className="text-xs">
+                <TabsTrigger value="insights" className="type-label">
                   Live copilot
                 </TabsTrigger>
-                <TabsTrigger value="chat" className="text-xs">
+                <TabsTrigger value="chat" className="type-label">
                   Pod chat
                 </TabsTrigger>
-                <TabsTrigger value="wrap-up" className="text-xs">
+                <TabsTrigger value="wrap-up" className="type-label">
                   Wrap-up
                 </TabsTrigger>
               </TabsList>
@@ -346,6 +346,7 @@ export function LiveCallWorkspace({
                     <BotChatPanel
                       callId={callId}
                       phase="live"
+                      surface="live_dc"
                       className="h-full min-h-0"
                       accountName={accountName}
                       brief={brief}

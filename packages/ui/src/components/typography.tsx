@@ -4,12 +4,18 @@ import { cn } from "../lib/cn";
 export type TypographyVariant =
   | "display"
   | "headline"
+  | "page-title"
+  | "screen-title"
+  | "section-title"
+  | "panel-title"
   | "title"
   | "subtitle"
   | "body"
   | "body-sm"
   | "label"
+  | "kicker"
   | "caption"
+  | "chip"
   | "mono";
 
 export interface TypographyProps extends React.HTMLAttributes<HTMLElement> {
@@ -21,24 +27,36 @@ export interface TypographyProps extends React.HTMLAttributes<HTMLElement> {
 const defaultElementByVariant: Record<TypographyVariant, React.ElementType> = {
   display: "h1",
   headline: "h1",
+  "page-title": "h1",
+  "screen-title": "h1",
+  "section-title": "h2",
+  "panel-title": "h3",
   title: "h2",
   subtitle: "p",
   body: "p",
   "body-sm": "p",
   label: "span",
+  kicker: "span",
   caption: "span",
+  chip: "span",
   mono: "code",
 };
 
 const typographyVariants: Record<TypographyVariant, string> = {
   display: "type-display",
   headline: "type-headline",
+  "page-title": "type-page-title",
+  "screen-title": "type-screen-title",
+  "section-title": "type-section-title",
+  "panel-title": "type-panel-title",
   title: "type-title",
   subtitle: "type-subtitle",
   body: "type-body",
   "body-sm": "type-body-sm",
   label: "type-label",
+  kicker: "type-kicker",
   caption: "type-caption",
+  chip: "type-chip",
   mono: "type-mono",
 };
 

@@ -10,6 +10,7 @@ import {
   CLP_SECTION_TYPE_OPTIONS,
   bulletsToText,
   createClpSection,
+  isCompanyPlaybookLandingAsset,
   linksToText,
   sectionTypeLabel,
   textToBullets,
@@ -54,7 +55,7 @@ export function ClpSectionEditor({ draft, onChange, embedded = false }: ClpSecti
         <h2
           className={cn(
             "font-semibold",
-            embedded ? "text-xs text-muted-foreground uppercase tracking-wide" : "text-sm"
+            embedded ? "type-kicker text-muted-foreground" : "type-body"
           )}
         >
           Sections
@@ -63,7 +64,7 @@ export function ClpSectionEditor({ draft, onChange, embedded = false }: ClpSecti
           <select
             value={addType}
             onChange={(e) => setAddType(e.target.value as ClpSectionType)}
-            className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+            className="h-8 rounded-md border border-border bg-background px-2 type-label"
             aria-label="Section type to add"
           >
             {CLP_SECTION_TYPE_OPTIONS.map((o) => (
@@ -72,7 +73,13 @@ export function ClpSectionEditor({ draft, onChange, embedded = false }: ClpSecti
               </option>
             ))}
           </select>
-          <Button type="button" variant="outline" size="sm" className="h-8 gap-1" onClick={addSection}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1"
+            onClick={addSection}
+          >
             <Plus className="h-3.5 w-3.5" />
             Add
           </Button>
@@ -85,14 +92,16 @@ export function ClpSectionEditor({ draft, onChange, embedded = false }: ClpSecti
             <div className="flex items-center gap-2 px-3 py-2">
               <button
                 type="button"
-                className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm"
+                className="flex min-w-0 flex-1 items-center gap-2 text-left type-body"
                 onClick={() => setExpandedId(expandedId === section.id ? null : section.id)}
               >
-                <span className="text-[10px] tabular-nums text-muted-foreground w-4">{index + 1}</span>
+                <span className="type-caption tabular-nums text-muted-foreground w-4">
+                  {index + 1}
+                </span>
                 <span className="font-medium truncate">
                   {section.title ?? section.headline ?? sectionTypeLabel(section.type)}
                 </span>
-                <span className="text-[10px] text-muted-foreground shrink-0">
+                <span className="type-caption text-muted-foreground shrink-0">
                   {section.type.replace(/_/g, " ")}
                 </span>
                 {expandedId === section.id ? (
@@ -105,7 +114,7 @@ export function ClpSectionEditor({ draft, onChange, embedded = false }: ClpSecti
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-7 text-xs shrink-0"
+                className="h-7 type-label shrink-0"
                 onClick={() => patchSection(section.id, { visible: section.visible === false })}
               >
                 {section.visible !== false ? "Hide" : "Show"}
@@ -124,7 +133,10 @@ export function ClpSectionEditor({ draft, onChange, embedded = false }: ClpSecti
 
             {expandedId === section.id && (
               <div className="border-t px-3 py-3 space-y-3 bg-muted/10">
-                <SectionFields section={section} onPatch={(patch) => patchSection(section.id, patch)} />
+                <SectionFields
+                  section={section}
+                  onPatch={(patch) => patchSection(section.id, patch)}
+                />
                 {section.type === "company_deck" && (
                   <CompanyDeckAssetPicker
                     draft={draft}
@@ -144,7 +156,7 @@ export function ClpSectionEditor({ draft, onChange, embedded = false }: ClpSecti
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-1">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Label className="type-caption text-muted-foreground">{label}</Label>
       {children}
     </div>
   );
@@ -164,7 +176,7 @@ function SectionFields({
           <Input
             value={section.headline ?? ""}
             onChange={(e) => onPatch({ headline: e.target.value })}
-            className="h-8 text-sm"
+            className="h-8 type-body"
           />
         </Field>
         <Field label="Subhead">
@@ -172,30 +184,38 @@ function SectionFields({
             value={section.subhead ?? ""}
             onChange={(e) => onPatch({ subhead: e.target.value })}
             rows={2}
-            className="text-sm"
+            className="type-body"
           />
         </Field>
       </>
     );
   }
 
-  if (section.type === "summary" || section.type === "next_steps" || section.type === "testimonials") {
+  if (
+    section.type === "summary" ||
+    section.type === "next_steps" ||
+    section.type === "testimonials"
+  ) {
     return (
       <>
         <Field label="Section title">
           <Input
             value={section.title ?? ""}
             onChange={(e) => onPatch({ title: e.target.value })}
-            className="h-8 text-sm"
+            className="h-8 type-body"
           />
         </Field>
-        <Field label={section.type === "testimonials" ? "Quotes (one per line)" : "Bullets (one per line)"}>
+        <Field
+          label={
+            section.type === "testimonials" ? "Quotes (one per line)" : "Bullets (one per line)"
+          }
+        >
           <Textarea
             value={bulletsToText(section.bullets)}
             onChange={(e) => onPatch({ bullets: textToBullets(e.target.value) })}
             rows={5}
             className={cn(
-              "text-sm leading-relaxed",
+              "type-body leading-relaxed",
               section.type === "summary" ? "text-foreground" : "font-mono"
             )}
           />
@@ -211,7 +231,7 @@ function SectionFields({
           <Input
             value={section.title ?? ""}
             onChange={(e) => onPatch({ title: e.target.value })}
-            className="h-8 text-sm"
+            className="h-8 type-body"
           />
         </Field>
         <Field label="Caption (optional)">
@@ -219,10 +239,10 @@ function SectionFields({
             value={section.caption ?? ""}
             onChange={(e) => onPatch({ caption: e.target.value })}
             rows={2}
-            className="text-sm"
+            className="type-body"
           />
         </Field>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="type-caption text-muted-foreground">
           Attach files from the Knowledge base assets panel below.
         </p>
       </>
@@ -235,7 +255,7 @@ function SectionFields({
         <Input
           value={section.title ?? ""}
           onChange={(e) => onPatch({ title: e.target.value })}
-          className="h-8 text-sm"
+          className="h-8 type-body"
         />
       </Field>
     );
@@ -248,7 +268,7 @@ function SectionFields({
           <Input
             value={section.title ?? ""}
             onChange={(e) => onPatch({ title: e.target.value })}
-            className="h-8 text-sm"
+            className="h-8 type-body"
           />
         </Field>
         <Field label="Links (label|url per line)">
@@ -256,7 +276,7 @@ function SectionFields({
             value={linksToText(section.links)}
             onChange={(e) => onPatch({ links: textToLinks(e.target.value) })}
             rows={4}
-            className="text-sm font-mono"
+            className="type-body font-mono"
             placeholder={"Schedule call|https://…\nProduct tour|https://…"}
           />
         </Field>
@@ -270,7 +290,7 @@ function SectionFields({
         <Input
           value={section.title ?? ""}
           onChange={(e) => onPatch({ title: e.target.value })}
-          className="h-8 text-sm"
+          className="h-8 type-body"
         />
       </Field>
     );
@@ -281,7 +301,7 @@ function SectionFields({
       <Input
         value={section.title ?? ""}
         onChange={(e) => onPatch({ title: e.target.value })}
-        className="h-8 text-sm"
+        className="h-8 type-body"
       />
     </Field>
   );
@@ -301,14 +321,14 @@ function CompanyDeckAssetPicker({
     ...draft.aiSuggestions
       .filter((s) => !draft.selectedAssets.some((a) => a.assetId === s.assetId))
       .map((s) => ({ assetId: s.assetId, title: s.title })),
-  ];
+  ].filter((asset) => !isCompanyPlaybookLandingAsset(asset));
 
   return (
     <Field label="Deck asset">
       <select
         value={section.assetId ?? ""}
         onChange={(e) => onPatch({ assetId: e.target.value || undefined })}
-        className={cn("h-8 w-full rounded-md border border-border bg-background px-2 text-sm")}
+        className={cn("h-8 w-full rounded-md border border-border bg-background px-2 type-body")}
       >
         <option value="">Select asset…</option>
         {options.map((o) => (

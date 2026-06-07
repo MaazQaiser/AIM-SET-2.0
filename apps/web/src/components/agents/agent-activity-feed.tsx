@@ -49,7 +49,7 @@ export function AgentActivityFeed({ events, maxHeight = "400px", className }: Ag
 
   if (eventCount === 0) {
     return (
-      <div className={cn("flex items-center justify-center py-12 text-muted-foreground text-sm", className)}>
+      <div className={cn("flex items-center justify-center py-12 text-muted-foreground type-body", className)}>
         No activity yet
       </div>
     );
@@ -70,14 +70,14 @@ export function AgentActivityFeed({ events, maxHeight = "400px", className }: Ag
                 <Icon className="h-3 w-3" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium">{ev.description}</p>
+                <p className="type-label">{ev.description}</p>
                 {ev.cost_usd !== undefined && ev.cost_usd > 0 && (
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                  <p className="type-caption text-muted-foreground mt-0.5">
                     ${ev.cost_usd.toFixed(4)}
                   </p>
                 )}
               </div>
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0">
+              <span className="type-caption text-muted-foreground whitespace-nowrap shrink-0">
                 {formatTime(ev.timestamp)}
               </span>
             </div>

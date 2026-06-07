@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPostDcWorkflowTasks,
+  countWorkflowTasksDone,
+  countWorkflowTasksTotal,
   getPostDcRecommendation,
 } from "@/lib/post-dc/workflow-tasks";
 import type { PostCallReview } from "@/lib/brief-types";
@@ -84,9 +86,16 @@ describe("buildPostDcWorkflowTasks", () => {
       leadStage: "Opportunity",
       hasEmailDraft: false,
       hasJiraTicket: false,
+      statusOverrides: {
+        "wf-build-proposal": "done",
+      },
     });
     const proposal = tasks.find((t) => t.kind === "build_proposal");
     expect(proposal?.badge).toBe("Coming soon");
     expect(proposal?.actionDisabled).toBe(true);
+    expect(proposal?.countsTowardProgress).toBe(false);
+    expect(proposal?.status).toBe("pending");
+    expect(countWorkflowTasksTotal(tasks)).toBe(tasks.length - 1);
+    expect(countWorkflowTasksDone(tasks)).toBe(0);
   });
 });

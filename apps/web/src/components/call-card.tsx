@@ -42,7 +42,7 @@ export function CallCard({ call }: CallCardProps) {
         <div className="min-w-0">
           <div className="flex items-start gap-2">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              <h3 className="text-base font-bold text-foreground leading-tight truncate">
+              <h3 className="type-section-title truncate text-foreground">
                 {call.accountName}
               </h3>
               <Badge
@@ -66,7 +66,7 @@ export function CallCard({ call }: CallCardProps) {
             {call.annualRevenue && (
               <Badge
                 variant="outline"
-                className="gap-1 text-[10px] font-medium border-emerald-300/80 bg-emerald-50/80 text-emerald-900 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-100"
+                className="gap-1 border-emerald-300/80 bg-emerald-50/80 text-emerald-900 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-100"
               >
                 <DollarSign className="h-3 w-3 shrink-0" />
                 {call.annualRevenue}
@@ -75,7 +75,7 @@ export function CallCard({ call }: CallCardProps) {
             )}
             <Badge
               variant="outline"
-              className="gap-1 text-[10px] font-medium tabular-nums border-amber-300/80 bg-amber-50/80 text-amber-950 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100"
+              className="gap-1 tabular-nums border-amber-300/80 bg-amber-50/80 text-amber-950 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100"
             >
               Rating {agentRating}
             </Badge>
@@ -83,7 +83,6 @@ export function CallCard({ call }: CallCardProps) {
               <Badge
                 variant="outline"
                 className={cn(
-                  "text-[10px] font-medium",
                   companyStage === "Enterprise" &&
                     "border-violet-300/80 bg-violet-50/80 text-violet-900",
                   companyStage === "Startup" && "border-sky-300/80 bg-sky-50/80 text-sky-900",
@@ -101,9 +100,9 @@ export function CallCard({ call }: CallCardProps) {
         </div>
 
         {/* ── Meta row: lead, date, time ──────────────────────────────── */}
-        <div className="space-y-2 border-t pt-3 text-xs text-muted-foreground">
+        <div className="space-y-2 border-t pt-3 type-body-sm text-muted-foreground">
           {call.leadName && (
-            <div className="flex min-w-0 items-center gap-1.5 truncate border-b border-border/60 pb-2 font-semibold text-foreground/80">
+            <div className="flex min-w-0 items-center gap-1.5 truncate border-b border-border/60 pb-2 font-medium text-foreground/80">
               <ParticipantAvatar name={call.leadName} kind="external" size="xs" />
               <span className="truncate">
                 {call.leadName}

@@ -111,15 +111,15 @@ export default function PublicLandingPage({ params }: PageParams) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="w-full max-w-sm space-y-4 rounded-xl border bg-card p-6">
-          <h1 className="text-lg font-semibold">Enter password</h1>
-          <p className="text-sm text-muted-foreground">This page is shared privately with you.</p>
+          <h1 className="type-section-title">Enter password</h1>
+          <p className="type-body text-muted-foreground">This page is shared privately with you.</p>
           <Input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
           />
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="type-body text-destructive">{error}</p>}
           <Button className="w-full" onClick={() => void submitPassword()}>
             Continue
           </Button>
@@ -132,8 +132,8 @@ export default function PublicLandingPage({ params }: PageParams) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="w-full max-w-sm space-y-4 rounded-xl border bg-card p-6">
-          <h1 className="text-lg font-semibold">Welcome</h1>
-          <p className="text-xs text-muted-foreground">
+          <h1 className="type-section-title">Welcome</h1>
+          <p className="type-caption text-muted-foreground">
             Your activity on this page may be shared with your account team to support our
             conversation.
           </p>
@@ -144,7 +144,7 @@ export default function PublicLandingPage({ params }: PageParams) {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Work email"
           />
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="type-body text-destructive">{error}</p>}
           <Button className="w-full" onClick={() => void submitIdentity()}>
             View landing page
           </Button>

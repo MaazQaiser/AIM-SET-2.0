@@ -3,6 +3,8 @@
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     letter-spacing: 0;
@@ -63,33 +65,55 @@
 
   .type-subtitle {
     font-size: var(--text-subtitle);
-    line-height: 1.5;
-    font-weight: 500;
+    line-height: var(--text-subtitle--line-height);
+    font-weight: var(--text-subtitle--font-weight);
     letter-spacing: 0;
   }
 
   .type-body {
     font-size: var(--text-body);
-    line-height: 1.6;
+    line-height: var(--text-body--line-height);
     letter-spacing: 0;
   }
 
   .type-body-sm {
     font-size: var(--text-body-sm);
-    line-height: 1.5;
+    line-height: var(--text-body-sm--line-height);
     letter-spacing: 0;
   }
 
   .type-label {
     font-size: var(--text-label);
-    line-height: 1.35;
-    font-weight: 600;
+    line-height: var(--text-label--line-height);
+    font-weight: var(--text-label--font-weight);
+    letter-spacing: 0;
+  }
+
+  .type-kicker {
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+
+  .type-nav {
+    font-size: var(--text-body-sm);
+    line-height: var(--text-label--line-height);
+    font-weight: 500;
     letter-spacing: 0;
   }
 
   .type-caption {
     font-size: var(--text-caption);
-    line-height: 1.45;
+    line-height: var(--text-caption--line-height);
+    letter-spacing: 0;
+  }
+
+  .type-chip {
+    font-size: var(--text-caption);
+    line-height: var(--text-caption--line-height);
+    font-weight: 500;
     letter-spacing: 0;
   }
 
@@ -97,6 +121,96 @@
     font-family: var(--font-mono);
     font-size: var(--text-body-sm);
     line-height: 1.5;
+    letter-spacing: 0;
+  }
+
+  .type-page-title {
+    font-family: var(--font-title);
+    font-size: var(--text-display);
+    line-height: var(--text-display--line-height);
+    font-weight: var(--text-display--font-weight);
+    letter-spacing: 0;
+  }
+
+  .type-screen-title {
+    font-family: var(--font-title);
+    font-size: var(--text-headline);
+    line-height: var(--text-headline--line-height);
+    font-weight: var(--text-headline--font-weight);
+    letter-spacing: 0;
+  }
+
+  .type-section-title {
+    font-family: var(--font-title);
+    font-size: var(--text-title);
+    line-height: var(--text-title--line-height);
+    font-weight: var(--text-title--font-weight);
+    letter-spacing: 0;
+  }
+
+  .type-panel-title {
+    font-size: var(--text-body);
+    line-height: 1.4;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  .type-chat {
+    font-size: var(--text-body);
+    line-height: 1.65;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  .type-table {
+    font-size: var(--text-body-sm);
+    line-height: 1.45;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  .type-table-header {
+    font-size: var(--text-label);
+    line-height: var(--text-label--line-height);
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  .app-typography {
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    letter-spacing: 0;
+  }
+
+  .app-typography :where(h1):not([class*="type-"]) {
+    font-family: var(--font-title);
+    font-size: var(--text-display);
+    line-height: var(--text-display--line-height);
+    font-weight: var(--text-display--font-weight);
+    letter-spacing: 0;
+  }
+
+  .app-typography :where(h2):not([class*="type-"]) {
+    font-family: var(--font-title);
+    font-size: var(--text-title);
+    line-height: var(--text-title--line-height);
+    font-weight: var(--text-title--font-weight);
+    letter-spacing: 0;
+  }
+
+  .app-typography :where(h3, h4, h5, h6):not([class*="type-"]) {
+    font-size: var(--text-body);
+    line-height: 1.4;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  .app-typography :where(p, li, dd, dt, button, input, select, textarea) {
+    letter-spacing: 0;
+  }
+
+  .app-typography :where(.tracking-wide, .tracking-wider, .tracking-widest) {
     letter-spacing: 0;
   }
 }

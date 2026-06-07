@@ -159,7 +159,7 @@ export function AddPreDcLeadDialog({ onCreated }: AddPreDcLeadDialogProps) {
                 placeholder="Acme Corp"
               />
               {callId ? (
-                <p className="text-xs text-muted-foreground font-mono">Call ID: {callId}</p>
+                <p className="type-caption text-muted-foreground font-mono">Call ID: {callId}</p>
               ) : null}
             </div>
             <div className="space-y-2">
@@ -189,12 +189,12 @@ export function AddPreDcLeadDialog({ onCreated }: AddPreDcLeadDialogProps) {
           </div>
 
           <div className="rounded-lg border p-3 max-h-[40vh] overflow-y-auto space-y-3">
-            <p className="text-xs font-medium text-muted-foreground">All Pre-DC fields</p>
+            <p className="type-label text-muted-foreground">All Pre-DC fields</p>
             {PRE_DC_FIELD_ENTRIES.map(({ key, header }) => (
               <div key={key} className="space-y-1">
-                <Label className="text-xs text-muted-foreground">{header}</Label>
+                <Label className="type-caption text-muted-foreground">{header}</Label>
                 <Input
-                  className="h-8 text-sm"
+                  className="h-8 type-body"
                   value={record.fields[header] ?? ""}
                   onChange={(e) => updateField(header, e.target.value)}
                 />

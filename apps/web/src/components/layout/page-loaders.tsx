@@ -117,7 +117,7 @@ export function LiveCallPageLoader() {
       <div className="shrink-0 space-y-3 border-b border-border/60 px-6 py-4 sm:px-8">
         <Skeleton className="h-6 w-56" />
         <Skeleton className="h-4 w-80 max-w-full" />
-        <p className="text-sm text-muted-foreground">Connecting stream…</p>
+        <p className="type-body text-muted-foreground">Connecting stream…</p>
         <div className="flex gap-2">
           <Skeleton className="h-8 w-24 rounded-md" />
           <Skeleton className="h-8 w-28 rounded-md" />

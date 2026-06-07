@@ -29,7 +29,7 @@ const dimConfig: Record<
 export function SignalLog({ signals }: SignalLogProps) {
   if (signals.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground">
+      <p className="type-caption text-muted-foreground">
         BANT signals will appear as the conversation progresses.
       </p>
     );
@@ -48,7 +48,7 @@ export function SignalLog({ signals }: SignalLogProps) {
           <li
             key={s.id}
             className={cn(
-              "flex items-start gap-2 rounded-lg border px-3 py-2.5 text-xs",
+              "flex items-start gap-2 rounded-lg border px-3 py-2.5 type-label",
               cfg.accent
             )}
           >

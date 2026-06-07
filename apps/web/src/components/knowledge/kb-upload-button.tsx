@@ -242,7 +242,7 @@ export function KbUploadButton({ onAssetReady, trigger, defaultTitle }: KbUpload
 
           {busy && (
             <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
-              <div className="flex justify-between text-xs text-muted-foreground">
+              <div className="flex justify-between type-caption text-muted-foreground">
                 <span>{stageLabel}</span>
                 <span className="tabular-nums font-medium text-foreground">{overallPct}%</span>
               </div>
@@ -272,7 +272,7 @@ export function KbUploadButton({ onAssetReady, trigger, defaultTitle }: KbUpload
                 value={assetType}
                 onChange={(e) => setAssetType(e.target.value as AssetType)}
                 disabled={busy}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 type-body"
               >
                 {KB_ASSET_TYPES.map(({ value, label }) => (
                   <option key={value} value={value}>

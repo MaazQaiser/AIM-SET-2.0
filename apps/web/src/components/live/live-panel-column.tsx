@@ -46,7 +46,7 @@ export function LivePanelColumn({
           )}
           aria-hidden
         />
-        <span className="text-xs font-semibold text-muted-foreground flex-1 truncate">
+        <span className="type-label text-muted-foreground flex-1 truncate">
           {title}
         </span>
         {headerExtra}

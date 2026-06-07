@@ -41,8 +41,8 @@ export function KnowledgePageClient() {
     <PageShell size="wide">
       <PageHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Knowledge base</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="type-page-title text-foreground">Knowledge base</h1>
+          <p className="mt-1 type-body-sm text-muted-foreground">
             {assets.length} assets
             {process.env.NEXT_PUBLIC_KB_SHARED === "true" && (
               <span className="ml-1">· Shared team library</span>
@@ -107,8 +107,8 @@ export function KnowledgePageClient() {
             <Card key={item.assetId}>
               <CardContent className="p-4 flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium">{item.title}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{item.reason}</p>
+                  <p className="type-panel-title">{item.title}</p>
+                  <p className="mt-1 type-caption text-muted-foreground">{item.reason}</p>
                 </div>
                 <Badge
                   variant={

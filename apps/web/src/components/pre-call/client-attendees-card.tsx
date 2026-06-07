@@ -65,19 +65,19 @@ function ClientAttendeeDetailDialog({
               <div className="flex flex-wrap items-center gap-2 mt-2">
                 <span
                   className={cn(
-                    "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                    "inline-flex rounded-full border px-2 py-0.5 type-caption font-medium",
                     influence.className
                   )}
                 >
                   {influence.label}
                 </span>
                 {attendee.lastContactedAt ? (
-                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 type-caption text-muted-foreground">
                     <Clock className="h-3 w-3" />
                     Last contact {formatRelativeDays(attendee.lastContactedAt)}
                   </span>
                 ) : (
-                  <span className="text-xs text-warning font-medium">First meeting</span>
+                  <span className="type-label text-warning font-medium">First meeting</span>
                 )}
               </div>
             </div>
@@ -86,10 +86,10 @@ function ClientAttendeeDetailDialog({
 
         <div className="space-y-4 pt-2">
           <section>
-            <h4 className="text-[10px] font-semibold text-muted-foreground mb-1.5">
+            <h4 className="type-caption font-medium text-muted-foreground mb-1.5">
               Background
             </h4>
-            <p className="text-sm text-foreground/90 leading-relaxed">{attendee.background}</p>
+            <p className="type-body text-foreground/90 leading-relaxed">{attendee.background}</p>
           </section>
 
           {attendee.priorInteractionNote && (
@@ -97,10 +97,10 @@ function ClientAttendeeDetailDialog({
               <div className="flex gap-2">
                 <MessageCircle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-[10px] font-semibold text-primary mb-1">
+                  <h4 className="type-caption font-medium text-primary mb-1">
                     Agent note
                   </h4>
-                  <p className="text-sm text-foreground/90 leading-relaxed">
+                  <p className="type-body text-foreground/90 leading-relaxed">
                     {attendee.priorInteractionNote}
                   </p>
                 </div>
@@ -109,7 +109,7 @@ function ClientAttendeeDetailDialog({
           )}
 
           {!attendee.lastContactedAt && (
-            <p className="text-sm text-warning leading-relaxed">
+            <p className="type-body text-warning leading-relaxed">
               No prior interaction on record — plan a crisp introduction and confirm role on the call.
             </p>
           )}
@@ -155,7 +155,7 @@ export function ClientAttendeesCard({
             "Attendee details are taken from the lead fields and contact history available in the imported data. Influence labels are prep hints, not confirmed org-chart truth.",
         }}
         headerExtra={
-          <span className="text-xs text-muted-foreground shrink-0">{attendees.length}</span>
+          <span className="type-caption text-muted-foreground shrink-0">{attendees.length}</span>
         }
       >
         <div className="flex flex-wrap gap-1.5 mb-3">
@@ -166,7 +166,7 @@ export function ClientAttendeesCard({
               <span
                 key={key}
                 className={cn(
-                  "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                  "inline-flex items-center rounded-full border px-2 py-0.5 type-caption font-medium",
                   cfg.className
                 )}
               >
@@ -183,15 +183,15 @@ export function ClientAttendeesCard({
               <li key={attendee.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
                 <ParticipantAvatar name={attendee.name} kind="external" size="md" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-foreground truncate">{attendee.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">
+                  <p className="type-panel-title text-foreground truncate">{attendee.name}</p>
+                  <p className="type-caption text-muted-foreground truncate">
                     {attendee.title}
                     {attendee.department ? ` · ${attendee.department}` : ""}
                   </p>
                 </div>
                 <span
                   className={cn(
-                    "hidden sm:inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                    "hidden sm:inline-flex shrink-0 rounded-full border px-2 py-0.5 type-caption font-medium",
                     influence.className
                   )}
                 >
@@ -201,7 +201,7 @@ export function ClientAttendeesCard({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="shrink-0 h-8 text-xs"
+                  className="shrink-0 h-8 type-label"
                   onClick={() => setSelectedId(attendee.id)}
                 >
                   Details

@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../lib/cn";
 
 const chipVariants = cva(
-  "inline-flex items-center justify-center rounded-full font-medium transition-colors",
+  "inline-flex items-center justify-center rounded-full type-chip transition-colors",
   {
     variants: {
       variant: {
@@ -11,8 +11,8 @@ const chipVariants = cva(
         muted: "bg-muted/60 text-muted-foreground",
       },
       size: {
-        sm: "h-6 px-2.5 text-[11px]",
-        md: "h-7 px-3 text-xs",
+        sm: "h-6 px-2.5",
+        md: "h-7 px-3 type-label",
       },
     },
     defaultVariants: {
@@ -23,7 +23,7 @@ const chipVariants = cva(
 );
 
 const filterChipVariants = cva(
-  "inline-flex h-8 shrink-0 items-center justify-center rounded-full px-3.5 text-xs font-medium transition-[background-color,color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+  "inline-flex h-8 shrink-0 items-center justify-center rounded-full px-3.5 type-label transition-[background-color,color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
   {
     variants: {
       active: {

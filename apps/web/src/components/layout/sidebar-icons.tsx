@@ -38,7 +38,7 @@ export function SidebarSearchIcon() {
 export function SidebarAccountAvatar() {
   return (
     <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#e2e8f0]">
-      <span className="text-[9px] font-semibold leading-none text-[#64748b]">A</span>
+      <span className="type-caption font-medium leading-none text-[#64748b]">A</span>
     </span>
   );
 }

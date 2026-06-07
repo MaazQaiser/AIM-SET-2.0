@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useMemo, useRef } from "react";
 import { Sparkles } from "lucide-react";
 import {
   LiveCopilotChatComposer,
@@ -70,8 +70,78 @@ export const LiveInsightsPanel = memo(function LiveInsightsPanel({
   suggestionLog,
   openGaps,
 }: LiveInsightsPanelProps) {
+  const panelScrollRef = useRef<HTMLDivElement>(null);
+  const liveCopilotContext = useMemo(
+    () => ({
+      accountName,
+      leadName,
+      intentLabel,
+      intent,
+      transcriptLineCount: transcript.length,
+      transcriptTail: transcript.slice(-8).map((event) => ({
+        speaker: event.speakerName,
+        role: event.speakerRole,
+        text: event.text,
+        keywords: event.keywords,
+        sentiment: event.sentiment,
+      })),
+      pains: pains.slice(0, 6).map((pain) => ({
+        text: pain.text,
+        source: pain.source,
+        confidence: pain.confidence,
+        evidence: pain.evidence,
+      })),
+      insights: insights.slice(0, 6).map((insight) => ({
+        label: insight.label,
+        kind: insight.kind,
+        message: insight.message,
+        details: insight.details,
+      })),
+      openGaps,
+      checklistOpenGaps: checklist?.openGaps,
+      keywords: keywords.slice(0, 12),
+      bantSignals: bantSignals.slice(-8).map((signal) => ({
+        dimension: signal.dimension,
+        label: signal.label,
+        value: signal.value,
+        snippet: signal.snippet,
+      })),
+      suggestionLog: suggestionLog.slice(-8).map((entry) => ({
+        operation: entry.operation,
+        summary: entry.summary,
+        confidence: entry.confidence,
+      })),
+      sentiment: {
+        aeScore: sentimentAE,
+        customerScore: sentimentCustomer,
+        salesRepTone,
+        customerSentiment,
+        sentimentShift,
+      },
+    }),
+    [
+      accountName,
+      leadName,
+      intentLabel,
+      intent,
+      transcript,
+      pains,
+      insights,
+      openGaps,
+      checklist,
+      keywords,
+      bantSignals,
+      suggestionLog,
+      sentimentAE,
+      sentimentCustomer,
+      salesRepTone,
+      customerSentiment,
+      sentimentShift,
+    ]
+  );
+
   return (
-    <LiveCopilotChatProvider callId={callId}>
+    <LiveCopilotChatProvider callId={callId} context={liveCopilotContext}>
       <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
         <LiveColumnHeader icon={Sparkles} title="Live copilot" />
         <LiveMetricsRail
@@ -89,6 +159,7 @@ export const LiveInsightsPanel = memo(function LiveInsightsPanel({
           bantSignals={bantSignals}
           suggestionLog={suggestionLog}
           openGaps={openGaps}
+          panelScrollRef={panelScrollRef}
           panelChildren={
             <>
               <LiveCopilotSummary
@@ -104,7 +175,7 @@ export const LiveInsightsPanel = memo(function LiveInsightsPanel({
               />
 
               <div className="border-t border-border/50 pt-4 mt-4">
-                <LiveCopilotChatThread />
+                <LiveCopilotChatThread scrollContainerRef={panelScrollRef} />
               </div>
             </>
           }

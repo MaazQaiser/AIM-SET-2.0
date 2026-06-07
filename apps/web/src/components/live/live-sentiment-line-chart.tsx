@@ -24,6 +24,8 @@ type SentimentPoint = {
   current?: boolean;
 };
 
+const MIN_X_AXIS_TICKS = 5;
+
 function clampScore(score: number): number {
   return Math.max(-1, Math.min(1, score));
 }
@@ -122,9 +124,34 @@ function buildSentimentPoints(
 }
 
 function formatTime(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
+  const roundedSeconds = Math.max(0, Math.round(seconds));
+  const m = Math.floor(roundedSeconds / 60);
+  const s = roundedSeconds % 60;
   return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function buildTimeTicks(points: SentimentPoint[], minTickCount = MIN_X_AXIS_TICKS) {
+  const timestamps = points
+    .map((point) => point.timestamp)
+    .filter((timestamp) => Number.isFinite(timestamp));
+  if (timestamps.length === 0) return [];
+
+  const min = Math.min(...timestamps);
+  const max = Math.max(...timestamps);
+  if (max <= min) {
+    return Array.from({ length: minTickCount }, (_, index) => min + index * 15);
+  }
+
+  const step = (max - min) / (minTickCount - 1);
+  return Array.from({ length: minTickCount }, (_, index) => min + step * index).reduce<number[]>(
+    (ticks, tick) => {
+      const rounded = Math.round(tick);
+      const previous = ticks[ticks.length - 1];
+      ticks.push(previous == null || rounded > previous ? rounded : previous + 1);
+      return ticks;
+    },
+    []
+  );
 }
 
 function SentimentDot({
@@ -186,7 +213,7 @@ function SentimentTooltip({
   if (!point) return null;
 
   return (
-    <div className="rounded-lg border border-border bg-popover px-2.5 py-1.5 text-[11px] shadow-sm">
+    <div className="rounded-lg border border-border bg-popover px-2.5 py-1.5 type-caption shadow-sm">
       <p className="text-muted-foreground">Time {formatTime(label ?? point.timestamp)}</p>
       <p className="mt-0.5 font-semibold" style={{ color: toneColor(point.tone) }}>
         {toneLabel(point.tone)}
@@ -253,6 +280,11 @@ export function LiveSentimentLineChart({
     () => buildSentimentPoints(sentimentSignals, transcript, customerScore),
     [sentimentSignals, transcript, customerScore]
   );
+  const xTicks = useMemo(() => buildTimeTicks(points), [points]);
+  const xDomain = useMemo<[number, number]>(
+    () => [xTicks[0] ?? 0, xTicks[xTicks.length - 1] ?? 1],
+    [xTicks]
+  );
 
   const segmentLayer = useMemo(
     () =>
@@ -270,7 +302,7 @@ export function LiveSentimentLineChart({
 
   if (points.length < 2) {
     return (
-      <p className="py-2 text-xs text-muted-foreground">
+      <p className="py-2 type-caption text-muted-foreground">
         Sentiment timeline will appear as the conversation progresses.
       </p>
     );
@@ -287,12 +319,13 @@ export function LiveSentimentLineChart({
           <XAxis
             dataKey="timestamp"
             type="number"
-            domain={["dataMin", "dataMax"]}
+            domain={xDomain}
+            ticks={xTicks}
             tickFormatter={formatTime}
             tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
             tickLine={false}
             axisLine={false}
-            interval="preserveStartEnd"
+            interval={0}
           />
           <YAxis
             domain={[-1, 1]}

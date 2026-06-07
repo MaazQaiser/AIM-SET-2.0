@@ -60,7 +60,7 @@ function RelevanceBar({ score, className }: { score: number; className?: string 
           style={{ width: `${Math.min(100, pct)}%` }}
         />
       </div>
-      <span className="w-8 shrink-0 text-right text-[10px] font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+      <span className="w-8 shrink-0 text-right type-caption font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
         {pct}%
       </span>
     </div>
@@ -97,7 +97,7 @@ export function BriefRelevantContent({
   if (isEmpty) {
     if (embedded) {
       return (
-        <p className="text-sm text-muted-foreground py-2">{relevantContentEmptyMessage(section)}</p>
+        <p className="type-body text-muted-foreground py-2">{relevantContentEmptyMessage(section)}</p>
       );
     }
     if (section === "all") return null;
@@ -113,7 +113,7 @@ export function BriefRelevantContent({
         {visibleDocuments.length > 0 && (
           <div className="space-y-2">
             {section === "all" ? (
-              <p className="text-xs font-medium text-muted-foreground">Documents</p>
+              <p className="type-label text-muted-foreground">Documents</p>
             ) : null}
             <ul className={cn("space-y-0 rounded-lg border border-border/40 overflow-hidden", briefMainNestedSurfaceClass)}>
               {visibleDocuments.map((doc) => (
@@ -145,7 +145,7 @@ export function BriefRelevantContent({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-7 shrink-0 px-2.5 text-xs font-medium"
+                      className="h-7 shrink-0 px-2.5 type-label"
                       onClick={() => setActiveDoc(doc)}
                     >
                       View
@@ -160,7 +160,7 @@ export function BriefRelevantContent({
         {visibleProjects.length > 0 && (
           <div className="space-y-2">
             {section === "all" ? (
-              <p className="text-xs font-medium text-muted-foreground">Relevant projects</p>
+              <p className="type-label text-muted-foreground">Relevant projects</p>
             ) : null}
             <ul className={cn("divide-y divide-border/40 rounded-lg border border-border/40 overflow-hidden", briefMainNestedSurfaceClass)}>
               {visibleProjects.map((project) => (
@@ -325,7 +325,7 @@ export function BriefRelevantContentLoader({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+      <div className="flex items-center gap-2 type-body text-muted-foreground py-4">
         <Loader2 className="h-4 w-4 animate-spin" />
         Loading relevant content from knowledge base…
       </div>

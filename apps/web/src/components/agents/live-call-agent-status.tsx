@@ -36,7 +36,7 @@ export function LiveCallAgentStatus({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-lg border text-xs",
+        "flex items-center gap-3 px-3 py-2 rounded-lg border type-label",
         active ? "border-primary/30 bg-primary/5" : "border-border bg-muted/50",
         className
       )}
@@ -51,7 +51,7 @@ export function LiveCallAgentStatus({
         />
         <span className="font-medium text-muted-foreground">Live Call Agent</span>
         {active && (
-          <Badge className="h-4 text-[10px] px-1 bg-success/10 text-success border-success/30 border">
+          <Badge className="h-4 type-caption px-1 bg-success/10 text-success border-success/30 border">
             Active
           </Badge>
         )}

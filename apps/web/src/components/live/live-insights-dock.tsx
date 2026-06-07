@@ -130,7 +130,7 @@ export function LiveInsightsDock({
 
   if (visibleSectionCount === 0) {
     return (
-      <p className="text-xs text-muted-foreground px-1">
+      <p className="type-caption text-muted-foreground px-1">
         Live insights (BANT, keywords, objections) will appear here as the call progresses.
       </p>
     );

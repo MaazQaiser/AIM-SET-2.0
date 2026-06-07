@@ -62,21 +62,21 @@ function CompactCallBlock({ call }: { call: Call }) {
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-mono text-muted-foreground">{timeLabel}</span>
+        <span className="type-label font-mono text-muted-foreground">{timeLabel}</span>
         {call.status === "live" ? (
-          <Badge variant="live" className="text-[10px] h-5">
+          <Badge variant="live" className="type-caption h-5">
             Live
           </Badge>
         ) : call.briefReady ? (
           <FileText className="h-3 w-3 text-primary shrink-0" aria-label="Brief ready" />
         ) : null}
       </div>
-      <p className="text-sm font-medium text-foreground truncate mt-0.5">{call.accountName}</p>
+      <p className="type-body font-medium text-foreground truncate mt-0.5">{call.accountName}</p>
       {call.annualRevenue && (
-        <p className="text-[10px] font-medium text-primary/90">{call.annualRevenue} revenue</p>
+        <p className="type-caption font-medium text-primary/90">{call.annualRevenue} revenue</p>
       )}
       {call.leadName && (
-        <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
+        <div className="mt-0.5 flex min-w-0 items-center gap-1 type-caption text-muted-foreground">
           <ParticipantAvatar
             name={call.leadName}
             kind="external"
@@ -113,8 +113,8 @@ function TodayView({ calls, day }: { calls: Call[]; day: Date }) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center rounded-xl border border-dashed border-border bg-muted/20">
         <CalendarDays className="h-10 w-10 text-muted-foreground mb-3" />
-        <p className="text-sm font-medium text-foreground">No calls scheduled</p>
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="type-body font-medium text-foreground">No calls scheduled</p>
+        <p className="type-caption text-muted-foreground mt-1">
           {isToday(day) ? "Your calendar is clear for today." : format(day, "EEEE, MMM d")}
         </p>
       </div>
@@ -125,7 +125,7 @@ function TodayView({ calls, day }: { calls: Call[]; day: Date }) {
     <div className="space-y-1">
       {slots.map(({ hour, calls: hourCalls }) => (
         <div key={hour} className="grid grid-cols-[56px_1fr] gap-3 min-h-[52px]">
-          <div className="pt-2 text-xs font-mono text-muted-foreground text-right">
+          <div className="pt-2 type-label font-mono text-muted-foreground text-right">
             {format(setHours(startOfDay(day), hour), "h a")}
           </div>
           <div className="space-y-2 border-l border-border pl-3 pb-2">
@@ -184,16 +184,16 @@ function WeekView({ calls, weekStart }: { calls: Call[]; weekStart: Date }) {
                 today ? "border-primary/20 bg-primary/10" : "border-border bg-muted/30"
               )}
             >
-              <p className="text-[10px] font-semibold text-muted-foreground">
+              <p className="type-caption font-medium text-muted-foreground">
                 {format(day, "EEE")}
               </p>
-              <p className={cn("text-lg font-semibold tabular-nums", today && "text-primary")}>
+              <p className={cn("type-screen-title tabular-nums", today && "text-primary")}>
                 {format(day, "d")}
               </p>
             </div>
             <div className="flex-1 p-1.5 space-y-1.5 overflow-y-auto max-h-[240px]">
               {dayCalls.length === 0 ? (
-                <p className="text-[10px] text-muted-foreground text-center py-6 px-1">No calls</p>
+                <p className="type-caption text-muted-foreground text-center py-6 px-1">No calls</p>
               ) : (
                 dayCalls.map((call) => (
                   <WeekCallChip key={call.id} call={call} />
@@ -216,7 +216,7 @@ function WeekCallChip({ call }: { call: Call }) {
     <Link
       href={href}
       className={cn(
-        "block rounded-md px-2 py-1.5 text-left text-[11px] leading-tight border transition-colors hover:bg-muted/80",
+        "block rounded-md px-2 py-1.5 text-left type-caption leading-tight border transition-colors hover:bg-muted/80",
         call.status === "live"
           ? "border-destructive/30 bg-destructive/10"
           : "border-border/80 bg-background"
@@ -225,7 +225,7 @@ function WeekCallChip({ call }: { call: Call }) {
       <span className="font-mono text-muted-foreground">{formatPktSchedule(call)}</span>
       <p className="font-medium text-foreground truncate mt-0.5">{call.accountName}</p>
       {call.annualRevenue && (
-        <p className="text-[9px] text-primary/90 font-medium">{call.annualRevenue}</p>
+        <p className="type-caption text-primary/90 font-medium">{call.annualRevenue}</p>
       )}
       {call.status === "live" && (
         <span className="inline-flex items-center gap-0.5 text-destructive mt-0.5">
@@ -279,27 +279,27 @@ export function CallsCalendar({ calls, className }: CallsCalendarProps) {
         <Tabs defaultValue="today" className="w-full">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 pt-4 pb-2 border-b border-border">
             <div>
-              <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+              <h2 className="flex items-center gap-2 type-section-title text-foreground">
                 <CalendarDays className="h-4 w-4" />
                 Call schedule
               </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="mt-0.5 type-caption text-muted-foreground">
                 Pre-DC leads by Discovery Call Date (PKT) from your import
               </p>
             </div>
             <TabsList className="h-9">
-              <TabsTrigger value="today" className="text-xs gap-1.5">
+              <TabsTrigger value="today" className="gap-1.5">
                 Today
                 {todayCount > 0 && (
-                  <span className="rounded-full bg-primary/15 px-1.5 py-0 text-[10px] font-medium text-primary">
+                  <span className="rounded-full bg-primary/15 px-1.5 py-0 type-caption font-medium text-primary">
                     {todayCount}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="week" className="text-xs gap-1.5">
+              <TabsTrigger value="week" className="gap-1.5">
                 Week
                 {weekCount > 0 && (
-                  <span className="rounded-full bg-muted-foreground/15 px-1.5 py-0 text-[10px] font-medium">
+                  <span className="rounded-full bg-muted-foreground/15 px-1.5 py-0 type-caption font-medium">
                     {weekCount}
                   </span>
                 )}
@@ -308,11 +308,11 @@ export function CallsCalendar({ calls, className }: CallsCalendarProps) {
           </div>
 
           <TabsContent value="today" className="m-0 p-4">
-            <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
+            <div className="mb-4 flex items-center gap-2 type-body-sm text-muted-foreground">
               <Clock className="h-3.5 w-3.5" />
               {format(today, "EEEE, MMMM d")}
               {isToday(today) && (
-                <Badge variant="outline" className="text-[10px] h-5">
+                <Badge variant="outline" className="type-caption h-5">
                   Today
                 </Badge>
               )}
@@ -322,7 +322,7 @@ export function CallsCalendar({ calls, className }: CallsCalendarProps) {
 
           <TabsContent value="week" className="m-0 p-4">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-muted-foreground">
+              <p className="type-body-sm text-muted-foreground">
                 {format(weekAnchor, "MMM d")} – {format(weekEnd, "MMM d, yyyy")}
               </p>
               <div className="flex items-center gap-1">
@@ -338,7 +338,7 @@ export function CallsCalendar({ calls, className }: CallsCalendarProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs"
+                  className="h-8 type-label"
                   onClick={() => setWeekAnchor(startOfWeek(new Date(), { weekStartsOn: 1 }))}
                 >
                   This week

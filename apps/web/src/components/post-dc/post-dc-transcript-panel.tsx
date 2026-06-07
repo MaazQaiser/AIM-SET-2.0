@@ -20,7 +20,7 @@ export function PostDcTranscriptPanel({ callId }: PostDcTranscriptPanelProps) {
   if (isError || events.length === 0) {
     return (
       <BriefDetailCard title="Call transcript" icon={MessageSquareText}>
-        <p className="text-sm text-muted-foreground">
+        <p className="type-body text-muted-foreground">
           No transcript captured — run wrap-up after a live call or replay the demo transcript from
           the live cockpit.
         </p>

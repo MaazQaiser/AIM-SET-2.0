@@ -67,7 +67,7 @@ export function BantLiveStatusBars({
               )}
               title={`${bantLabels[key]}: ${bantStatusLabel(status, key)}`}
             />
-            <span className="text-[9px] font-semibold text-muted-foreground">
+            <span className="type-caption font-medium text-muted-foreground">
               {bantShort[key]}
             </span>
           </div>

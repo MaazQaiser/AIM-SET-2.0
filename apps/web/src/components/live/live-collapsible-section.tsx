@@ -87,15 +87,15 @@ export function LiveCollapsibleSection({
         />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-foreground">{title}</span>
+            <span className="type-label text-foreground">{title}</span>
             {count != null && count > 0 && (
-              <Badge variant={variant === "attention" ? "warning" : "secondary"} className="text-[10px] px-1.5 py-0">
+              <Badge variant={variant === "attention" ? "warning" : "secondary"} className="type-caption px-1.5 py-0">
                 {count}
               </Badge>
             )}
           </div>
           {summary && !open && (
-            <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{summary}</p>
+            <p className="mt-0.5 line-clamp-2 type-caption text-muted-foreground">{summary}</p>
           )}
         </div>
       </button>

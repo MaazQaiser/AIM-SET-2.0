@@ -57,8 +57,8 @@ export function ContentLibraryColumn({
           <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-foreground">{meta.title}</h3>
-          <p className="text-[11px] text-muted-foreground">
+          <h3 className="type-panel-title text-foreground">{meta.title}</h3>
+          <p className="type-caption text-muted-foreground">
             {assets.length} asset{assets.length === 1 ? "" : "s"}
           </p>
         </div>
@@ -75,7 +75,7 @@ export function ContentLibraryColumn({
             ))}
           </div>
         ) : (
-          <p className="px-1 py-8 text-center text-xs text-muted-foreground">{meta.emptyMessage}</p>
+          <p className="px-1 py-8 text-center type-caption text-muted-foreground">{meta.emptyMessage}</p>
         )}
       </div>
     </section>

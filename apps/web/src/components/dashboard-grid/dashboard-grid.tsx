@@ -74,7 +74,7 @@ export function DashboardGrid<P>({ layoutKey, widgets, widgetProps }: DashboardG
   return (
     <div className={cn(editingEnabled && "editing-layout")}>
       {isMobile && isEditing && (
-        <p className="mb-3 text-xs text-muted-foreground">Customize layout on larger screens.</p>
+        <p className="mb-3 type-caption text-muted-foreground">Customize layout on larger screens.</p>
       )}
       <ResponsiveGridLayout
         className="layout"

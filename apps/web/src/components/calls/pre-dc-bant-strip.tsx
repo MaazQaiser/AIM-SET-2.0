@@ -62,7 +62,7 @@ export function PreDcBantStrip({
           asChild
           size="sm"
           className={cn(
-            "h-8 shrink-0 rounded-full px-4 text-sm font-bold",
+            "h-8 shrink-0 rounded-full px-4 type-body font-bold",
             isIntercom && "bg-[#111111] text-white hover:bg-[#111111]/90"
           )}
         >

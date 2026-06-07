@@ -87,17 +87,17 @@ export function LiveAssistantCard({
 
       <div className="flex items-center gap-1.5 pr-6">
         <Icon className={cn("h-3.5 w-3.5 shrink-0", cfg.accent)} aria-hidden />
-        <span className="text-[10px] font-semibold text-muted-foreground">
+        <span className="type-caption font-medium text-muted-foreground">
           {cfg.label}
         </span>
       </div>
 
-      <p className="mt-2 text-sm leading-snug text-foreground">{message}</p>
+      <p className="mt-2 type-body leading-snug text-foreground">{message}</p>
 
       {(contextLabel || actionLabel) && (
         <div className="mt-3 flex items-center justify-between gap-2">
           {contextLabel ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/30 px-2 py-0.5 text-[10px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/30 px-2 py-0.5 type-caption text-muted-foreground">
               <Sparkles className="h-2.5 w-2.5" aria-hidden />
               {contextLabel}
             </span>
@@ -105,7 +105,7 @@ export function LiveAssistantCard({
             <span />
           )}
           {actionLabel && onAction && (
-            <Button type="button" size="sm" className="h-7 text-xs shrink-0" onClick={onAction}>
+            <Button type="button" size="sm" className="h-7 type-label shrink-0" onClick={onAction}>
               {actionLabel}
             </Button>
           )}

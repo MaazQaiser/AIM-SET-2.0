@@ -45,6 +45,7 @@ export function PostDcChatColumn({
           callId={callId}
           variant="embedded"
           phase="wrapup"
+          surface="post_dc"
           accountName={accountName}
           brief={brief}
           className="flex-1 min-h-0 border-0 rounded-none bg-transparent"
@@ -54,6 +55,11 @@ export function PostDcChatColumn({
               ? Math.round(review.discoveryBantCoverage * 100)
               : undefined
           }
+          context={{
+            reviewReady: Boolean(review),
+            reviewHeadline: review?.headline,
+            nextStepProposal: review?.nextStepProposal,
+          }}
           copilotOnly
         />
       </div>

@@ -8,10 +8,12 @@ import { KeywordHighlight } from "@/components/live/keyword-highlight";
 import { liveColumnHorizontalPadding } from "@/components/live/live-column-header";
 import type { TranscriptEvent } from "@/types";
 
-const sentimentColor: Record<string, string> = {
-  positive: "border-l-success",
-  negative: "border-l-destructive",
-  neutral: "border-l-border",
+const sentimentToneClass: Record<string, string> = {
+  positive:
+    "bg-success/[0.06] hover:bg-success/[0.09] dark:bg-success/[0.08] dark:hover:bg-success/[0.12]",
+  negative:
+    "bg-destructive/[0.055] hover:bg-destructive/[0.085] dark:bg-destructive/[0.08] dark:hover:bg-destructive/[0.12]",
+  neutral: "hover:bg-muted/50",
 };
 
 const sentimentEmoji: Record<string, string> = {
@@ -105,9 +107,9 @@ export const TranscriptViewer = memo(function TranscriptViewer({
               <button
                 type="button"
                 className={cn(
-                  "group w-full text-left border-l-2 hover:bg-muted/50 transition-colors",
+                  "group w-full text-left transition-colors",
                   isLive ? cn(liveColumnHorizontalPadding, "py-4") : "px-4 py-3",
-                  event.sentiment ? sentimentColor[event.sentiment] : "border-l-border",
+                  event.sentiment ? sentimentToneClass[event.sentiment] : "hover:bg-muted/50",
                   onEventClick && "cursor-pointer"
                 )}
                 onClick={() => onEventClick?.(event)}
@@ -126,18 +128,18 @@ export const TranscriptViewer = memo(function TranscriptViewer({
                   />
                   <span
                     className={cn(
-                      "text-xs font-semibold",
+                      "type-label",
                       roleColor[event.speakerRole ?? "customer"]
                     )}
                   >
                     {event.speakerName}
                   </span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="type-caption text-muted-foreground">
                     {Math.floor(event.timestamp / 60)}:{String(event.timestamp % 60).padStart(2, "0")}
                   </span>
                   {event.sentiment && (
                     <span
-                      className="text-xs leading-none"
+                      className="type-label leading-none"
                       title={event.sentiment}
                       aria-label={`Sentiment: ${event.sentiment}`}
                     >
@@ -145,12 +147,12 @@ export const TranscriptViewer = memo(function TranscriptViewer({
                     </span>
                   )}
                   {event.signalType === "discovery_anchor" && (
-                    <span className="text-[10px] font-medium text-success bg-success/10 border border-success/30 rounded px-1.5 py-0.5">
+                    <span className="type-caption font-medium text-success bg-success/10 border border-success/30 rounded px-1.5 py-0.5">
                       Discovery anchor
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-foreground leading-relaxed">
+                <p className="type-body text-foreground leading-relaxed">
                   <KeywordHighlight text={event.text} />
                   {isLastLive && (
                     <span className="inline-block w-2 h-3.5 ml-0.5 bg-foreground animate-cursor align-middle" />

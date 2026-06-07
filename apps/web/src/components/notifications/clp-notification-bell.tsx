@@ -27,16 +27,16 @@ export function ClpNotificationBell() {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">
-        <div className="px-3 py-2 border-b text-sm font-medium">Landing page activity</div>
+        <div className="px-3 py-2 border-b type-body font-medium">Landing page activity</div>
         <ul className="max-h-72 overflow-y-auto">
           {unread.length === 0 ? (
-            <li className="px-3 py-6 text-xs text-muted-foreground text-center">No new activity</li>
+            <li className="px-3 py-6 type-caption text-muted-foreground text-center">No new activity</li>
           ) : (
             unread.slice(0, 10).map((n) => (
               <li key={n.id} className="border-b last:border-0">
                 <Link
                   href={`/calls/${n.callId}/landing-page/activity`}
-                  className="block px-3 py-2 text-xs hover:bg-muted/50"
+                  className="block px-3 py-2 type-label hover:bg-muted/50"
                 >
                   <p className="text-foreground">{n.summary}</p>
                   <p className="text-muted-foreground mt-0.5">

@@ -8,6 +8,7 @@ from dc_core.tenancy import TenantContext
 
 from app.deps import get_tenant_context
 from app.domain.calls_service import CallsService
+from app.domain.copilot_greeting import simple_greeting_response
 from app.orchestrator.dispatcher import Orchestrator
 from app.services.transcript_provider.recall_client import (
     RecallAPIError,
@@ -117,6 +118,10 @@ async def bot_chat(
     mode = (body.get("mode") or "group").strip().lower()
     if mode not in ("direct", "group"):
         mode = "group"
+    greeting = simple_greeting_response(message, "live_dc")
+    if greeting:
+        return greeting
+
     result = await asyncio.to_thread(
         _orch.dispatch_bot_chat,
         ctx,
@@ -125,6 +130,7 @@ async def bot_chat(
         mode=mode,
         sender_name=(body.get("sender_name") or "").strip() or None,
         sender_role=(body.get("sender_role") or "").strip() or None,
+        context=body.get("context") if isinstance(body.get("context"), dict) else None,
     )
     channel = get_call_channel()
     for msg in result.get("ws_messages") or []:

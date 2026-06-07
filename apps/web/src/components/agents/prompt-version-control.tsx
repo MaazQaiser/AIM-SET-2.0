@@ -21,10 +21,10 @@ export function PromptVersionControl({ versions, onRollback }: PromptVersionCont
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Tag className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Prompt Versions</span>
+          <span className="type-body font-medium">Prompt Versions</span>
         </div>
         {active && (
-          <Badge variant="outline" className="font-mono text-xs text-primary border-primary/30">
+          <Badge variant="outline" className="font-mono type-label text-primary border-primary/30">
             Active: v{active.version}
           </Badge>
         )}
@@ -35,14 +35,14 @@ export function PromptVersionControl({ versions, onRollback }: PromptVersionCont
           <div key={v.version} className={cn("flex items-start gap-3 px-4 py-3", v.is_active && "bg-primary/5")}>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-xs font-medium">v{v.version}</span>
-                <span className="text-xs text-muted-foreground">· {v.label}</span>
+                <span className="font-mono type-label">v{v.version}</span>
+                <span className="type-caption text-muted-foreground">· {v.label}</span>
                 {v.is_active && (
-                  <Badge className="text-[10px] h-4 px-1.5 bg-primary text-primary-foreground">Active</Badge>
+                  <Badge className="type-caption h-4 px-1.5 bg-primary text-primary-foreground">Active</Badge>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{v.changelog}</p>
-              <p className="text-[10px] text-muted-foreground mt-1">
+              <p className="type-caption text-muted-foreground mt-0.5 line-clamp-2">{v.changelog}</p>
+              <p className="type-caption text-muted-foreground mt-1">
                 Deployed {new Date(v.deployed_at).toLocaleDateString()} · reviewed by {v.reviewed_by}
               </p>
             </div>
@@ -50,7 +50,7 @@ export function PromptVersionControl({ versions, onRollback }: PromptVersionCont
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 text-xs shrink-0"
+                className="h-7 type-label shrink-0"
                 onClick={() => onRollback(v)}
               >
                 <RotateCcw className="h-3 w-3 mr-1" />

@@ -18,7 +18,7 @@ function StatRow({
   icon?: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 text-sm">
+    <div className="flex items-start justify-between gap-3 type-body">
       <span className="flex items-center gap-1.5 text-muted-foreground shrink-0">
         {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
         {label}
@@ -43,7 +43,7 @@ export function KbAssetStatistics({ asset, className }: KbAssetStatisticsProps) 
   return (
     <div className={cn("space-y-4", className)}>
       <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Statistics</p>
+        <p className="type-kicker text-muted-foreground">Statistics</p>
         <div className="mt-3 space-y-2.5 rounded-lg border border-border bg-muted/20 p-3">
           <StatRow
             label="Format"
@@ -54,7 +54,7 @@ export function KbAssetStatistics({ asset, className }: KbAssetStatisticsProps) 
           <StatRow
             label="Status"
             value={
-              <Badge variant={status === "ready" ? "success" : status === "failed" ? "destructive" : "secondary"} className="capitalize text-[10px]">
+              <Badge variant={status === "ready" ? "success" : status === "failed" ? "destructive" : "secondary"} className="capitalize type-caption">
                 {status}
               </Badge>
             }
@@ -91,13 +91,13 @@ export function KbAssetStatistics({ asset, className }: KbAssetStatisticsProps) 
 
       {asset.tags.length > 0 ? (
         <div>
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="mb-2 flex items-center gap-1.5 type-kicker text-muted-foreground">
             <Tag className="h-3.5 w-3.5" />
             Tags
           </p>
           <div className="flex flex-wrap gap-1.5">
             {asset.tags.map((tag) => (
-              <Badge key={tag} variant="outline" className="text-[10px]">
+              <Badge key={tag} variant="outline" className="type-caption">
                 {tag}
               </Badge>
             ))}
@@ -106,7 +106,7 @@ export function KbAssetStatistics({ asset, className }: KbAssetStatisticsProps) 
       ) : null}
 
       {asset.fileName ? (
-        <p className="text-[11px] text-muted-foreground break-all">{asset.fileName}</p>
+        <p className="type-caption text-muted-foreground break-all">{asset.fileName}</p>
       ) : null}
     </div>
   );

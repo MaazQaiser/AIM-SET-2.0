@@ -51,7 +51,7 @@ export function BriefSections({
   return (
     <div className="space-y-5">
       {leadershipPreview && (
-        <div className="rounded-md border border-dashed border-primary/40 bg-primary/5 px-4 py-2 text-xs text-muted-foreground">
+        <div className="rounded-md border border-dashed border-primary/40 bg-primary/5 px-4 py-2 type-caption text-muted-foreground">
           Leadership read-only preview — brief updates as the AE prepares.
         </div>
       )}

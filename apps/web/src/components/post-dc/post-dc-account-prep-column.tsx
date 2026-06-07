@@ -36,7 +36,7 @@ export function PostDcAccountPrepColumn({
     <div className={cn("flex min-w-0 flex-col gap-8", className)}>
       {hasLeadDetails ? (
         <section className="space-y-4 min-w-0">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <h2 className="type-kicker text-muted-foreground">
             Lead details
           </h2>
           <div className="grid gap-4 md:grid-cols-2 md:items-start">
@@ -51,7 +51,7 @@ export function PostDcAccountPrepColumn({
       ) : null}
 
       <section className="space-y-4 min-w-0">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <h2 className="type-kicker text-muted-foreground">
           Pre-call & discovery prep
         </h2>
         <div className="flex flex-col gap-4">
@@ -65,7 +65,7 @@ export function PostDcAccountPrepColumn({
             />
           ) : null}
           {!hasPrepContent && !hasLeadDetails ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="type-body text-muted-foreground">
               Account details and pre-call context appear here when lead data or a brief is available.
             </p>
           ) : null}

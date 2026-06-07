@@ -17,6 +17,14 @@ export const CLP_SECTION_TYPE_OPTIONS: { value: ClpSectionType; label: string }[
   { value: "ae_contact", label: "Account team" },
 ];
 
+export function isCompanyPlaybookLandingAsset(asset?: {
+  title?: string | null;
+  fileName?: string | null;
+}) {
+  const label = `${asset?.title ?? ""} ${asset?.fileName ?? ""}`;
+  return /\bcompany[\s_-]+playbook\b/i.test(label);
+}
+
 export function sectionTypeLabel(type: ClpSectionType): string {
   return CLP_SECTION_TYPE_OPTIONS.find((o) => o.value === type)?.label ?? type.replace(/_/g, " ");
 }
@@ -31,11 +39,19 @@ export function createClpSection(type: ClpSectionType): ClpSection {
 
   switch (type) {
     case "hero":
-      return { ...base, headline: "Your discovery follow-up", subhead: "Personalized for your team" };
+      return {
+        ...base,
+        headline: "Your discovery follow-up",
+        subhead: "Personalized for your team",
+      };
     case "summary":
       return { ...base, title: "What we discussed", bullets: ["Add a key point from the call."] };
     case "next_steps":
-      return { ...base, title: "Next steps", bullets: ["Review shared materials.", "Reply with questions."] };
+      return {
+        ...base,
+        title: "Next steps",
+        bullets: ["Review shared materials.", "Reply with questions."],
+      };
     case "asset":
       return { ...base, title: "Shared resources", assetIds: [], caption: "" };
     case "company_deck":
@@ -60,15 +76,31 @@ export function createClpSection(type: ClpSectionType): ClpSection {
 }
 
 export function syncAssetSections(page: CustomerLandingPage): CustomerLandingPage {
-  const selectedAssets = page.selectedAssets ?? [];
+  const originalSelectedAssets = page.selectedAssets ?? [];
+  const originalAiSuggestions = page.aiSuggestions ?? [];
+  const selectedAssets = originalSelectedAssets.filter(
+    (asset) => !isCompanyPlaybookLandingAsset(asset)
+  );
+  const aiSuggestions = originalAiSuggestions.filter(
+    (asset) => !isCompanyPlaybookLandingAsset(asset)
+  );
+  const blockedAssetIds = new Set(
+    [...originalSelectedAssets, ...originalAiSuggestions]
+      .filter((asset) => isCompanyPlaybookLandingAsset(asset))
+      .map((asset) => asset.assetId)
+  );
   const sections = page.sections ?? [];
   const ids = selectedAssets.map((a) => a.assetId);
   return {
     ...page,
     selectedAssets,
+    aiSuggestions,
     sections: sections.map((s) => {
       if (s.type === "asset") {
         return { ...s, assetIds: ids };
+      }
+      if (s.assetId && blockedAssetIds.has(s.assetId)) {
+        return { ...s, assetId: undefined };
       }
       return s;
     }),
@@ -79,10 +111,14 @@ export function toggleSelectedAsset(
   page: CustomerLandingPage,
   asset: { assetId: string; title: string }
 ): CustomerLandingPage {
+  if (isCompanyPlaybookLandingAsset(asset)) return syncAssetSections(page);
   const exists = page.selectedAssets.some((s) => s.assetId === asset.assetId);
   const selectedAssets: ClpAssetRef[] = exists
     ? page.selectedAssets.filter((s) => s.assetId !== asset.assetId)
-    : [...page.selectedAssets, { assetId: asset.assetId, title: asset.title, displayMode: "embed" }];
+    : [
+        ...page.selectedAssets,
+        { assetId: asset.assetId, title: asset.title, displayMode: "embed" },
+      ];
   return syncAssetSections({ ...page, selectedAssets });
 }
 

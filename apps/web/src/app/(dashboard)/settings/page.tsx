@@ -37,8 +37,8 @@ export default function SettingsPage() {
   return (
     <PageShell>
       <PageHeader>
-        <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <h1 className="type-page-title text-foreground">Settings</h1>
+        <p className="mt-1 type-body-sm text-muted-foreground">
           Team and personal preferences ·{" "}
           <Link href="/governance" className="text-primary hover:underline">
             Governance &amp; AI cost →

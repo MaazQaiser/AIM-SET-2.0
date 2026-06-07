@@ -136,16 +136,16 @@ function TodoRowContent({
     <div className="flex-1 min-w-0">
       <p
         className={cn(
-          "text-sm font-medium text-foreground",
+          "type-panel-title text-foreground",
           done && "line-through text-muted-foreground"
         )}
       >
         {todo.title}
       </p>
       {todo.subtitle && (
-        <p className="text-xs text-muted-foreground truncate mt-0.5">{todo.subtitle}</p>
+        <p className="mt-0.5 truncate type-caption text-muted-foreground">{todo.subtitle}</p>
       )}
-      <p className="text-[10px] text-muted-foreground mt-0.5">{cfg.label} Agent</p>
+      <p className="mt-0.5 type-caption text-muted-foreground">{cfg.label} Agent</p>
     </div>
   );
 }
@@ -180,7 +180,7 @@ export function AiTodoList() {
     <Card className="flex h-[380px] flex-col">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
             For you, today
           </CardTitle>
@@ -191,7 +191,7 @@ export function AiTodoList() {
           )}
         </div>
         {counts.high > 0 && (
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="mt-1 type-caption text-muted-foreground">
             {counts.high} high priority · AI-derived from agent activity
           </p>
         )}
@@ -200,8 +200,8 @@ export function AiTodoList() {
         {todos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center rounded-lg border border-dashed bg-muted/20">
             <CheckCircle2 className="h-8 w-8 text-success mb-2" />
-            <p className="text-sm font-medium">You&apos;re all caught up</p>
-            <p className="text-xs text-muted-foreground mt-1">The agents are quiet.</p>
+            <p className="type-panel-title">You&apos;re all caught up</p>
+            <p className="mt-1 type-caption text-muted-foreground">The agents are quiet.</p>
           </div>
         ) : (
           todos.map((todo) => (

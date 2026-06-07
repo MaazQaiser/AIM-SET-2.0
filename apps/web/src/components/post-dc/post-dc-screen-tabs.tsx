@@ -47,7 +47,7 @@ export function PostDcScreenTabs({
           <TabsTrigger
             key={tab.id}
             value={tab.id}
-            className={cn("shrink-0 text-sm", embedded && "text-xs")}
+            className={cn("shrink-0 type-body", embedded && "type-label")}
           >
             {tab.label}
           </TabsTrigger>

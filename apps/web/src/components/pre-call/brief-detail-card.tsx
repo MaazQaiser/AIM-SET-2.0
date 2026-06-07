@@ -144,7 +144,7 @@ function BriefDetailCardTitleRow({
       <CardTitle
         className={cn(
           "font-semibold flex items-center gap-2 min-w-0",
-          tone === "main" ? "text-base" : "text-sm"
+          tone === "main" ? "text-base" : "type-body"
         )}
       >
         {headerIcon ??
@@ -184,10 +184,10 @@ function SourceInfoIcon({ info }: { info: BriefSourceInfo }) {
           </button>
         </TooltipTrigger>
         <TooltipContent side="top" align="start" className="max-w-xs space-y-1.5 p-3">
-          <p className="text-[10px] font-semibold text-muted-foreground">
+          <p className="type-caption font-medium text-muted-foreground">
             Source: {info.source}
           </p>
-          <p className="text-xs leading-relaxed">{info.detail}</p>
+          <p className="type-label leading-relaxed">{info.detail}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -335,8 +335,8 @@ export function BriefDetailFields({
           <dt
             className={cn(
               isIntercom
-                ? "text-xs text-[#7b7b78]"
-                : "text-xs font-semibold text-muted-foreground"
+                ? "type-label text-[#7b7b78]"
+                : "type-label text-muted-foreground"
             )}
           >
             {row.label}
@@ -374,7 +374,7 @@ export function BriefDetailAccordion({
       <button
         type="button"
         className={cn(
-          "sticky top-0 z-[9] flex w-full items-center justify-between gap-2 py-2.5 text-left text-sm min-w-0",
+          "sticky top-0 z-[9] flex w-full items-center justify-between gap-2 py-2.5 text-left type-body min-w-0",
           "hover:opacity-80"
         )}
         onClick={() => setOpen((v) => !v)}
@@ -384,9 +384,9 @@ export function BriefDetailAccordion({
           <span
             className={cn(
               "text-foreground",
-              main && "text-base font-semibold underline decoration-foreground/40 underline-offset-[3px]",
-              !main && loud && "text-sm font-semibold",
-              !main && !loud && "text-sm font-medium"
+              main && "type-panel-title underline decoration-foreground/40 underline-offset-[3px]",
+              !main && loud && "type-panel-title",
+              !main && !loud && "type-body font-medium"
             )}
           >
             {title}

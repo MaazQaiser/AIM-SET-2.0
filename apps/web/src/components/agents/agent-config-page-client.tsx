@@ -34,7 +34,7 @@ export function AgentConfigPageClient({ agentId, label }: AgentConfigPageClientP
         <div className="flex items-center gap-2">
           <Link
             href="/agents"
-            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1 type-body-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
             Agents
@@ -42,34 +42,34 @@ export function AgentConfigPageClient({ agentId, label }: AgentConfigPageClientP
           <span className="text-muted-foreground">/</span>
           <Link
             href={`/agents/${agentId}`}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="type-body-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             {label}
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="text-sm font-medium">Configuration</span>
+          <span className="type-body-sm font-medium">Configuration</span>
         </div>
 
         <div>
-          <h1 className="text-2xl font-semibold">{label} — Configuration</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="type-page-title">{label} — Configuration</h1>
+          <p className="mt-1 type-body-sm text-muted-foreground">
             Model policy, cost caps, throttle, and prompts from this repo. Settings are saved per tenant and apply on the next agent run.
           </p>
         </div>
       </PageHeader>
 
       {isLoading || (isFetching && !data) ? (
-        <p className="text-sm text-muted-foreground">Loading agent settings…</p>
+        <p className="type-body-sm text-muted-foreground">Loading agent settings…</p>
       ) : error || !data ? (
         <div className="space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-4">
-          <p className="text-sm text-destructive font-medium">Failed to load agent settings</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="type-body-sm font-medium text-destructive">Failed to load agent settings</p>
+          <p className="type-caption text-muted-foreground">
             {error instanceof Error ? error.message : "Unknown error"}
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="type-caption text-muted-foreground">
             Make sure the Python API is running (port 8000) and migration 005_agent_configs.sql is applied if you use Supabase.
           </p>
-          <button type="button" className="text-sm underline" onClick={() => void refetch()}>
+          <button type="button" className="type-body-sm underline" onClick={() => void refetch()}>
             Retry
           </button>
         </div>
@@ -79,8 +79,8 @@ export function AgentConfigPageClient({ agentId, label }: AgentConfigPageClientP
             <p
               className={
                 saveMessage.includes("saved")
-                  ? "text-sm text-green-700"
-                  : "text-sm text-destructive"
+                  ? "type-body-sm text-green-700"
+                  : "type-body-sm text-destructive"
               }
             >
               {saveMessage}

@@ -62,16 +62,16 @@ export function BriefDiscoveryArtifactsTabbedPanel({
         className="min-w-0"
       >
         <TabsList className={STICKY_TABS_LIST_CLASS}>
-          <TabsTrigger value="plan" className="text-xs">
+          <TabsTrigger value="plan" className="type-label">
             Planned for this call
           </TabsTrigger>
-          <TabsTrigger value="suggest" className="text-xs">
+          <TabsTrigger value="suggest" className="type-label">
             Missing Artifacts
           </TabsTrigger>
-          <TabsTrigger value="documents" className="text-xs">
+          <TabsTrigger value="documents" className="type-label">
             Relevant content
           </TabsTrigger>
-          <TabsTrigger value="projects" className="text-xs">
+          <TabsTrigger value="projects" className="type-label">
             Relevant projects
           </TabsTrigger>
         </TabsList>
@@ -86,7 +86,7 @@ export function BriefDiscoveryArtifactsTabbedPanel({
 
         <TabsContent value="documents" className="m-0 pt-4 focus-visible:outline-none">
           {loading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+            <div className="flex items-center gap-2 type-body text-muted-foreground py-4">
               <Loader2 className="h-4 w-4 animate-spin" />
               Loading relevant content from knowledge base…
             </div>
@@ -97,7 +97,7 @@ export function BriefDiscoveryArtifactsTabbedPanel({
 
         <TabsContent value="projects" className="m-0 pt-4 focus-visible:outline-none">
           {loading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+            <div className="flex items-center gap-2 type-body text-muted-foreground py-4">
               <Loader2 className="h-4 w-4 animate-spin" />
               Loading relevant projects from knowledge base…
             </div>

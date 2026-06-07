@@ -38,7 +38,7 @@ function SlideSourceBadge({ slide }: { slide: PreDeckSlide }) {
     <Badge
       variant="outline"
       className={cn(
-        "gap-1 text-[10px]",
+        "gap-1 type-caption",
         fromKb
           ? "border-emerald-200 bg-emerald-50 text-emerald-900"
           : "border-primary/25 bg-primary/10 text-primary"
@@ -95,7 +95,7 @@ export function BriefPreDeckPanel({ deck, callId, accountName, industry }: Brief
           <Badge
             variant="outline"
             className={cn(
-              "text-[10px] capitalize",
+              "type-caption capitalize",
               needsContent
                 ? "border-amber-200 bg-amber-50 text-amber-950"
                 : "border-emerald-200 bg-emerald-50 text-emerald-900"
@@ -108,7 +108,7 @@ export function BriefPreDeckPanel({ deck, callId, accountName, industry }: Brief
         <div className="space-y-3">
           <p className={cn(briefMainBody, "font-medium")}>{deck.summary}</p>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 type-caption text-muted-foreground">
               <Layers3 className="h-3.5 w-3.5" />
               {slideCount} preview slide{slideCount === 1 ? "" : "s"}
             </span>
@@ -131,7 +131,7 @@ export function BriefPreDeckPanel({ deck, callId, accountName, industry }: Brief
             {slides.slice(0, 3).map((slide, index) => (
               <li key={slide.id}>
                 <BriefDetailRow className="flex items-start gap-2">
-                  <span className="shrink-0 font-mono text-[10px] font-bold text-primary mt-0.5">
+                  <span className="shrink-0 font-mono type-caption font-bold text-primary mt-0.5">
                     {index + 1}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -168,10 +168,10 @@ export function BriefPreDeckPanel({ deck, callId, accountName, industry }: Brief
               >
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-3">
                   <div className="min-w-0">
-                    <p className="text-[10px] font-semibold text-muted-foreground">
+                    <p className="type-caption font-medium text-muted-foreground">
                       Slide {index + 1}
                     </p>
-                    <h3 className="mt-1 text-lg font-semibold text-foreground break-words">
+                    <h3 className="mt-1 type-section-title text-foreground break-words">
                       {slide.title}
                     </h3>
                   </div>
@@ -181,7 +181,7 @@ export function BriefPreDeckPanel({ deck, callId, accountName, industry }: Brief
                   {slide.previewText || slide.narrative}
                 </p>
                 {slide.assetId ? (
-                  <p className="mt-auto pt-5 text-[10px] font-mono text-muted-foreground">
+                  <p className="mt-auto pt-5 type-caption font-mono text-muted-foreground">
                     KB asset: {slide.assetId}
                   </p>
                 ) : null}

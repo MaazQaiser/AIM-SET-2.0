@@ -8,7 +8,7 @@ import { briefBodyClass } from "@/components/pre-call/brief-detail-card";
 import { CallDetailPageLoader } from "@/components/layout/page-loaders";
 import { enrichCallBant } from "@/lib/bant/authority-from-lead";
 import { buildAccountSnapshot } from "@/lib/dc-data/build-account-snapshot";
-import { useCall, useCallBrief } from "@/lib/data/hooks";
+import { useCall, useCallBrief, usePostCallReview } from "@/lib/data/hooks";
 import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import {
@@ -25,6 +25,7 @@ interface CallDetailViewProps {
 export function CallDetailView({ callId }: CallDetailViewProps) {
   const { data: call, isLoading, isFetching } = useCall(callId);
   const { data: brief } = useCallBrief(callId);
+  const { data: postCallReview } = usePostCallReview(callId);
   const importsHydrated = useDcImportsStore((s) => s.importsHydrated);
   const preRecord = useDcImportsStore((s) =>
     findPreDcRecordForCall(s.preDcRecords, callId, call?.accountName)
@@ -69,7 +70,9 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
           minute: "2-digit",
         });
 
-  const showJoinCall = call.status === "upcoming" || call.status === "live";
+  const isWrapped = call.status === "completed" || Boolean(postCallReview);
+  const showJoinCall =
+    !isWrapped && (call.status === "upcoming" || call.status === "live");
 
   const resolvedBant = enrichCallBant(call.bant, {
     leadTitle: call.leadTitle ?? (preRecord ? preDcField(preRecord, "prospectPersona") : undefined),
@@ -82,7 +85,7 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
       className={cn("call-detail-page min-h-0 space-y-4 pb-8", briefBodyClass)}
     >
       {isFetching && call ? (
-        <p className="text-xs text-muted-foreground" aria-live="polite">
+        <p className="type-caption text-muted-foreground" aria-live="polite">
           Syncing latest call data…
         </p>
       ) : null}

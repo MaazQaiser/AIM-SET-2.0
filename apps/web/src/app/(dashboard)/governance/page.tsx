@@ -21,8 +21,8 @@ export default function GovernancePage() {
   return (
     <PageShell>
       <PageHeader>
-        <h1 className="text-2xl font-semibold text-foreground">Governance</h1>
-        <p className="text-sm text-muted-foreground mt-1">Audit, compliance, and AI cost policy</p>
+        <h1 className="type-page-title text-foreground">Governance</h1>
+        <p className="mt-1 type-body-sm text-muted-foreground">Audit, compliance, and AI cost policy</p>
       </PageHeader>
 
       <Tabs defaultValue="cost">
@@ -69,13 +69,13 @@ export default function GovernancePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-md border bg-muted/40 p-4">
-                <p className="text-sm font-medium">Recording consent</p>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="type-panel-title">Recording consent</p>
+                <p className="mt-1 type-body-sm text-muted-foreground">
                   Configure consent capture before the meeting bot joins a call.
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Primary region:</span>
+                <span className="type-body-sm text-muted-foreground">Primary region:</span>
                 <Badge>Not configured</Badge>
               </div>
             </CardContent>
@@ -94,7 +94,7 @@ export default function GovernancePage() {
               <CardTitle>Event schema and audit policy</CardTitle>
               <CardDescription>Immutable policy decisions with replay-ready traces</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
+            <CardContent className="space-y-3 type-body-sm">
               <div className="rounded-md border bg-muted/40 p-3">
                 Required fields:{" "}
                 <span className="font-mono">
@@ -118,7 +118,7 @@ export default function GovernancePage() {
               {rolloutStages.map((item) => (
                 <div
                   key={item.stage}
-                  className="grid grid-cols-3 items-center text-sm border-b pb-2 last:border-0"
+                  className="grid grid-cols-3 items-center border-b pb-2 type-body-sm last:border-0"
                 >
                   <span>{item.stage}</span>
                   <span className="text-muted-foreground">{item.gate}</span>

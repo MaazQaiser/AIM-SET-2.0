@@ -71,7 +71,7 @@ function AssistantGreetingBody({
 
   return (
     <PageHeader>
-      <h1 className="type-headline sm:type-display text-foreground">
+      <h1 className="type-page-title text-foreground">
         {isLoaded ? (
           <>
             {salutation},{" "}

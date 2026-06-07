@@ -73,6 +73,18 @@ class CopilotChatIn(BaseModel):
     message: str
     history: List[CopilotHistoryTurn] = Field(default_factory=list)
     call_id: Optional[str] = Field(default=None, alias="callId")
+    surface: Literal[
+        "home",
+        "pre_dc",
+        "live_dc",
+        "post_dc",
+        "knowledge",
+        "content",
+        "agents",
+        "settings",
+        "global",
+    ] = "global"
+    context: Dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -101,6 +113,9 @@ class CopilotChatResponse(BaseModel):
     citations: List[CopilotCitationOut] = Field(default_factory=list)
     actions_taken: List[Dict[str, Any]] = Field(default_factory=list)
     call_exports: List[Dict[str, Any]] = Field(default_factory=list)
+    suggestions: List[str] = Field(default_factory=list)
+    confidence: float = 0.0
+    missing_evidence: List[str] = Field(default_factory=list)
 
 
 def row_to_post_record(row: Dict[str, Any]) -> PostDCRecordOut:

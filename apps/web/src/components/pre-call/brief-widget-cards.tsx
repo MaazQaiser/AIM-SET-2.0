@@ -113,14 +113,14 @@ export function BriefBANTCard({
       <BANTScorecard bant={bant} layout="stack" plain />
       {provenance.length > 0 && (
         <div className="mt-4 pt-3 border-t border-border">
-          <p className="text-[10px] font-semibold text-muted-foreground mb-2">
+          <p className="type-caption font-medium text-muted-foreground mb-2">
             Based on
           </p>
           <BriefDetailFields rows={provenance} />
         </div>
       )}
       {openDimensions.length > 0 && (
-        <p className="text-xs font-medium text-muted-foreground mt-3 leading-relaxed">
+        <p className="type-label text-muted-foreground mt-3 leading-relaxed">
           Still to confirm on the call:{" "}
           {openDimensions.map((k) => BANT_LABELS[k].toLowerCase()).join(", ")}.
         </p>
@@ -131,7 +131,7 @@ export function BriefBANTCard({
   if (embedded) {
     return (
       <div className="min-w-0">
-        <p className="text-sm font-extrabold tracking-tight text-foreground mb-2">BANT scorecard</p>
+        <p className="type-body font-extrabold tracking-tight text-foreground mb-2">BANT scorecard</p>
         {bantBody}
       </div>
     );
@@ -165,7 +165,7 @@ export function BriefSignalsCard({ signals }: { signals: string[] }) {
           "The workflow looks for important notes that could change call prep, like urgency, unusual context, or extra research signals.",
       }}
       headerExtra={
-        <span className="text-[10px] font-semibold text-warning shrink-0 rounded-full bg-warning/15 px-2 py-0.5">
+        <span className="type-caption font-medium text-warning shrink-0 rounded-full bg-warning/15 px-2 py-0.5">
           {signals.length} new
         </span>
       }
@@ -175,7 +175,7 @@ export function BriefSignalsCard({ signals }: { signals: string[] }) {
           <li key={signal}>
             <BriefDetailRow>
               <div className="flex items-start gap-2 min-w-0">
-                <span className="shrink-0 rounded-md bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold text-warning">
+                <span className="shrink-0 rounded-md bg-warning/15 px-1.5 py-0.5 type-caption font-medium text-warning">
                   Signal {i + 1}
                 </span>
                 <p
@@ -209,7 +209,7 @@ export function BriefPainsCard({ pains }: { pains: HypothesizedPain[] }) {
           "These are likely pains inferred from the prospect's described needs, company context, and fit notes. They are hypotheses to validate, not confirmed facts.",
       }}
       headerExtra={
-        <span className="text-xs text-muted-foreground shrink-0">{safePains.length} items</span>
+        <span className="type-caption text-muted-foreground shrink-0">{safePains.length} items</span>
       }
     >
       <ul className="space-y-2">
@@ -218,7 +218,7 @@ export function BriefPainsCard({ pains }: { pains: HypothesizedPain[] }) {
             <BriefDetailRow>
               <div className="flex items-start justify-between gap-3 min-w-0">
                 <div className="flex items-start gap-2 min-w-0 flex-1">
-                  <span className="shrink-0 font-mono text-[10px] font-bold text-primary mt-0.5">
+                  <span className="shrink-0 font-mono type-caption font-bold text-primary mt-0.5">
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <p
@@ -234,7 +234,7 @@ export function BriefPainsCard({ pains }: { pains: HypothesizedPain[] }) {
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-0.5 shrink-0">
-                  <span className="text-[10px] font-mono text-muted-foreground">
+                  <span className="type-caption font-mono text-muted-foreground">
                     {(pain.confidence * 100).toFixed(0)}%
                   </span>
                   <ConfidenceTag score={pain.confidence} />
@@ -260,7 +260,7 @@ export function BriefDiscoveryQuestionsCard({ questions }: { questions: string[]
       scrollMaxHeight={scrolls ? QUESTIONS_PEEK_HEIGHT : undefined}
       headerExtra={
         scrolls ? (
-          <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
+          <span className="type-caption text-muted-foreground shrink-0 tabular-nums">
             {questions.length} questions
           </span>
         ) : null
@@ -277,7 +277,7 @@ export function BriefDiscoveryQuestionsCard({ questions }: { questions: string[]
             key={`${i}-${q.slice(0, 48)}`}
             className="flex gap-3 py-3 min-w-0 first:pt-0 last:pb-0"
           >
-            <span className="shrink-0 font-mono text-sm text-primary font-bold w-7 pt-0.5">
+            <span className="shrink-0 font-mono type-body text-primary font-bold w-7 pt-0.5">
               Q{i + 1}
             </span>
             <p className={cn(briefMainBody, "font-normal break-words min-w-0 flex-1")}>
@@ -287,7 +287,7 @@ export function BriefDiscoveryQuestionsCard({ questions }: { questions: string[]
         ))}
       </ol>
       {scrolls ? (
-        <p className="pt-2 text-[10px] text-muted-foreground border-t border-border/50 mt-1">
+        <p className="pt-2 type-caption text-muted-foreground border-t border-border/50 mt-1">
           {hiddenCount} more question{hiddenCount === 1 ? "" : "s"} below — scroll in this card to
           read Q{PEEK_DISCOVERY_QUESTIONS + 1}–Q{questions.length}.
         </p>
@@ -470,13 +470,13 @@ export function BriefPodNotesCard({ notes }: { notes: CallBrief["podNotes"] }) {
               className={cn(
                 briefMainLead,
                 briefMainUnderline,
-                "text-sm truncate"
+                "type-body truncate"
               )}
             >
               {note.memberName} · {note.role}
             </p>
             {note.reviewedAt && (
-              <p className="text-[10px] text-muted-foreground mt-0.5">
+              <p className="type-caption text-muted-foreground mt-0.5">
                 Reviewed{" "}
                 {new Date(note.reviewedAt).toLocaleTimeString("en-US", {
                   hour: "numeric",

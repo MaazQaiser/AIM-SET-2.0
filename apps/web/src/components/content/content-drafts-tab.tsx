@@ -102,7 +102,7 @@ export function ContentDraftsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
+        <p className="type-body-sm text-muted-foreground">
           In-progress and review-ready content. Approved items are published to the library.
         </p>
         <Button onClick={openCreateDialog} disabled={create.isPending} size="sm">
@@ -112,21 +112,21 @@ export function ContentDraftsTab() {
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading content…</p>
+        <p className="type-body-sm text-muted-foreground">Loading content…</p>
       ) : projects.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((p) => (
             <Card key={p.id}>
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="text-base">{p.title}</CardTitle>
+                  <CardTitle>{p.title}</CardTitle>
                   <Badge variant={statusBadge[p.status] ?? "secondary"} className="capitalize shrink-0">
                     {p.status.replace(/_/g, " ")}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
-                <p className="text-xs text-muted-foreground capitalize">{p.artifactType}</p>
+                <p className="type-caption text-muted-foreground capitalize">{p.artifactType}</p>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button asChild size="sm" variant="secondary">
                     <Link href={`/content/studio/${p.id}`}>Open in Studio</Link>
@@ -195,7 +195,7 @@ export function ContentDraftsTab() {
                   setArtifactType(e.target.value as (typeof ARTIFACT_TYPES)[number]["value"])
                 }
                 disabled={create.isPending}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 type-body ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {ARTIFACT_TYPES.map((type) => (
                   <option key={type.value} value={type.value}>
@@ -205,7 +205,7 @@ export function ContentDraftsTab() {
               </select>
             </div>
 
-            {createError ? <p className="text-sm text-destructive">{createError}</p> : null}
+            {createError ? <p className="type-body text-destructive">{createError}</p> : null}
           </div>
 
           <DialogFooter>

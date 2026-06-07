@@ -41,11 +41,11 @@ function MetricTile({
         variant === "default" && "border-border bg-card/50"
       )}
     >
-      <p className="text-[10px] font-semibold text-muted-foreground">
+      <p className="type-caption font-medium text-muted-foreground">
         {label}
       </p>
-      <p className="text-sm font-medium text-foreground mt-0.5 truncate">{value}</p>
-      {hint && <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{hint}</p>}
+      <p className="type-body font-medium text-foreground mt-0.5 truncate">{value}</p>
+      {hint && <p className="type-caption text-muted-foreground mt-0.5 line-clamp-2">{hint}</p>}
     </div>
   );
 }
@@ -185,14 +185,14 @@ export function LiveCallActionSummary({
           />
         </div>
         <div className="mt-3">
-          <p className="text-[10px] font-semibold text-muted-foreground mb-1.5">
+          <p className="type-caption font-medium text-muted-foreground mb-1.5">
             Recommended actions
           </p>
           <ul className="space-y-1.5">
             {actions.map((action) => (
               <li
                 key={action}
-                className="text-xs text-foreground rounded-md border border-border/70 bg-muted/20 px-2 py-1.5 leading-snug"
+                className="type-label text-foreground rounded-md border border-border/70 bg-muted/20 px-2 py-1.5 leading-snug"
               >
                 {action}
               </li>
@@ -202,7 +202,7 @@ export function LiveCallActionSummary({
         {pains.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {pains.slice(-3).map((p) => (
-              <Badge key={p.id} variant="outline" className="text-[9px] font-normal max-w-full truncate">
+              <Badge key={p.id} variant="outline" className="type-caption font-normal max-w-full truncate">
                 {p.text.slice(0, 48)}
                 {p.text.length > 48 ? "…" : ""}
               </Badge>

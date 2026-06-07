@@ -71,7 +71,7 @@ export function DailyBriefingCard({ enabled = true }: { enabled?: boolean }) {
   const statChips = (
     <>
       {revenue && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-3 py-1 type-caption font-semibold text-foreground">
+        <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-3 py-1 type-caption font-medium text-foreground">
           <DollarSign className="h-3 w-3 text-warning" />
           Top opp: {revenue}
         </span>
@@ -86,7 +86,7 @@ export function DailyBriefingCard({ enabled = true }: { enabled?: boolean }) {
         </span>
       )}
       {highPriorityTodos > 0 && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-3 py-1 type-caption font-semibold text-destructive">
+        <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-3 py-1 type-caption font-medium text-destructive">
           <AlertCircle className="h-3 w-3" />
           {highPriorityTodos} high-priority action{highPriorityTodos !== 1 ? "s" : ""}
         </span>

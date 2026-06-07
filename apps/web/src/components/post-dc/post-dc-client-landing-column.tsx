@@ -151,20 +151,20 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <Globe className="h-5 w-5 shrink-0 text-primary" />
-            <h2 className="text-lg font-semibold">Client landing page</h2>
+            <h2 className="type-section-title">Client landing page</h2>
             <Badge
               variant={isPublished ? "success" : "secondary"}
-              className="text-[10px] uppercase tracking-wide"
+              className="type-kicker"
             >
               {isPublished && !editMode ? "Live" : "Planning"}
             </Badge>
             {isHydrating && (
-              <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+              <Badge variant="outline" className="type-kicker">
                 Syncing assets…
               </Badge>
             )}
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="type-body text-muted-foreground">
             Digital sales room for {accountName} — share the call summary, tkxel deck, and selected
             materials. Clients can chat and comment once launched.
           </p>
@@ -239,10 +239,10 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
 
           <BriefDetailCard title="Proposal" icon={FileText}>
             <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 Attach a formal proposal to the sales room after discovery.
               </p>
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="type-caption">
                 Coming soon
               </Badge>
             </div>
@@ -276,7 +276,7 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
           <PostDcClpActivityCard callId={callId} enabled />
           <BriefDetailCard title="Client feedback" icon={MessageSquare}>
             <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">
+              <p className="type-caption text-muted-foreground">
                 {displayDraft.settings?.allowChat !== false && displayDraft.settings?.allowComments !== false
                   ? "Chat and section comments are enabled on the live page."
                   : displayDraft.settings?.allowChat !== false
@@ -287,7 +287,7 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
               </p>
               <Link
                 href={`/calls/${callId}/landing-page/activity`}
-                className="text-xs text-primary hover:underline inline-block"
+                className="type-label text-primary hover:underline inline-block"
               >
                 View full activity &amp; engagement report
               </Link>
@@ -404,27 +404,27 @@ function RoomPlanChecklist({
   return (
     <BriefDetailCard title={published ? "Sales room contents" : "Plan your sales room"}>
       <div className="space-y-3">
-        <p className="text-xs text-muted-foreground">
+        <p className="type-caption text-muted-foreground">
           What your client will see when they open the link.
         </p>
         <ul className="space-y-2">
           {items.map((item) => (
             <li
               key={item.label}
-              className="flex items-start justify-between gap-3 rounded-md border border-border/60 px-4 py-3 text-sm"
+              className="flex items-start justify-between gap-3 rounded-md border border-border/60 px-4 py-3 type-body"
             >
               <div className="min-w-0">
                 <p className="font-medium">{item.label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{item.detail}</p>
+                <p className="type-caption text-muted-foreground mt-0.5">{item.detail}</p>
               </div>
               {item.comingSoon ? (
-                <Badge variant="outline" className="shrink-0 text-[10px]">
+                <Badge variant="outline" className="shrink-0 type-caption">
                   Coming soon
                 </Badge>
               ) : (
                 <Badge
                   variant={item.ready ? "success" : "secondary"}
-                  className="shrink-0 text-[10px]"
+                  className="shrink-0 type-caption"
                 >
                   {item.ready ? "Ready" : "Pending"}
                 </Badge>

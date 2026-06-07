@@ -29,13 +29,14 @@ import { resolveLeadStage } from "@/lib/post-dc/deal-signals";
 import {
   buildPostDcWorkflowTasks,
   countWorkflowTasksDone,
+  countWorkflowTasksTotal,
   type PostDcWorkflowTaskStatus,
 } from "@/lib/post-dc/workflow-tasks";
 import { preDcField } from "@/types/dc-notes";
 import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { PostDcCloseDealAction } from "@/components/post-dc/post-dc-close-deal-action";
-import { FloatingAiChatBar } from "@/components/floating-ai-chat-bar";
+import { BotChatPanel } from "@/components/bot-chat-panel";
 import { briefBodyClass } from "@/components/pre-call/brief-detail-card";
 import { sanitizeClientEmailDraft } from "@/lib/post-dc-client-email-safety";
 import { cn } from "@/lib/cn";
@@ -294,16 +295,45 @@ export function PostDcReviewScreen({
     statusOverrides: workflowTaskStatus,
   });
   const workflowTasksDone = countWorkflowTasksDone(workflowTasks);
+  const workflowTasksTotal = countWorkflowTasksTotal(workflowTasks);
   const crmTasksDone = taskList.filter((t) => t.status === "created").length;
   const postDcWorkflow = {
-    hasNextSteps: workflowTasks.length > 0,
-    workflowTasksTotal: workflowTasks.length,
+    hasNextSteps: workflowTasksTotal > 0,
+    workflowTasksTotal,
     workflowTasksDone,
     crmTasksTotal: taskList.length,
     crmTasksDone,
     clientEmailReady: Boolean(displayedEmailDraft),
     internalEmailReady: Boolean(displayedInternalEmailDraft),
   };
+  const postDcOpenGaps = displayedReview.openDiscoveryGaps?.map((gap) => gap.toLowerCase()) ?? [];
+  const postDcBantCoveragePct =
+    displayedReview.discoveryBantCoverage !== undefined
+      ? Math.round(displayedReview.discoveryBantCoverage * 100)
+      : undefined;
+  const floatingCopilot = (
+    <BotChatPanel
+      callId={callId}
+      variant="floating"
+      phase="wrapup"
+      surface="post_dc"
+      accountName={call.accountName}
+      brief={brief ?? null}
+      openGaps={postDcOpenGaps}
+      bantCoveragePct={postDcBantCoveragePct}
+      context={{
+        screenTab,
+        leadStage,
+        reviewHeadline: displayedReview.headline,
+        nextStepProposal: displayedReview.nextStepProposal,
+        workflowTasksTotal: postDcWorkflow.workflowTasksTotal,
+        workflowTasksDone: postDcWorkflow.workflowTasksDone,
+        clientEmailReady: postDcWorkflow.clientEmailReady,
+        internalEmailReady: postDcWorkflow.internalEmailReady,
+      }}
+      copilotOnly
+    />
+  );
 
   const widgetProps = normalizePostDcWidgetProps({
     review: displayedReview,
@@ -357,8 +387,8 @@ export function PostDcReviewScreen({
         <div className="flex flex-col gap-2 border-b border-border/60 pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate">{call.accountName}</p>
-              <p className="text-xs text-muted-foreground">Post-DC wrap-up</p>
+              <p className="type-panel-title text-foreground truncate">{call.accountName}</p>
+              <p className="type-caption text-muted-foreground">Post-DC wrap-up</p>
             </div>
             <CallWrapUpActions
               callId={callId}
@@ -374,7 +404,7 @@ export function PostDcReviewScreen({
           <PostDcActionStrip {...postDcWorkflow} />
         </div>
         {layoutBody}
-        <FloatingAiChatBar phase="wrapup" />
+        {floatingCopilot}
       </div>
     );
   }
@@ -406,7 +436,7 @@ export function PostDcReviewScreen({
         }
       />
       {layoutBody}
-      <FloatingAiChatBar phase="wrapup" />
+      {floatingCopilot}
     </PageShell>
   );
 }

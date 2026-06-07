@@ -45,7 +45,7 @@ export function PostDcContextPanel({
           style={{ maxHeight: scrollMax }}
         >
           <CardHeader className={briefStickyHeaderClassName}>
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <CardTitle className="type-panel-title flex items-center gap-2">
               <Building2 className="h-4 w-4 shrink-0 text-foreground" />
               Lead overview
             </CardTitle>

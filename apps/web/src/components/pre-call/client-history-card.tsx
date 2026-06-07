@@ -90,23 +90,23 @@ function InteractionRow({
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             <span
               className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 type-caption font-medium",
                 typeCfg.color
               )}
             >
               <TypeIcon className="h-3 w-3" />
               {typeCfg.label}
             </span>
-            <span className="text-xs text-muted-foreground">
+            <span className="type-caption text-muted-foreground">
               {compact ? daysAgo(interaction.date) : formatDate(interaction.date)}
             </span>
             {!compact && (
-              <span className="text-[10px] text-muted-foreground">
+              <span className="type-caption text-muted-foreground">
                 ({daysAgo(interaction.date)})
               </span>
             )}
             {!compact && interaction.durationMinutes && (
-              <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+              <span className="inline-flex items-center gap-0.5 type-caption text-muted-foreground">
                 <Clock className="h-2.5 w-2.5" />
                 {interaction.durationMinutes}m
               </span>
@@ -115,7 +115,7 @@ function InteractionRow({
           <div className="flex items-center gap-2 shrink-0">
             <span
               className={cn(
-                "inline-flex items-center gap-0.5 text-xs font-medium",
+                "inline-flex items-center gap-0.5 type-label",
                 sentimentCfg.color
               )}
             >
@@ -132,7 +132,7 @@ function InteractionRow({
 
         <p
           className={cn(
-            "text-sm font-medium text-foreground leading-snug break-words",
+            "type-body font-medium text-foreground leading-snug break-words",
             compact && "line-clamp-2"
           )}
         >
@@ -142,14 +142,14 @@ function InteractionRow({
 
       {expanded && (
         <div className="mt-2 mb-4 space-y-2">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+          <div className="flex items-center gap-1.5 type-caption text-muted-foreground min-w-0">
             <Users className="h-3 w-3 shrink-0" />
             <span className="truncate">{interaction.attendees.join(" · ")}</span>
           </div>
 
           <div className="rounded-md bg-muted/40 px-3 py-2 space-y-1.5">
             {interaction.keyMoments.map((moment) => (
-              <div key={moment} className="flex items-start gap-2 text-xs text-foreground/80 min-w-0">
+              <div key={moment} className="flex items-start gap-2 type-label text-foreground/80 min-w-0">
                 <span className="text-primary font-bold shrink-0 mt-0.5">·</span>
                 <span className={cn("break-words min-w-0", compact && "line-clamp-3")}>
                   {moment}
@@ -180,7 +180,7 @@ export function ClientHistoryCard({
             "This section shows prior interactions that are already in the imported data or connected call records. AI is not inventing history.",
         }}
       >
-        <p className="text-sm text-muted-foreground">No prior interactions recorded.</p>
+        <p className="type-body text-muted-foreground">No prior interactions recorded.</p>
       </BriefDetailCard>
     );
   }
@@ -201,7 +201,7 @@ export function ClientHistoryCard({
           "Interactions are sorted from existing call/contact history. The section helps the AE see what happened before this discovery call.",
       }}
       headerExtra={
-        <span className="text-xs text-muted-foreground shrink-0">{interactions.length}</span>
+        <span className="type-caption text-muted-foreground shrink-0">{interactions.length}</span>
       }
     >
       <div className="relative border-l border-dashed border-border ml-1.5 pl-3 space-y-3">

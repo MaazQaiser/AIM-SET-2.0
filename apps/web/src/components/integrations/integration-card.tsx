@@ -61,20 +61,20 @@ export function IntegrationCard({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold">{name}</span>
-            <span className={cn("inline-flex items-center gap-1 text-xs font-medium", cfg.className)}>
+            <span className="type-panel-title">{name}</span>
+            <span className={cn("inline-flex items-center gap-1 type-label", cfg.className)}>
               <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", cfg.dot)} />
               {cfg.label}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+          <p className="type-caption text-muted-foreground mt-0.5">{description}</p>
           {connectedEmail && (
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="type-caption text-muted-foreground mt-0.5">
               Signed in as <span className="font-medium">{connectedEmail}</span>
             </p>
           )}
           {lastSyncAt && (
-            <p className="text-xs text-muted-foreground">
+            <p className="type-caption text-muted-foreground">
               Last synced {formatLastSync(lastSyncAt)}
             </p>
           )}
@@ -86,7 +86,7 @@ export function IntegrationCard({
             <Button
               variant="outline"
               size="sm"
-              className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+              className="h-7 type-label text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
               onClick={onDisconnect}
               disabled={isLoading}
             >
@@ -95,7 +95,7 @@ export function IntegrationCard({
           ) : (
             <Button
               size="sm"
-              className="h-7 text-xs gap-1.5"
+              className="h-7 type-label gap-1.5"
               onClick={onConnect}
               disabled={isLoading}
             >
@@ -114,7 +114,7 @@ export function IntegrationCard({
 
       {/* Error */}
       {errorMessage && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 type-label text-destructive">
           {errorMessage}
         </div>
       )}

@@ -60,14 +60,14 @@ export function DataTable<TData, TValue>({
       )}
 
       <div className="rounded-xl border border-border overflow-hidden bg-card">
-        <table className="w-full border-collapse bg-card text-sm">
+        <table className="w-full border-collapse bg-card type-table">
           <thead className="border-b border-border bg-card">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="h-10 whitespace-nowrap px-4 text-left align-middle text-xs font-semibold text-muted-foreground"
+                    className="h-10 whitespace-nowrap px-4 text-left align-middle type-table-header text-muted-foreground"
                   >
                     {header.isPlaceholder ? null : (
                       <button
@@ -112,7 +112,7 @@ export function DataTable<TData, TValue>({
                   className="border-b border-border/70 bg-card last:border-0 transition-colors hover:bg-muted/20"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-2.5 align-middle text-sm text-foreground">
+                    <td key={cell.id} className="px-4 py-2.5 align-middle type-table text-foreground">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
@@ -131,7 +131,7 @@ export function DataTable<TData, TValue>({
 
       {/* Pagination */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
+        <p className="type-body-sm text-muted-foreground">
           Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
         </p>
         <div className="flex items-center gap-2">

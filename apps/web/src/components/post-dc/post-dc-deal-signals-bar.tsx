@@ -64,7 +64,7 @@ export function PostDcDealSignalsBar({
       headerExtra={
         attendeesShort ? (
           <span
-            className="inline-flex items-center gap-1 max-w-[160px] text-[10px] text-muted-foreground truncate"
+            className="inline-flex items-center gap-1 max-w-[160px] type-caption text-muted-foreground truncate"
             title={attendeesFull ?? undefined}
           >
             <Users className="h-3 w-3 shrink-0" />

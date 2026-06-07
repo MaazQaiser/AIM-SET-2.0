@@ -19,7 +19,7 @@ export function ModelPolicyBadge({ policy, showFallback = false }: ModelPolicyBa
       <Tooltip>
         <TooltipTrigger asChild>
           <span
-            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${TIER_COLOR[policy.primary] ?? "bg-muted text-muted-foreground"}`}
+            className={`inline-flex items-center rounded-full border px-2 py-0.5 type-label ${TIER_COLOR[policy.primary] ?? "bg-muted text-muted-foreground"}`}
           >
             {policy.model_name.split("-").slice(0, 3).join("-")}
           </span>
@@ -30,7 +30,7 @@ export function ModelPolicyBadge({ policy, showFallback = false }: ModelPolicyBa
       {showFallback && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="inline-flex items-center rounded-full border border-dashed px-2 py-0.5 text-xs text-muted-foreground">
+            <span className="inline-flex items-center rounded-full border border-dashed px-2 py-0.5 type-caption text-muted-foreground">
               ↓ {policy.fallback_model_name.split("-").slice(0, 3).join("-")}
             </span>
           </TooltipTrigger>
