@@ -11,7 +11,7 @@ function surfaceFromPath(pathname: string): GlobalSurface {
   if (pathname.startsWith("/content")) return "content";
   if (pathname.startsWith("/agents")) return "agents";
   if (pathname.startsWith("/settings")) return "settings";
-  if (pathname === "/" || pathname.startsWith("/calls")) return "home";
+  if (pathname === "/" || pathname === "/dashboard" || pathname.startsWith("/calls")) return "home";
   return "global";
 }
 

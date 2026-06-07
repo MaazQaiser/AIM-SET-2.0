@@ -5,8 +5,10 @@ import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
 import { isClerkConfigured, isClerkSecretConfigured } from "@/lib/public-env";
 
 const isPublicRoute = createRouteMatcher([
+  "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
+  "/fullsphere(.*)",
   "/api/health/deployment",
   "/p/(.*)",
   "/api/public/clp/(.*)",
@@ -19,6 +21,10 @@ const clerkHandler = clerkMiddleware(async (auth, request) => {
 });
 
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
+  if (request.nextUrl.pathname === "/") {
+    return NextResponse.rewrite(new URL("/fullsphere/index.html", request.url));
+  }
+
   if (
     isLocalAuthBypassEnabled() ||
     !isClerkConfigured() ||

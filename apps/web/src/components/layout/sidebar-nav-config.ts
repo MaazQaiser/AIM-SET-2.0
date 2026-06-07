@@ -17,7 +17,7 @@ export interface SidebarNavItem {
 }
 
 export const mainNavItems: SidebarNavItem[] = [
-  { href: "/", label: "Home", icon: Home },
+  { href: "/dashboard", label: "Home", icon: Home },
   { href: "/calls", label: "Calls", icon: Phone },
   { href: "/agents", label: "Agents", icon: Bot },
   { href: "/content", label: "Knowledge Base", icon: FileText },
@@ -48,6 +48,7 @@ export const sidebarWidgetCards: SidebarWidgetCard[] = [
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "Sales Plan Overview",
+  "/dashboard": "Sales Plan Overview",
   "/calls": "Calls",
   "/agents": "Agents",
   "/content": "Knowledge Base",
@@ -60,7 +61,9 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 export function getSidebarPageTitle(pathname: string): string {
-  if (pathname === "/") return PAGE_TITLES["/"] ?? "Sales Plan Overview";
+  if (pathname === "/" || pathname === "/dashboard") {
+    return PAGE_TITLES["/dashboard"] ?? "Sales Plan Overview";
+  }
 
   const match = Object.keys(PAGE_TITLES)
     .filter((p) => p !== "/" && pathname.startsWith(p))

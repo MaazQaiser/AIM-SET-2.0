@@ -1,0 +1,2834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FullSphere — AI-Native Sales Enablement</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Urbanist:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: #FEFCF8; color: #2C2810;
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden; text-wrap: pretty;
+    }
+    h1,h2,h3,h4,h5,h6 { font-family: 'Urbanist', system-ui, sans-serif; }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; }
+    img { max-width: 100%; display: block; }
+    ::selection { background: rgba(31,35,40,0.12); }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(32px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes livePulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+    @keyframes slideInRight {
+      from { opacity: 0; transform: translateX(24px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes gradientShift {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    #root { min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Module 1: Tweaks Panel -->
+  <script type="text/babel" data-module="tweaks-panel">
+(function(){
+// @ds-adherence-ignore -- omelette starter scaffold (raw elements/hex/px by design)
+
+/* BEGIN USAGE */
+// tweaks-panel.jsx
+// Reusable Tweaks shell + form-control helpers.
+// Exports (to window): useTweaks, TweaksPanel, TweakSection, TweakRow, TweakSlider,
+//   TweakToggle, TweakRadio, TweakSelect, TweakText, TweakNumber, TweakColor, TweakButton.
+//
+// Owns the host protocol (listens for __activate_edit_mode / __deactivate_edit_mode,
+// posts __edit_mode_available / __edit_mode_set_keys / __edit_mode_dismissed) so
+// individual prototypes don't re-roll it. Ships a consistent set of controls so you
+// don't hand-draw <input type="range">, segmented radios, steppers, etc.
+//
+// Usage (in an HTML file that loads React + Babel):
+//
+//   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+//     "primaryColor": "#D97757",
+//     "palette": ["#D97757", "#29261b", "#f6f4ef"],
+//     "fontSize": 16,
+//     "density": "regular",
+//     "dark": false
+//   }/*EDITMODE-END*/;
+//
+//   function App() {
+//     const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+//     return (
+//       <div style={{ fontSize: t.fontSize, color: t.primaryColor }}>
+//         Hello
+//         <TweaksPanel>
+//           <TweakSection label="Typography" />
+//           <TweakSlider label="Font size" value={t.fontSize} min={10} max={32} unit="px"
+//                        onChange={(v) => setTweak('fontSize', v)} />
+//           <TweakRadio  label="Density" value={t.density}
+//                        options={['compact', 'regular', 'comfy']}
+//                        onChange={(v) => setTweak('density', v)} />
+//           <TweakSection label="Theme" />
+//           <TweakColor  label="Primary" value={t.primaryColor}
+//                        options={['#D97757', '#2A6FDB', '#1F8A5B', '#7A5AE0']}
+//                        onChange={(v) => setTweak('primaryColor', v)} />
+//           <TweakColor  label="Palette" value={t.palette}
+//                        options={[['#D97757', '#29261b', '#f6f4ef'],
+//                                  ['#475569', '#0f172a', '#f1f5f9']]}
+//                        onChange={(v) => setTweak('palette', v)} />
+//           <TweakToggle label="Dark mode" value={t.dark}
+//                        onChange={(v) => setTweak('dark', v)} />
+//         </TweaksPanel>
+//       </div>
+//     );
+//   }
+//
+// TweakRadio is the segmented control for 2–3 short options (auto-falls-back to
+// TweakSelect past ~16/~10 chars per label); reach for TweakSelect directly when
+// options are many or long. For color tweaks always curate 3-4 options rather than
+// a free picker; an option can also be a whole 2–5 color palette (the stored value
+// is the array). The Tweak* controls are a floor, not a ceiling — build custom
+// controls inside the panel if a tweak calls for UI they don't cover.
+/* END USAGE */
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    transform:scale(var(--dc-inv-zoom,1));transform-origin:bottom right;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0;
+    scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-body::-webkit-scrollbar{width:8px}
+  .twk-body::-webkit-scrollbar-track{background:transparent;margin:2px}
+  .twk-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  .twk-body::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25);
+    border:2px solid transparent;background-clip:content-box}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
+    color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums}
+
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+
+  .twk-field{appearance:none;box-sizing:border-box;width:100%;min-width:0;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  .twk-field:focus{border-color:rgba(0,0,0,.25);background:rgba(255,255,255,.85)}
+  select.twk-field{padding-right:22px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(0,0,0,.5)' d='M0 0h10L5 6z'/></svg>");
+    background-repeat:no-repeat;background-position:right 8px center}
+
+  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:4px;margin:6px 0;
+    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
+  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;background:#fff;
+    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;
+    background:#fff;border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+
+  .twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;
+    background:rgba(0,0,0,.06);user-select:none}
+  .twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;
+    background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);
+    transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
+  .twk-seg.dragging .twk-seg-thumb{transition:none}
+  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;
+    background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;
+    border-radius:6px;cursor:default;padding:4px 6px;line-height:1.2;
+    overflow-wrap:anywhere}
+
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+
+  .twk-num{display:flex;align-items:center;box-sizing:border-box;min-width:0;height:26px;padding:0 0 0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:rgba(255,255,255,.6)}
+  .twk-num-lbl{font-weight:500;color:rgba(41,38,27,.6);cursor:ew-resize;
+    user-select:none;padding-right:8px}
+  .twk-num input{flex:1;min-width:0;height:100%;border:0;background:transparent;
+    font:inherit;font-variant-numeric:tabular-nums;text-align:right;padding:0 8px 0 0;
+    outline:none;color:inherit;-moz-appearance:textfield}
+  .twk-num input::-webkit-inner-spin-button,.twk-num input::-webkit-outer-spin-button{
+    -webkit-appearance:none;margin:0}
+  .twk-num-unit{padding-right:8px;color:rgba(41,38,27,.45)}
+
+  .twk-btn{appearance:none;height:26px;padding:0 12px;border:0;border-radius:7px;
+    background:rgba(0,0,0,.78);color:#fff;font:inherit;font-weight:500;cursor:default}
+  .twk-btn:hover{background:rgba(0,0,0,.88)}
+  .twk-btn.secondary{background:rgba(0,0,0,.06);color:inherit}
+  .twk-btn.secondary:hover{background:rgba(0,0,0,.1)}
+
+  .twk-swatch{appearance:none;-webkit-appearance:none;width:56px;height:22px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:default;
+    background:transparent;flex-shrink:0}
+  .twk-swatch::-webkit-color-swatch-wrapper{padding:0}
+  .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
+  .twk-swatch::-moz-color-swatch{border:0;border-radius:5.5px}
+
+  .twk-chips{display:flex;gap:6px}
+  .twk-chip{position:relative;appearance:none;flex:1;min-width:0;height:46px;
+    padding:0;border:0;border-radius:6px;overflow:hidden;cursor:default;
+    box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.06);
+    transition:transform .12s cubic-bezier(.3,.7,.4,1),box-shadow .12s}
+  .twk-chip:hover{transform:translateY(-1px);
+    box-shadow:0 0 0 .5px rgba(0,0,0,.18),0 4px 10px rgba(0,0,0,.12)}
+  .twk-chip[data-on="1"]{box-shadow:0 0 0 1.5px rgba(0,0,0,.85),
+    0 2px 6px rgba(0,0,0,.15)}
+  .twk-chip>span{position:absolute;top:0;bottom:0;right:0;width:34%;
+    display:flex;flex-direction:column;box-shadow:-1px 0 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i{flex:1;box-shadow:0 -1px 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i:first-child{box-shadow:none}
+  .twk-chip svg{position:absolute;top:6px;left:6px;width:13px;height:13px;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
+`;
+
+// ── useTweaks ───────────────────────────────────────────────────────────────
+// Single source of truth for tweak values. setTweak persists via the host
+// (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  // Accepts either setTweak('key', value) or setTweak({ key: value, ... }) so a
+  // useState-style call doesn't write a "[object Object]" key into the persisted
+  // JSON block.
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+    // Same-window signal so in-page listeners (deck-stage rail thumbnails)
+    // can react — the parent message only reaches the host, not peers.
+    window.dispatchEvent(new CustomEvent('tweakchange', { detail: edits }));
+  }, []);
+  return [values, setTweak];
+}
+
+// ── TweaksPanel ─────────────────────────────────────────────────────────────
+// Floating shell. Registers the protocol listener BEFORE announcing
+// availability — if the announce ran first, the host's activate could land
+// before our handler exists and the toolbar toggle would silently no-op.
+// The close button posts __edit_mode_dismissed so the host's toolbar toggle
+// flips off in lockstep; the host echoes __deactivate_edit_mode back which
+// is what actually hides the panel.
+function TweaksPanel({ title = 'Tweaks', children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  const offsetRef = React.useRef({ x: 16, y: 16 });
+  const PAD = 16;
+
+  const clampToViewport = React.useCallback(() => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
+    offsetRef.current = {
+      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
+      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
+    };
+    panel.style.right = offsetRef.current.x + 'px';
+    panel.style.bottom = offsetRef.current.y + 'px';
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    clampToViewport();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', clampToViewport);
+      return () => window.removeEventListener('resize', clampToViewport);
+    }
+    const ro = new ResizeObserver(clampToViewport);
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, [open, clampToViewport]);
+
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const t = e?.data?.type;
+      if (t === '__activate_edit_mode') setOpen(true);
+      else if (t === '__deactivate_edit_mode') setOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  const dismiss = () => {
+    setOpen(false);
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  };
+
+  const onDragStart = (e) => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    const startRight = window.innerWidth - r.right;
+    const startBottom = window.innerHeight - r.bottom;
+    const move = (ev) => {
+      offsetRef.current = {
+        x: startRight - (ev.clientX - sx),
+        y: startBottom - (ev.clientY - sy),
+      };
+      clampToViewport();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  if (!open) return null;
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <div ref={dragRef} className="twk-panel" data-omelette-chrome=""
+           style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+        <div className="twk-hd" onMouseDown={onDragStart}>
+          <b>{title}</b>
+          <button className="twk-x" aria-label="Close tweaks"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={dismiss}>✕</button>
+        </div>
+        <div className="twk-body">
+          {children}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Layout helpers ──────────────────────────────────────────────────────────
+
+function TweakSection({ label, children }) {
+  return (
+    <>
+      <div className="twk-sect">{label}</div>
+      {children}
+    </>
+  );
+}
+
+function TweakRow({ label, value, children, inline = false }) {
+  return (
+    <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
+      <div className="twk-lbl">
+        <span>{label}</span>
+        {value != null && <span className="twk-val">{value}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Controls ────────────────────────────────────────────────────────────────
+
+function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+  return (
+    <TweakRow label={label} value={`${value}${unit}`}>
+      <input type="range" className="twk-slider" min={min} max={max} step={step}
+             value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </TweakRow>
+  );
+}
+
+function TweakToggle({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <button type="button" className="twk-toggle" data-on={value ? '1' : '0'}
+              role="switch" aria-checked={!!value}
+              onClick={() => onChange(!value)}><i /></button>
+    </div>
+  );
+}
+
+function TweakRadio({ label, value, options, onChange }) {
+  const trackRef = React.useRef(null);
+  const [dragging, setDragging] = React.useState(false);
+  // The active value is read by pointer-move handlers attached for the lifetime
+  // of a drag — ref it so a stale closure doesn't fire onChange for every move.
+  const valueRef = React.useRef(value);
+  valueRef.current = value;
+
+  // Segments wrap mid-word once per-segment width runs out. The track is
+  // ~248px (280 panel − 28 body pad − 4 seg pad), each button loses 12px
+  // to its own padding, and 11.5px system-ui averages ~6.3px/char — so 2
+  // options fit ~16 chars each, 3 fit ~10. Past that (or >3 options), fall
+  // back to a dropdown rather than wrap.
+  const labelLen = (o) => String(typeof o === 'object' ? o.label : o).length;
+  const maxLen = options.reduce((m, o) => Math.max(m, labelLen(o)), 0);
+  const fitsAsSegments = maxLen <= ({ 2: 16, 3: 10 }[options.length] ?? 0);
+  if (!fitsAsSegments) {
+    // <select> emits strings — map back to the original option value so the
+    // fallback stays type-preserving (numbers, booleans) like the segment path.
+    const resolve = (s) => {
+      const m = options.find((o) => String(typeof o === 'object' ? o.value : o) === s);
+      return m === undefined ? s : typeof m === 'object' ? m.value : m;
+    };
+    return <TweakSelect label={label} value={value} options={options}
+                        onChange={(s) => onChange(resolve(s))} />;
+  }
+  const opts = options.map((o) => (typeof o === 'object' ? o : { value: o, label: o }));
+  const idx = Math.max(0, opts.findIndex((o) => o.value === value));
+  const n = opts.length;
+
+  const segAt = (clientX) => {
+    const r = trackRef.current.getBoundingClientRect();
+    const inner = r.width - 4;
+    const i = Math.floor(((clientX - r.left - 2) / inner) * n);
+    return opts[Math.max(0, Math.min(n - 1, i))].value;
+  };
+
+  const onPointerDown = (e) => {
+    setDragging(true);
+    const v0 = segAt(e.clientX);
+    if (v0 !== valueRef.current) onChange(v0);
+    const move = (ev) => {
+      if (!trackRef.current) return;
+      const v = segAt(ev.clientX);
+      if (v !== valueRef.current) onChange(v);
+    };
+    const up = () => {
+      setDragging(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  return (
+    <TweakRow label={label}>
+      <div ref={trackRef} role="radiogroup" onPointerDown={onPointerDown}
+           className={dragging ? 'twk-seg dragging' : 'twk-seg'}>
+        <div className="twk-seg-thumb"
+             style={{ left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
+                      width: `calc((100% - 4px) / ${n})` }} />
+        {opts.map((o) => (
+          <button key={o.value} type="button" role="radio" aria-checked={o.value === value}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakSelect({ label, value, options, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => {
+          const v = typeof o === 'object' ? o.value : o;
+          const l = typeof o === 'object' ? o.label : o;
+          return <option key={v} value={v}>{l}</option>;
+        })}
+      </select>
+    </TweakRow>
+  );
+}
+
+function TweakText({ label, value, placeholder, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <input className="twk-field" type="text" value={value} placeholder={placeholder}
+             onChange={(e) => onChange(e.target.value)} />
+    </TweakRow>
+  );
+}
+
+function TweakNumber({ label, value, min, max, step = 1, unit = '', onChange }) {
+  const clamp = (n) => {
+    if (min != null && n < min) return min;
+    if (max != null && n > max) return max;
+    return n;
+  };
+  const startRef = React.useRef({ x: 0, val: 0 });
+  const onScrubStart = (e) => {
+    e.preventDefault();
+    startRef.current = { x: e.clientX, val: value };
+    const decimals = (String(step).split('.')[1] || '').length;
+    const move = (ev) => {
+      const dx = ev.clientX - startRef.current.x;
+      const raw = startRef.current.val + dx * step;
+      const snapped = Math.round(raw / step) * step;
+      onChange(clamp(Number(snapped.toFixed(decimals))));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  return (
+    <div className="twk-num">
+      <span className="twk-num-lbl" onPointerDown={onScrubStart}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+             onChange={(e) => onChange(clamp(Number(e.target.value)))} />
+      {unit && <span className="twk-num-unit">{unit}</span>}
+    </div>
+  );
+}
+
+// Relative-luminance contrast pick — checkmarks drawn over a swatch need to
+// read on both #111 and #fafafa without per-option configuration. Hex input
+// only (#rgb / #rrggbb); named or rgb()/hsl() colors fall through to "light".
+function __twkIsLight(hex) {
+  const h = String(hex).replace('#', '');
+  const x = h.length === 3 ? h.replace(/./g, (c) => c + c) : h.padEnd(6, '0');
+  const n = parseInt(x.slice(0, 6), 16);
+  if (Number.isNaN(n)) return true;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return r * 299 + g * 587 + b * 114 > 148000;
+}
+
+const __TwkCheck = ({ light }) => (
+  <svg viewBox="0 0 14 14" aria-hidden="true">
+    <path d="M3 7.2 5.8 10 11 4.2" fill="none" strokeWidth="2.2"
+          strokeLinecap="round" strokeLinejoin="round"
+          stroke={light ? 'rgba(0,0,0,.78)' : '#fff'} />
+  </svg>
+);
+
+// TweakColor — curated color/palette picker. Each option is either a single
+// hex string or an array of 1-5 hex strings; the card adapts — a lone color
+// renders solid, a palette renders colors[0] as the hero (left ~2/3) with the
+// rest stacked in a sharp column on the right. onChange emits the
+// option in the shape it was passed (string stays string, array stays array).
+// Without options it falls back to the native color input for back-compat.
+function TweakColor({ label, value, options, onChange }) {
+  if (!options || !options.length) {
+    return (
+      <div className="twk-row twk-row-h">
+        <div className="twk-lbl"><span>{label}</span></div>
+        <input type="color" className="twk-swatch" value={value}
+               onChange={(e) => onChange(e.target.value)} />
+      </div>
+    );
+  }
+  // Native <input type=color> emits lowercase hex per the HTML spec, so
+  // compare case-insensitively. String() guards JSON.stringify(undefined),
+  // which returns the primitive undefined (no .toLowerCase).
+  const key = (o) => String(JSON.stringify(o)).toLowerCase();
+  const cur = key(value);
+  return (
+    <TweakRow label={label}>
+      <div className="twk-chips" role="radiogroup">
+        {options.map((o, i) => {
+          const colors = Array.isArray(o) ? o : [o];
+          const [hero, ...rest] = colors;
+          const sup = rest.slice(0, 4);
+          const on = key(o) === cur;
+          return (
+            <button key={i} type="button" className="twk-chip" role="radio"
+                    aria-checked={on} data-on={on ? '1' : '0'}
+                    aria-label={colors.join(', ')} title={colors.join(' · ')}
+                    style={{ background: hero }}
+                    onClick={() => onChange(o)}>
+              {sup.length > 0 && (
+                <span>
+                  {sup.map((c, j) => <i key={j} style={{ background: c }} />)}
+                </span>
+              )}
+              {on && <__TwkCheck light={__twkIsLight(hero)} />}
+            </button>
+          );
+        })}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakButton({ label, onClick, secondary = false }) {
+  return (
+    <button type="button" className={secondary ? 'twk-btn secondary' : 'twk-btn'}
+            onClick={onClick}>{label}</button>
+  );
+}
+
+Object.assign(window, {
+  useTweaks, TweaksPanel, TweakSection, TweakRow,
+  TweakSlider, TweakToggle, TweakRadio, TweakSelect,
+  TweakText, TweakNumber, TweakColor, TweakButton,
+});
+
+})();
+  </script>
+
+  <!-- Module 2: Widgets (Live Call + Pre-DC) -->
+  <script type="text/babel" data-module="fs-widgets">
+(function(){
+/* FullSphere — Product widgets (1/2): Live Call + Pre-DC */
+const { useState, useEffect, useRef } = React;
+
+const T = {
+  bg: '#EFF3F6', fg: '#1F2328', muted: '#6B7280', border: 'rgba(0,0,0,0.07)',
+  card: '#FFFFFF', green: '#16A34A', amber: '#D97706', red: '#DC2626',
+  purple: '#6366F1', blue: '#0EA5E9', cardR: '12px',
+  font: "'Inter', system-ui, sans-serif",
+  fontTitle: "'Urbanist', system-ui, sans-serif",
+};
+
+function WAvatar({ initials, bg = '#9CA3AF', size = 28 }) {
+  return React.createElement('span', { style: {
+    width: size, height: size, borderRadius: '50%', background: bg,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: size * 0.38, fontWeight: 700, color: '#fff', flexShrink: 0,
+  }}, initials);
+}
+
+function WBadge({ text, color = T.green, bg }) {
+  return React.createElement('span', { style: {
+    display: 'inline-flex', alignItems: 'center', gap: '4px',
+    padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
+    color, background: bg || (color + '18'),
+  }}, text);
+}
+
+function SectionLabel({ icon, text, color = T.fg }) {
+  return React.createElement('div', { style: {
+    display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 14px',
+    borderBottom: '1px solid ' + T.border, fontSize: '12.5px', fontWeight: 600, color,
+  }}, icon, text);
+}
+
+function SubLabel({ text, color }) {
+  return React.createElement('div', { style: {
+    fontSize: '10px', fontWeight: 700, color: color || T.amber,
+    textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px',
+    display: 'flex', alignItems: 'center', gap: '5px',
+  }}, text);
+}
+
+function AppFrame({ children, style }) {
+  return React.createElement('div', { style: {
+    borderRadius: T.cardR, overflow: 'hidden', background: T.bg,
+    border: '1px solid rgba(0,0,0,0.09)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+    fontFamily: T.font, color: T.fg, fontSize: '13px', ...style,
+  }}, children);
+}
+
+// ─── Left sidebar nav ───
+function SideNav() {
+  var navIcons = [
+    React.createElement('svg', { key: 'grid', width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: T.muted, strokeWidth: 1.8 },
+      React.createElement('rect', { x: 3, y: 3, width: 7, height: 7 }),
+      React.createElement('rect', { x: 14, y: 3, width: 7, height: 7 }),
+      React.createElement('rect', { x: 3, y: 14, width: 7, height: 7 }),
+      React.createElement('rect', { x: 14, y: 14, width: 7, height: 7 })),
+    React.createElement('svg', { key: 'phone', width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: T.fg, strokeWidth: 2 },
+      React.createElement('path', { d: 'M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 11.85 19 19.45 19.45 0 0 1 5 12.15 19.79 19.79 0 0 1 2.12 4.2 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91A16 16 0 0 0 14.09 15.91l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z' })),
+    React.createElement('svg', { key: 'brief', width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: T.muted, strokeWidth: 1.8 },
+      React.createElement('rect', { x: 2, y: 7, width: 20, height: 14, rx: 2 }),
+      React.createElement('path', { d: 'M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2' })),
+    React.createElement('svg', { key: 'doc', width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: T.muted, strokeWidth: 1.8 },
+      React.createElement('path', { d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' }),
+      React.createElement('polyline', { points: '14 2 14 8 20 8' })),
+    React.createElement('svg', { key: 'cap', width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: T.muted, strokeWidth: 1.8 },
+      React.createElement('path', { d: 'M22 10v6M2 10l10-5 10 5-10 5z' }),
+      React.createElement('path', { d: 'M6 12v5c3 3 9 3 12 0v-5' })),
+    React.createElement('svg', { key: 'shield', width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: T.muted, strokeWidth: 1.8 },
+      React.createElement('path', { d: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' })),
+    React.createElement('svg', { key: 'clip', width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: T.muted, strokeWidth: 1.8 },
+      React.createElement('path', { d: 'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' }),
+      React.createElement('rect', { x: 8, y: 2, width: 8, height: 4, rx: 1 })),
+  ];
+
+  return React.createElement('div', { style: {
+    width: 42, background: T.card, borderRight: '1px solid ' + T.border,
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    padding: '10px 0 8px', flexShrink: 0,
+  }},
+    // Logo mark
+    React.createElement('div', { style: { marginBottom: '12px', padding: '4px' } },
+      React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 32 32' },
+        React.createElement('path', { d: 'M8 28L16 8L24 28', fill: 'none', stroke: '#C4A035', strokeWidth: 3, strokeLinecap: 'round', strokeLinejoin: 'round' }),
+        React.createElement('path', { d: 'M11 20h10', fill: 'none', stroke: '#C4A035', strokeWidth: 2.5, strokeLinecap: 'round' }))),
+    // Nav icons
+    navIcons.map(function(icon, i) {
+      var isActive = i === 1;
+      return React.createElement('div', { key: i, style: {
+        width: 32, height: 32, borderRadius: '8px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: isActive ? '#EFF3F6' : 'transparent',
+        marginBottom: '2px', cursor: 'pointer',
+      }}, icon);
+    }),
+    // Spacer
+    React.createElement('div', { style: { flex: 1 } }),
+    // Bottom icons
+    [
+      React.createElement('svg', { key: 'bell', width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: T.muted, strokeWidth: 1.8 },
+        React.createElement('path', { d: 'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9' }),
+        React.createElement('path', { d: 'M13.73 21a2 2 0 0 1-3.46 0' })),
+      React.createElement('svg', { key: 'cog', width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: T.muted, strokeWidth: 1.8 },
+        React.createElement('circle', { cx: 12, cy: 12, r: 3 }),
+        React.createElement('path', { d: 'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z' })),
+    ].map(function(icon, i) {
+      return React.createElement('div', { key: i, style: {
+        width: 32, height: 32, borderRadius: '8px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginBottom: '2px',
+      }}, icon);
+    }),
+    // Avatar
+    React.createElement('div', { style: { marginTop: '4px' } },
+      React.createElement(WAvatar, { initials: 'N', bg: '#6B7280', size: 26 }))
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// TRANSCRIPT DATA
+// ═══════════════════════════════════════════════════
+var LIVE_TRANSCRIPT = [
+  { time: '2:00', text: 'We need board approval on budget before Q3 pilot kickoff.' },
+  { time: '1:35', text: 'For budget we carved four fifty to six hundred thousand for year one — board blesses it in May.' },
+  { time: '2:00', text: 'We need board approval before Q3 — our CFO needs the ROI model first.' },
+  { time: '1:35', text: 'Finance carved the envelope at $450K–$600K. Board blesses it in May if numbers hold.' },
+  { time: '2:00', text: "That's a great first answer and exactly what we needed. We are excited to move forward." },
+  { time: '1:35', text: 'Timeline is Q3 pilot, Q1 production. Pending board sign-off next month.' },
+];
+
+var ALL_KEYWORDS = [
+  { word: 'board', count: 12 }, { word: 'budget', count: 12 },
+  { word: 'approval', count: 7 }, { word: 'kickoff', count: 7 },
+  { word: 'pilot', count: 7 }, { word: 'blesses', count: 5 },
+  { word: 'carved', count: 5 }, { word: 'fifty', count: 5 },
+];
+
+// ═══════════════════════════════════════════════════
+// LIVE CALL COCKPIT
+// ═══════════════════════════════════════════════════
+function LiveCallCockpitWidget() {
+  var [recSeconds, setRecSeconds] = useState(8);
+  var [msgCount, setMsgCount] = useState(2);
+  var [chartDraw, setChartDraw] = useState(false);
+  var [bantDraw, setBantDraw] = useState(false);
+  var [copilotStage, setCopilotStage] = useState(0);
+  var [kwCount, setKwCount] = useState(4);
+  var [insightVisible, setInsightVisible] = useState(false);
+  var transcriptRef = useRef(null);
+
+  useEffect(function() {
+    var t1 = setTimeout(function() { setBantDraw(true); }, 300);
+    var t2 = setTimeout(function() { setChartDraw(true); }, 700);
+    var t3 = setTimeout(function() { setCopilotStage(1); }, 500);
+    var t4 = setTimeout(function() { setKwCount(8); }, 1200);
+    var t5 = setTimeout(function() { setCopilotStage(2); }, 1800);
+    var t6 = setTimeout(function() { setCopilotStage(3); }, 2800);
+    var t7 = setTimeout(function() { setInsightVisible(true); }, 3600);
+
+    var msgTimer = setInterval(function() {
+      setMsgCount(function(c) {
+        if (c >= LIVE_TRANSCRIPT.length) return c;
+        return c + 1;
+      });
+    }, 2200);
+
+    var recTimer = setInterval(function() {
+      setRecSeconds(function(s) { return s + 1; });
+    }, 1000);
+
+    return function() {
+      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+      clearTimeout(t4); clearTimeout(t5); clearTimeout(t6); clearTimeout(t7);
+      clearInterval(msgTimer); clearInterval(recTimer);
+    };
+  }, []);
+
+  useEffect(function() {
+    if (transcriptRef.current) {
+      transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
+    }
+  }, [msgCount]);
+
+  function formatRec(s) {
+    var m = Math.floor(s / 60);
+    var sec = s % 60;
+    return m + ':' + (sec < 10 ? '0' : '') + sec;
+  }
+
+  var visibleMsgs = LIVE_TRANSCRIPT.slice(0, msgCount);
+  var visibleKw = ALL_KEYWORDS.slice(0, kwCount);
+
+  // BANT bar widths (B and A partially filled since partially qualified)
+  var bantBars = [
+    { l: 'B', w: bantDraw ? 60 : 0, color: T.amber },
+    { l: 'A', w: bantDraw ? 55 : 0, color: T.amber },
+    { l: 'N', w: bantDraw ? 100 : 0, color: T.green },
+    { l: 'T', w: bantDraw ? 100 : 0, color: T.green },
+  ];
+
+  // Chart points (flat-ish line, slight upward trend at end)
+  var chartPts = [
+    { x: 12, y: 32 }, { x: 55, y: 30 }, { x: 98, y: 34 },
+    { x: 141, y: 28 }, { x: 184, y: 24 },
+  ];
+  var polyline = chartPts.map(function(p) { return p.x + ',' + p.y; }).join(' ');
+  var pathLength = 180;
+
+  return React.createElement(AppFrame, null,
+
+    // ── Main header ──
+    React.createElement('div', { style: {
+      padding: '9px 14px', background: T.card, borderBottom: '1px solid ' + T.border,
+      display: 'flex', alignItems: 'center', gap: '8px',
+    }},
+      // Back arrow
+      React.createElement('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: T.muted, strokeWidth: 2, style: { flexShrink: 0, cursor: 'pointer' } },
+        React.createElement('polyline', { points: '15 18 9 12 15 6' })),
+      React.createElement('span', { style: { fontFamily: T.fontTitle, fontSize: '14px', fontWeight: 700 } }, 'Frontera Franchise Group'),
+      React.createElement('div', { style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' } },
+        // Avatars
+        React.createElement('div', { style: { display: 'flex' } },
+          React.createElement(WAvatar, { initials: 'TQ', bg: '#8B5CF6', size: 22 }),
+          React.createElement(WAvatar, { initials: 'SM', bg: '#0EA5E9', size: 22, style: { marginLeft: '-6px' } })),
+        // Neutral badge
+        React.createElement('span', { style: {
+          display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 9px',
+          borderRadius: '5px', fontSize: '11px', fontWeight: 600, color: T.muted,
+          border: '1px solid rgba(0,0,0,0.08)', background: '#F9FAFB',
+        }},
+          React.createElement('span', { style: { width: 5, height: 5, borderRadius: '50%', background: T.muted } }),
+          'Neutral'),
+        // URL
+        React.createElement('span', { style: { fontSize: '11px', color: T.muted, maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, 'https://meet.google.c…'),
+        // Post-DC
+        React.createElement('span', { style: { padding: '2px 8px', borderRadius: '5px', background: '#F3F4F6', fontSize: '11px', fontWeight: 600, color: T.fg } }, 'Post-DC'),
+        // End & review
+        React.createElement('span', { style: {
+          padding: '5px 12px', borderRadius: '7px', background: T.fg, color: '#fff',
+          fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer',
+        }},
+          React.createElement('svg', { width: 11, height: 11, viewBox: '0 0 24 24', fill: 'none', stroke: '#fff', strokeWidth: 2 },
+            React.createElement('rect', { x: 3, y: 3, width: 18, height: 18, rx: 2 }),
+            React.createElement('path', { d: 'M9 9h6M9 12h6M9 15h4' })),
+          'End & review')
+      )
+    ),
+
+    // ── Sub-header ──
+    React.createElement('div', { style: {
+      padding: '5px 14px', background: T.card, borderBottom: '1px solid ' + T.border,
+      display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11.5px',
+    }},
+      React.createElement('span', { style: {
+        display: 'inline-flex', alignItems: 'center', gap: '4px',
+        padding: '2px 9px', borderRadius: '10px', background: '#ECFDF5', fontWeight: 600, color: T.green,
+      }},
+        React.createElement('span', { style: {
+          width: 6, height: 6, borderRadius: '50%', background: T.green,
+          animation: 'livePulse 1.5s ease infinite',
+        } }),
+        'Live'),
+      React.createElement('span', { style: { display: 'flex', alignItems: 'center', gap: '5px', color: T.fg } },
+        React.createElement(WAvatar, { initials: 'MC', bg: '#6B7280', size: 18 }),
+        React.createElement('span', { style: { fontWeight: 500 } }, 'Marcus Chen')),
+      React.createElement('span', { style: { display: 'flex', alignItems: 'center', gap: '4px', color: T.red, fontWeight: 600 } },
+        React.createElement('span', { style: {
+          width: 6, height: 6, borderRadius: '50%', background: T.red,
+          animation: 'livePulse 1.5s ease infinite 0.3s',
+        } }),
+        'REC ', formatRec(recSeconds))
+    ),
+
+    // ── Body: sidebar + 3 columns ──
+    React.createElement('div', { style: { display: 'flex', minHeight: '400px' } },
+
+      // Left sidebar
+      React.createElement(SideNav),
+
+      // Three columns grid
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1.05fr 0.95fr 1.3fr', flex: 1, minWidth: 0 } },
+
+        // ── Column 1: Transcript ──
+        React.createElement('div', { style: { borderRight: '1px solid ' + T.border, display: 'flex', flexDirection: 'column', background: T.card } },
+          React.createElement('div', { style: {
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '9px 14px', borderBottom: '1px solid ' + T.border,
+          }},
+            React.createElement('span', { style: { display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12.5px', fontWeight: 600 } },
+              React.createElement('svg', { width: 13, height: 13, viewBox: '0 0 24 24', fill: 'none', stroke: T.muted, strokeWidth: 2 },
+                React.createElement('path', { d: 'M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z' }),
+                React.createElement('path', { d: 'M19 10v2a7 7 0 0 1-14 0v-2' })),
+              'Live transcript'),
+            React.createElement('span', { style: { fontSize: '11px', color: T.muted, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' } },
+              React.createElement('svg', { width: 11, height: 11, viewBox: '0 0 24 24', fill: 'none', stroke: T.muted, strokeWidth: 2 },
+                React.createElement('rect', { x: 2, y: 3, width: 20, height: 14, rx: 2 }),
+                React.createElement('path', { d: 'M8 21h8M12 17v4' })),
+              'Hide')
+          ),
+          React.createElement('div', { ref: transcriptRef, style: {
+            flex: 1, overflowY: 'auto', padding: '8px 12px',
+            scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,0,0,0.1) transparent',
+          }},
+            visibleMsgs.map(function(m, i) {
+              return React.createElement('div', { key: i, style: {
+                padding: '8px 0',
+                borderBottom: i < visibleMsgs.length - 1 ? '1px solid ' + T.border : 'none',
+                animation: i === visibleMsgs.length - 1 && i > 0 ? 'fadeInUp 0.45s cubic-bezier(.16,1,.3,1)' : 'none',
+              }},
+                React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' } },
+                  React.createElement(WAvatar, { initials: 'P', bg: '#374151', size: 22 }),
+                  React.createElement('span', { style: { fontWeight: 700, fontSize: '12.5px' } }, 'prospect'),
+                  React.createElement('span', { style: { fontSize: '11px', color: T.muted } }, m.time)),
+                React.createElement('p', { style: { fontSize: '12px', lineHeight: 1.55, color: '#374151', margin: 0, paddingLeft: '28px' } }, m.text)
+              );
+            }),
+            // Typing indicator when about to get new message
+            msgCount < LIVE_TRANSCRIPT.length && React.createElement('div', { style: {
+              padding: '10px 0 6px', display: 'flex', alignItems: 'center', gap: '6px',
+              animation: 'fadeInUp 0.3s ease',
+            }},
+              React.createElement(WAvatar, { initials: 'P', bg: '#374151', size: 22 }),
+              React.createElement('div', { style: { display: 'flex', gap: '3px', paddingLeft: '4px' } },
+                [0, 1, 2].map(function(d) {
+                  return React.createElement('span', { key: d, style: {
+                    width: 5, height: 5, borderRadius: '50%', background: '#D1D5DB',
+                    animation: 'livePulse 1.2s ease ' + (d * 0.2) + 's infinite',
+                  } });
+                })
+              )
+            )
+          )
+        ),
+
+        // ── Column 2: BANT + Signals + Keywords ──
+        React.createElement('div', { style: { borderRight: '1px solid ' + T.border, display: 'flex', flexDirection: 'column', background: T.card, overflow: 'hidden' } },
+
+          // BANT header with bars
+          React.createElement('div', { style: {
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '9px 14px', borderBottom: '1px solid ' + T.border,
+          }},
+            React.createElement('span', { style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', fontWeight: 600 } },
+              React.createElement('svg', { width: 13, height: 13, viewBox: '0 0 24 24', fill: 'none', stroke: T.fg, strokeWidth: 2 },
+                React.createElement('circle', { cx: 12, cy: 12, r: 10 }),
+                React.createElement('circle', { cx: 12, cy: 12, r: 6 }),
+                React.createElement('circle', { cx: 12, cy: 12, r: 2 })),
+              'BANT live'),
+            React.createElement('div', { style: { display: 'flex', gap: '4px', alignItems: 'flex-end' } },
+              bantBars.map(function(b) {
+                return React.createElement('div', { key: b.l, style: { textAlign: 'center' } },
+                  React.createElement('div', { style: { fontSize: '9px', fontWeight: 600, color: T.muted, marginBottom: '2px' } }, b.l),
+                  React.createElement('div', { style: { width: 24, height: 4, borderRadius: '2px', background: '#E5E7EB', overflow: 'hidden' } },
+                    React.createElement('div', { style: {
+                      width: b.w + '%', height: '100%', borderRadius: '2px', background: b.color,
+                      transition: 'width 1.4s cubic-bezier(.16,1,.3,1) ' + (bantBars.indexOf(b) * 0.15) + 's',
+                    } })));
+              }))
+          ),
+
+          // BANT rows
+          React.createElement('div', { style: { padding: '8px 14px', borderBottom: '1px solid ' + T.border } },
+            [
+              { k: 'Budget',    v: 'Partially qualified', c: T.fg,    bold: true  },
+              { k: 'Authority', v: 'Partially qualified', c: T.fg,    bold: true  },
+              { k: 'Need',      v: 'Confirmed',           c: T.green, bold: false },
+              { k: 'Timeline',  v: 'Confirmed',           c: T.green, bold: false },
+            ].map(function(r) {
+              return React.createElement('div', { key: r.k, style: {
+                display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: '12px',
+              }},
+                React.createElement('span', { style: { color: T.muted } }, r.k),
+                React.createElement('span', { style: { fontWeight: r.bold ? 700 : 600, color: r.c, fontSize: '11.5px' } }, r.v));
+            })
+          ),
+
+          // Signals
+          React.createElement('div', { style: { padding: '8px 14px', borderBottom: '1px solid ' + T.border } },
+            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12.5px', fontWeight: 600, marginBottom: '8px' } },
+              React.createElement('svg', { width: 13, height: 13, viewBox: '0 0 24 24', fill: 'none', stroke: T.fg, strokeWidth: 2 },
+                React.createElement('path', { d: 'M13 2L3 14h9l-1 8 10-12h-9l1-8z' })),
+              'Signals'),
+            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: '12px' } },
+              React.createElement('span', { style: { color: T.muted } }, 'Customer'),
+              React.createElement('span', { style: { fontWeight: 600, color: T.amber } }, 'Evaluating fit')),
+            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '12px' } },
+              React.createElement('span', { style: { color: T.muted } }, 'Sales rep tone'),
+              React.createElement('span', { style: { fontWeight: 600, color: T.green } }, 'Steady delivery')),
+
+            // Sentiment chart — dots on a line
+            React.createElement('svg', { viewBox: '0 0 200 52', style: { width: '100%', height: '44px', marginBottom: '6px' } },
+              // Gridline subtle
+              React.createElement('line', { x1: 12, y1: 36, x2: 188, y2: 36, stroke: '#F3F4F6', strokeWidth: 1 }),
+              // Line path
+              React.createElement('polyline', { points: polyline,
+                fill: 'none', stroke: '#D1D5DB', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round',
+                style: { strokeDasharray: pathLength, strokeDashoffset: chartDraw ? 0 : pathLength, transition: 'stroke-dashoffset 1.8s cubic-bezier(.16,1,.3,1) 0.2s' }
+              }),
+              // Dots
+              chartPts.map(function(p, i) {
+                var isLast = i === chartPts.length - 1;
+                return React.createElement('circle', {
+                  key: i, cx: p.x, cy: p.y,
+                  r: isLast ? 5 : 3,
+                  fill: isLast ? T.fg : '#9CA3AF',
+                  stroke: isLast ? '#fff' : 'none',
+                  strokeWidth: isLast ? 1.5 : 0,
+                  style: {
+                    opacity: chartDraw ? 1 : 0,
+                    transition: 'opacity 0.3s ease ' + (0.4 + i * 0.12) + 's',
+                  }
+                });
+              }),
+              // Time labels
+              ['0:00', '0:25', '0:50', '1:15', '1:40'].map(function(t, i) {
+                return React.createElement('text', { key: t, x: chartPts[i].x, y: 50, fontSize: 7.5, fill: T.muted, textAnchor: 'middle' }, t);
+              })
+            ),
+
+            React.createElement('p', { style: { fontSize: '11px', color: T.muted, marginBottom: '3px' } },
+              'Recommended move: ',
+              React.createElement('span', { style: { color: T.amber, fontWeight: 500 } }, 'Keep discovery open')),
+            React.createElement('p', { style: { fontSize: '11px', color: T.muted, lineHeight: 1.4 } },
+              'Sentiment signals will appear as the conversation progresses.')
+          ),
+
+          // Keywords
+          React.createElement('div', { style: { padding: '8px 14px', flex: 1 } },
+            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12.5px', fontWeight: 600, marginBottom: '7px' } },
+              React.createElement('span', { style: { fontWeight: 700, color: T.muted, fontSize: '13px' } }, '#'),
+              'Keywords'),
+            React.createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '4px' } },
+              visibleKw.map(function(k, i) {
+                return React.createElement('span', { key: k.word, style: {
+                  display: 'inline-flex', gap: '4px', padding: '2px 7px',
+                  borderRadius: '4px', background: '#F3F4F6', fontSize: '11px', fontWeight: 500, color: T.fg,
+                  animation: i >= 4 ? 'fadeInUp 0.3s ease' : 'none',
+                } },
+                  k.word,
+                  React.createElement('span', { style: { fontWeight: 700, color: T.muted } }, k.count));
+              })
+            )
+          )
+        ),
+
+        // ── Column 3: Live Copilot ──
+        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', background: T.card } },
+          React.createElement('div', { style: {
+            display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 14px',
+            borderBottom: '1px solid ' + T.border, fontSize: '12.5px', fontWeight: 600,
+          }},
+            React.createElement('svg', { width: 13, height: 13, viewBox: '0 0 24 24', fill: 'none', stroke: T.fg, strokeWidth: 2 },
+              React.createElement('path', { d: 'M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.582a.5.5 0 0 1 0 .962L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z' })),
+            'Live copilot'),
+
+          React.createElement('div', { style: { flex: 1, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '14px', overflow: 'hidden' } },
+
+            // Running summary
+            copilotStage >= 1 && React.createElement('div', { style: { animation: 'fadeInUp 0.5s cubic-bezier(.16,1,.3,1)' } },
+              React.createElement(SubLabel, { text: '📋 RUNNING SUMMARY', color: T.amber }),
+              React.createElement('p', { style: { fontSize: '12px', lineHeight: 1.6, color: '#374151', margin: 0 } },
+                'Live discovery with Marcus Chen at Frontera Franchise Group. BANT coverage at 75%. Still to cover: Next step. Partially covered: Budget, Authority — ask for specifics. Most recent customer comment: "That\'s a great first answer and exactly what we needed. We are excited to move fo…',
+                React.createElement('span', { style: { color: T.blue, fontWeight: 500, cursor: 'pointer' } }, ' See more'))
+            ),
+
+            // Pain points
+            copilotStage >= 2 && React.createElement('div', { style: { animation: 'fadeInUp 0.5s cubic-bezier(.16,1,.3,1)' } },
+              React.createElement(SubLabel, { text: '🎯 PAIN POINTS IDENTIFIED', color: T.green }),
+              insightVisible
+                ? React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '5px', animation: 'fadeInUp 0.4s ease' } },
+                    [
+                      'Board approval is the primary bottleneck before Q3 kickoff.',
+                      'Budget carved at $450K–$600K — CFO sign-off still pending.',
+                    ].map(function(p, i) {
+                      return React.createElement('div', { key: i, style: { display: 'flex', gap: '6px', fontSize: '12px', lineHeight: 1.45, color: '#374151' } },
+                        React.createElement('span', { style: { color: T.amber, fontWeight: 700, flexShrink: 0 } }, '●'), p);
+                    }))
+                : React.createElement('p', { style: { fontSize: '12px', color: T.muted, lineHeight: 1.5, margin: 0 } }, 'Pain points appear as the customer speaks.')
+            ),
+
+            // Live insights
+            copilotStage >= 3 && React.createElement('div', { style: { animation: 'fadeInUp 0.5s cubic-bezier(.16,1,.3,1)' } },
+              React.createElement(SubLabel, { text: '⚡ LIVE INSIGHTS', color: T.purple }),
+              insightVisible
+                ? React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '5px' } },
+                    [
+                      { type: 'SIGNAL', text: 'Budget signal: $450K–$600K envelope confirmed by prospect', color: T.green },
+                      { type: 'SIGNAL', text: 'Timeline signal: Q3 pilot / Q1 production — board meeting May', color: T.green },
+                      { type: 'ALERT',  text: 'Authority gap: CFO not yet in the room — budget needs sign-off', color: T.amber },
+                    ].map(function(s, i) {
+                      var badgeBg = s.type === 'SIGNAL' ? '#ECFDF5' : '#FEF3C7';
+                      return React.createElement('div', { key: i, style: {
+                        display: 'flex', alignItems: 'flex-start', gap: '6px',
+                        fontSize: '11.5px', lineHeight: 1.4,
+                        animation: 'slideInRight 0.4s ease ' + (i * 0.15) + 's both',
+                      }},
+                        React.createElement('span', { style: {
+                          padding: '1px 5px', borderRadius: '3px', fontSize: '9px',
+                          fontWeight: 700, background: badgeBg, color: s.color,
+                          flexShrink: 0, textTransform: 'uppercase', marginTop: '1px',
+                        } }, s.type),
+                        React.createElement('span', { style: { color: '#374151' } }, s.text));
+                    }))
+                : React.createElement('p', { style: { fontSize: '12px', color: T.muted, lineHeight: 1.5, margin: 0 } }, 'AI insights will appear here as the call progresses.')
+            )
+          ),
+
+          // Chat input
+          React.createElement('div', { style: { padding: '8px 12px 10px', borderTop: '1px solid ' + T.border } },
+            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+              React.createElement('div', { style: {
+                flex: 1, padding: '7px 11px', borderRadius: '8px',
+                border: '1px solid #E5E7EB', fontSize: '11.5px', color: '#9CA3AF', background: '#F9FAFB',
+              } }, 'Ask DC Copilot anything about this call…'),
+              React.createElement('div', { style: {
+                width: 28, height: 28, borderRadius: '50%', background: T.fg,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
+              } },
+                React.createElement('svg', { width: 13, height: 13, viewBox: '0 0 24 24', fill: 'none', stroke: '#fff', strokeWidth: 2 },
+                  React.createElement('line', { x1: 22, y1: 2, x2: 11, y2: 13 }),
+                  React.createElement('polygon', { points: '22 2 15 22 11 13 2 9 22 2' })))
+            )
+          )
+        ) // end column 3
+      ) // end grid
+    ) // end body
+  ); // end AppFrame
+}
+
+// ═══════════════════════════════════════════════════
+// PRE-DC BRIEFING (unchanged)
+// ═══════════════════════════════════════════════════
+function PreDCBriefingWidget() {
+  var [expanded, setExpanded] = useState({ summary: true });
+  return React.createElement(AppFrame, null,
+    React.createElement('div', { style: { padding: '14px 16px', background: T.card, borderBottom: '1px solid ' + T.border } },
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' } },
+        React.createElement('h3', { style: { fontFamily: T.fontTitle, fontSize: '15px', fontWeight: 700, margin: 0 } }, 'Frontera Franchise Group'),
+        React.createElement('span', { style: { padding: '5px 14px', borderRadius: '7px', background: T.fg, color: '#fff', fontSize: '11.5px', fontWeight: 600 } }, 'Join call')),
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '7px', fontSize: '11.5px', color: T.muted, flexWrap: 'wrap' } },
+        React.createElement(WAvatar, { initials: 'MC', size: 18, bg: '#6B7280' }),
+        'Marcus Chen · Chief Operating Officer ·',
+        React.createElement('span', null, '2026-05-21 · 10:00 AM PKT'),
+        React.createElement('span', { style: { padding: '2px 7px', borderRadius: '4px', background: '#F3F4F6', fontWeight: 600, color: T.fg } }, 'Pre-DC'),
+        React.createElement('span', { style: { padding: '2px 7px', borderRadius: '4px', background: '#F3F4F6', fontWeight: 600 } }, '$180M system-wide'))
+    ),
+    React.createElement('div', { style: { display: 'flex', gap: '14px', padding: '7px 16px', background: T.card, borderBottom: '1px solid ' + T.border, justifyContent: 'flex-end' } },
+      [{ k: 'Budget', v: 'Partial', c: T.amber }, { k: 'Authority', v: 'Confirmed', c: T.green }, { k: 'Need', v: 'Confirmed', c: T.green }, { k: 'Timeline', v: 'Confirmed', c: T.green }].map(function(b) {
+        return React.createElement('div', { key: b.k, style: { display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px' } },
+          React.createElement('span', { style: { width: 7, height: 7, borderRadius: '50%', border: '2px solid ' + b.c } }),
+          React.createElement('span', { style: { color: T.muted } }, b.k),
+          React.createElement('span', { style: { fontWeight: 600, color: b.c } }, b.v));
+      })
+    ),
+    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '0.65fr 1fr', minHeight: '280px' } },
+      React.createElement('div', { style: { borderRight: '1px solid ' + T.border, background: T.card, padding: '4px 0' } },
+        ['Customer & account', 'Opportunity framing', 'Account snapshot', 'Company metrics', 'Internal attendees', 'Client attendees', 'Interaction history'].map(function(s) {
+          return React.createElement('div', { key: s, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 13px', fontSize: '12.5px', fontWeight: 500, color: T.fg, borderBottom: '1px solid ' + T.border, cursor: 'pointer' } },
+            s, React.createElement('span', { style: { color: T.muted } }, '›'));
+        }),
+        React.createElement('div', { style: { padding: '12px' } },
+          React.createElement('div', { style: { fontSize: '12.5px', fontWeight: 600, marginBottom: '7px', display: 'flex', alignItems: 'center', gap: '5px' } }, '☰ Discovery checklist'),
+          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', marginBottom: '4px' } },
+            React.createElement('span', { style: { color: T.muted } }, 'Discovery coverage'),
+            React.createElement('span', { style: { fontWeight: 700 } }, '25%')),
+          React.createElement('div', { style: { height: '4px', borderRadius: '2px', background: '#E5E7EB' } },
+            React.createElement('div', { style: { width: '25%', height: '100%', borderRadius: '2px', background: T.blue } })),
+          React.createElement('p', { style: { fontSize: '11px', color: T.muted, marginTop: '4px' } }, '3 open gaps to confirm on the call'))
+      ),
+      React.createElement('div', { style: { background: T.card, padding: '14px' } },
+        React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '10px' } },
+          React.createElement('span', { style: { fontFamily: T.fontTitle, fontSize: '14px', fontWeight: 700 } }, 'Summary'),
+          React.createElement('div', { style: { display: 'flex', gap: '5px' } },
+            React.createElement('span', { style: { padding: '2px 7px', borderRadius: '4px', border: '1px solid ' + T.green, fontSize: '10.5px', fontWeight: 600, color: T.green } }, 'Enterprise'),
+            React.createElement('span', { style: { padding: '2px 7px', borderRadius: '4px', background: '#F3F4F6', fontSize: '10.5px', fontWeight: 600 } }, '$180M system-wide'))
+        ),
+        React.createElement('div', { style: { marginBottom: '12px' } },
+          React.createElement('p', { style: { fontSize: '10.5px', fontWeight: 600, color: T.muted, marginBottom: '5px' } }, 'Profile Summary'),
+          React.createElement('p', { style: { fontSize: '12.5px', lineHeight: 1.6, color: '#374151' } },
+            'Frontera operates 140 franchise locations across North America with fragmented ops tooling. Pre-call intel suggests ',
+            React.createElement('span', { style: { padding: '1px 5px', borderRadius: '4px', background: '#FEF3C7', fontWeight: 600 } }, '$450K–$600K'),
+            ' first-year envelope and a Q3 pilot / Q1 production timeline pending board sign-off.')),
+        React.createElement('div', null,
+          React.createElement('p', { style: { fontSize: '10.5px', fontWeight: 600, color: T.green, marginBottom: '5px' } }, 'Client needs'),
+          React.createElement('p', { style: { fontSize: '12.5px', lineHeight: 1.6, color: '#374151' } },
+            'COO lacks real-time unit-level performance and compliance visibility across 140 locations.'))
+      )
+    )
+  );
+}
+
+Object.assign(window, { LiveCallCockpitWidget, PreDCBriefingWidget, WAvatar, WBadge, SectionLabel, SubLabel, AppFrame });
+
+})();
+  </script>
+
+  <!-- Module 3: Widgets 2 (Post-DC + Coaching + KB) -->
+  <script type="text/babel" data-module="fs-widgets2">
+(function(){
+/* FullSphere — Product widgets (2/2): Post-DC, Coaching, KB */
+
+// ─── Tokens (shared with fs-widgets.jsx) ───
+var T2 = {
+  bg: '#EFF3F6', fg: '#1F2328', muted: '#6B7280', border: 'rgba(0,0,0,0.06)',
+  card: '#FFFFFF', green: '#16A34A', amber: '#D97706', red: '#DC2626',
+  purple: '#6366F1', blue: '#0EA5E9', cardR: '12px',
+  font: "'Inter', system-ui, sans-serif",
+  fontTitle: "'Urbanist', system-ui, sans-serif",
+};
+
+function AppFrame2({ children }) {
+  return React.createElement('div', { style: {
+    borderRadius: T2.cardR, overflow: 'hidden', background: T2.bg,
+    border: '1px solid rgba(0,0,0,0.08)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+    fontFamily: T2.font, color: T2.fg, fontSize: '13px',
+  }}, children);
+}
+
+// ═══════════════════════════════════════════════════
+// POST-DC REVIEW
+// ═══════════════════════════════════════════════════
+function PostDCReviewWidget() {
+  var [activeTab, setActiveTab] = React.useState('overview');
+  var tabs = ['Overview', 'Account & prep', 'Client Landing Page', 'Transcript', 'AI Coach'];
+
+  return React.createElement(AppFrame2, null,
+    // Header
+    React.createElement('div', { style: { padding: '14px 16px', background: T2.card, borderBottom: '1px solid ' + T2.border }},
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }},
+        React.createElement('h3', { style: { fontFamily: T2.fontTitle, fontSize: '16px', fontWeight: 700, margin: 0 }}, 'NovaCart Marketplace'),
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' }},
+          React.createElement('span', { style: { padding: '6px 16px', borderRadius: '8px', background: T2.fg, color: '#fff', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }},
+            '☐ Mark call closed'),
+          // Status dots
+          React.createElement('div', { style: { display: 'flex', gap: '12px', fontSize: '11px' }},
+            [{ l: 'Review', done: true }, { l: 'Tasks', done: false }, { l: 'Email', done: true }, { l: 'Done', done: false }].map(function(s) {
+              return React.createElement('span', { key: s.l, style: { display: 'flex', alignItems: 'center', gap: '4px', color: s.done ? T2.green : T2.muted }},
+                React.createElement('span', { style: { width: 8, height: 8, borderRadius: '50%', border: s.done ? 'none' : '2px solid #D1D5DB', background: s.done ? T2.green : 'transparent' }},
+                  s.done && React.createElement('svg', { width: 8, height: 8, viewBox: '0 0 24 24', fill: 'none', stroke: '#fff', strokeWidth: 4 },
+                    React.createElement('polyline', { points: '20 6 9 17 4 12' }))),
+                s.l);
+            })))),
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: T2.muted }},
+        React.createElement(WAvatar, { initials: 'AV', size: 20, bg: '#6B7280' }),
+        'Amin Visram · Chief Executive Officer', '·', '05/20/2026 · 7:30 pm PKT',
+        React.createElement('span', { style: { padding: '2px 8px', borderRadius: '4px', background: '#DBEAFE', fontWeight: 600, color: T2.blue }}, 'Post-DC wrap-up'),
+        React.createElement('span', { style: { padding: '2px 8px', borderRadius: '4px', background: '#F3F4F6', fontWeight: 600, color: T2.fg }}, 'Opportunity'))
+    ),
+    // Tabs
+    React.createElement('div', { style: { display: 'flex', gap: '0', background: T2.card, borderBottom: '1px solid ' + T2.border, padding: '0 16px' }},
+      tabs.map(function(t) {
+        var active = t.toLowerCase().startsWith(activeTab);
+        return React.createElement('button', { key: t, onClick: function() { setActiveTab(t.toLowerCase().split(' ')[0]); },
+          style: { padding: '10px 16px', fontSize: '13px', fontWeight: active ? 600 : 400,
+            color: active ? T2.fg : T2.muted, background: 'none', border: 'none', cursor: 'pointer',
+            borderBottom: active ? '2px solid ' + T2.fg : '2px solid transparent', fontFamily: T2.font }}, t);
+      })
+    ),
+    // Content
+    React.createElement('div', { style: { padding: '16px', background: T2.card }},
+      // Call summary card
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 0.4fr', gap: '16px' }},
+        React.createElement('div', null,
+          React.createElement('div', { style: { padding: '16px', borderRadius: '10px', border: '1px solid ' + T2.border, marginBottom: '16px' }},
+            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }},
+              React.createElement('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: T2.fg, strokeWidth: 2 },
+                React.createElement('path', { d: 'M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.582a.5.5 0 0 1 0 .962L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z' })),
+              React.createElement('span', { style: { fontSize: '14px', fontWeight: 600 }}, 'Call summary')),
+            React.createElement('p', { style: { fontSize: '13px', lineHeight: 1.6, color: '#374151', margin: 0 }},
+              'Amin Visram at NovaCart Marketplace needs to graduate from Shopify Plus plus bolt-ons to a custom B2C platform tying catalog, multi-warehouse fulfillment, and subscription club billing. NovaCart confirmed executive sponsorship and wants a phased proposal.'),
+            React.createElement('div', { style: { marginTop: '12px' }},
+              React.createElement('p', { style: { fontSize: '11px', fontWeight: 600, color: T2.muted, marginBottom: '4px' }}, 'AI recommended next steps'),
+              React.createElement('p', { style: { fontSize: '12.5px', lineHeight: 1.55, color: '#374151' }},
+                'Deliver commerce maturity assessment, three reference sites, and fixed-cost phase-one proposal for catalog + checkout.'))
+          ),
+          // BANT + Deal signals
+          React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }},
+            // BANT
+            React.createElement('div', { style: { padding: '14px', borderRadius: '10px', border: '1px solid ' + T2.border }},
+              React.createElement('span', { style: { fontSize: '13px', fontWeight: 600, marginBottom: '10px', display: 'block' }}, 'BANT score'),
+              [{ k: 'Budget', v: 'Partial', c: T2.amber, q: '"100K+"' }, { k: 'Authority', v: 'Confirmed', c: T2.green, q: '"Yes"' },
+               { k: 'Timeline', v: 'Partial', c: T2.amber, q: '"30-60 days"' }, { k: 'Need', v: 'Partial', c: T2.amber, q: '"Custom B2C..."' }].map(function(b) {
+                return React.createElement('div', { key: b.k, style: { marginBottom: '8px' }},
+                  React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }},
+                    React.createElement('span', { style: { width: 10, height: 10, borderRadius: '50%', border: '2px solid ' + b.c }}),
+                    React.createElement('span', { style: { color: T2.muted }}, b.k),
+                    React.createElement('span', { style: { fontWeight: 600, color: b.c }}, b.v)),
+                  React.createElement('p', { style: { fontSize: '11px', color: T2.muted, marginLeft: '16px', marginTop: '2px' }}, b.q));
+              })
+            ),
+            // Deal signals
+            React.createElement('div', { style: { padding: '14px', borderRadius: '10px', border: '1px solid ' + T2.border }},
+              React.createElement('span', { style: { fontSize: '13px', fontWeight: 600, marginBottom: '10px', display: 'block' }}, 'Deal signals'),
+              React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }},
+                [{ k: 'Lead stage', v: 'Opportunity' }, { k: 'Annual potential', v: 'High Potential' },
+                 { k: 'Engagement model', v: 'Fixed Cost' }, { k: 'Service line', v: 'Software Engineering' }].map(function(d) {
+                  return React.createElement('div', { key: d.k },
+                    React.createElement('p', { style: { fontSize: '10px', color: T2.muted }}, d.k),
+                    React.createElement('p', { style: { fontSize: '13px', fontWeight: 600 }}, d.v));
+                }))
+            )
+          )
+        ),
+        // Tasks column
+        React.createElement('div', { style: { padding: '14px', borderRadius: '10px', border: '1px solid ' + T2.border }},
+          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }},
+            React.createElement('span', { style: { fontSize: '13px', fontWeight: 600 }}, '☰ Tasks'),
+            React.createElement('span', { style: { fontSize: '11px', color: T2.muted }}, '0/5')),
+          ['Send follow-up email', 'Create Jira handoff', 'Book internal sync', 'Create landing page', 'Build proposal'].map(function(t, i) {
+            var icons = ['✉', '📋', '📅', '🌐', '📄'];
+            return React.createElement('div', { key: t, style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0', borderBottom: i < 4 ? '1px solid ' + T2.border : 'none' }},
+              React.createElement('span', { style: { fontSize: '14px' }}, icons[i]),
+              React.createElement('span', { style: { flex: 1, fontSize: '12.5px', fontWeight: 500 }}, t),
+              React.createElement('span', { style: { width: 16, height: 16, borderRadius: '50%', border: '2px solid #D1D5DB' }}));
+          }),
+          React.createElement('p', { style: { fontSize: '10px', color: T2.amber, marginTop: '4px' }}, 'Coming soon')
+        )
+      )
+    )
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// COACHING & ANALYTICS
+// ═══════════════════════════════════════════════════
+function CoachingWidget() {
+  var [chartDraw, setChartDraw] = React.useState(false);
+  React.useEffect(function() { setTimeout(function() { setChartDraw(true); }, 600); }, []);
+
+  return React.createElement(AppFrame2, null,
+    React.createElement('div', { style: { padding: '16px', background: T2.card }},
+      // Greeting
+      React.createElement('h3', { style: { fontFamily: T2.fontTitle, fontSize: '18px', fontWeight: 700, marginBottom: '4px' }}, 'Team coaching'),
+      React.createElement('p', { style: { fontSize: '12px', color: T2.muted, marginBottom: '16px' }}, 'Week of June 2 · 47 calls analyzed'),
+      // Coaching candidates
+      React.createElement('div', { style: { fontSize: '10px', fontWeight: 700, color: T2.amber, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}, '✦ This week\'s coaching candidates'),
+      [
+        { name: 'Sarah Mendes', role: 'Account Executive', score: '0.86', grade: 'Strong', color: T2.green, insight: 'Strong on discovery, but on 3 of last 4 calls she let the prospect drive the timeline conversation. Worth a 1:1 on commitment-anchoring.' },
+        { name: 'James Liu', role: 'Account Executive', score: '0.91', grade: 'Excellent', color: T2.green, insight: 'Closed strong last week. Second deal in a month with a pattern of pricing pushback on Wednesday-Friday calls.' },
+        { name: 'Anika Shah', role: 'Solutions Engineer', score: '0.68', grade: 'Developing', color: T2.amber, insight: 'New to the CIO persona. Two consecutive calls with sentiment dropping after technical pivot.' },
+      ].map(function(c, i) {
+        return React.createElement('div', { key: i, style: {
+          padding: '12px 14px', borderRadius: '10px', border: '1px solid ' + T2.border,
+          marginBottom: '8px', animation: 'fadeInUp 0.5s ease ' + (i * 0.15) + 's both',
+        }},
+          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }},
+            React.createElement(WAvatar, { initials: c.name.split(' ').map(function(n) { return n[0]; }).join(''), size: 28, bg: i === 0 ? '#F59E0B' : i === 1 ? '#3B82F6' : '#8B5CF6' }),
+            React.createElement('div', { style: { flex: 1 }},
+              React.createElement('span', { style: { fontWeight: 700, fontSize: '13px' }}, c.name),
+              React.createElement('span', { style: { fontSize: '11px', color: T2.muted, marginLeft: '6px' }}, c.role)),
+            React.createElement('div', { style: { textAlign: 'right' }},
+              React.createElement('span', { style: { fontFamily: T2.fontTitle, fontSize: '20px', fontWeight: 800, lineHeight: 1 }}, c.score),
+              React.createElement('div', { style: { fontSize: '9px', fontWeight: 600, color: c.color }}, c.grade))),
+          React.createElement('p', { style: { fontSize: '12px', lineHeight: 1.5, color: '#374151', margin: 0 }}, c.insight)
+        );
+      }),
+      // Pattern
+      React.createElement('div', { style: { padding: '12px 14px', borderRadius: '10px', border: '1px solid ' + T2.border, borderLeft: '3px solid ' + T2.purple, marginTop: '12px', background: '#FAFAFF' }},
+        React.createElement('div', { style: { fontSize: '10px', fontWeight: 700, color: T2.purple, textTransform: 'uppercase', marginBottom: '4px' }}, '⚡ Pattern Detected'),
+        React.createElement('p', { style: { fontSize: '12px', lineHeight: 1.5, color: '#374151' }},
+          'Calls with stumble-and-recovery score ', React.createElement('strong', null, '18% higher'), ' than calls without. Sample: 47 calls · Confidence: ', React.createElement('span', { style: { color: T2.green, fontWeight: 600 }}, 'High')))
+    )
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// KNOWLEDGE BASE
+// ═══════════════════════════════════════════════════
+function KnowledgeBaseWidget() {
+  return React.createElement(AppFrame2, null,
+    React.createElement('div', { style: { padding: '16px', background: T2.card }},
+      React.createElement('h3', { style: { fontFamily: T2.fontTitle, fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}, 'Knowledge Base'),
+      React.createElement('p', { style: { fontSize: '12px', color: T2.muted, marginBottom: '16px' }}, 'Content watchlist · 12 assets flagged this week'),
+      [
+        { name: 'Whitlock Capital Modernization (2023)', type: 'Case Study', uses: 14, prog: 9, status: 'Strong asset', sColor: T2.green, desc: 'Used in 14 calls this quarter. Cited in 9 progressions.' },
+        { name: 'Mid-Market ESG Compliance Brief', type: 'AI Draft · New', uses: 0, prog: 0, status: 'Needs review', sColor: T2.purple, desc: 'Auto-drafted by content generation agent following 3 calls mentioning ESG regulatory pressure.' },
+        { name: 'Legacy System Integration Playbook (2022)', type: 'Playbook', uses: 0, prog: 0, status: 'Deprecate', sColor: T2.red, desc: "Hasn't been used in any call in 90 days. Last reviewed 14 months ago." },
+      ].map(function(a, i) {
+        return React.createElement('div', { key: i, style: {
+          padding: '14px', borderRadius: '10px', border: '1px solid ' + T2.border,
+          marginBottom: '8px', animation: 'fadeInUp 0.4s ease ' + (i * 0.1) + 's both',
+        }},
+          React.createElement('div', { style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '6px' }},
+            React.createElement('div', null,
+              React.createElement('p', { style: { fontWeight: 600, fontSize: '13px', margin: 0 }}, a.name),
+              React.createElement('p', { style: { fontSize: '11px', color: T2.muted, marginTop: '2px' }}, a.type)),
+            React.createElement('span', { style: { fontSize: '10px', fontWeight: 700, color: a.sColor, padding: '2px 8px', borderRadius: '4px', background: a.sColor + '12', textTransform: 'uppercase', flexShrink: 0 }}, a.status)),
+          React.createElement('p', { style: { fontSize: '12px', lineHeight: 1.5, color: '#374151', margin: 0 }}, a.desc),
+          a.uses > 0 && React.createElement('div', { style: { display: 'flex', gap: '16px', marginTop: '8px', fontSize: '11px', color: T2.muted }},
+            React.createElement('span', null, React.createElement('strong', { style: { color: T2.fg }}, a.uses), ' calls'),
+            React.createElement('span', null, React.createElement('strong', { style: { color: T2.green }}, a.prog), ' progressions'))
+        );
+      })
+    )
+  );
+}
+
+Object.assign(window, { PostDCReviewWidget, CoachingWidget, KnowledgeBaseWidget });
+
+})();
+  </script>
+
+  <!-- Module 4: Sections -->
+  <script type="text/babel" data-module="fs-sections">
+(function(){
+/* FullSphere — Landing page sections (warm, premium aesthetic) */
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── Warm palette ───
+const W = {
+  bg: '#FEFCF8',
+  fg: '#2C2810',
+  muted: '#8B8570',
+  border: 'rgba(180,160,100,0.12)',
+  card: '#FFFFFF',
+  cream: '#F5EDDA',
+  creamLight: '#FAF6EC',
+  amber: '#C4A035',
+  amberDark: '#8B7A2E',
+  warmGlow: 'radial-gradient(ellipse 120% 80% at 50% 100%, rgba(245,220,160,0.35) 0%, rgba(250,240,220,0.15) 50%, transparent 80%)',
+  peachGlow: 'radial-gradient(ellipse 80% 60% at 80% 80%, rgba(255,210,180,0.18) 0%, transparent 60%)',
+  font: "'Inter', system-ui, sans-serif",
+  fontTitle: "'Urbanist', system-ui, sans-serif",
+};
+
+// ─── Reveal animation ───
+function Reveal({ children, delay = 0, style = {} }) {
+  var ref = useRef(null);
+  var [mounted, setMounted] = useState(false);
+  useEffect(function() {
+    var t = setTimeout(function() { setMounted(true); }, Math.max(80, delay * 1000));
+    return function() { clearTimeout(t); };
+  }, [delay]);
+  return React.createElement('div', { ref: ref, style: {
+    opacity: mounted ? 1 : 0,
+    transform: mounted ? 'translateY(0)' : 'translateY(20px)',
+    transition: 'opacity 0.8s cubic-bezier(.16,1,.3,1), transform 0.8s cubic-bezier(.16,1,.3,1)',
+    ...style,
+  }}, children);
+}
+
+// ─── Section wrapper ───
+function Section({ id, children, style = {} }) {
+  return React.createElement('section', { id: id, style: {
+    padding: '120px 24px', position: 'relative', overflow: 'hidden', ...style,
+  }}, React.createElement('div', { style: { maxWidth: '1080px', margin: '0 auto' }}, children));
+}
+
+// ═══════════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════════
+function Nav() {
+  var [hovBtn, setHovBtn] = useState(false);
+
+  return React.createElement('nav', { style: {
+    position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+    height: '52px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'rgba(255,255,255,0.96)',
+    backdropFilter: 'blur(12px) saturate(160%)',
+    borderBottom: '1px solid rgba(0,0,0,0.07)',
+    padding: '0',
+  }},
+    React.createElement('div', { style: {
+      maxWidth: '1120px', width: '100%', padding: '0 48px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    }},
+
+      // ── Logo ──
+      React.createElement('a', { href: '#', style: {
+        display: 'flex', alignItems: 'center', gap: '7px', textDecoration: 'none',
+      }},
+        React.createElement('img', { src: '/fullsphere/logo.png', alt: 'FullSphere', style: {
+          width: '30px', height: '30px', objectFit: 'contain',
+          filter: 'brightness(0) sepia(1) saturate(12) hue-rotate(-15deg) brightness(1.5)',
+        }}),
+        React.createElement('span', { style: {
+          fontFamily: W.fontTitle, fontSize: '17px', fontWeight: 600,
+          color: '#1A1A18', letterSpacing: '-0.01em',
+        }}, 'FullSphere'),
+        React.createElement('span', { style: {
+          fontSize: '11px', fontWeight: 500, color: '#888780',
+          padding: '1px 6px', borderRadius: '4px',
+          background: 'rgba(0,0,0,0.05)', letterSpacing: '0.02em',
+        }}, 'AI')
+      ),
+
+      // ── Center links ──
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '4px' }},
+        [
+          { label: 'The Problem',      badge: null },
+          { label: 'Workflow',         badge: null },
+          { label: 'AI Agents',        badge: null },
+          { label: 'Product Features', badge: null },
+          { label: 'Business Impact',  badge: null },
+        ].map(function(item) {
+          return React.createElement('a', {
+            key: item.label, href: '#' + item.label.toLowerCase().replace(/ /g, '-').replace('the-', ''),
+            style: {
+              position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px',
+              padding: '6px 12px', borderRadius: '8px',
+              fontSize: '13.5px', fontWeight: 400, color: '#3A3830',
+              transition: 'background 0.15s, color 0.15s', textDecoration: 'none',
+            },
+            onMouseEnter: function(e) { e.currentTarget.style.background = 'rgba(0,0,0,0.05)'; },
+            onMouseLeave: function(e) { e.currentTarget.style.background = 'transparent'; },
+          },
+            item.label,
+            item.badge && React.createElement('span', { style: {
+              position: 'absolute', top: '-4px', right: '2px',
+              fontSize: '9px', fontWeight: 600, color: '#C0392B',
+              letterSpacing: '0.04em', textTransform: 'uppercase',
+            }}, item.badge)
+          );
+        })
+      ),
+
+      // ── Right: sign in + CTA ──
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' }},
+        React.createElement('a', { href: '/sign-in?redirect_url=/dashboard', style: {
+          padding: '6px 14px', borderRadius: '8px',
+          fontSize: '13.5px', fontWeight: 400, color: '#3A3830',
+          transition: 'background 0.15s', textDecoration: 'none',
+        },
+        onMouseEnter: function(e) { e.currentTarget.style.background = 'rgba(0,0,0,0.05)'; },
+        onMouseLeave: function(e) { e.currentTarget.style.background = 'transparent'; },
+        }, 'Sign in'),
+        React.createElement('a', { href: '/sign-in?redirect_url=/dashboard', style: {
+          padding: '7px 18px', borderRadius: '100px',
+          background: hovBtn ? '#333' : '#1A1A18', color: '#fff',
+          fontSize: '13.5px', fontWeight: 500,
+          transition: 'background 0.18s', textDecoration: 'none',
+        },
+        onMouseEnter: function() { setHovBtn(true); },
+        onMouseLeave: function() { setHovBtn(false); },
+        }, 'Get Started')
+      )
+    )
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// HERO  (panxo-style: split text + full-bleed image below)
+// ═══════════════════════════════════════════════════
+function Hero() {
+  var [hovPrimary, setHovPrimary] = useState(false);
+  var [hovSecondary, setHovSecondary] = useState(false);
+
+  return React.createElement('section', { style: {
+    background: W.bg, paddingTop: '96px', overflow: 'hidden', position: 'relative',
+    borderBottom: '1px dashed rgba(0,0,0,0.1)',
+  }},
+
+    // Left/right boundary lines — full hero height, same column as problem section
+    React.createElement('div', { style: {
+      position: 'absolute', inset: 0, pointerEvents: 'none',
+      display: 'flex', justifyContent: 'center',
+    }},
+      React.createElement('div', { style: {
+        width: '100%', maxWidth: '1120px', margin: '0 auto',
+        padding: '0 48px', display: 'flex',
+      }},
+        React.createElement('div', { style: {
+          flex: 1,
+          borderLeft: '1px dashed rgba(0,0,0,0.1)',
+          borderRight: '1px dashed rgba(0,0,0,0.1)',
+        }})
+      )
+    ),
+
+
+
+    // ── Top: two-column text ──
+    React.createElement('div', { style: {
+      maxWidth: '1120px', margin: '0 auto',
+      padding: '56px 88px 80px', position: 'relative', zIndex: 1,
+    }},
+      React.createElement('div', { style: {
+        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '64px',
+        alignItems: 'flex-start',
+      }},
+
+        // Left — eyebrow + headline
+        React.createElement('div', null,
+          React.createElement(Reveal, null,
+            React.createElement('p', { style: {
+              fontSize: '11.5px', fontWeight: 400, letterSpacing: '0.09em',
+              textTransform: 'uppercase', color: '#888780', marginBottom: '20px',
+            }}, 'AI-Native Sales Enablement')),
+          React.createElement(Reveal, { delay: 0.06 },
+            React.createElement('h1', { style: {
+              fontFamily: W.fontTitle,
+              fontSize: 'clamp(32px, 3.4vw, 50px)',
+              fontWeight: 500, lineHeight: 1.1,
+              letterSpacing: '-0.012em', color: '#1A1A18',
+            }}, 'Every discovery call is full of answers.')
+          )
+        ),
+
+        // Right — description starts at same top as eyebrow, no offset
+        React.createElement('div', null,
+          React.createElement(Reveal, { delay: 0.1 },
+            React.createElement('p', { style: {
+              fontSize: '15.5px', lineHeight: 1.7, color: '#5A5850',
+              fontWeight: 400, marginBottom: '28px',
+            }},
+              'FullSphere turns every discovery call into actionable intelligence helping your team prepare better, qualify faster, and follow through with confidence.')
+          ),
+          React.createElement(Reveal, { delay: 0.17 },
+            React.createElement('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }},
+              React.createElement('a', { href: '/sign-in?redirect_url=/dashboard',
+                style: {
+                  display: 'inline-flex', alignItems: 'center',
+                  padding: '10px 22px', borderRadius: '100px',
+                  background: hovPrimary ? '#333' : '#1A1A18', color: '#fff',
+                  fontSize: '13.5px', fontWeight: 500, transition: 'background 0.18s',
+                },
+                onMouseEnter: function() { setHovPrimary(true); },
+                onMouseLeave: function() { setHovPrimary(false); },
+              }, 'Get Started'),
+              React.createElement('a', { href: '#product',
+                style: {
+                  display: 'inline-flex', alignItems: 'center',
+                  padding: '10px 22px', borderRadius: '100px',
+                  border: '1px solid rgba(26,26,24,0.18)',
+                  background: hovSecondary ? 'rgba(26,26,24,0.04)' : 'transparent',
+                  fontSize: '13.5px', fontWeight: 400, color: '#1A1A18', transition: 'background 0.18s',
+                },
+                onMouseEnter: function() { setHovSecondary(true); },
+                onMouseLeave: function() { setHovSecondary(false); },
+              }, 'Explore Platform')
+            )
+          )
+        )
+      )
+    ),
+
+    // ── Bottom: gradient card aligned to boundary lines ──
+    React.createElement(Reveal, { delay: 0.32, style: { position: 'relative', zIndex: 1 }},
+      React.createElement('div', { style: { maxWidth: '1120px', margin: '0 auto', padding: '0 48px' }},
+        React.createElement('div', { style: {
+          borderRadius: '20px 20px 0 0', overflow: 'hidden',
+          backgroundImage: 'url(/fullsphere/hero-bg.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center top',
+          padding: '72px 40px 0',
+        }},
+          React.createElement('img', {
+            src: '/fullsphere/hero-screenshot.png',
+            alt: 'FullSphere Live Call',
+            style: { width: '100%', display: 'block', borderRadius: '10px 10px 0 0', boxShadow: '0 -12px 56px rgba(180,140,80,0.14)' },
+          })
+        )
+      )
+    )
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// TRANSITION / TAGLINE
+// ═══════════════════════════════════════════════════
+function TransitionSection() {
+  var [visible, setVisible] = useState(false);
+  var sectionRef = useRef(null);
+
+  useEffect(function() {
+    var observer = new IntersectionObserver(function(entries) {
+      if (entries[0].isIntersecting) { setVisible(true); observer.disconnect(); }
+    }, { threshold: 0.25 });
+    if (sectionRef.current) observer.observe(sectionRef.current);
+    return function() { observer.disconnect(); };
+  }, []);
+
+  function anim(delay) {
+    return {
+      opacity: visible ? 1 : 0,
+      transform: visible ? 'translateY(0)' : 'translateY(28px)',
+      transition: 'opacity 0.9s cubic-bezier(.16,1,.3,1) ' + delay + 's, transform 0.9s cubic-bezier(.16,1,.3,1) ' + delay + 's',
+    };
+  }
+
+  return React.createElement('section', { ref: sectionRef, style: {
+    background: W.bg, position: 'relative', overflow: 'hidden',
+    marginBottom: '0',
+  }},
+
+    // Left/right boundary lines — same column system
+    React.createElement('div', { style: {
+      position: 'absolute', inset: 0, pointerEvents: 'none',
+      display: 'flex', justifyContent: 'center',
+    }},
+      React.createElement('div', { style: {
+        width: '100%', maxWidth: '1120px', margin: '0 auto',
+        padding: '0 48px', display: 'flex',
+      }},
+        React.createElement('div', { style: {
+          flex: 1,
+          borderLeft: '1px dashed rgba(0,0,0,0.1)',
+          borderRight: '1px dashed rgba(0,0,0,0.1)',
+        }})
+      )
+    ),
+
+    // Warm radial glow in center
+    React.createElement('div', { style: {
+      position: 'absolute', inset: 0, pointerEvents: 'none',
+      background: 'radial-gradient(ellipse 65% 75% at 50% 55%, rgba(245,215,150,0.28) 0%, rgba(255,235,200,0.12) 45%, transparent 72%)',
+    }}),
+
+    // Content
+    React.createElement('div', { style: {
+      maxWidth: '1120px', margin: '0 auto',
+      padding: '180px 88px 180px',
+      textAlign: 'center', position: 'relative', zIndex: 1,
+    }},
+
+      // Eyebrow
+      React.createElement('div', { style: anim(0) },
+        React.createElement('p', { style: {
+          fontSize: '11.5px', fontWeight: 400, letterSpacing: '0.09em',
+          textTransform: 'uppercase', color: W.muted, marginBottom: '24px',
+        }}, 'Sales Intelligence, Reimagined')
+      ),
+
+      // Headline — large, light weight
+      React.createElement('div', { style: anim(0.18) },
+        React.createElement('h2', { style: {
+          fontFamily: W.fontTitle,
+          fontSize: 'clamp(32px, 4.2vw, 58px)',
+          fontWeight: 500, lineHeight: 1.1,
+          letterSpacing: '-0.02em', color: W.fg,
+          maxWidth: '680px', margin: '0 auto',
+        }}, 'FullSphere turns every sales conversation into actionable intelligence.')
+      ),
+
+      // Sub-line
+      React.createElement('div', { style: Object.assign({}, anim(0.34), { marginTop: '28px' }) },
+        React.createElement('p', { style: {
+          fontSize: '15.5px', lineHeight: 1.7, color: W.muted,
+          maxWidth: '460px', margin: '0 auto', fontWeight: 400,
+        }}, 'From the first prep brief to the final follow-up every stage covered.')
+      )
+    )
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// THREE PHASES — animated card visuals
+// ─── Pre-DC: Brief loads in item by item ───
+function PreDCVisual() {
+  var [step, setStep] = useState(0);
+  useEffect(function() {
+    var t = setInterval(function() { setStep(function(s) { return s < 4 ? s + 1 : 0; }); }, 1800);
+    return function() { clearInterval(t); };
+  }, []);
+  var rows = [
+    'Budget: $450K–$600K envelope',
+    'Need: Fragmented ops tooling',
+    'Timeline: Q3 pilot / Q1 prod',
+  ];
+  function fadeStyle(i, delay) {
+    return { opacity: step > i ? 1 : 0, transform: step > i ? 'translateY(0)' : 'translateY(8px)', transition: 'opacity 0.5s ease ' + delay + 's, transform 0.5s ease ' + delay + 's' };
+  }
+  return React.createElement('div', { style: { width: '100%', padding: '8px 20px' }},
+    React.createElement('div', { style: { border: '1px solid rgba(0,0,0,0.09)', borderRadius: '8px', background: '#fff', overflow: 'hidden', fontSize: '12px' }},
+      React.createElement('div', { style: { padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center' }},
+        React.createElement('span', { style: { fontWeight: 600, color: '#1A1A18', fontSize: '12px' }}, 'Frontera Franchise Group')),
+      rows.map(function(row, i) {
+        return React.createElement('div', { key: i, style: Object.assign({ padding: '9px 14px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '8px', color: '#3A3830' }, fadeStyle(i, 0)) },
+          React.createElement('div', { style: { width: 4, height: 4, borderRadius: '50%', background: 'rgba(0,0,0,0.2)', flexShrink: 0 }}),
+          row);
+      }),
+      React.createElement('div', { style: Object.assign({ padding: '9px 14px', display: 'flex', alignItems: 'center', gap: '6px' }, fadeStyle(2, 0.1)) },
+        React.createElement('span', { style: { width: 7, height: 7, borderRadius: '50%', background: '#16A34A' }}),
+        React.createElement('span', { style: { fontSize: '11.5px', fontWeight: 500, color: '#16A34A' }}, 'Brief ready · 3 open gaps'))
+    )
+  );
+}
+
+// ─── DC: BANT rows reveal one by one ───
+function DCVisual() {
+  var [step, setStep] = useState(0);
+  useEffect(function() {
+    var t = setInterval(function() { setStep(function(s) { return s < 4 ? s + 1 : 0; }); }, 1600);
+    return function() { clearInterval(t); };
+  }, []);
+  var rows = [
+    { k: 'Budget', v: 'Confirmed', ok: true },
+    { k: 'Authority', v: 'Partial', ok: false },
+    { k: 'Need', v: 'Confirmed', ok: true },
+    { k: 'Timeline', v: 'Confirmed', ok: true },
+  ];
+  return React.createElement('div', { style: { width: '100%', padding: '8px 20px' }},
+    React.createElement('div', { style: { border: '1px solid rgba(0,0,0,0.09)', borderRadius: '8px', background: '#fff', overflow: 'hidden', fontSize: '12px' }},
+      React.createElement('div', { style: { padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', gap: '6px' }},
+        React.createElement('span', { style: { width: 6, height: 6, borderRadius: '50%', background: '#16A34A', animation: 'livePulse 1.5s infinite' }}),
+        React.createElement('span', { style: { fontWeight: 600, fontSize: '12px', color: '#1A1A18' }}, 'BANT live'),
+        React.createElement('span', { style: { marginLeft: 'auto', fontSize: '11px', color: '#6B7280' }},
+          Math.min(step, 4) * 22 + '% coverage')),
+      rows.map(function(r, i) {
+        var show = step > i;
+        return React.createElement('div', { key: i, style: {
+          padding: '9px 14px', borderBottom: i < 3 ? '1px solid rgba(0,0,0,0.06)' : 'none',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          opacity: show ? 1 : 0, transform: show ? 'translateX(0)' : 'translateX(-10px)',
+          transition: 'opacity 0.45s ease, transform 0.45s ease',
+        }},
+          React.createElement('span', { style: { color: '#6B7280' }}, r.k),
+          React.createElement('span', { style: { fontWeight: 600, fontSize: '11.5px', color: r.ok ? '#16A34A' : '#1A1A18' }}, r.v));
+      })
+    )
+  );
+}
+
+// ─── Post-DC: tasks complete one at a time ───
+function PostDCVisual() {
+  var [done, setDone] = useState(0);
+  useEffect(function() {
+    var t = setInterval(function() { setDone(function(d) { return d < 4 ? d + 1 : 0; }); }, 1600);
+    return function() { clearInterval(t); };
+  }, []);
+  var tasks = ['Send follow-up email', 'Create Jira handoff', 'Book internal sync', 'Update CRM stage'];
+  return React.createElement('div', { style: { width: '100%', padding: '8px 20px' }},
+    React.createElement('div', { style: { border: '1px solid rgba(0,0,0,0.09)', borderRadius: '8px', background: '#fff', overflow: 'hidden', fontSize: '12px' }},
+      React.createElement('div', { style: { padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.07)', display: 'flex', justifyContent: 'space-between' }},
+        React.createElement('span', { style: { fontWeight: 600, fontSize: '12px', color: '#1A1A18' }}, 'Post-call tasks'),
+        React.createElement('span', { style: { fontSize: '11px', color: '#6B7280' }}, done + '/4 done')),
+      tasks.map(function(task, i) {
+        var isDone = i < done;
+        return React.createElement('div', { key: i, style: {
+          padding: '9px 14px', borderBottom: i < 3 ? '1px solid rgba(0,0,0,0.06)' : 'none',
+          display: 'flex', alignItems: 'center', gap: '8px',
+          transition: 'opacity 0.4s ease',
+        }},
+          React.createElement('div', { style: {
+            width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+            border: isDone ? 'none' : '1.5px solid #D1D5DB',
+            background: isDone ? '#16A34A' : 'transparent',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'background 0.3s ease, border 0.3s ease',
+          }}, isDone && React.createElement('svg', { width: 8, height: 8, viewBox: '0 0 24 24', fill: 'none', stroke: '#fff', strokeWidth: 3 },
+            React.createElement('polyline', { points: '20 6 9 17 4 12' }))),
+          React.createElement('span', { style: {
+            color: isDone ? '#9CA3AF' : '#3A3830',
+            textDecoration: isDone ? 'line-through' : 'none',
+            transition: 'color 0.3s ease, text-decoration 0.3s ease',
+          }}, task));
+      })
+    )
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// THREE PHASES
+// ═══════════════════════════════════════════════════
+function PhasesSection() {
+  var [visible, setVisible] = useState(false);
+  var sectionRef = useRef(null);
+
+  useEffect(function() {
+    var obs = new IntersectionObserver(function(e) {
+      if (e[0].isIntersecting) { setVisible(true); obs.disconnect(); }
+    }, { threshold: 0.15 });
+    if (sectionRef.current) obs.observe(sectionRef.current);
+    return function() { obs.disconnect(); };
+  }, []);
+
+  var phases = [
+    { tag: 'Pre-DC',   title: 'Walk into every call prepared.',     desc: 'Research leads, uncover insights, and surface relevant case studies before every conversation.', visual: React.createElement(PreDCVisual) },
+    { tag: 'DC',       title: 'Stay focused on the conversation.',   desc: 'Track qualification signals, uncover opportunities, and guide discovery in real time.',           visual: React.createElement(DCVisual)    },
+    { tag: 'Post-DC',  title: 'Turn conversations into action.',     desc: 'Generate summaries, create follow-ups, and keep every opportunity moving forward.',               visual: React.createElement(PostDCVisual) },
+  ];
+
+  return React.createElement('section', { id: 'product', ref: sectionRef, style: {
+    background: W.bg, position: 'relative',
+    borderTop: '1px dashed rgba(0,0,0,0.1)',
+    marginBottom: '0',
+  }},
+
+    // Boundary lines
+    React.createElement('div', { style: { position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', justifyContent: 'center' }},
+      React.createElement('div', { style: { width: '100%', maxWidth: '1120px', margin: '0 auto', padding: '0 48px', display: 'flex' }},
+        React.createElement('div', { style: { flex: 1, borderLeft: '1px dashed rgba(0,0,0,0.1)', borderRight: '1px dashed rgba(0,0,0,0.1)' }})
+      )
+    ),
+
+    React.createElement('div', { style: { maxWidth: '1120px', margin: '0 auto', padding: '0 48px', position: 'relative', zIndex: 1 }},
+
+      // Header — same 2-col as Problems
+      React.createElement('div', { style: { padding: '80px 40px 52px' }},
+        React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '64px', alignItems: 'flex-start' }},
+          React.createElement('div', null,
+            React.createElement('div', { style: {
+              opacity: visible ? 1 : 0, transform: visible ? 'none' : 'translateY(20px)',
+              transition: 'all 0.8s cubic-bezier(.16,1,.3,1)',
+            }},
+              React.createElement('p', { style: { fontSize: '11.5px', fontWeight: 400, letterSpacing: '0.09em', textTransform: 'uppercase', color: W.muted, marginBottom: '14px' }}, 'Workflow'),
+              React.createElement('h2', { style: { fontFamily: W.fontTitle, fontSize: 'clamp(28px, 3vw, 44px)', fontWeight: 500, lineHeight: 1.1, letterSpacing: '-0.015em', color: W.fg }},
+                'Support at every stage of the sales conversation.')
+            )
+          ),
+          React.createElement('div', { style: { paddingTop: '40px' }},
+            React.createElement('div', { style: {
+              opacity: visible ? 1 : 0, transform: visible ? 'none' : 'translateY(20px)',
+              transition: 'all 0.8s cubic-bezier(.16,1,.3,1) 0.15s',
+            }},
+              React.createElement('p', { style: { fontSize: '15.5px', lineHeight: 1.7, color: W.muted, fontWeight: 400 }},
+                'FullSphere helps your team stay informed, aligned, and focused on what matters most at every stage of the conversation.')
+            )
+          )
+        )
+      ),
+
+      // 3 Cards
+      React.createElement('div', { style: { padding: '0 40px 80px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }},
+        phases.map(function(p, i) {
+          return React.createElement('div', { key: i, style: {
+            borderRadius: '8px',
+            border: '1px solid rgba(0,0,0,0.08)',
+            background: W.card || '#fff',
+            overflow: 'hidden',
+            opacity: visible ? 1 : 0,
+            transform: visible ? 'translateY(0)' : 'translateY(32px)',
+            transition: 'opacity 0.8s cubic-bezier(.16,1,.3,1) ' + (0.2 + i * 0.12) + 's, transform 0.8s cubic-bezier(.16,1,.3,1) ' + (0.2 + i * 0.12) + 's',
+          }},
+            // Visual area
+            React.createElement('div', { style: {
+              height: '220px',
+              background: 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '24px',
+            }}, p.visual),
+            // Text area
+            React.createElement('div', { style: { padding: '24px 24px 28px', textAlign: 'center' }},
+              React.createElement('span', { style: {
+                display: 'inline-block', padding: '3px 12px', borderRadius: '100px',
+                background: 'rgba(196,160,53,0.1)', fontSize: '11px', fontWeight: 500,
+                color: W.amber, marginBottom: '12px', letterSpacing: '0.02em',
+              }}, p.tag),
+              React.createElement('h3', { style: { fontFamily: W.fontTitle, fontSize: '16px', fontWeight: 600, color: W.fg, lineHeight: 1.3, marginBottom: '8px' }}, p.title),
+              React.createElement('p', { style: { fontSize: '13.5px', lineHeight: 1.6, color: W.muted, margin: 0 }}, p.desc)
+            )
+          );
+        })
+      )
+    )
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// SIX AGENTS SECTION
+// ═══════════════════════════════════════════════════
+function AgentsSection() {
+  var [visible, setVisible] = useState(false);
+  var sectionRef = useRef(null);
+
+  useEffect(function() {
+    var obs = new IntersectionObserver(function(e) {
+      if (e[0].isIntersecting) { setVisible(true); obs.disconnect(); }
+    }, { threshold: 0.08 });
+    if (sectionRef.current) obs.observe(sectionRef.current);
+    return function() { obs.disconnect(); };
+  }, []);
+
+  var agents = [
+    { name: 'Research Agent',      desc: 'Surfaces account intel, public filings, tech stack signals, and ICP matches before every call.',        icon: 'M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z' },
+    { name: 'Discovery Agent',     desc: 'Generates pre-call briefs with hypothesized pains, persona profiles, and anticipated objections.',       icon: 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2' },
+    { name: 'Live Call Agent',     desc: 'Tracks conversation in real-time, routes nudges by role, and qualifies BANT signals live.',             icon: 'M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zm7 10v2a7 7 0 0 1-14 0v-2' },
+    { name: 'Qualification Agent', desc: 'Scores deal quality, detects buying signals, and flags pipeline risks automatically.',                   icon: 'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 0 0 1.946-.806 3.42 3.42 0 0 1 4.438 0 3.42 3.42 0 0 0 1.946.806 3.42 3.42 0 0 1 3.138 3.138 3.42 3.42 0 0 0 .806 1.946 3.42 3.42 0 0 1 0 4.438 3.42 3.42 0 0 0-.806 1.946 3.42 3.42 0 0 1-3.138 3.138 3.42 3.42 0 0 0-1.946.806 3.42 3.42 0 0 1-4.438 0 3.42 3.42 0 0 0-1.946-.806 3.42 3.42 0 0 1-3.138-3.138 3.42 3.42 0 0 0-.806-1.946 3.42 3.42 0 0 1 0-4.438 3.42 3.42 0 0 0 .806-1.946 3.42 3.42 0 0 1 3.138-3.138z' },
+    { name: 'Content Agent',       desc: 'Matches the right case study to the right conversation and auto-drafts new assets from gaps.',          icon: 'M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16m-2-2 1.586-1.586a2 2 0 0 1 2.828 0L20 14m-6-6h.01M6 20h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z' },
+    { name: 'Post-Call Agent',     desc: "Generates summaries, drafts follow-up emails in the AE's voice, and creates CRM tasks.",              icon: 'M3 8l7.89 5.26a2 2 0 0 0 2.22 0L21 8M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z' },
+  ];
+
+  var NAV_H  = 68;
+  var ITEM_H = 140;
+  var STACK  = 12;
+  var N      = agents.length;
+  var SECTION_H = 240 + (N - 1) * (ITEM_H - STACK) + ITEM_H + 500;
+
+  return React.createElement('section', { id: 'agents', ref: sectionRef, style: {
+    background: W.bg, position: 'relative', height: SECTION_H,
+    borderTop: '1px dashed rgba(0,0,0,0.1)',
+    borderBottom: '1px dashed rgba(0,0,0,0.1)',
+    marginBottom: '0',
+  }},
+
+    // Boundary lines
+    React.createElement('div', { style: { position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', justifyContent: 'center' }},
+      React.createElement('div', { style: { width: '100%', maxWidth: '1120px', margin: '0 auto', padding: '0 48px', display: 'flex' }},
+        React.createElement('div', { style: { flex: 1, borderLeft: '1px dashed rgba(0,0,0,0.1)', borderRight: '1px dashed rgba(0,0,0,0.1)' }})
+      )
+    ),
+
+    // Two-column layout
+    React.createElement('div', { style: {
+      maxWidth: '1120px', margin: '0 auto', padding: '0 88px',
+      display: 'grid', gridTemplateColumns: '1fr 1.1fr', gap: '80px',
+      position: 'relative', zIndex: 1,
+    }},
+
+      // ── LEFT: sticky heading ──
+      React.createElement('div', { style: { position: 'sticky', top: NAV_H + 20, alignSelf: 'flex-start', paddingTop: '80px' }},
+        React.createElement('div', { style: {
+          opacity: visible ? 1 : 0, transform: visible ? 'none' : 'translateY(20px)',
+          transition: 'all 0.8s cubic-bezier(.16,1,.3,1)',
+        }},
+          React.createElement('p', { style: { fontSize: '11.5px', fontWeight: 400, letterSpacing: '0.09em', textTransform: 'uppercase', color: W.muted, marginBottom: '14px' }}, 'AI Agents'),
+          React.createElement('h2', { style: { fontFamily: W.fontTitle, fontSize: 'clamp(28px, 3.2vw, 44px)', fontWeight: 500, lineHeight: 1.1, letterSpacing: '-0.015em', color: W.fg, marginBottom: '16px' }},
+            'Six Agents. One Sales Team.'),
+          React.createElement('p', { style: { fontSize: '15px', lineHeight: 1.65, color: W.muted }},
+            'Every specialist running in parallel — researching, qualifying, coaching, and closing the loop automatically.')
+        )
+      ),
+
+      // ── RIGHT: sticky-stacking line-style items ──
+      React.createElement('div', { style: { position: 'relative', paddingTop: '80px', minHeight: SECTION_H - 160 } },
+        agents.map(function(a, i) {
+          return React.createElement('div', { key: i, style: {
+            position: 'sticky',
+            top: NAV_H + 20 + i * STACK,
+            zIndex: i + 1,
+            height: ITEM_H,
+            background: W.bg,
+            borderTop: '1px dashed rgba(0,0,0,0.1)',
+            borderBottom: i === agents.length - 1 ? '1px dashed rgba(0,0,0,0.1)' : 'none',
+            padding: '20px 0',
+            display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+            opacity: visible ? 1 : 0,
+            transition: 'opacity 0.6s ease ' + (i * 0.08) + 's',
+          }},
+            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' }},
+              React.createElement('div', { style: {
+                width: 32, height: 32, borderRadius: '7px',
+                background: 'rgba(196,160,53,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }},
+                React.createElement('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: W.amber, strokeWidth: 1.8, strokeLinecap: 'round' },
+                  React.createElement('path', { d: a.icon }))
+              ),
+              React.createElement('span', { style: { fontSize: '14.5px', fontWeight: 600, color: W.fg } }, a.name)
+            ),
+            React.createElement('p', { style: { fontSize: '13px', lineHeight: 1.6, color: W.muted, margin: 0 } }, a.desc)
+          );
+        })
+      )
+    )
+  );
+}
+// ═══════════════════════════════════════════════════
+// FEATURE SHOWCASE (text + widget)
+// ═══════════════════════════════════════════════════
+function FeatureShowcase({ id, tag, title, desc, bullets, widget, reversed }) {
+  return React.createElement(Section, { id: id, style: { padding: '100px 24px' }},
+    React.createElement('div', { style: {
+      display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+      gap: '48px', alignItems: 'center',
+    }},
+      React.createElement(Reveal, { delay: reversed ? 0.15 : 0, style: { order: reversed ? 2 : 1 } },
+        React.createElement('div', null,
+          React.createElement('span', { style: { fontSize: '11px', fontWeight: 600, color: W.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}, tag),
+          React.createElement('h2', { style: { fontFamily: W.fontTitle, fontSize: 'clamp(24px, 3vw, 34px)', fontWeight: 700, color: W.fg, marginTop: '12px', letterSpacing: '-0.02em', lineHeight: 1.15 }}, title),
+          React.createElement('p', { style: { fontSize: '14px', lineHeight: 1.65, color: W.muted, marginTop: '16px' }}, desc),
+          bullets && React.createElement('ul', { style: { marginTop: '20px', listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px' }},
+            bullets.map(function(b, i) {
+              return React.createElement('li', { key: i, style: { display: 'flex', gap: '10px', fontSize: '13px', color: W.fg, lineHeight: 1.5 }},
+                React.createElement('span', { style: { width: '4px', height: '4px', borderRadius: '50%', background: W.amber, flexShrink: 0, marginTop: '8px' }}),
+                b);
+            }))
+        )),
+      React.createElement(Reveal, { delay: reversed ? 0 : 0.15, style: { order: reversed ? 1 : 2 } },
+        React.createElement('div', { style: {
+          borderRadius: '16px', overflow: 'hidden', padding: '3px',
+          background: 'linear-gradient(145deg, rgba(245,220,160,0.3) 0%, rgba(255,240,220,0.1) 100%)',
+        }},
+          React.createElement('div', { style: { borderRadius: '14px', overflow: 'hidden', background: '#FAF6EC', padding: '3px' }},
+            widget)))
+    )
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// PROBLEM SECTION (subtle)
+// ═══════════════════════════════════════════════════
+function ProblemSection() {
+  var problems = [
+    {
+      title: 'Longer Sales Cycles',
+      desc: 'Deals stall between stages because teams lack the data to push forward.',
+      icon: React.createElement('svg', { width: 28, height: 28, viewBox: '0 0 24 24', fill: 'none', stroke: '#1A1A18', strokeWidth: 1.8, strokeLinecap: 'round' },
+        React.createElement('circle', { cx: 12, cy: 12, r: 10 }),
+        React.createElement('polyline', { points: '12 6 12 12 16 14' })),
+    },
+    {
+      title: 'Inconsistent Prep',
+      desc: 'AEs walk into calls under-prepared. The variance kills win rate.',
+      icon: React.createElement('svg', { width: 28, height: 28, viewBox: '0 0 24 24', fill: 'none', stroke: '#1A1A18', strokeWidth: 1.8, strokeLinecap: 'round' },
+        React.createElement('path', { d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' }),
+        React.createElement('polyline', { points: '14 2 14 8 20 8' }),
+        React.createElement('line', { x1: 8, y1: 13, x2: 16, y2: 13 }),
+        React.createElement('line', { x1: 8, y1: 17, x2: 12, y2: 17 })),
+    },
+    {
+      title: 'Unaided Live Calls',
+      desc: 'No real-time intelligence. The right collateral surfaces after the call ends.',
+      icon: React.createElement('svg', { width: 28, height: 28, viewBox: '0 0 24 24', fill: 'none', stroke: '#1A1A18', strokeWidth: 1.8, strokeLinecap: 'round' },
+        React.createElement('path', { d: 'M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 11.85 19 19.45 19.45 0 0 1 5 12.15 19.79 19.79 0 0 1 2.12 4.2 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z' })),
+    },
+    {
+      title: 'Post-Call Time Tax',
+      desc: 'Follow-ups, CRM updates, and task creation are done badly or late.',
+      icon: React.createElement('svg', { width: 28, height: 28, viewBox: '0 0 24 24', fill: 'none', stroke: '#1A1A18', strokeWidth: 1.8, strokeLinecap: 'round' },
+        React.createElement('path', { d: 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z' }),
+        React.createElement('path', { d: 'M12 6v6l4 2' })),
+    },
+    {
+      title: 'Descriptive Analytics',
+      desc: "Tools tell you what happened. They don't tell you what to do next.",
+      icon: React.createElement('svg', { width: 28, height: 28, viewBox: '0 0 24 24', fill: 'none', stroke: '#1A1A18', strokeWidth: 1.8, strokeLinecap: 'round' },
+        React.createElement('line', { x1: 18, y1: 20, x2: 18, y2: 10 }),
+        React.createElement('line', { x1: 12, y1: 20, x2: 12, y2: 4 }),
+        React.createElement('line', { x1: 6, y1: 20, x2: 6, y2: 14 }),
+        React.createElement('line', { x1: 2, y1: 20, x2: 22, y2: 20 })),
+    },
+    {
+      title: 'Missing Coaching',
+      desc: "Leaders can't listen to every call. Coaching is generic when it happens.",
+      icon: React.createElement('svg', { width: 28, height: 28, viewBox: '0 0 24 24', fill: 'none', stroke: '#1A1A18', strokeWidth: 1.8, strokeLinecap: 'round' },
+        React.createElement('path', { d: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2' }),
+        React.createElement('circle', { cx: 9, cy: 7, r: 4 }),
+        React.createElement('path', { d: 'M23 21v-2a4 4 0 0 0-3-3.87' }),
+        React.createElement('path', { d: 'M16 3.13a4 4 0 0 1 0 7.75' })),
+    },
+  ];
+
+  return React.createElement('section', { id: 'problems', style: {
+    background: W.bg, padding: '0', marginTop: '0',
+    borderTop: '1px dashed rgba(0,0,0,0.1)',
+    borderBottom: '1px dashed rgba(0,0,0,0.1)',
+  }},
+    React.createElement('div', { style: { maxWidth: '1120px', margin: '0 auto', padding: '0 48px' }},
+      React.createElement('div', { style: { borderLeft: '1px dashed rgba(0,0,0,0.1)', borderRight: '1px dashed rgba(0,0,0,0.1)' }},
+
+        // Header inside frame
+        React.createElement('div', { style: { padding: '80px 40px 64px' }},
+          React.createElement(Reveal, null,
+            React.createElement('p', { style: {
+              fontSize: '11.5px', fontWeight: 400, letterSpacing: '0.09em',
+              textTransform: 'uppercase', color: W.muted, marginBottom: '14px',
+            }}, 'The Problem')),
+          React.createElement(Reveal, { delay: 0.06 },
+            React.createElement('h2', { style: {
+              fontFamily: W.fontTitle, fontSize: 'clamp(28px, 3vw, 42px)',
+              fontWeight: 500, lineHeight: 1.1, letterSpacing: '-0.015em', color: W.fg,
+            }}, 'Sales teams lose deals to broken workflows'))
+        ),
+
+        // 3x2 grid
+        React.createElement('div', { style: {
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+          borderTop: '1px dashed rgba(0,0,0,0.1)',
+        }},
+          problems.map(function(p, i) {
+            return React.createElement(Reveal, { key: i, delay: i * 0.05 },
+              React.createElement('div', { style: {
+                padding: '52px 32px 56px',
+                borderRight: (i + 1) % 3 !== 0 ? '1px dashed rgba(0,0,0,0.1)' : 'none',
+                borderBottom: '1px dashed rgba(0,0,0,0.1)',
+              }},
+                React.createElement('div', { style: { marginBottom: '20px' }}, p.icon),
+                React.createElement('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '10px' }},
+                  React.createElement('div', { style: { width: '3px', flexShrink: 0, alignSelf: 'stretch', background: W.amber, borderRadius: '2px', marginTop: '3px' }}),
+                  React.createElement('h3', { style: { fontSize: '15px', fontWeight: 600, color: W.fg, lineHeight: 1.3, margin: 0 }}, p.title)
+                ),
+                React.createElement('p', { style: { fontSize: '13.5px', lineHeight: 1.65, color: W.muted, margin: 0, paddingLeft: '13px' }}, p.desc)
+              )
+            );
+          })
+        ),
+
+        // Bottom breathing room
+        React.createElement('div', { style: { height: '80px' }})
+      )
+    )
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// METRICS
+// ═══════════════════════════════════════════════════
+function MetricsSection() {
+  var [visible, setVisible] = useState(false);
+  var sectionRef = useRef(null);
+
+  useEffect(function() {
+    var obs = new IntersectionObserver(function(e) {
+      if (e[0].isIntersecting) { setVisible(true); obs.disconnect(); }
+    }, { threshold: 0.2 });
+    if (sectionRef.current) obs.observe(sectionRef.current);
+    return function() { obs.disconnect(); };
+  }, []);
+
+  var metrics = [
+    { value: '34%', prefix: '', label: 'DC-to-Closed-Won conversion lift' },
+    { value: '28%', prefix: '', label: 'Shorter sales cycles on average' },
+    { value: '95%', prefix: '',  label: 'Pipeline accuracy, not promises' },
+  ];
+
+  return React.createElement('section', { id: 'metrics', ref: sectionRef, style: {
+    background: W.bg, position: 'relative',
+    borderBottom: '1px dashed rgba(0,0,0,0.1)',
+    marginBottom: '0',
+  }},
+
+    // Boundary lines
+    React.createElement('div', { style: { position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', justifyContent: 'center' }},
+      React.createElement('div', { style: { width: '100%', maxWidth: '1120px', margin: '0 auto', padding: '0 48px', display: 'flex' }},
+        React.createElement('div', { style: { flex: 1, borderLeft: '1px dashed rgba(0,0,0,0.1)', borderRight: '1px dashed rgba(0,0,0,0.1)' }})
+      )
+    ),
+
+    React.createElement('div', { style: { maxWidth: '1120px', margin: '0 auto', padding: '0 48px', position: 'relative', zIndex: 1 }},
+
+      // Header
+      React.createElement('div', { style: { padding: '64px 40px 48px' }},
+        React.createElement('div', { style: {
+          opacity: visible ? 1 : 0, transform: visible ? 'none' : 'translateY(20px)',
+          transition: 'all 0.8s cubic-bezier(.16,1,.3,1)',
+        }},
+          React.createElement('p', { style: { fontSize: '11.5px', fontWeight: 400, letterSpacing: '0.09em', textTransform: 'uppercase', color: W.muted, marginBottom: '14px' }}, 'Business Impact'),
+          React.createElement('h2', { style: { fontFamily: W.fontTitle, fontSize: 'clamp(28px, 3vw, 42px)', fontWeight: 500, lineHeight: 1.1, letterSpacing: '-0.015em', color: W.fg }},
+            'Measurable outcomes, not promises.')
+        )
+      ),
+
+      // Metric cards
+      React.createElement('div', { style: { padding: '0 40px 72px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }},
+        metrics.map(function(m, i) {
+          return React.createElement('div', { key: i, style: {
+            background: '#fff',
+            borderRadius: '12px',
+            border: '1px solid rgba(0,0,0,0.07)',
+            padding: '32px 28px 36px',
+            display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+            minHeight: '200px',
+            opacity: visible ? 1 : 0,
+            transform: visible ? 'translateY(0)' : 'translateY(28px)',
+            transition: 'opacity 0.8s cubic-bezier(.16,1,.3,1) ' + (0.1 + i * 0.12) + 's, transform 0.8s cubic-bezier(.16,1,.3,1) ' + (0.1 + i * 0.12) + 's',
+          }},
+            // Label top-left
+            React.createElement('p', { style: { fontSize: '13px', color: W.muted, fontWeight: 400, lineHeight: 1.4 }}, m.label),
+            // Large number bottom-left
+            React.createElement('p', { style: {
+              fontFamily: W.fontTitle,
+              fontSize: 'clamp(48px, 5.5vw, 72px)',
+              fontWeight: 400, lineHeight: 1,
+              letterSpacing: '-0.02em', color: W.fg,
+              marginTop: '24px',
+            }}, m.prefix + m.value)
+          );
+        })
+      )
+    )
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// CTA
+// ═══════════════════════════════════════════════════
+function CTASection() {
+  var [hov1, setHov1] = useState(false);
+  var [hov2, setHov2] = useState(false);
+
+  return React.createElement('section', { id: 'cta', style: {
+    background: W.bg, padding: '64px 96px 80px', position: 'relative',
+  }},
+    // Side boundary lines
+    React.createElement('div', { style: { position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', justifyContent: 'center' }},
+      React.createElement('div', { style: { width: '100%', maxWidth: '1120px', margin: '0 auto', padding: '0 48px', display: 'flex' }},
+        React.createElement('div', { style: { flex: 1, borderLeft: '1px dashed rgba(0,0,0,0.1)', borderRight: '1px dashed rgba(0,0,0,0.1)' }})
+      )
+    ),
+    React.createElement('div', { style: {
+      maxWidth: '1024px', margin: '0 auto',
+      borderRadius: '20px', overflow: 'hidden',
+      position: 'relative',
+      backgroundImage: 'url(/fullsphere/hero-bg.png)',
+      backgroundSize: 'cover', backgroundPosition: 'center',
+      padding: '100px 48px',
+      textAlign: 'center',
+    }},
+
+      // Blob shape — top left
+      React.createElement('div', { style: {
+        position: 'absolute', top: '-120px', left: '-100px',
+        width: '480px', height: '480px', borderRadius: '50%',
+        background: 'rgba(196,160,53,0.11)',
+        pointerEvents: 'none',
+      }}),
+
+      // Blob shape — bottom right (large)
+      React.createElement('div', { style: {
+        position: 'absolute', bottom: '-160px', right: '-80px',
+        width: '560px', height: '560px', borderRadius: '50%',
+        background: 'rgba(196,160,53,0.1)',
+        pointerEvents: 'none',
+      }}),
+
+      // Blob shape — center-right (medium)
+      React.createElement('div', { style: {
+        position: 'absolute', top: '40px', right: '80px',
+        width: '260px', height: '260px', borderRadius: '50%',
+        background: 'rgba(196,160,53,0.07)',
+        pointerEvents: 'none',
+      }}),
+
+      // Content
+      React.createElement('div', { style: { position: 'relative', zIndex: 1 }},
+        React.createElement(Reveal, null,
+          React.createElement('h2', { style: {
+            fontFamily: W.fontTitle,
+            fontSize: 'clamp(32px, 4vw, 54px)',
+            fontWeight: 500, lineHeight: 1.1,
+            letterSpacing: '-0.02em', color: W.fg,
+            maxWidth: '640px', margin: '0 auto 16px',
+          }}, 'Ready to close more deals?'),
+          React.createElement('p', { style: {
+            fontSize: '16px', color: 'rgba(44,40,16,0.55)',
+            maxWidth: '400px', margin: '0 auto 40px',
+            lineHeight: 1.65,
+          }}, 'Start your free trial today. No credit card required.'),
+          React.createElement('div', { style: { display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }},
+            React.createElement('a', { href: '/sign-in?redirect_url=/dashboard', style: {
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              padding: '12px 28px', borderRadius: '100px',
+              background: hov1 ? '#444' : W.fg,
+              color: '#fff', fontSize: '14px', fontWeight: 600,
+              transition: 'background 0.18s', textDecoration: 'none',
+            },
+            onMouseEnter: function() { setHov1(true); },
+            onMouseLeave: function() { setHov1(false); } },
+              'Request Demo',
+              React.createElement('svg', { width: 13, height: 13, viewBox: '0 0 24 24', fill: 'none', stroke: '#fff', strokeWidth: 2.5 },
+                React.createElement('path', { d: 'M5 12h14M12 5l7 7-7 7' }))
+            ),
+            React.createElement('a', { href: '#', style: {
+              display: 'inline-flex', alignItems: 'center',
+              padding: '12px 28px', borderRadius: '100px',
+              border: '1px solid rgba(44,40,16,0.2)',
+              background: hov2 ? 'rgba(44,40,16,0.05)' : 'transparent',
+              color: W.fg, fontSize: '14px', fontWeight: 400,
+              transition: 'background 0.18s', textDecoration: 'none',
+            },
+            onMouseEnter: function() { setHov2(true); },
+            onMouseLeave: function() { setHov2(false); } },
+              'Contact us'
+            )
+          )
+        )
+      )
+    )
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// FOOTER
+// ═══════════════════════════════════════════════════
+function Footer() {
+  var navLinks = [
+    { label: 'The Problem',      href: '#problems' },
+    { label: 'Workflow',         href: '#product'  },
+    { label: 'AI Agents',        href: '#agents'   },
+    { label: 'Product Features', href: '#features' },
+    { label: 'Business Impact',  href: '#metrics'  },
+    { label: 'Request Demo',     href: '#cta'      },
+  ];
+
+  return React.createElement('footer', { style: {
+    background: W.bg,
+  }},
+    React.createElement('div', { style: { maxWidth: '1120px', margin: '0 auto', padding: '0 48px' }},
+      React.createElement('div', { style: {
+        borderLeft: '1px dashed rgba(0,0,0,0.1)',
+        borderRight: '1px dashed rgba(0,0,0,0.1)',
+      }},
+
+        // Main footer row
+        React.createElement('div', { style: {
+          padding: '64px 40px 48px',
+          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '80px',
+          borderBottom: '1px dashed rgba(0,0,0,0.1)',
+        }},
+
+          // Left: logo + tagline
+          React.createElement('div', null,
+            React.createElement('a', { href: '#', style: {
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              textDecoration: 'none', marginBottom: '16px',
+            }},
+              React.createElement('img', { src: '/fullsphere/logo.png', alt: 'FullSphere', style: {
+                width: '30px', height: '30px', objectFit: 'contain',
+                filter: 'brightness(0) sepia(1) saturate(12) hue-rotate(-15deg) brightness(1.5)',
+              }}),
+              React.createElement('span', { style: { fontFamily: W.fontTitle, fontSize: '17px', fontWeight: 600, color: W.fg, letterSpacing: '-0.01em' }}, 'FullSphere')
+            ),
+            React.createElement('p', { style: { fontSize: '13.5px', color: W.muted, lineHeight: 1.65, maxWidth: '300px', fontWeight: 400 }},
+              'AI-native sales enablement for teams that take discovery calls seriously.')
+          ),
+
+          // Right: navigation links
+          React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 48px' }},
+            navLinks.map(function(link) {
+              return React.createElement('a', { key: link.label, href: link.href, style: {
+                fontSize: '13.5px', fontWeight: 400, color: W.muted,
+                textDecoration: 'none', transition: 'color 0.18s',
+                display: 'block', paddingTop: '4px',
+              },
+              onMouseEnter: function(e) { e.currentTarget.style.color = W.fg; },
+              onMouseLeave: function(e) { e.currentTarget.style.color = W.muted; }
+              }, link.label);
+            })
+          )
+        ),
+
+        // Bottom bar
+        React.createElement('div', { style: {
+          padding: '20px 40px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px',
+        }},
+          React.createElement('p', { style: { fontSize: '12px', color: W.muted, fontWeight: 400 }},
+            '© 2026 FullSphere. All rights reserved.'),
+          React.createElement('div', { style: { display: 'flex', gap: '20px' }},
+            ['Privacy', 'Terms'].map(function(l) {
+              return React.createElement('a', { key: l, href: '#', style: {
+                fontSize: '12px', color: W.muted, textDecoration: 'none', transition: 'color 0.18s',
+              },
+              onMouseEnter: function(e) { e.currentTarget.style.color = W.fg; },
+              onMouseLeave: function(e) { e.currentTarget.style.color = W.muted; }
+              }, l);
+            }))
+        )
+      )
+    )
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// STICKY FEATURE STACK
+// ═══════════════════════════════════════════════════
+function StickyFeaturesSection() {
+  var features = [
+    {
+      id: 'live-call', tag: 'Live Call Cockpit',
+      title: 'Real-time intelligence, mid-conversation',
+      desc: 'Your AE sees what they need exactly when they need it — live BANT tracking, signal detection, and role-routed nudges without breaking flow.',
+      bullets: ['Live transcript with keyword highlighting', 'BANT qualification updated in real-time', 'Role-routed nudges for each pod member', 'Sentiment analysis and signal detection'],
+      widget: function() { return React.createElement(LiveCallCockpitWidget); },
+    },
+    {
+      id: 'pre-dc', tag: 'Pre-DC Briefing',
+      title: 'Every call starts with context, not scrambling',
+      desc: 'AI-generated briefs pulling from CRM data, public filings, past interactions, and your knowledge base.',
+      bullets: ['Account snapshots with ICP scoring', 'Persona profiles from public data + history', 'Hypothesized pains with confidence levels', 'Pod-specific preparation notes'],
+      widget: function() { return React.createElement(PreDCBriefingWidget); },
+    },
+    {
+      id: 'post-dc', tag: 'Post-DC Review',
+      title: 'Post-call admin? Handled.',
+      desc: "Within 45 seconds of the call ending — summary generated, follow-up drafted in the AE's voice, CRM tasks created, pod scored.",
+      bullets: ["AI-written follow-ups in the AE's voice", 'CRM tasks auto-created and assigned', 'Pod scorecards with transcript evidence', 'Platform updates its own assumptions openly'],
+      widget: function() { return React.createElement(PostDCReviewWidget); },
+    },
+    {
+      id: 'coaching', tag: 'Coaching & Analytics',
+      title: 'Coaching backed by evidence, not hunch',
+      desc: 'Leadership sees which reps need coaching, on what specific skill, with the exact transcript moments that prove it.',
+      bullets: ['Individual scorecards with transcript proof', 'Pattern detection across hundreds of calls', 'AE-facing transparency before 1:1 meetings', 'Win-loss analysis that surfaces surprises'],
+      widget: function() { return React.createElement(CoachingWidget); },
+    },
+    {
+      id: 'knowledge', tag: 'Knowledge Base',
+      title: "Content that works stays. Content that doesn't gets cut.",
+      desc: 'Every asset tracked for usage and effectiveness. The platform auto-drafts new content when it detects gaps.',
+      bullets: ['Usage tracking across every call', 'AI-drafted assets from real conversation gaps', 'Automatic deprecation for stale content', 'Effectiveness scoring by persona and vertical'],
+      widget: function() { return React.createElement(KnowledgeBaseWidget); },
+    },
+  ];
+
+  var NAV_H = 68;   // nav height + buffer
+  var CARD_H = 540; // each card height
+  var STACK = 16;   // offset between stacked cards
+  // Container height: intro + (N-1)*(CARD_H - STACK) + CARD_H + extra
+  var CONTAINER_H = 200 + (features.length - 1) * (CARD_H - STACK) + CARD_H + 700;
+
+  return React.createElement('section', { id: 'features', style: {
+    background: W.bg, position: 'relative',
+    borderTop: '1px dashed rgba(0,0,0,0.1)',
+    borderBottom: '1px dashed rgba(0,0,0,0.1)',
+    marginBottom: '0',
+  }},
+
+    // Boundary lines — same column system
+    React.createElement('div', { style: { position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', justifyContent: 'center' }},
+      React.createElement('div', { style: { width: '100%', maxWidth: '1120px', margin: '0 auto', padding: '0 48px', display: 'flex' }},
+        React.createElement('div', { style: { flex: 1, borderLeft: '1px dashed rgba(0,0,0,0.1)', borderRight: '1px dashed rgba(0,0,0,0.1)' }})
+      )
+    ),
+
+    // Regular (non-sticky) intro — scrolls normally
+    React.createElement('div', { style: { textAlign: 'center', padding: '72px 48px 56px' }},
+      React.createElement(Reveal, null,
+        React.createElement('p', { style: { fontSize: '11.5px', fontWeight: 400, letterSpacing: '0.09em', textTransform: 'uppercase', color: W.muted, marginBottom: '14px' }}, 'Product Features')),
+      React.createElement(Reveal, { delay: 0.1 },
+        React.createElement('h2', { style: { fontFamily: W.fontTitle, fontSize: 'clamp(28px, 3.2vw, 46px)', fontWeight: 500, lineHeight: 1.1, letterSpacing: '-0.015em', color: W.fg, maxWidth: '640px', margin: '0 auto' }},
+          'Real intelligence at every stage of the conversation.'))
+    ),
+
+    // Single tall container — all cards sticky inside
+    React.createElement('div', { style: {
+      position: 'relative', height: CONTAINER_H,
+      maxWidth: '1120px', margin: '0 auto', padding: '0 40px',
+    }},
+      features.map(function(f, i) {
+        return React.createElement('div', { key: f.id, style: {
+          position: 'sticky',
+          top: NAV_H + i * STACK,
+          zIndex: i + 1,
+          height: CARD_H,
+          display: 'grid',
+          gridTemplateColumns: '1fr 1.5fr',
+          background: '#fff',
+          borderRadius: '14px',
+          border: '1px solid rgba(0,0,0,0.08)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+          overflow: 'hidden',
+          marginBottom: '0',
+        }},
+          // Left info
+          React.createElement('div', { style: {
+            padding: '44px 36px',
+            display: 'flex', flexDirection: 'column', justifyContent: 'center',
+            borderRight: '1px solid rgba(0,0,0,0.07)',
+          }},
+            React.createElement('span', { style: {
+              display: 'inline-block', padding: '3px 12px', borderRadius: '100px',
+              background: 'rgba(196,160,53,0.1)', fontSize: '11px', fontWeight: 500,
+              color: W.amber, marginBottom: '18px', letterSpacing: '0.02em',
+            }}, f.tag),
+            React.createElement('h3', { style: {
+              fontFamily: W.fontTitle, fontSize: 'clamp(20px, 2vw, 26px)',
+              fontWeight: 500, lineHeight: 1.2, letterSpacing: '-0.01em',
+              color: W.fg, marginBottom: '12px',
+            }}, f.title),
+            React.createElement('p', { style: { fontSize: '13.5px', lineHeight: 1.7, color: W.muted, marginBottom: '20px' }}, f.desc),
+            React.createElement('ul', { style: { listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }},
+              f.bullets.map(function(b, j) {
+                return React.createElement('li', { key: j, style: { display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12.5px', color: W.fg, lineHeight: 1.5 }},
+                  React.createElement('span', { style: { width: 4, height: 4, borderRadius: '50%', background: W.amber, flexShrink: 0, marginTop: '7px' }}),
+                  b);
+              })
+            )
+          ),
+          // Right widget
+          React.createElement('div', { style: {
+            background: '#FAF8F2', overflow: 'hidden',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '12px',
+          }}, f.widget())
+        );
+      })
+    ),
+
+    React.createElement('div', { style: { height: '80px' }})
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// HERO LIVE MOCKUP — screenshot + animated overlays
+// ═══════════════════════════════════════════════════
+function HeroLiveMockup() {
+  var [recSec, setRecSec] = useState(4);
+  var [msgIdx, setMsgIdx] = useState(0);
+  var [msgVisible, setMsgVisible] = useState(true);
+  var [insightIdx, setInsightIdx] = useState(0);
+  var [insightVisible, setInsightVisible] = useState(false);
+
+  var messages = [
+    'We need board approval on budget before Q3 pilot kickoff.',
+    'For budget we carved four fifty to six hundred thousand for year one.',
+    "That's exactly what we needed. We are excited to move forward.",
+    'Timeline is Q3 pilot, Q1 production. Pending board sign-off next month.',
+  ];
+
+  var insights = [
+    { type: 'SIGNAL', text: 'Budget signal: $450K–$600K envelope confirmed by prospect', color: '#16A34A' },
+    { type: 'ALERT',  text: 'Authority gap: CFO not yet in the room — budget needs sign-off', color: '#D97706' },
+    { type: 'SIGNAL', text: 'Timeline signal: Q3 pilot / Q1 production — board meeting May', color: '#16A34A' },
+  ];
+
+  useEffect(function() {
+    // REC counter
+    var recTimer = setInterval(function() { setRecSec(function(s) { return s + 1; }); }, 1000);
+
+    // Messages cycling
+    var msgTimer = setInterval(function() {
+      setMsgVisible(false);
+      setTimeout(function() {
+        setMsgIdx(function(i) { return (i + 1) % messages.length; });
+        setMsgVisible(true);
+      }, 400);
+    }, 2800);
+
+    // Insights appearing
+    setTimeout(function() { setInsightVisible(true); }, 1200);
+    var insightTimer = setInterval(function() {
+      setInsightVisible(false);
+      setTimeout(function() {
+        setInsightIdx(function(i) { return (i + 1) % insights.length; });
+        setInsightVisible(true);
+      }, 500);
+    }, 3500);
+
+    return function() { clearInterval(recTimer); clearInterval(msgTimer); clearInterval(insightTimer); };
+  }, []);
+
+  function formatRec(s) {
+    var m = Math.floor(s / 60);
+    var sec = s % 60;
+    return m + ':' + (sec < 10 ? '0' : '') + sec;
+  }
+
+  var insight = insights[insightIdx];
+
+  return React.createElement('div', { style: {
+    position: 'relative',
+    borderRadius: '10px 10px 0 0',
+    overflow: 'hidden',
+    fontFamily: "'Inter', system-ui, sans-serif",
+  }},
+
+    // Base screenshot
+    React.createElement('img', { src: '/fullsphere/hero-screenshot.png', alt: 'FullSphere Live Call', style: { width: '100%', display: 'block' } }),
+
+    // ── REC counter overlay ──
+    React.createElement('div', { style: {
+      position: 'absolute', top: '7.2%', left: '22.2%',
+      display: 'flex', alignItems: 'center', gap: '4px',
+      fontSize: '1.1vw', fontWeight: 600, color: '#DC2626',
+      pointerEvents: 'none',
+    }},
+      React.createElement('span', { style: { width: '0.55vw', height: '0.55vw', borderRadius: '50%', background: '#DC2626', animation: 'livePulse 1.5s infinite', flexShrink: 0 }}),
+      'REC ', formatRec(recSec)
+    ),
+
+    // ── New message slide-in at bottom of transcript ──
+    React.createElement('div', { style: {
+      position: 'absolute',
+      top: '76%', left: '6.7%', width: '23.5%',
+      background: 'rgba(255,255,255,0.97)',
+      borderRadius: '6px',
+      padding: '1% 1.2%',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
+      opacity: msgVisible ? 1 : 0,
+      transform: msgVisible ? 'translateY(0)' : 'translateY(8px)',
+      transition: 'opacity 0.35s ease, transform 0.35s ease',
+      pointerEvents: 'none',
+    }},
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '0.5vw', marginBottom: '0.4%' }},
+        React.createElement('div', { style: { width: '1.4vw', height: '1.4vw', borderRadius: '50%', background: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }},
+          React.createElement('span', { style: { fontSize: '0.55vw', fontWeight: 700, color: '#fff' }}, 'P')),
+        React.createElement('span', { style: { fontSize: '0.75vw', fontWeight: 600, color: '#1F2328' }}, 'prospect'),
+        React.createElement('span', { style: { fontSize: '0.65vw', color: '#6B7280', marginLeft: '0.3vw' }}, formatRec(recSec))
+      ),
+      React.createElement('p', { style: { fontSize: '0.75vw', lineHeight: 1.45, color: '#374151', margin: 0, paddingLeft: '1.9vw' }}, messages[msgIdx])
+    ),
+
+    // ── Live insight appearing in copilot ──
+    React.createElement('div', { style: {
+      position: 'absolute',
+      top: '36%', left: '56%', width: '40%',
+      background: 'rgba(255,255,255,0.97)',
+      borderRadius: '6px',
+      padding: '1% 1.2%',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.1)',
+      display: 'flex', alignItems: 'flex-start', gap: '0.5vw',
+      opacity: insightVisible ? 1 : 0,
+      transform: insightVisible ? 'translateX(0)' : 'translateX(12px)',
+      transition: 'opacity 0.45s ease, transform 0.45s ease',
+      pointerEvents: 'none',
+    }},
+      React.createElement('span', { style: {
+        padding: '0.1% 0.5%', borderRadius: '3px', fontSize: '0.6vw',
+        fontWeight: 700, background: insight.color + '18', color: insight.color,
+        flexShrink: 0, textTransform: 'uppercase', marginTop: '0.1vw',
+        letterSpacing: '0.04em',
+      }}, insight.type),
+      React.createElement('span', { style: { fontSize: '0.7vw', lineHeight: 1.45, color: '#374151' }}, insight.text)
+    )
+  );
+}
+
+// Export
+Object.assign(window, {
+  Nav, Hero, TransitionSection, PhasesSection, AgentsSection,
+  FeatureShowcase, ProblemSection, MetricsSection, CTASection, Footer, Reveal,
+  StickyFeaturesSection, HeroLiveMockup,
+});
+
+})();
+  </script>
+
+  <!-- Module 5: App entry -->
+  <script type="text/babel" data-module="fs-app">
+(function(){
+/* FullSphere — Main App (warm aesthetic) */
+
+var TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "ctaText": "Request Demo"
+}/*EDITMODE-END*/;
+
+function FullSphereApp() {
+  var t_result = useTweaks(TWEAK_DEFAULTS);
+  var t = t_result[0];
+  var setTweak = t_result[1];
+
+  var features = [
+    {
+      id: 'live-call',
+      tag: 'Live Call Cockpit',
+      title: 'Real-time intelligence, mid-conversation',
+      desc: 'Your AE sees what they need exactly when they need it. The live cockpit tracks the conversation, surfaces relevant content, and routes role-specific nudges — without breaking flow.',
+      bullets: [
+        'Live transcript with keyword highlighting and sentiment emoji',
+        'BANT qualification tracking updated in real-time',
+        'Role-routed nudges that respect each pod member',
+        'Sentiment analysis and signal detection',
+      ],
+      widget: React.createElement(LiveCallCockpitWidget),
+    },
+    {
+      id: 'pre-dc',
+      tag: 'Pre-DC Briefing',
+      title: 'Every call starts with context, not scrambling',
+      desc: 'AI-generated briefs that pull from CRM data, public filings, past interactions, and your knowledge base. Confidence scores on every pain hypothesis.',
+      bullets: [
+        'Account snapshots with ICP scoring',
+        'Persona profiles from public data + call history',
+        'Hypothesized pains with confidence levels',
+        'Pod-specific preparation notes',
+      ],
+      widget: React.createElement(PreDCBriefingWidget),
+      reversed: true,
+    },
+    {
+      id: 'post-dc',
+      tag: 'Post-DC Review',
+      title: 'Post-call admin? Handled.',
+      desc: 'Within 45 seconds of the call ending, the platform generates a summary, drafts a follow-up email in the AE\'s voice, creates CRM tasks, and scores the pod.',
+      bullets: [
+        'AI-written follow-up emails in your voice',
+        'CRM tasks auto-created and assigned',
+        'Pod scorecards with transcript evidence',
+        'The platform openly updates its own assumptions',
+      ],
+      widget: React.createElement(PostDCReviewWidget),
+    },
+    {
+      id: 'coaching',
+      tag: 'Coaching & Analytics',
+      title: 'Coaching backed by evidence, not hunch',
+      desc: 'Leadership sees which reps need coaching, on what specific skill, with the exact transcript moments that prove it.',
+      bullets: [
+        'Individual scorecards with transcript proof',
+        'Pattern detection across hundreds of calls',
+        'AE-facing transparency before 1:1 meetings',
+        'Win-loss analysis that surfaces surprises',
+      ],
+      widget: React.createElement(CoachingWidget),
+      reversed: true,
+    },
+    {
+      id: 'knowledge',
+      tag: 'Knowledge Base',
+      title: 'Content that works stays. Content that doesn\'t gets cut.',
+      desc: 'Every asset is tracked for usage and effectiveness. The platform auto-drafts new content when it detects gaps.',
+      bullets: [
+        'Usage tracking across every call',
+        'AI-drafted assets from real conversation gaps',
+        'Automatic deprecation for stale content',
+        'Effectiveness scoring by persona and vertical',
+      ],
+      widget: React.createElement(KnowledgeBaseWidget),
+    },
+  ];
+
+  return React.createElement('div', { style: { minHeight: '100vh' } },
+    React.createElement(Nav),
+    React.createElement(Hero),
+    React.createElement(ProblemSection),
+    React.createElement(TransitionSection),
+    React.createElement(PhasesSection),
+    React.createElement(AgentsSection),
+
+    // Feature deep-dives — sticky stack
+    React.createElement(StickyFeaturesSection),
+
+    React.createElement(MetricsSection),
+    React.createElement(CTASection),
+    React.createElement(Footer),
+
+    // Tweaks
+    React.createElement(TweaksPanel, null,
+      React.createElement(TweakSection, { label: 'Copy' }),
+      React.createElement(TweakRadio, {
+        label: 'CTA text',
+        value: t.ctaText,
+        options: ['Request Demo', 'Try it Free', 'Get Early Access'],
+        onChange: function(v) { setTweak('ctaText', v); },
+      })
+    )
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  React.createElement(FullSphereApp)
+);
+
+})();
+  </script>
+</body>
+</html>

@@ -63,8 +63,8 @@ export function getInternalApiSecret(): string {
 export const clerkUrls = {
   signIn: clean(process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL) || "/sign-in",
   signUp: clean(process.env.NEXT_PUBLIC_CLERK_SIGN_UP_URL) || "/sign-up",
-  afterSignIn: clean(process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL) || "/",
-  afterSignUp: clean(process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL) || "/",
+  afterSignIn: clean(process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL) || "/dashboard",
+  afterSignUp: clean(process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL) || "/dashboard",
 } as const;
 
 export function getPublicAppUrl(): string {

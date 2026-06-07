@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Sign up" };
 export const dynamic = "force-dynamic";
 
 export default function SignUpPage() {
-  if (isLocalAuthBypassEnabled()) redirect("/");
+  if (isLocalAuthBypassEnabled()) redirect("/dashboard");
 
   if (!isClerkConfigured()) {
     return (
@@ -24,7 +24,7 @@ export default function SignUpPage() {
 
   return (
     <AuthFormPanel title="Create your account" description="Join your team on the DC platform.">
-      <SignUp appearance={clerkAppearance} />
+      <SignUp appearance={clerkAppearance} fallbackRedirectUrl="/dashboard" />
     </AuthFormPanel>
   );
 }

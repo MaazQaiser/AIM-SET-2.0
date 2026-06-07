@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Sign in" };
 export const dynamic = "force-dynamic";
 
 export default function SignInPage() {
-  if (isLocalAuthBypassEnabled()) redirect("/");
+  if (isLocalAuthBypassEnabled()) redirect("/dashboard");
 
   if (!isClerkConfigured()) {
     return (
@@ -27,7 +27,7 @@ export default function SignInPage() {
 
   return (
     <AuthFormPanel title="Welcome back" description="Sign in to continue to your workspace.">
-      <SignIn appearance={clerkAppearance} />
+      <SignIn appearance={clerkAppearance} fallbackRedirectUrl="/dashboard" />
     </AuthFormPanel>
   );
 }
