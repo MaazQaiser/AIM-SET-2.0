@@ -105,6 +105,40 @@ def _fuzzy_pain_match(text: str, pain_text: str) -> float:
     return SequenceMatcher(None, lower, p).ratio()
 
 
+def _pain_text_key(text: str) -> str:
+    cleaned = re.sub(r"\s+", " ", (text or "").lower().strip())
+    return cleaned[:80]
+
+
+def _summarize_pain_quote(text: str, max_len: int = 100) -> str:
+    t = (text or "").strip()
+    t = re.sub(r"^(honestly|yeah|so|well|look),?\s*", "", t, flags=re.I)
+    parts = re.split(r"\s*[—–-]\s+", t, maxsplit=1)
+    if len(parts) > 1 and len(parts[1].strip()) >= 20:
+        t = parts[1].strip()
+    if len(t) <= max_len:
+        return t
+    clipped = t[: max_len - 1]
+    last_space = clipped.rfind(" ")
+    if last_space > 40:
+        clipped = clipped[:last_space]
+    return f"{clipped.rstrip()}…"
+
+
+def _pain_already_detected(session: LiveCallSession, text: str) -> bool:
+    key = _pain_text_key(text)
+    for existing in session.detected_pains:
+        existing_text = existing.get("text") or ""
+        existing_evidence = existing.get("evidence") or ""
+        if _pain_text_key(existing_text) == key:
+            return True
+        if _fuzzy_pain_match(text, existing_text) >= 0.82:
+            return True
+        if existing_evidence and _fuzzy_pain_match(text, existing_evidence) >= 0.82:
+            return True
+    return False
+
+
 def _detect_pains(
     text: str,
     session: LiveCallSession,
@@ -112,11 +146,10 @@ def _detect_pains(
     timestamp: float,
 ) -> List[Dict[str, Any]]:
     new_pains: List[Dict[str, Any]] = []
-    existing_texts = {p.get("text", "").lower() for p in session.detected_pains}
 
     for pain in session.brief_context.pains:
         pain_text = pain.get("text") or ""
-        if pain_text.lower() in existing_texts:
+        if _pain_already_detected(session, pain_text):
             continue
         if _fuzzy_pain_match(text, pain_text) >= 0.72:
             entry = {
@@ -129,24 +162,21 @@ def _detect_pains(
             }
             session.detected_pains.append(entry)
             new_pains.append(entry)
-            existing_texts.add(pain_text.lower())
 
     for pattern in _PAIN_EMERGENT_PATTERNS:
         if re.search(pattern, text, re.IGNORECASE):
-            snippet = text[:120]
-            key = f"emergent:{snippet[:40]}"
-            if key not in existing_texts:
-                entry = {
-                    "id": str(uuid.uuid4()),
-                    "text": snippet,
-                    "source": "emergent",
-                    "confidence": 0.65,
-                    "timestamp": timestamp,
-                    "evidence": text[:200],
-                }
-                session.detected_pains.append(entry)
-                new_pains.append(entry)
-                existing_texts.add(key)
+            if _pain_already_detected(session, text):
+                break
+            entry = {
+                "id": str(uuid.uuid4()),
+                "text": _summarize_pain_quote(text),
+                "source": "emergent",
+                "confidence": 0.65,
+                "timestamp": timestamp,
+                "evidence": text[:200],
+            }
+            session.detected_pains.append(entry)
+            new_pains.append(entry)
             break
 
     return new_pains

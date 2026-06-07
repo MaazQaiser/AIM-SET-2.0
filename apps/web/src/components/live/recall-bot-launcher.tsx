@@ -2,11 +2,12 @@
 
 import { Button } from "@dc-copilot/ui/components/button";
 import { Input } from "@dc-copilot/ui/components/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@dc-copilot/ui/components/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLiveCall } from "@/stores/use-live-call";
 import type { TranscriptEvent } from "@/types";
-import { AlertCircle, Bot, CheckCircle2, Send } from "lucide-react";
+import { AlertCircle, CheckCircle2, Send } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/cn";
 
 interface RecallBotLauncherProps {
   callId: string;
@@ -39,7 +40,6 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
 
   async function doLaunch(meetingUrlValue: string) {
     if (!meetingUrlValue || loading || status === "ready") return;
-    // Prevent duplicate launches for the same URL
     if (launchedUrlRef.current === meetingUrlValue) return;
 
     setLoading(true);
@@ -63,7 +63,6 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
       launchedUrlRef.current = meetingUrlValue;
       setStatus("ready");
       setMessage(body.botId ? `Bot invited: ${body.botId}` : "Bot invited");
-      // Start polling Recall API as fallback for unreliable webhooks
       startPolling();
     } catch (err) {
       setStatus("error");
@@ -109,7 +108,6 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
               keywords?: string[];
             }>;
           };
-          // Directly push new transcript events into the store
           for (const ev of data.events ?? []) {
             const mapped: TranscriptEvent = {
               id: ev.id ?? crypto.randomUUID(),
@@ -144,45 +142,47 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
     const pasted = e.clipboardData.getData("text").trim();
     if (pasted && /^https?:\/\/.+/.test(pasted)) {
       setValue(pasted);
-      // Auto-launch after paste
       setTimeout(() => void doLaunch(pasted), 0);
     }
   }
 
   return (
     <form className="flex min-w-0 items-center gap-2" onSubmit={(event) => void launchBot(event)}>
-      <Bot className="hidden h-4 w-4 shrink-0 text-muted-foreground sm:block" aria-hidden="true" />
-      <Input
-        aria-label="Meeting URL"
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        onPaste={handlePaste}
-        placeholder="Meeting URL"
-        className="h-7 w-[180px] min-w-0 text-xs sm:w-[260px] lg:w-[320px]"
-        disabled={loading || status === "ready"}
-      />
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            type="submit"
-            variant="outline"
-            size="icon-sm"
-            className="h-7 w-7"
-            loading={loading}
-            disabled={loading || status === "ready"}
-            aria-label="Start Recall bot"
-          >
-            {!loading && <Send className="h-3.5 w-3.5" />}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Start Recall bot</TooltipContent>
-      </Tooltip>
+      <div className="relative shrink-0">
+        <Input
+          aria-label="Meeting URL"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          onPaste={handlePaste}
+          placeholder="Meeting URL"
+          className="h-8 w-[132px] min-w-0 rounded-lg pr-9 text-xs sm:w-[168px]"
+          disabled={loading || status === "ready"}
+        />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="submit"
+              size="icon-sm"
+              className={cn(
+                "absolute right-0.5 top-1/2 h-6 w-6 -translate-y-1/2 rounded-md",
+                "bg-foreground text-background hover:bg-foreground/90"
+              )}
+              loading={loading}
+              disabled={loading || status === "ready"}
+              aria-label="Join meeting with Recall bot"
+            >
+              {!loading && <Send className="h-3 w-3" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Join with Recall bot</TooltipContent>
+        </Tooltip>
+      </div>
       {status !== "idle" && message && (
         <span
           className={
             status === "ready"
-              ? "flex max-w-[220px] items-center gap-1 truncate text-xs text-emerald-600"
-              : "flex max-w-[280px] items-center gap-1 truncate text-xs text-destructive"
+              ? "flex max-w-[160px] items-center gap-1 truncate text-xs text-emerald-600"
+              : "flex max-w-[180px] items-center gap-1 truncate text-xs text-destructive"
           }
           title={message}
         >

@@ -5,6 +5,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ParticipantAvatar } from "@/components/participant-avatar";
 import { cn } from "@/lib/cn";
 import { KeywordHighlight } from "@/components/live/keyword-highlight";
+import { liveColumnHorizontalPadding } from "@/components/live/live-column-header";
 import type { TranscriptEvent } from "@/types";
 
 const sentimentColor: Record<string, string> = {
@@ -104,8 +105,8 @@ export const TranscriptViewer = memo(function TranscriptViewer({
               <button
                 type="button"
                 className={cn(
-                  "group w-full text-left py-3 border-l-2 hover:bg-muted/50 transition-colors",
-                  isLive ? "px-6" : "px-4",
+                  "group w-full text-left border-l-2 hover:bg-muted/50 transition-colors",
+                  isLive ? cn(liveColumnHorizontalPadding, "py-4") : "px-4 py-3",
                   event.sentiment ? sentimentColor[event.sentiment] : "border-l-border",
                   onEventClick && "cursor-pointer"
                 )}

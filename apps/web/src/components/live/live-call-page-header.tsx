@@ -66,7 +66,7 @@ export function LiveCallPageHeader({
         ? "Cooling"
         : "Neutral";
   return (
-    <header className="sticky top-0 z-30 shrink-0 border-b border-border/50 bg-background/75 px-6 py-4 backdrop-blur-md sm:px-8">
+    <header className="z-30 shrink-0 border-b border-border/50 bg-background/75 px-6 py-3 backdrop-blur-md sm:px-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <Button
@@ -82,13 +82,11 @@ export function LiveCallPageHeader({
           </Button>
 
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="type-headline truncate text-foreground">{accountName}</h1>
+            <h1 className="type-headline truncate text-foreground">{accountName}</h1>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 type-body-sm">
               <Badge variant="live" className="shrink-0 text-xs">
                 Live
               </Badge>
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 type-body-sm text-muted-foreground">
               {leadName && (
                 <span className="inline-flex items-center gap-1.5 font-semibold text-foreground/90">
                   <ParticipantAvatar name={leadName} kind="external" size="xs" />
@@ -126,6 +124,7 @@ export function LiveCallPageHeader({
             accountName={accountName}
             hasReview={hasReview}
             showLiveLink={false}
+            showCreateDeck={false}
             variant="compact"
           />
         </div>

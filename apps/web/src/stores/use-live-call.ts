@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { filterKeywordStats } from "@/lib/live/keyword-filter";
+import { dedupePainSignals } from "@/lib/live/pain-display";
 import type {
   TranscriptEvent,
   NudgePayload,
@@ -272,10 +273,13 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
 
   applyIntentUpdate: (payload) => {
     const focusAreas = Array.from(new Set(payload.focus_areas ?? []));
+    const mergedPains = dedupePainSignals(
+      uniqueBy(payload.pains ?? [], (pain) => pain.id)
+    );
     const intentSnapshot: IntentSnapshot = {
       ...payload,
       focus_areas: focusAreas,
-      pains: uniqueBy(payload.pains ?? [], (pain) => pain.id),
+      pains: mergedPains,
       next_actions: payload.next_actions ?? [],
     };
     set({

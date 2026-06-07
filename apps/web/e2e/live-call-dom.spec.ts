@@ -238,7 +238,10 @@ test.describe("Live call cockpit — DOM + API", () => {
 
     const bantLiveSection = page.getByTestId("bant-live-section");
     await expect(bantLiveSection).toContainText(/Authority/i, { timeout: 25_000 });
+    await bantLiveSection.getByTestId("bant-see-details").click();
     await expect(bantLiveSection).toContainText(/board/i, { timeout: 25_000 });
+    await bantLiveSection.getByTestId("bant-hide-details").click();
+    await expect(bantLiveSection.getByTestId("bant-signals-section")).toHaveCount(0);
     await expect(bantLiveSection).not.toContainText(/AI-native platform to/i);
   });
 
@@ -266,6 +269,7 @@ test.describe("Live call cockpit — DOM + API", () => {
 
     const bantLiveSection = page.getByTestId("bant-live-section");
     await expect(bantLiveSection).toContainText(/Timeline/i, { timeout: 25_000 });
+    await bantLiveSection.getByTestId("bant-see-details").click();
     await expect(bantLiveSection).toContainText(/project ETA is six weeks from kickoff/i, {
       timeout: 25_000,
     });

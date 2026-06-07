@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { SignalLog } from "@/components/live/signal-log";
 import { SuggestionLog } from "@/components/live/suggestion-log";
 import { buildLiveKeywordEntries } from "@/lib/live/keyword-filter";
@@ -22,7 +23,8 @@ import type {
   TranscriptEvent,
 } from "@/types";
 import { LiveCollapsibleSection } from "@/components/live/live-collapsible-section";
-import { LiveSubsectionHeader } from "@/components/live/live-column-header";
+import { LiveSentimentLineChart } from "@/components/live/live-sentiment-line-chart";
+import { LiveSubsectionHeader, liveColumnContentPadding } from "@/components/live/live-column-header";
 import { ParticipantAvatar } from "@/components/participant-avatar";
 import { participantKindFromRole } from "@/lib/attendees/participant-display";
 import { cn } from "@/lib/cn";
@@ -31,11 +33,6 @@ const BANT_KEYS = ["budget", "authority", "need", "timeline"] as const;
 
 type BantKey = (typeof BANT_KEYS)[number];
 type SentimentTone = "positive" | "neutral" | "negative";
-type SentimentBar = {
-  id: string;
-  tone: SentimentTone;
-  current?: boolean;
-};
 
 const bantLabels: Record<BantKey, string> = {
   budget: "Budget",
@@ -84,7 +81,7 @@ interface LiveMetricsRailProps {
   openGaps: string[];
   /** stack | accordions | copilot-panel (sticky metrics + scrollable body) */
   layout?: "stack" | "accordions" | "copilot-panel";
-  /** BANT is shown in LiveCopilotHeader — omit duplicate accordion */
+  /** BANT is shown in BantLiveWidget above Live signals — omit duplicate accordion */
   bantInHeader?: boolean;
   /** Rendered in the scroll region when layout is copilot-panel */
   panelChildren?: React.ReactNode;
@@ -158,74 +155,6 @@ export function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistStat
   );
 }
 
-function SentimentBars({
-  transcript,
-  customerScore,
-  compact = false,
-}: {
-  transcript: TranscriptEvent[];
-  customerScore: number;
-  compact?: boolean;
-}) {
-  const bars = useMemo<SentimentBar[]>(() => {
-    const currentTone = scoreToTone(customerScore);
-    const withSentiment = transcript
-      .filter((e) => e.speakerRole === "customer" && e.sentiment)
-      .slice(-12);
-    if (withSentiment.length > 0) {
-      const transcriptBars: SentimentBar[] = withSentiment.slice(-7).map((e, index) => ({
-        id: e.id || `${e.timestamp}-${index}`,
-        tone: e.sentiment as SentimentTone,
-      }));
-      return [
-        ...transcriptBars,
-        {
-          id: `current-${currentTone}-${Math.round(customerScore * 100)}`,
-          tone: currentTone,
-          current: true,
-        },
-      ];
-    }
-    const fill = currentTone === "positive" ? 0.85 : currentTone === "negative" ? 0.35 : 0.55;
-    return Array.from({ length: 8 }, (_, i): SentimentBar => ({
-      id: `fallback-${i}`,
-      tone: i / 7 <= fill ? currentTone : ("neutral" as const),
-      current: i === 7,
-    }));
-  }, [transcript, customerScore]);
-
-  return (
-    <div
-      className={cn(
-        "flex items-end",
-        compact ? "h-4 min-w-[5rem] max-w-[9rem] flex-1 gap-0.5" : "h-8 w-full gap-1"
-      )}
-    >
-      {bars.map((bar, i) => (
-        <div
-          key={bar.id}
-          className={cn(
-            "flex-1 rounded-sm",
-            compact ? "min-w-[3px]" : "min-w-[4px]",
-            bar.tone === "positive" && "bg-success",
-            bar.tone === "negative" && "bg-destructive/70",
-            bar.tone === "neutral" && "bg-warning/60",
-            bar.current && "ring-1 ring-foreground/20"
-          )}
-          style={{
-            height: compact
-              ? `${50 + (i / Math.max(bars.length - 1, 1)) * 50}%`
-              : `${40 + (i / Math.max(bars.length - 1, 1)) * 60}%`,
-          }}
-          data-sentiment-tone={bar.tone}
-          data-current-sentiment={bar.current ? "true" : undefined}
-          aria-hidden
-        />
-      ))}
-    </div>
-  );
-}
-
 function scoreTextClass(score: number, toneOverride?: SentimentTone): string {
   const tone = toneOverride ?? scoreToTone(score);
   if (tone === "positive") return "text-success";
@@ -233,14 +162,7 @@ function scoreTextClass(score: number, toneOverride?: SentimentTone): string {
   return "text-warning";
 }
 
-function scoreTileClass(score: number, toneOverride?: SentimentTone): string {
-  const tone = toneOverride ?? scoreToTone(score);
-  if (tone === "positive") return "border-success/35 bg-success/5";
-  if (tone === "negative") return "border-destructive/35 bg-destructive/5";
-  return "border-warning/35 bg-warning/5";
-}
-
-function SentimentScoreChip({
+function SentimentMetricRow({
   label,
   dataLabel,
   score,
@@ -256,19 +178,16 @@ function SentimentScoreChip({
   const tone = toneOverride ?? scoreToTone(score);
   const normalizedDataLabel = dataLabel ?? label.toLowerCase().replace(/\s+/g, "-");
   return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border py-0.5 pl-2 pr-2 text-[11px]",
-        scoreTileClass(score, tone)
-      )}
+    <div
+      className="flex items-center justify-between gap-3 border-b border-border/50 py-2.5 last:border-b-0"
       data-sentiment-label={normalizedDataLabel}
       data-sentiment-tone={tone}
     >
-      <span className="font-medium text-muted-foreground">{label}</span>
-      <span className={cn("max-w-[8rem] truncate font-semibold", scoreTextClass(score, tone))}>
+      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
+      <span className={cn("min-w-0 truncate text-right text-xs font-semibold", scoreTextClass(score, tone))}>
         {value ?? formatSentimentScore(score)}
       </span>
-    </span>
+    </div>
   );
 }
 
@@ -287,11 +206,11 @@ function KeywordPills({ keywords }: { keywords: { term: string; count: number }[
       {keywords.map(({ term, count }) => (
         <span
           key={term}
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/20 bg-primary/5 py-0.5 pl-2 pr-1.5 text-[11px] font-medium text-primary"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted/40 py-0.5 pl-2 pr-1.5 text-[11px] font-medium text-foreground"
         >
           <span className="whitespace-nowrap">{term}</span>
           <span
-            className="min-w-[1.125rem] shrink-0 rounded-full bg-primary/15 px-1 text-center text-[10px] font-semibold tabular-nums text-primary"
+            className="min-w-[1.125rem] shrink-0 rounded-full bg-muted/70 px-1 text-center text-[10px] font-semibold tabular-nums text-muted-foreground"
             aria-label={`${count} mentions`}
           >
             {count}
@@ -360,16 +279,27 @@ export function LiveKeywordsBar({
   keywords,
   transcript,
   className,
+  embedded = false,
 }: {
   keywordStats: KeywordStats | null;
   keywords: string[];
   transcript: TranscriptEvent[];
   className?: string;
+  /** Render inside a card that already has a column header */
+  embedded?: boolean;
 }) {
   const keywordEntries = useMemo(
     () => buildLiveKeywordEntries(keywordStats, keywords, transcript),
     [keywordStats, keywords, transcript]
   );
+
+  if (embedded) {
+    return (
+      <div className={cn("min-w-0", className)} data-testid="keywords-section">
+        <KeywordsRow keywords={keywordEntries} layout="stack-content" />
+      </div>
+    );
+  }
 
   return (
     <div className={cn("shrink-0", className)}>
@@ -393,6 +323,7 @@ function SentimentSection({
   sentimentCustomer,
   customerSentiment,
   sentimentShift,
+  sentimentSignals,
   className,
   layout = "inline",
 }: {
@@ -402,33 +333,15 @@ function SentimentSection({
   sentimentCustomer: number;
   customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
+  sentimentSignals: SentimentSignal[];
   className?: string;
   layout?: "inline" | "stack" | "stack-content";
 }) {
   const repToneCue = resolveSalesRepToneCue(sentimentAE, salesRepTone);
   const customerCue = resolveCustomerSentimentCue(sentimentCustomer, customerSentiment);
 
-  const chips = (
-    <div className={cn("flex items-center gap-1.5", layout !== "inline" ? "flex-wrap" : "shrink-0 flex-nowrap")}>
-      <SentimentScoreChip
-        label="Customer"
-        dataLabel="customer"
-        score={sentimentCustomer}
-        value={customerCue.label}
-        toneOverride={customerCue.tone}
-      />
-      <SentimentScoreChip
-        label="Sales rep tone"
-        dataLabel="sales-rep"
-        score={sentimentAE}
-        value={repToneCue.label}
-        toneOverride={repToneCue.tone}
-      />
-    </div>
-  );
-
   const shiftMessage = sentimentShift ? (
-    <p className="text-[11px] leading-snug text-muted-foreground">
+    <p className="border-b border-border/50 py-2.5 text-[11px] leading-snug text-muted-foreground last:border-b-0">
       Shift:{" "}
       <span className={scoreTextClass(sentimentShift.to_score)}>
         {sentimentShift.message ||
@@ -441,7 +354,7 @@ function SentimentSection({
   const decision = sentimentDecisionCue(customerCue);
   const decisionCue = (
     <p
-      className="text-[11px] leading-snug text-muted-foreground"
+      className="border-b border-border/50 py-2.5 text-[11px] leading-snug text-muted-foreground last:border-b-0"
       data-testid="sentiment-decision-cue"
       data-sentiment-decision={decision.id}
     >
@@ -452,28 +365,64 @@ function SentimentSection({
     </p>
   );
 
-  const stackBody = (
+  const metricsBlock = (
     <>
-      {chips}
-      <SentimentBars compact transcript={transcript} customerScore={sentimentCustomer} />
+      <SentimentMetricRow
+        label="Customer"
+        dataLabel="customer"
+        score={sentimentCustomer}
+        value={customerCue.label}
+        toneOverride={customerCue.tone}
+      />
+      <SentimentMetricRow
+        label="Sales rep tone"
+        dataLabel="sales-rep"
+        score={sentimentAE}
+        value={repToneCue.label}
+        toneOverride={repToneCue.tone}
+      />
+      <div className="border-b border-border/50 py-2.5 last:border-b-0">
+        <LiveSentimentLineChart
+          compact
+          transcript={transcript}
+          customerScore={sentimentCustomer}
+          sentimentSignals={sentimentSignals}
+        />
+      </div>
       {decisionCue}
       {shiftMessage}
     </>
   );
 
-  if (layout === "stack-content") {
-    return (
-      <div className={cn("flex min-w-0 flex-col gap-2", className)}>
-        {stackBody}
+  const signalsBlock =
+    sentimentSignals.length > 0 ? (
+      <div className="mt-1" data-testid="sentiment-signals-section">
+        {[...sentimentSignals].reverse().slice(0, 8).map((signal) => (
+          <SentimentSignalRow key={signal.id} signal={signal} />
+        ))}
       </div>
+    ) : (
+      <p className="border-t border-border/50 py-2.5 text-xs text-muted-foreground">
+        Sentiment signals will appear as the conversation progresses.
+      </p>
     );
+
+  const stackBody = (
+    <>
+      {metricsBlock}
+      {signalsBlock}
+    </>
+  );
+
+  if (layout === "stack-content") {
+    return <div className={cn("flex min-w-0 flex-col", className)}>{stackBody}</div>;
   }
 
   if (layout === "stack") {
     return (
       <div className={cn("px-3 py-2.5", className)}>
-        <div className="flex min-w-0 flex-col gap-2">
-          <span className="text-xs font-semibold text-foreground">Sentiment</span>
+        <div className="flex min-w-0 flex-col">
+          <span className="mb-2 text-xs font-semibold text-foreground">Sentiment</span>
           {stackBody}
         </div>
       </div>
@@ -482,17 +431,10 @@ function SentimentSection({
 
   return (
     <div className={cn("px-3 py-2.5", className)}>
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="shrink-0 text-xs font-semibold text-foreground">Sentiment</span>
-        {chips}
-        <SentimentBars
-          compact
-          transcript={transcript}
-          customerScore={sentimentCustomer}
-        />
+      <div className="flex min-w-0 flex-col">
+        <span className="mb-2 shrink-0 text-xs font-semibold text-foreground">Sentiment</span>
+        {stackBody}
       </div>
-      <div className="mt-1.5">{decisionCue}</div>
-      {shiftMessage && <div className="mt-1.5">{shiftMessage}</div>}
     </div>
   );
 }
@@ -504,7 +446,9 @@ export function LiveSentimentBar({
   sentimentCustomer,
   customerSentiment,
   sentimentShift,
+  sentimentSignals,
   className,
+  embedded = false,
 }: {
   transcript: TranscriptEvent[];
   sentimentAE: number;
@@ -512,17 +456,41 @@ export function LiveSentimentBar({
   sentimentCustomer: number;
   customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
+  sentimentSignals: SentimentSignal[];
   className?: string;
+  embedded?: boolean;
 }) {
   const repToneCue = resolveSalesRepToneCue(sentimentAE, salesRepTone);
   const customerCue = resolveCustomerSentimentCue(sentimentCustomer, customerSentiment);
+  const latestSignal = sentimentSignals.length > 0 ? sentimentSignals[sentimentSignals.length - 1] : null;
+
+  if (embedded) {
+    return (
+      <div className={cn("min-w-0", className)} data-testid="sentiment-section">
+        <SentimentSection
+          layout="stack-content"
+          transcript={transcript}
+          sentimentAE={sentimentAE}
+          salesRepTone={salesRepTone}
+          sentimentCustomer={sentimentCustomer}
+          customerSentiment={customerSentiment}
+          sentimentShift={sentimentShift}
+          sentimentSignals={sentimentSignals}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={cn("shrink-0", className)} data-testid="sentiment-section">
       <LiveCollapsibleSection
         flush
         title="Sentiment"
-        summary={`Customer ${customerCue.label} · Sales rep ${repToneCue.label}`}
+        summary={
+          latestSignal
+            ? `Customer ${customerCue.label} · ${latestSignal.label}`
+            : `Customer ${customerCue.label} · Sales rep ${repToneCue.label}`
+        }
         defaultOpen
       >
         <SentimentSection
@@ -533,103 +501,60 @@ export function LiveSentimentBar({
           sentimentCustomer={sentimentCustomer}
           customerSentiment={customerSentiment}
           sentimentShift={sentimentShift}
+          sentimentSignals={sentimentSignals}
         />
       </LiveCollapsibleSection>
     </div>
   );
 }
 
-function sentimentSignalClass(tone: SentimentSignal["tone"]): string {
-  if (tone === "positive") return "border-success/30 bg-success/5";
-  if (tone === "negative") return "border-destructive/30 bg-destructive/5";
-  return "border-warning/30 bg-warning/5";
-}
-
-function sentimentSignalTextClass(tone: SentimentSignal["tone"]): string {
-  if (tone === "positive") return "text-success";
-  if (tone === "negative") return "text-destructive";
-  return "text-warning";
-}
-
-function sentimentSignalValue(signal: SentimentSignal): string {
-  const pct = Math.round(Math.abs(signal.score) * 100);
-  if (signal.tone === "neutral") return "Neutral";
-  return signal.tone === "positive" ? `+${pct}%` : `-${pct}%`;
-}
-
-function SentimentSignalLog({
-  signals,
-  compact = false,
-}: {
-  signals: SentimentSignal[];
-  compact?: boolean;
-}) {
-  if (signals.length === 0) {
-    return (
-      <p className="text-xs text-muted-foreground">
-        Sentiment signals will appear as the conversation progresses.
-      </p>
-    );
-  }
+function SentimentSignalRow({ signal }: { signal: SentimentSignal }) {
+  const [open, setOpen] = useState(false);
+  const hasDetail = Boolean(signal.snippet?.trim());
 
   return (
-    <ul className={cn("space-y-1.5", compact && "max-h-[340px] overflow-y-auto")}>
-      {[...signals]
-        .reverse()
-        .slice(0, compact ? 4 : 8)
-        .map((signal) => (
-          <li
-            key={signal.id}
+    <div className="border-b border-border/50 last:border-b-0" data-sentiment-tone={signal.tone}>
+      <button
+        type="button"
+        className="flex w-full items-start justify-between gap-2 py-2.5 text-left"
+        aria-expanded={open}
+        disabled={!hasDetail}
+        onClick={() => hasDetail && setOpen((v) => !v)}
+      >
+        <div className="flex min-w-0 items-start gap-2">
+          <ParticipantAvatar
+            name={signal.speakerName ?? signal.speakerRole ?? "Speaker"}
+            kind={participantKindFromRole(signal.speakerRole)}
+            role={
+              signal.speakerRole === "customer" || !signal.speakerRole
+                ? "customer"
+                : signal.speakerRole
+            }
+            size="xs"
+            className="mt-0.5 shrink-0"
+          />
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-foreground">{signal.label}</p>
+            <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
+              {signal.speakerName ?? signal.speakerRole}
+            </p>
+          </div>
+        </div>
+        {hasDetail && (
+          <ChevronDown
             className={cn(
-              "rounded-lg border px-3 py-2 text-xs",
-              sentimentSignalClass(signal.tone)
+              "mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+              open && "rotate-180"
             )}
-            data-sentiment-tone={signal.tone}
-          >
-            <div className="flex min-w-0 items-start justify-between gap-2">
-              <div className="flex min-w-0 items-start gap-2">
-                <ParticipantAvatar
-                  name={signal.speakerName ?? signal.speakerRole ?? "Speaker"}
-                  kind={participantKindFromRole(signal.speakerRole)}
-                  role={
-                    signal.speakerRole === "customer" || !signal.speakerRole
-                      ? "customer"
-                      : signal.speakerRole
-                  }
-                  size="xs"
-                  className="mt-0.5"
-                />
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-foreground">{signal.label}</p>
-                  <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
-                    {signal.speakerName ?? signal.speakerRole}
-                  </p>
-                </div>
-              </div>
-              <span
-                className={cn(
-                  "shrink-0 rounded-full border border-current/20 px-1.5 py-0.5 text-[10px] font-semibold",
-                  sentimentSignalTextClass(signal.tone)
-                )}
-              >
-                {sentimentSignalValue(signal)}
-              </span>
-            </div>
-            {signal.snippet && (
-              <p className="mt-1.5 line-clamp-2 leading-snug text-foreground/75">
-                {signal.snippet}
-              </p>
-            )}
-          </li>
-        ))}
-    </ul>
+            aria-hidden
+          />
+        )}
+      </button>
+      {open && signal.snippet && (
+        <p className="pb-2.5 pl-8 text-xs leading-relaxed text-muted-foreground">{signal.snippet}</p>
+      )}
+    </div>
   );
-}
-
-function sentimentSignalsSummary(signals: SentimentSignal[]): string {
-  if (signals.length === 0) return "Signals will appear as the conversation progresses.";
-  const latest = [...signals].reverse()[0];
-  return latest.label;
 }
 
 function bantSignalsSummary(signals: BantSignal[]): string {
@@ -644,46 +569,23 @@ function bantSignalsSummary(signals: BantSignal[]): string {
   return `${dims[latest.dimension]} · ${latest.label}`;
 }
 
-export function LiveSignalLogs({
-  sentimentSignals,
-  bantSignals,
-}: {
-  sentimentSignals: SentimentSignal[];
-  bantSignals: BantSignal[];
-}) {
-  if (sentimentSignals.length === 0 && bantSignals.length === 0) {
+export function LiveSignalLogs({ bantSignals }: { bantSignals: BantSignal[] }) {
+  if (bantSignals.length === 0) {
     return null;
   }
 
   return (
-    <>
-      {sentimentSignals.length > 0 && (
-        <div className="shrink-0" data-testid="sentiment-signals-section">
-          <LiveCollapsibleSection
-            flush
-            title="Sentiment signals"
-            count={sentimentSignals.length}
-            summary={sentimentSignalsSummary(sentimentSignals)}
-            defaultOpen
-          >
-            <SentimentSignalLog signals={sentimentSignals} compact />
-          </LiveCollapsibleSection>
-        </div>
-      )}
-      {bantSignals.length > 0 && (
-        <div className="shrink-0">
-          <LiveCollapsibleSection
-            flush
-            title="BANT signals"
-            count={bantSignals.length}
-            summary={bantSignalsSummary(bantSignals)}
-            defaultOpen
-          >
-            <SignalLog signals={bantSignals} />
-          </LiveCollapsibleSection>
-        </div>
-      )}
-    </>
+    <div className="shrink-0">
+      <LiveCollapsibleSection
+        flush
+        title="BANT signals"
+        count={bantSignals.length}
+        summary={bantSignalsSummary(bantSignals)}
+        defaultOpen
+      >
+        <SignalLog signals={bantSignals} />
+      </LiveCollapsibleSection>
+    </div>
   );
 }
 
@@ -747,7 +649,7 @@ export function LiveMetricsRail({
         )}
       >
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:thin]">
-          <div className="flex flex-col gap-4 px-5 py-4">{panelChildren}</div>
+          <div className={cn("flex flex-col gap-4", liveColumnContentPadding)}>{panelChildren}</div>
         </div>
       </div>
     );
@@ -780,21 +682,9 @@ export function LiveMetricsRail({
           sentimentCustomer={sentimentCustomer}
           customerSentiment={customerSentiment}
           sentimentShift={sentimentShift}
+          sentimentSignals={sentimentSignals}
+          layout="stack"
         />
-
-        {sentimentSignals.length > 0 && (
-          <LiveCollapsibleSection
-            flush
-            title="Sentiment signals"
-            summary={`${sentimentSignals.length} recent signals`}
-            count={sentimentSignals.length}
-            defaultOpen={sentimentSignals.length <= 3}
-          >
-            <div className="pt-2" data-testid="sentiment-signals-section">
-              <SentimentSignalLog signals={sentimentSignals} compact />
-            </div>
-          </LiveCollapsibleSection>
-        )}
 
         {bantSignals.length > 0 && (
           <LiveCollapsibleSection
@@ -853,7 +743,7 @@ export function LiveMetricsRail({
         <KeywordsRow keywords={keywordEntries} />
       </section>
 
-      <section>
+      <section data-testid="sentiment-section">
         <SentimentSection
           transcript={transcript}
           sentimentAE={sentimentAE}
@@ -861,12 +751,9 @@ export function LiveMetricsRail({
           sentimentCustomer={sentimentCustomer}
           customerSentiment={customerSentiment}
           sentimentShift={sentimentShift}
+          sentimentSignals={sentimentSignals}
+          layout="stack"
         />
-      </section>
-
-      <section data-testid="sentiment-signals-section">
-        <LiveSubsectionHeader title="Sentiment signals" />
-        <SentimentSignalLog signals={sentimentSignals} />
       </section>
 
       <section>

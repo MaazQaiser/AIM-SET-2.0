@@ -1,20 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, Mic } from "lucide-react";
+import { Activity, ChevronRight, Hash, Mic, PanelLeftClose } from "lucide-react";
 import { Card } from "@dc-copilot/ui/components/card";
+import { Button } from "@dc-copilot/ui/components/button";
 import { BotChatPanel } from "@/components/bot-chat-panel";
 import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import { DemoTranscriptPlayer } from "@/components/live/demo-transcript-player";
 import {
   LiveColumnHeader,
-  liveColumnBodyClass,
+  liveColumnHorizontalPadding,
+  liveColumnScrollPadding,
 } from "@/components/live/live-column-header";
-import type { AssistantCardKind } from "@/components/live/live-assistant-card";
 import { LiveInsightsPanel } from "@/components/live/live-insights-panel";
-import { LiveKeywordsBar, LiveSentimentBar, LiveSignalLogs } from "@/components/live/live-metrics-rail";
+import { buildCopilotInsights } from "@/lib/live/build-copilot-insights";
+import { BantLiveWidget } from "@/components/live/bant-live-widget";
+import { LiveKeywordsBar, LiveSentimentBar } from "@/components/live/live-metrics-rail";
 import { LiveCallPageHeader } from "@/components/live/live-call-page-header";
-import { LiveRunningSummaryBar } from "@/components/live/live-running-summary-bar";
 import { PostDcReviewScreen } from "@/components/post-dc/post-dc-review-screen";
 import { TranscriptViewer } from "@/components/transcript-viewer";
 import type { CallBrief } from "@/lib/brief-types";
@@ -34,96 +36,7 @@ import type {
   UnansweredQuestionPayload,
 } from "@/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
-import { copyTextToClipboard } from "@/lib/clipboard";
-import { toast } from "sonner";
-
-interface AssistantFeedItem {
-  id: string;
-  kind: AssistantCardKind;
-  message: string;
-  contextLabel?: string;
-  actionLabel?: string;
-  onAction?: () => void;
-  onDismiss?: () => void;
-}
-
-function buildAssistantFeed({
-  customerSentiment,
-  nudges,
-  objections,
-  unansweredQuestions,
-  onAcceptNudge,
-  onDismissNudge,
-}: {
-  customerSentiment: CustomerSentimentCue | null;
-  nudges: NudgePayload[];
-  objections: ObjectionPayload[];
-  unansweredQuestions: UnansweredQuestionPayload[];
-  onAcceptNudge: (id: string) => void;
-  onDismissNudge: (id: string) => void;
-}): AssistantFeedItem[] {
-  const items: AssistantFeedItem[] = [];
-
-  if (customerSentiment) {
-    items.push({
-      id: `customer-intent-${customerSentiment.label}`,
-      kind: "insight",
-      message: `Customer intent: ${customerSentiment.label}. ${customerSentiment.guidance}`,
-      contextLabel: "Customer signal",
-    });
-  }
-
-  for (const n of nudges) {
-    const kind: AssistantCardKind =
-      n.source === "discovery-checklist" ? "question" : "insight";
-    items.push({
-      id: n.id,
-      kind,
-      message: n.message,
-      contextLabel: n.checklistItemId ? "BANT gap" : "Live signal",
-      actionLabel: kind === "question" ? "Copy question" : "Got it",
-      onAction: () => {
-        if (kind === "question") {
-          void copyTextToClipboard(n.message).then((copied) => {
-            if (copied) toast.success("Copied to clipboard");
-            else toast.error("Click back into the page before copying");
-          });
-        }
-        onAcceptNudge(n.id);
-      },
-      onDismiss: () => onDismissNudge(n.id),
-    });
-  }
-
-  for (const o of objections.slice(-3)) {
-    items.push({
-      id: `objection-${o.id ?? o.objection_text}`,
-      kind: "alert",
-      message: o.objection_text,
-      contextLabel: "Objection detected",
-      actionLabel: "Flag deal",
-      onAction: () => toast.message("Deal flagged for follow-up"),
-    });
-  }
-
-  for (const q of unansweredQuestions.slice(-3)) {
-    items.push({
-      id: `question-${q.id ?? q.text}`,
-      kind: "question",
-      message: q.text,
-      contextLabel: "Unanswered",
-      actionLabel: "Copy question",
-      onAction: () => {
-        void copyTextToClipboard(q.text).then((copied) => {
-          if (copied) toast.success("Copied to clipboard");
-          else toast.error("Click back into the page before copying");
-        });
-      },
-    });
-  }
-
-  return items;
-}
+import { cn } from "@/lib/cn";
 
 export interface LiveCallWorkspaceProps {
   callId: string;
@@ -185,9 +98,10 @@ export function LiveCallWorkspace({
   onDismissNudge,
 }: LiveCallWorkspaceProps) {
   const [viewportMode, setViewportMode] = useState<"desktop" | "mobile">("desktop");
-  const assistantFeed = useMemo(
+  const [transcriptOpen, setTranscriptOpen] = useState(true);
+  const copilotInsights = useMemo(
     () =>
-      buildAssistantFeed({
+      buildCopilotInsights({
         customerSentiment,
         nudges: visibleNudges,
         objections,
@@ -210,7 +124,23 @@ export function LiveCallWorkspace({
 
   const transcriptColumn = (
     <>
-      <LiveColumnHeader icon={Mic} title="Live transcript" />
+      <LiveColumnHeader
+        icon={Mic}
+        title="Live transcript"
+        extra={
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-2 text-[10px] text-muted-foreground"
+            aria-label="Hide transcript"
+            onClick={() => setTranscriptOpen(false)}
+          >
+            <PanelLeftClose className="h-3.5 w-3.5" aria-hidden />
+            Hide
+          </Button>
+        }
+      />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {transcript.length > 0 ? (
           <TranscriptViewer
@@ -220,7 +150,7 @@ export function LiveCallWorkspace({
             className="flex-1 min-h-0"
           />
         ) : (
-          <p className="px-5 py-8 text-center text-sm text-muted-foreground">
+          <p className={cn(liveColumnHorizontalPadding, "py-8 text-center text-sm text-muted-foreground")}>
             Waiting for transcript. Start Recall above or play a demo transcript.
           </p>
         )}
@@ -231,7 +161,12 @@ export function LiveCallWorkspace({
   const insightsPanel = (
     <LiveInsightsPanel
       callId={callId}
-      assistantFeed={assistantFeed}
+      accountName={accountName}
+      leadName={leadName}
+      intentLabel={intentLabel}
+      intent={intentSnapshot?.intent ?? null}
+      pains={intentSnapshot?.pains ?? []}
+      insights={copilotInsights}
       checklist={checklist}
       keywordStats={keywordStats}
       keywords={keywords}
@@ -248,66 +183,80 @@ export function LiveCallWorkspace({
     />
   );
 
-  const runningSummary = (
-    <LiveRunningSummaryBar
-      embedded
-      accountName={accountName}
-      leadName={leadName}
-      intent={intentSnapshot?.intent ?? null}
-      intentLabel={intentLabel}
-      pains={intentSnapshot?.pains ?? []}
+  const bantWidget = (
+    <BantLiveWidget
       checklist={checklist}
-      transcript={transcript}
-      className="min-w-0"
+      bantSignals={bantSignals}
+      className="min-h-0 min-w-0 shrink-0"
     />
   );
 
-  const liveInsightsMetrics = (
-    <>
-      <LiveKeywordsBar
-        keywordStats={keywordStats}
-        keywords={keywords}
-        transcript={transcript}
-        className="border-0 bg-transparent backdrop-blur-none"
-      />
-      <LiveSentimentBar
-        transcript={transcript}
-        sentimentAE={sentimentAE}
-        salesRepTone={salesRepTone}
-        sentimentCustomer={sentimentCustomer}
-        customerSentiment={customerSentiment}
-        sentimentShift={sentimentShift}
-        className="border-0 bg-transparent backdrop-blur-none"
-      />
-      <LiveSignalLogs
-        sentimentSignals={sentimentSignals}
-        bantSignals={bantSignals}
-      />
-    </>
-  );
-
-  const metricsColumn = (
-    <Card className="flex h-full min-h-0 min-w-0 flex-[3] flex-col overflow-hidden">
-      <LiveColumnHeader icon={Activity} title="Live signals" />
-      <div className="flex min-h-0 flex-1 flex-col divide-y divide-border/60 overflow-y-auto">
-        {liveInsightsMetrics}
+  const keywordsCard = (
+    <Card className="flex min-h-0 shrink-0 flex-col overflow-hidden">
+      <LiveColumnHeader icon={Hash} title="Keywords" />
+      <div className={cn("max-h-[min(28vh,220px)] overflow-y-auto [scrollbar-width:thin]", liveColumnScrollPadding)}>
+        <LiveKeywordsBar
+          embedded
+          keywordStats={keywordStats}
+          keywords={keywords}
+          transcript={transcript}
+        />
       </div>
     </Card>
   );
 
-  const copilotColumn = (
-    <Card className="flex h-full min-h-0 min-w-0 flex-[4] flex-col overflow-hidden">
-      {insightsPanel}
+  const signalsCard = (
+    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <LiveColumnHeader icon={Activity} title="Signals" />
+      <div className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto [scrollbar-width:thin]", liveColumnScrollPadding)}>
+        <LiveSentimentBar
+          embedded
+          transcript={transcript}
+          sentimentAE={sentimentAE}
+          salesRepTone={salesRepTone}
+          sentimentCustomer={sentimentCustomer}
+          customerSentiment={customerSentiment}
+          sentimentShift={sentimentShift}
+          sentimentSignals={sentimentSignals}
+        />
+      </div>
     </Card>
   );
 
-  const rightInsightsColumn = (
-    <div className="flex h-full min-h-0 w-[640px] shrink-0 flex-col gap-4 overflow-hidden">
-      {runningSummary}
-      <div className="flex h-0 min-h-0 flex-1 gap-4 overflow-hidden">
-        {metricsColumn}
-        {copilotColumn}
-      </div>
+  const signalsColumnInner = (
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+      {bantWidget}
+      {signalsCard}
+      {keywordsCard}
+    </div>
+  );
+
+  const desktopColumns = (
+    <div
+      className={cn(
+        "grid h-full min-h-0 flex-1 gap-4 overflow-hidden",
+        transcriptOpen
+          ? "grid-cols-[minmax(220px,1fr)_minmax(220px,1fr)_minmax(320px,1.75fr)]"
+          : "grid-cols-[2.5rem_minmax(240px,1fr)_minmax(320px,1.85fr)]"
+      )}
+    >
+      {transcriptOpen ? (
+        <Card className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">{transcriptColumn}</Card>
+      ) : (
+        <button
+          type="button"
+          className="flex h-full w-10 shrink-0 flex-col items-center justify-center gap-2 rounded-xl border border-border/60 bg-card text-muted-foreground transition-colors hover:bg-muted/40"
+          aria-label="Show transcript"
+          onClick={() => setTranscriptOpen(true)}
+        >
+          <ChevronRight className="h-4 w-4" aria-hidden />
+          <span className="text-[10px] font-semibold [writing-mode:vertical-rl] rotate-180">
+            Transcript
+          </span>
+        </button>
+      )}
+      <div className="flex h-full min-h-0 min-w-0 flex-col gap-3 overflow-hidden">{signalsColumnInner}</div>
+      <Card className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">{insightsPanel}</Card>
     </div>
   );
 
@@ -330,15 +279,10 @@ export function LiveCallWorkspace({
         hasReview={hasReview}
       />
 
-      <div className="flex h-0 min-h-0 flex-1 flex-col gap-4 overflow-hidden px-6 pt-4 sm:px-8">
+      <div className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden px-6 py-3 sm:px-8">
         {shouldRenderDesktop && (
-          <div className="hidden h-0 min-h-0 flex-1 flex-col overflow-hidden xl:flex">
-            <div className="flex h-0 min-h-0 flex-1 gap-4 overflow-hidden">
-              <Card className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                {transcriptColumn}
-              </Card>
-              {rightInsightsColumn}
-            </div>
+          <div className="hidden h-full min-h-0 flex-1 overflow-hidden xl:block">
+            {desktopColumns}
           </div>
         )}
 
@@ -382,9 +326,7 @@ export function LiveCallWorkspace({
                   value="signals"
                   className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
                 >
-                  <Card className="flex min-h-0 flex-1 flex-col overflow-hidden divide-y divide-border/60">
-                    {liveInsightsMetrics}
-                  </Card>
+                  {signalsColumnInner}
                 </TabsContent>
               )}
               {activeMobilePanel === "insights" && (
@@ -392,10 +334,7 @@ export function LiveCallWorkspace({
                   value="insights"
                   className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
                 >
-                  <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-                    {runningSummary}
-                    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">{insightsPanel}</Card>
-                  </div>
+                  <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">{insightsPanel}</Card>
                 </TabsContent>
               )}
               {activeMobilePanel === "chat" && (

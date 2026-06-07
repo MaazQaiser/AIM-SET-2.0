@@ -1,22 +1,23 @@
 "use client";
 
 import { memo } from "react";
-import { LiveCopilotHeader } from "@/components/live/live-copilot-header";
-import {
-  LiveAssistantCard,
-  type AssistantCardKind,
-} from "@/components/live/live-assistant-card";
+import { Sparkles } from "lucide-react";
 import {
   LiveCopilotChatComposer,
   LiveCopilotChatProvider,
   LiveCopilotChatThread,
 } from "@/components/live/live-copilot-chat";
+import { LiveCopilotSummary } from "@/components/live/live-copilot-summary";
+import { LiveColumnHeader } from "@/components/live/live-column-header";
 import { LiveMetricsRail } from "@/components/live/live-metrics-rail";
+import type { LiveInsightLine } from "@/lib/live/build-copilot-insights";
 import type { BantSignal } from "@/lib/live-types";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
 import type {
+  CallIntent,
   CustomerSentimentCue,
   KeywordStats,
+  PainSignal,
   SalesRepToneCue,
   SentimentShift,
   SentimentSignal,
@@ -24,19 +25,14 @@ import type {
   TranscriptEvent,
 } from "@/types";
 
-export interface LiveInsightsFeedItem {
-  id: string;
-  kind: AssistantCardKind;
-  message: string;
-  contextLabel?: string;
-  actionLabel?: string;
-  onAction?: () => void;
-  onDismiss?: () => void;
-}
-
 interface LiveInsightsPanelProps {
   callId: string;
-  assistantFeed: LiveInsightsFeedItem[];
+  accountName: string;
+  leadName?: string;
+  intentLabel?: string;
+  intent?: CallIntent | null;
+  pains: PainSignal[];
+  insights: LiveInsightLine[];
   checklist: DiscoveryChecklistState | null;
   keywordStats: KeywordStats | null;
   keywords: string[];
@@ -54,7 +50,12 @@ interface LiveInsightsPanelProps {
 
 export const LiveInsightsPanel = memo(function LiveInsightsPanel({
   callId,
-  assistantFeed,
+  accountName,
+  leadName,
+  intentLabel,
+  intent,
+  pains,
+  insights,
   checklist,
   keywordStats,
   keywords,
@@ -72,10 +73,9 @@ export const LiveInsightsPanel = memo(function LiveInsightsPanel({
   return (
     <LiveCopilotChatProvider callId={callId}>
       <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-        <LiveCopilotHeader checklist={checklist} />
+        <LiveColumnHeader icon={Sparkles} title="Live copilot" />
         <LiveMetricsRail
           layout="copilot-panel"
-          bantInHeader
           checklist={checklist}
           keywordStats={keywordStats}
           keywords={keywords}
@@ -91,34 +91,21 @@ export const LiveInsightsPanel = memo(function LiveInsightsPanel({
           openGaps={openGaps}
           panelChildren={
             <>
-              <div className="shrink-0 border-t border-border/50 pt-1">
-                <p className="text-[10px] font-semibold text-muted-foreground">
-                  Live prompts
-                </p>
-              </div>
+              <LiveCopilotSummary
+                accountName={accountName}
+                leadName={leadName}
+                intent={intent}
+                intentLabel={intentLabel}
+                checklist={checklist}
+                transcript={transcript}
+                pains={pains}
+                insights={insights}
+                className="min-w-0"
+              />
 
-              <div className="space-y-2.5">
-                {assistantFeed.length > 0 ? (
-                  assistantFeed.map((item) => (
-                    <LiveAssistantCard
-                      key={item.id}
-                      id={item.id}
-                      kind={item.kind}
-                      message={item.message}
-                      contextLabel={item.contextLabel}
-                      actionLabel={item.actionLabel}
-                      onAction={item.onAction}
-                      onDismiss={item.onDismiss}
-                    />
-                  ))
-                ) : (
-                  <p className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-3 py-6 text-center text-sm text-muted-foreground">
-                    AI prompts and alerts will stack here as the call progresses.
-                  </p>
-                )}
+              <div className="border-t border-border/50 pt-4 mt-4">
+                <LiveCopilotChatThread />
               </div>
-
-              <LiveCopilotChatThread />
             </>
           }
         />

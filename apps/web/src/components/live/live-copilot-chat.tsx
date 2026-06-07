@@ -17,6 +17,7 @@ import { usePersona } from "@/hooks/use-persona";
 import { podDisplayForRole } from "@/lib/bot-chat/pod-display";
 import type { BotChatMessage } from "@/lib/bot-chat/types";
 import type { Citation, PodRole } from "@/types";
+import { liveColumnHorizontalPadding } from "@/components/live/live-column-header";
 import { cn } from "@/lib/cn";
 import { EMPTY_BOT_CHAT_MESSAGES, useBotChatStore } from "@/stores/use-bot-chat";
 
@@ -201,8 +202,8 @@ export function LiveCopilotChatComposer({ className }: { className?: string }) {
 
   return (
     <div className={cn("shrink-0 border-t border-border/60 bg-transparent", className)}>
-      {error && <p className="px-4 pt-2 text-[11px] text-destructive">{error}</p>}
-      <form onSubmit={handleSubmit} className="flex gap-2 px-4 py-3">
+      {error && <p className={cn(liveColumnHorizontalPadding, "pt-2 text-[11px] text-destructive")}>{error}</p>}
+      <form onSubmit={handleSubmit} className={cn("flex gap-2 py-4", liveColumnHorizontalPadding)}>
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}

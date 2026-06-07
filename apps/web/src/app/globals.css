@@ -116,6 +116,11 @@ main:has(.live-call-page) > * {
   overflow: hidden;
 }
 
+.live-call-page.call-detail-page {
+  height: 100%;
+  min-height: 0;
+}
+
 .call-detail-page {
   min-height: 100%;
   font-family: var(--font-sans);
