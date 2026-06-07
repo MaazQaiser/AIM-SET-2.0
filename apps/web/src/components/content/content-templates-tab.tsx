@@ -1,19 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Code2, Eye, LayoutTemplate, Plus, Trash2, Upload } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
-import { Tabs, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
-import { TemplateDetailDialog } from "@/components/content/template-detail-dialog";
 import { useContentTemplates, useDeleteTemplate } from "@/lib/data/content-studio-hooks";
-import { TEMPLATE_ARTIFACT_TYPES } from "@/lib/content-studio/template-editor";
 import type { ContentTemplate } from "@/types/content_studio";
-
-type TemplateFilter = "all" | ContentTemplate["artifactType"];
 
 function formatArtifactType(value: string) {
   return value.replace(/_/g, " ");
@@ -22,13 +16,6 @@ function formatArtifactType(value: string) {
 export function ContentTemplatesTab() {
   const { data: templates = [], isLoading } = useContentTemplates();
   const del = useDeleteTemplate();
-  const [viewTemplateId, setViewTemplateId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<TemplateFilter>("all");
-
-  const filtered = useMemo(() => {
-    if (filter === "all") return templates;
-    return templates.filter((template) => template.artifactType === filter);
-  }, [filter, templates]);
 
   async function handleDeleteTemplate(templateId: string) {
     const ok = window.confirm("Delete this template? This action cannot be undone.");
@@ -65,49 +52,19 @@ export function ContentTemplatesTab() {
         </div>
       </div>
 
-      {templates.length > 0 && (
-        <Tabs value={filter} onValueChange={(value) => setFilter(value as TemplateFilter)}>
-          <TabsList className="h-9 rounded-lg bg-muted/50 p-1">
-            <TabsTrigger value="all" className="text-xs px-3">
-              All
-              <span className="ml-1.5 rounded-full bg-background px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
-                {templates.length}
-              </span>
-            </TabsTrigger>
-            {TEMPLATE_ARTIFACT_TYPES.map((type) => {
-              const count = templates.filter((t) => t.artifactType === type.value).length;
-              if (count === 0) return null;
-              return (
-                <TabsTrigger key={type.value} value={type.value} className="text-xs px-3">
-                  {type.label}
-                  <span className="ml-1.5 rounded-full bg-background px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
-                    {count}
-                  </span>
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-        </Tabs>
-      )}
-
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading templates…</p>
-      ) : filtered.length > 0 ? (
+      ) : templates.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((template) => (
+          {templates.map((template) => (
             <TemplateCard
               key={template.id}
               template={template}
               deleting={del.isPending}
-              onView={() => setViewTemplateId(template.id)}
               onDelete={() => void handleDeleteTemplate(template.id)}
             />
           ))}
         </div>
-      ) : templates.length > 0 ? (
-        <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-          No templates match this filter.
-        </p>
       ) : (
         <EmptyState
           icon={LayoutTemplate}
@@ -117,11 +74,6 @@ export function ContentTemplatesTab() {
         />
       )}
 
-      <TemplateDetailDialog
-        templateId={viewTemplateId}
-        open={Boolean(viewTemplateId)}
-        onOpenChange={(open) => !open && setViewTemplateId(null)}
-      />
     </div>
   );
 }
@@ -129,12 +81,10 @@ export function ContentTemplatesTab() {
 function TemplateCard({
   template,
   deleting,
-  onView,
   onDelete,
 }: {
   template: ContentTemplate;
   deleting: boolean;
-  onView: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -180,9 +130,11 @@ function TemplateCard({
         )}
 
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="secondary" disabled={template.status !== "ready"} onClick={onView}>
-            <Eye className="h-4 w-4 mr-1" />
-            Preview
+          <Button size="sm" variant="secondary" disabled={template.status !== "ready"} asChild>
+            <Link href={`/content/templates/${template.id}/preview`}>
+              <Eye className="h-4 w-4 mr-1" />
+              Preview
+            </Link>
           </Button>
           <Button size="sm" variant="outline" asChild>
             <Link href={`/content/templates/${template.id}/edit`}>

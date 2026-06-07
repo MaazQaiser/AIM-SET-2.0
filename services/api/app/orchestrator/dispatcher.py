@@ -467,7 +467,7 @@ class Orchestrator:
                 call = self.calls.get_call(ctx, call_id) or {}
             except Exception:
                 _logger.exception("call lookup failed during live checklist update call_id=%s", call_id)
-                call = {}
+                raise
             seed_bant = call.get("bant") if isinstance(call.get("bant"), dict) else None
             transcript_analysis = (
                 live_result.get("transcript") if isinstance(live_result.get("transcript"), dict) else {}

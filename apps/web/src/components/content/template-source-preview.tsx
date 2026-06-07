@@ -187,7 +187,7 @@ export function TemplateSourcePreview({ template, className }: TemplateSourcePre
     return (
       <div
         className={cn(
-          "flex h-[62vh] items-center justify-center gap-2 rounded-md border bg-muted/20 text-sm text-muted-foreground",
+          "flex min-h-[240px] flex-1 items-center justify-center gap-2 rounded-md border bg-muted/20 text-sm text-muted-foreground",
           className
         )}
       >
@@ -201,7 +201,7 @@ export function TemplateSourcePreview({ template, className }: TemplateSourcePre
     return (
       <div
         className={cn(
-          "flex h-[62vh] flex-col items-center justify-center gap-3 rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground",
+          "flex min-h-[240px] flex-1 flex-col items-center justify-center gap-3 rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground",
           className
         )}
       >
@@ -226,7 +226,7 @@ export function TemplateSourcePreview({ template, className }: TemplateSourcePre
 
   if (usingPdfFallback && blobUrl) {
     return (
-      <div className={cn("h-[62vh] overflow-hidden rounded-md border bg-white", className)}>
+      <div className={cn("min-h-0 flex-1 overflow-hidden rounded-md border bg-white", className)}>
         <iframe title={`${template.name} preview`} src={blobUrl} className="h-full w-full" />
       </div>
     );
@@ -234,7 +234,7 @@ export function TemplateSourcePreview({ template, className }: TemplateSourcePre
 
   if (preview.mode === "slides" && slideCount > 0 && slideBlobUrl) {
     return (
-      <div className={cn("flex h-[62vh] flex-col overflow-hidden rounded-md border bg-muted/10", className)}>
+      <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border bg-muted/10", className)}>
         <div className="flex items-center justify-between gap-2 border-b bg-card px-4 py-2">
           <div className="flex items-center gap-2">
             <Button
@@ -292,7 +292,7 @@ export function TemplateSourcePreview({ template, className }: TemplateSourcePre
 
   if ((preview.mode === "pdf" || preview.mode === "download") && blobUrl) {
     return (
-      <div className={cn("h-[62vh] overflow-hidden rounded-md border bg-white", className)}>
+      <div className={cn("min-h-0 flex-1 overflow-hidden rounded-md border bg-white", className)}>
         <iframe title={template.name} src={blobUrl} className="h-full w-full" />
       </div>
     );
@@ -300,7 +300,7 @@ export function TemplateSourcePreview({ template, className }: TemplateSourcePre
 
   if (preview.mode === "image" && blobUrl) {
     return (
-      <div className={cn("flex h-[62vh] items-center justify-center rounded-md border bg-muted/10 p-4", className)}>
+      <div className={cn("flex min-h-0 flex-1 items-center justify-center rounded-md border bg-muted/10 p-4", className)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={blobUrl} alt={template.name} className="max-h-full max-w-full rounded-md object-contain shadow-sm" />
       </div>
@@ -310,7 +310,7 @@ export function TemplateSourcePreview({ template, className }: TemplateSourcePre
   return (
     <div
       className={cn(
-        "flex h-[62vh] flex-col items-center justify-center gap-3 rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground",
+        "flex min-h-[240px] flex-1 flex-col items-center justify-center gap-3 rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground",
         className
       )}
     >

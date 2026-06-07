@@ -1,6 +1,7 @@
 export type ScratchSlideLayout =
   | "cover"
   | "section"
+  | "blank"
   | "two_column"
   | "three_cards"
   | "visual_left"
@@ -14,14 +15,28 @@ export interface ScratchSlideDraft {
   kicker: string;
   body: string;
   backgroundColor: string;
+  textColor?: string;
   backgroundImageDataUrl?: string;
   backgroundImageName?: string;
 }
 
+export interface ScratchLogoAsset {
+  id: string;
+  label: string;
+  dataUrl: string;
+  fileName?: string;
+  isPrimary?: boolean;
+}
+
+export type ScratchTemplateFont = "urbanist" | "inter" | "system" | "georgia" | "serif" | "mono";
+
 export interface ScratchTemplateDraft {
   name: string;
   accentColor: string;
+  textColor?: string;
+  fontFamily?: ScratchTemplateFont;
   tags: string[];
+  logos?: ScratchLogoAsset[];
   logoDataUrl?: string;
   logoName?: string;
   slides: ScratchSlideDraft[];
@@ -30,6 +45,7 @@ export interface ScratchTemplateDraft {
 export const SCRATCH_LAYOUT_OPTIONS: Array<{ value: ScratchSlideLayout; label: string }> = [
   { value: "cover", label: "Cover" },
   { value: "section", label: "Section" },
+  { value: "blank", label: "Blank" },
   { value: "two_column", label: "Two column" },
   { value: "three_cards", label: "Three cards" },
   { value: "visual_left", label: "Visual left" },
@@ -37,35 +53,56 @@ export const SCRATCH_LAYOUT_OPTIONS: Array<{ value: ScratchSlideLayout; label: s
   { value: "closing", label: "Closing" },
 ];
 
+export const SCRATCH_FONT_OPTIONS: Array<{
+  value: ScratchTemplateFont;
+  label: string;
+  css: string;
+}> = [
+  { value: "urbanist", label: "Urbanist", css: "Urbanist, Arial, sans-serif" },
+  { value: "inter", label: "Inter", css: "Inter, Arial, sans-serif" },
+  {
+    value: "system",
+    label: "System sans",
+    css: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  { value: "georgia", label: "Georgia", css: 'Georgia, "Times New Roman", serif' },
+  { value: "serif", label: "Editorial serif", css: 'Cambria, Georgia, "Times New Roman", serif' },
+  { value: "mono", label: "Mono", css: '"IBM Plex Mono", "SFMono-Regular", Consolas, monospace' },
+];
+
 const DEFAULT_BACKGROUNDS = ["#ffffff", "#f8fafc", "#eff6ff", "#f0fdf4", "#fff7ed", "#111827"];
 
 export function createScratchSlide(index: number, layout: ScratchSlideLayout = "cover"): ScratchSlideDraft {
-  const isCover = index === 1;
+  const isCover = index === 1 && layout === "cover";
+  const isBlank = layout === "blank";
   return {
     id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${index}`,
     layout,
-    title: isCover ? "Executive Narrative" : `Slide ${index} title`,
-    kicker: isCover ? "Template" : `Slide ${index}`,
-    body: isCover
-      ? "Use this skeleton as the starting point for generated sales content."
-      : "Add the message, proof, and visual direction for this slide.",
+    title: isBlank ? "" : isCover ? "Executive Narrative" : `Slide ${index} title`,
+    kicker: isBlank ? "" : isCover ? "Template" : `Slide ${index}`,
+    body: isBlank
+      ? ""
+      : isCover
+        ? "Use this skeleton as the starting point for generated sales content."
+        : "Add the message, proof, and visual direction for this slide.",
     backgroundColor: DEFAULT_BACKGROUNDS[(index - 1) % DEFAULT_BACKGROUNDS.length],
   };
 }
 
 export function buildScratchTemplateDocument(draft: ScratchTemplateDraft): { html: string; css: string } {
   const accent = safeColor(draft.accentColor, "#2563eb");
-  const logo = draft.logoDataUrl
-    ? `<img class="scratch-logo" src="${escapeAttr(draft.logoDataUrl)}" alt="${escapeAttr(
-        draft.logoName || "Logo"
-      )}" />`
-    : "";
+  const defaultTextColor = safeColor(draft.textColor ?? "#0f172a", "#0f172a");
+  const fontFamily = safeFontFamily(draft.fontFamily);
+  const logos = normalizeLogos(draft);
+  const logoCluster = logos.length > 0 ? buildLogoCluster(logos) : "";
 
-  const slides = draft.slides.map((slide, index) => buildSlideMarkup(slide, index + 1, logo));
+  const slides = draft.slides.map((slide, index) =>
+    buildSlideMarkup(slide, index + 1, logoCluster, defaultTextColor)
+  );
 
   return {
     html: slides.join("\n"),
-    css: buildScratchCss(accent),
+    css: buildScratchCss(accent, defaultTextColor, fontFamily),
   };
 }
 
@@ -76,8 +113,14 @@ export function parseScratchTags(value: string): string[] {
     .filter(Boolean);
 }
 
-function buildSlideMarkup(slide: ScratchSlideDraft, slideNumber: number, logo: string): string {
+function buildSlideMarkup(
+  slide: ScratchSlideDraft,
+  slideNumber: number,
+  logoCluster: string,
+  defaultTextColor: string
+): string {
   const bg = safeColor(slide.backgroundColor, "#ffffff");
+  const textColor = safeColor(slide.textColor ?? defaultTextColor, defaultTextColor);
   const hasBackgroundImage = Boolean(slide.backgroundImageDataUrl);
   const backgroundImage = hasBackgroundImage
     ? `<img class="scratch-bg-image" src="${escapeAttr(slide.backgroundImageDataUrl ?? "")}" alt="" />`
@@ -91,11 +134,37 @@ function buildSlideMarkup(slide: ScratchSlideDraft, slideNumber: number, logo: s
     .filter(Boolean)
     .join(" ");
 
-  return `<section class="${classes}" data-slide="${slideNumber}" style="--slide-bg: ${bg};">
+  return `<section class="${classes}" data-slide="${slideNumber}" style="--slide-bg: ${bg}; --slide-text: ${textColor}; --slide-muted: ${textColor};">
   ${backgroundImage}
-  ${logo}
+  ${logoCluster}
   ${buildLayoutBody(slide, slideNumber)}
 </section>`;
+}
+
+function normalizeLogos(draft: ScratchTemplateDraft): ScratchLogoAsset[] {
+  const logo = (draft.logos ?? []).find((entry) => Boolean(entry.dataUrl));
+  if (logo) return [logo];
+  if (!draft.logoDataUrl) return [];
+  return [
+    {
+      id: "logo",
+      label: "Logo",
+      dataUrl: draft.logoDataUrl,
+      fileName: draft.logoName,
+      isPrimary: true,
+    },
+  ];
+}
+
+function buildLogoCluster(logos: ScratchLogoAsset[]): string {
+  const logo = logos[0];
+  if (!logo) return "";
+
+  return `<div class="scratch-logo-cluster">
+  <img class="scratch-logo-primary" src="${escapeAttr(logo.dataUrl)}" alt="${escapeAttr(
+    logo.fileName || logo.label || "Logo"
+  )}" />
+</div>`;
 }
 
 function buildLayoutBody(slide: ScratchSlideDraft, slideNumber: number): string {
@@ -105,17 +174,22 @@ function buildLayoutBody(slide: ScratchSlideDraft, slideNumber: number): string 
 
   switch (slide.layout) {
     case "section":
-      return `<div class="section-marker">${String(slideNumber).padStart(2, "0")}</div>
-  <div class="slide-copy">
-    <div class="eyebrow">${kicker}</div>
-    <h1>${title}</h1>
-    <p>${body}</p>
+      return `<div class="section-layout">
+  <div class="section-main">
+    <div class="section-marker">${String(slideNumber).padStart(2, "0")}</div>
+    <div class="slide-copy">
+      <div class="eyebrow">${kicker}</div>
+      <h1>${title}</h1>
+      <p>${body}</p>
+    </div>
   </div>
-  <div class="anchor-block">
-    <span>Message</span>
-    <span>Evidence</span>
-    <span>Next action</span>
-  </div>`;
+  <div class="section-messages">
+    <span>Message 01</span>
+    <span>Message 02</span>
+  </div>
+</div>`;
+    case "blank":
+      return `<div class="blank-layout" aria-label="Blank slide"></div>`;
     case "two_column":
       return `<header class="slide-header">
     <div class="eyebrow">${kicker}</div>
@@ -169,32 +243,22 @@ function buildLayoutBody(slide: ScratchSlideDraft, slideNumber: number): string 
     <div class="eyebrow">${kicker}</div>
     <h2>${title}</h2>
     <p>${body}</p>
-  </div>
-  <ol class="step-list">
-    <li><span>1</span>Confirm priority use case</li>
-    <li><span>2</span>Align stakeholders</li>
-    <li><span>3</span>Approve next action</li>
-  </ol>`;
+  </div>`;
     case "cover":
     default:
       return `<div class="slide-copy cover-copy">
     <div class="eyebrow">${kicker}</div>
     <h1>${title}</h1>
     <p>${body}</p>
-  </div>
-  <div class="meta-row">
-    <span>Audience</span>
-    <span>Objective</span>
-    <span>Timeline</span>
   </div>`;
   }
 }
 
-function buildScratchCss(accent: string): string {
+function buildScratchCss(accent: string, textColor: string, fontFamily: string): string {
   return `:root {
   --surface: #ffffff;
-  --text: #0f172a;
-  --muted: #64748b;
+  --text: ${textColor};
+  --muted: ${textColor};
   --border: #dbe3ec;
   --accent: ${accent};
 }
@@ -203,7 +267,7 @@ body {
   margin: 0;
   background: #e5e7eb;
   color: var(--text);
-  font-family: Urbanist, Arial, sans-serif;
+  font-family: ${fontFamily};
 }
 
 .scratch-slide {
@@ -218,6 +282,7 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  color: var(--slide-text, var(--text));
   background: var(--slide-bg, var(--surface));
 }
 
@@ -230,7 +295,7 @@ body {
 }
 
 .scratch-slide.has-bg-image::before {
-  background: linear-gradient(90deg, rgba(255,255,255,0.92), rgba(255,255,255,0.74) 58%, rgba(255,255,255,0.28));
+  background: transparent;
 }
 
 .scratch-bg-image {
@@ -239,16 +304,25 @@ body {
   z-index: -2;
   width: 100%;
   height: 100%;
+  opacity: 1;
   object-fit: cover;
 }
 
-.scratch-logo {
+.scratch-logo-cluster {
   position: absolute;
   top: 34px;
   right: 42px;
   z-index: 2;
-  max-width: 148px;
-  max-height: 54px;
+  display: flex;
+  max-width: 230px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.scratch-logo-primary {
+  max-width: 164px;
+  max-height: 56px;
   object-fit: contain;
 }
 
@@ -292,7 +366,7 @@ h3 {
 
 p,
 li {
-  color: var(--muted);
+  color: var(--slide-muted, var(--muted));
   font-size: 21px;
   line-height: 1.45;
 }
@@ -307,21 +381,32 @@ li {
   margin-top: 72px;
 }
 
-.meta-row,
-.anchor-block,
 .proof-row {
   display: grid;
   gap: 14px;
 }
 
-.meta-row {
-  grid-template-columns: repeat(3, 1fr);
+.section-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 340px);
+  gap: 48px;
+  flex: 1;
+  align-items: center;
+  width: 100%;
 }
 
-.meta-row span,
-.anchor-block span,
+.section-main {
+  min-width: 0;
+}
+
+.section-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .proof-row span,
-.step-list li,
+.section-messages span,
 .card-grid article,
 .two-column-grid article,
 .visual-slot {
@@ -330,13 +415,18 @@ li {
   background: rgba(255,255,255,0.72);
 }
 
-.meta-row span,
-.anchor-block span,
-.proof-row span {
+.proof-row span,
+.section-messages span {
   padding: 18px 20px;
-  color: var(--text);
+  color: var(--slide-text, var(--text));
   font-size: 18px;
   font-weight: 700;
+}
+
+.section-messages span {
+  min-height: 132px;
+  display: flex;
+  align-items: center;
 }
 
 .slide-header {
@@ -404,10 +494,7 @@ li {
   font-size: 96px;
   line-height: 1;
   opacity: 0.16;
-}
-
-.anchor-block {
-  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 12px;
 }
 
 .quote-layout {
@@ -436,32 +523,20 @@ blockquote {
   max-width: 780px;
 }
 
-.step-list {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  padding: 0;
-  list-style: none;
-}
-
-.step-list li {
-  min-height: 120px;
-  padding: 22px;
-  color: var(--text);
-  font-weight: 700;
-}
-
-.step-list span {
-  display: block;
-  margin-bottom: 14px;
-  color: var(--accent);
-  font-size: 28px;
+.blank-layout {
+  flex: 1;
+  width: 100%;
+  min-height: 100%;
 }`;
 }
 
 function safeColor(value: string, fallback: string): string {
   const color = value.trim();
   return /^#[0-9a-fA-F]{6}$/.test(color) ? color : fallback;
+}
+
+function safeFontFamily(value?: ScratchTemplateFont): string {
+  return SCRATCH_FONT_OPTIONS.find((option) => option.value === value)?.css ?? SCRATCH_FONT_OPTIONS[0].css;
 }
 
 function escapeHtml(value: string): string {

@@ -187,6 +187,44 @@ class CallsService:
     def _read_tenant_keys(self, ctx: TenantContext) -> tuple[str, str]:
         return resolve_team_tenant(ctx, allow_memory_fallback=True)
 
+    def _fallback_clerk_key(self, ctx: TenantContext) -> str:
+        settings = get_settings()
+        if getattr(settings, "kb_shared_mode", False):
+            return (getattr(settings, "kb_shared_tenant_key", "") or "dc-copilot-shared").strip()
+        return ctx.clerk_org_id or ctx.tenant_id or ctx.user_id or "local-dev"
+
+    def _memory_keys(self, ctx: TenantContext, clerk_key: str) -> List[str]:
+        fallback = self._fallback_clerk_key(ctx)
+        return list(dict.fromkeys([clerk_key, fallback]))
+
+    def _save_post_review_memory(
+        self, ctx: TenantContext, clerk_key: str, call_id: str, payload: Dict[str, Any]
+    ) -> None:
+        for key in self._memory_keys(ctx, clerk_key):
+            get_memory_store().save_post_review(key, call_id, payload)
+
+    def _save_post_review_call_memory(
+        self, ctx: TenantContext, clerk_key: str, call_id: str, payload: Dict[str, Any]
+    ) -> None:
+        for key in self._memory_keys(ctx, clerk_key):
+            calls = get_memory_store().list_calls(key)
+            call = next((item for item in calls if item.get("id") == call_id), None)
+            if not call:
+                call = {"id": call_id, "accountName": call_id, "briefReady": False}
+            meta = call.get("metadata") or {}
+            if not isinstance(meta, dict):
+                meta = {}
+            meta["post_call"] = payload
+            call["metadata"] = meta
+            call["status"] = "completed"
+            get_memory_store().upsert_calls(key, [call])
+
+    def _save_live_signals_memory(
+        self, ctx: TenantContext, clerk_key: str, call_id: str, snapshot: Dict[str, Any]
+    ) -> None:
+        for key in self._memory_keys(ctx, clerk_key):
+            get_memory_store().save_live_signals(key, call_id, snapshot)
+
     def sync_from_dc_notes(self, ctx: TenantContext) -> List[Dict[str, Any]]:
         notes = self._dc.get_notes(ctx)
         calls = build_calls_from_pre_dc(notes["pre_dc_records"], notes["post_dc_records"])
@@ -329,9 +367,10 @@ class CallsService:
         tenant_uuid, clerk_key = self._read_tenant_keys(ctx)
         if not get_settings().supabase_configured:
             for alias in call_id_aliases(call_id):
-                brief = get_memory_store().get_call_brief(clerk_key, alias)
-                if brief:
-                    return apply_summary_titles_to_brief(brief)
+                for key in self._memory_keys(ctx, clerk_key):
+                    brief = get_memory_store().get_call_brief(key, alias)
+                    if brief:
+                        return apply_summary_titles_to_brief(brief)
             return None
         supabase = get_supabase()
         for alias in call_id_aliases(call_id):
@@ -387,14 +426,18 @@ class CallsService:
         supabase.table("calls").update({"brief_ready": True}).eq("tenant_id", tenant_uuid).eq("id", call_id).execute()
 
     def get_post_review(self, ctx: TenantContext, call_id: str) -> Optional[Dict[str, Any]]:
-        clerk_key = self._clerk_key(ctx)
+        try:
+            tenant_uuid, clerk_key = self._read_tenant_keys(ctx)
+        except Exception:
+            tenant_uuid = ""
+            clerk_key = self._fallback_clerk_key(ctx)
         for alias in call_id_aliases(call_id):
-            cached = get_memory_store().get_post_review(clerk_key, alias)
-            if cached:
-                return cached
+            for key in self._memory_keys(ctx, clerk_key):
+                cached = get_memory_store().get_post_review(key, alias)
+                if cached:
+                    return cached
 
-        if get_settings().supabase_configured:
-            tenant_uuid = self._tenant_uuid(ctx)
+        if get_settings().supabase_configured and tenant_uuid:
             supabase = get_supabase()
             for alias in call_id_aliases(call_id):
                 try:
@@ -439,22 +482,19 @@ class CallsService:
         return payload
 
     def save_post_review(self, ctx: TenantContext, call_id: str, payload: Dict[str, Any]) -> None:
-        clerk_key = self._clerk_key(ctx)
-        get_memory_store().save_post_review(clerk_key, call_id, payload)
+        try:
+            tenant_uuid, clerk_key = self._read_tenant_keys(ctx)
+        except Exception:
+            tenant_uuid = ""
+            clerk_key = self._fallback_clerk_key(ctx)
+        self._save_post_review_memory(ctx, clerk_key, call_id, payload)
+        self._save_post_review_call_memory(ctx, clerk_key, call_id, payload)
 
         if not get_settings().supabase_configured:
-            call = self.get_call(ctx, call_id)
-            if call:
-                meta = call.get("metadata") or {}
-                if not isinstance(meta, dict):
-                    meta = {}
-                meta["post_call"] = payload
-                call["metadata"] = meta
-                call["status"] = "completed"
-                get_memory_store().upsert_calls(clerk_key, [call])
             return
 
-        tenant_uuid = self._tenant_uuid(ctx)
+        if not tenant_uuid:
+            return
         supabase = get_supabase()
         meta: Dict[str, Any] = {}
         try:
@@ -480,9 +520,13 @@ class CallsService:
         supabase.table("calls").update({"metadata": meta, "status": "completed"}).eq("tenant_id", tenant_uuid).eq("id", call_id).execute()
 
     def save_live_signals(self, ctx: TenantContext, call_id: str, snapshot: Dict[str, Any]) -> None:
-        clerk_key = self._clerk_key(ctx)
+        try:
+            tenant_uuid, clerk_key = self._read_tenant_keys(ctx)
+        except Exception:
+            tenant_uuid = ""
+            clerk_key = self._fallback_clerk_key(ctx)
         if not get_settings().supabase_configured:
-            get_memory_store().save_live_signals(clerk_key, call_id, snapshot)
+            self._save_live_signals_memory(ctx, clerk_key, call_id, snapshot)
             call = self.get_call(ctx, call_id)
             if call:
                 meta = call.get("metadata") or {}
@@ -492,7 +536,9 @@ class CallsService:
                 call["metadata"] = meta
                 get_memory_store().upsert_calls(clerk_key, [call])
             return
-        tenant_uuid = self._tenant_uuid(ctx)
+        self._save_live_signals_memory(ctx, clerk_key, call_id, snapshot)
+        if not tenant_uuid:
+            return
         supabase = get_supabase()
         call = self.get_call(ctx, call_id)
         meta = (call or {}).get("metadata") or {}

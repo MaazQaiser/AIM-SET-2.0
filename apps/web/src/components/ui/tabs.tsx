@@ -32,7 +32,7 @@ const TabsList = React.forwardRef<
     <TabsPrimitive.List
       ref={ref}
       className={cn(
-        "inline-flex items-center text-muted-foreground",
+        "flex w-full max-w-full items-center overflow-x-auto text-muted-foreground",
         variant === "underline" &&
           "h-10 gap-6 border-b border-border/60 bg-transparent",
         variant === "pill" &&

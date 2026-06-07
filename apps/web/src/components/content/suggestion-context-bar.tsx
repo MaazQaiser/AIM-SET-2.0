@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Lightbulb, X } from "lucide-react";
+import { ChevronDown, Lightbulb, X } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent } from "@dc-copilot/ui/components/card";
 import { KbUploadButton } from "@/components/knowledge/kb-upload-button";
+import { cn } from "@/lib/cn";
 
 interface SuggestionContextBarProps {
   brief?: Record<string, unknown>;
@@ -13,6 +15,7 @@ interface SuggestionContextBarProps {
 }
 
 export function SuggestionContextBar({ brief, onDismiss }: SuggestionContextBarProps) {
+  const [open, setOpen] = useState(false);
   const plan = brief?.suggestion_plan as
     | { lead_count?: number; plan_summary?: string; evidence?: { projects?: Array<{ title: string }> } }
     | undefined;
@@ -33,81 +36,126 @@ export function SuggestionContextBar({ brief, onDismiss }: SuggestionContextBarP
   const reuseCount = suggestionPlan?.slide_plan?.filter((slide) => slide.mode === "reuse").length ?? 0;
   const leadCount = Number(brief.lead_count || plan?.lead_count || 0);
   const projects = plan?.evidence?.projects ?? [];
+  const collapsedSummary =
+    plan?.plan_summary ||
+    (brief.generation_reason ? String(brief.generation_reason) : "") ||
+    (brief.needed_for ? `Needed for: ${String(brief.needed_for)}` : "");
 
   return (
-    <Card className="border-warning/30 bg-warning/5 shrink-0">
-      <CardContent className="p-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Lightbulb className="h-4 w-4 text-warning shrink-0" />
-            <p className="text-sm font-medium truncate">{String(brief.asset_name || "Suggested content")}</p>
-            <Badge variant="outline" className="shrink-0">
-              {source}
-            </Badge>
-            {leadCount > 1 && (
-              <Badge variant="outline" className="shrink-0 tabular-nums">
-                {leadCount} leads
-              </Badge>
-            )}
-          </div>
-          {plan?.plan_summary ? (
-            <p className="text-xs text-muted-foreground">{plan.plan_summary}</p>
-          ) : null}
-          {brief.generation_reason ? (
-            <p className="text-xs text-muted-foreground">{String(brief.generation_reason)}</p>
-          ) : null}
-          {brief.needed_for ? (
-            <p className="text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">Needed for: </span>
-              {String(brief.needed_for)}
-            </p>
-          ) : null}
-          {projects.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">Projects: </span>
-              {projects.map((p) => p.title).join(", ")}
-            </p>
-          )}
-          {account && (
-            <p className="text-xs text-muted-foreground">
-              Account: {account}
-              {callId && (
-                <>
-                  {" · "}
-                  <Link href={`/calls/${callId}`} className="underline underline-offset-2">
-                    View call
-                  </Link>
-                </>
+    <Card className="shrink-0 border-warning/30 bg-warning/5">
+      <CardContent className="p-0">
+        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-start gap-2 text-left"
+            aria-expanded={open}
+            onClick={() => setOpen((current) => !current)}
+          >
+            <ChevronDown
+              className={cn(
+                "mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                open && "rotate-180"
               )}
-            </p>
-          )}
-          {(projectCount > 0 || kbCount > 0 || slideCount > 0) && (
-            <div className="flex flex-wrap gap-1.5">
-              {projectCount > 0 && <Badge variant="secondary">{projectCount} project proof{projectCount === 1 ? "" : "s"}</Badge>}
-              {kbCount > 0 && <Badge variant="secondary">{kbCount} KB asset{kbCount === 1 ? "" : "s"}</Badge>}
-              {slideCount > 0 && <Badge variant="outline">{slideCount} planned slide{slideCount === 1 ? "" : "s"}</Badge>}
-              {reuseCount > 0 && <Badge variant="outline">{reuseCount} reuse slide{reuseCount === 1 ? "" : "s"}</Badge>}
+              aria-hidden
+            />
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Lightbulb className="h-4 w-4 shrink-0 text-warning" />
+                <p className="truncate text-sm font-medium">{String(brief.asset_name || "Suggested content")}</p>
+                <Badge variant="outline" className="shrink-0">
+                  {source}
+                </Badge>
+                {leadCount > 1 ? (
+                  <Badge variant="outline" className="shrink-0 tabular-nums">
+                    {leadCount} leads
+                  </Badge>
+                ) : null}
+              </div>
+              {!open && collapsedSummary ? (
+                <p className="line-clamp-1 text-xs text-muted-foreground">{collapsedSummary}</p>
+              ) : null}
             </div>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <KbUploadButton
-            defaultTitle={String(brief.asset_name || "")}
-            trigger={
-              <Button size="sm" variant="outline">
-                Upload instead
+          </button>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <KbUploadButton
+              defaultTitle={String(brief.asset_name || "")}
+              trigger={
+                <Button size="sm" variant="outline">
+                  Upload instead
+                </Button>
+              }
+            />
+            {onDismiss ? (
+              <Button size="sm" variant="ghost" onClick={onDismiss} aria-label="Dismiss suggestion context">
+                <X className="h-4 w-4" />
               </Button>
-            }
-          />
-          {onDismiss && (
-            <Button size="sm" variant="ghost" onClick={onDismiss} aria-label="Dismiss suggestion context">
-              <X className="h-4 w-4" />
+            ) : null}
+            <Button size="sm" variant="secondary" asChild>
+              <Link href="/content?tab=suggestions">All suggestions</Link>
             </Button>
-          )}
-          <Button size="sm" variant="secondary" asChild>
-            <Link href="/content?tab=suggestions">All suggestions</Link>
-          </Button>
+          </div>
         </div>
+
+        {open ? (
+          <div className="space-y-2 border-t border-warning/20 px-4 pb-4 pt-3">
+            {plan?.plan_summary ? (
+              <p className="text-xs text-muted-foreground">{plan.plan_summary}</p>
+            ) : null}
+            {brief.generation_reason ? (
+              <p className="text-xs text-muted-foreground">{String(brief.generation_reason)}</p>
+            ) : null}
+            {brief.needed_for ? (
+              <p className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Needed for: </span>
+                {String(brief.needed_for)}
+              </p>
+            ) : null}
+            {projects.length > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Projects: </span>
+                {projects.map((project) => project.title).join(", ")}
+              </p>
+            ) : null}
+            {account ? (
+              <p className="text-xs text-muted-foreground">
+                Account: {account}
+                {callId ? (
+                  <>
+                    {" · "}
+                    <Link href={`/calls/${callId}`} className="underline underline-offset-2">
+                      View call
+                    </Link>
+                  </>
+                ) : null}
+              </p>
+            ) : null}
+            {projectCount > 0 || kbCount > 0 || slideCount > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {projectCount > 0 ? (
+                  <Badge variant="secondary">
+                    {projectCount} project proof{projectCount === 1 ? "" : "s"}
+                  </Badge>
+                ) : null}
+                {kbCount > 0 ? (
+                  <Badge variant="secondary">
+                    {kbCount} KB asset{kbCount === 1 ? "" : "s"}
+                  </Badge>
+                ) : null}
+                {slideCount > 0 ? (
+                  <Badge variant="outline">
+                    {slideCount} planned slide{slideCount === 1 ? "" : "s"}
+                  </Badge>
+                ) : null}
+                {reuseCount > 0 ? (
+                  <Badge variant="outline">
+                    {reuseCount} reuse slide{reuseCount === 1 ? "" : "s"}
+                  </Badge>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

@@ -7,6 +7,7 @@ import { bffFetch } from "@/lib/api/bff-fetch";
 import { buildArtifactStudioHref } from "@/lib/content-studio/artifact-studio-href";
 import { groupPreDcGaps } from "@/lib/content/group-pre-dc-gaps";
 import { groupPostDcGaps } from "@/lib/content/group-post-dc-gaps";
+import { QUERY_STALE_TIME_MS } from "@/lib/data/query-cache";
 import type {
   Call,
   CoachingInsight,
@@ -50,7 +51,7 @@ import type { ActivityEvent, AgentRun } from "@/types/agents";
 import type { PlannedArtifactType } from "@dc-copilot/types/brief";
 import { mapPostDcGapType } from "@/lib/content/group-post-dc-gaps";
 
-const REFETCH_MS = 30_000;
+const BRIEF_POLL_MS = 8_000;
 
 export interface PreDcContentGenerationGap extends ContentToGenerate {
   callId: string;
@@ -170,8 +171,7 @@ export function useCalls() {
     queryKey: ["calls", getImportVersion()],
     queryFn: fetchCallsFromApi,
     placeholderData: localCalls.length > 0 ? localCalls : undefined,
-    staleTime: REFETCH_MS,
-    refetchInterval: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -190,7 +190,7 @@ export function useCall(callId: string) {
       throw new Error(`Call not found: ${callId}`);
     },
     placeholderData: localCall,
-    staleTime: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -207,7 +207,7 @@ export function useCallTranscript(callId: string) {
       const postDcRecord = resolvePostDcRecordForCall(callId);
       return getPostDcTranscriptForCall(callId, postDcRecord);
     },
-    staleTime: 60_000,
+    staleTime: QUERY_STALE_TIME_MS,
     enabled: Boolean(callId),
   });
 }
@@ -263,13 +263,13 @@ export function useCallBrief(callId: string) {
       return local;
     },
     placeholderData: localBrief ?? undefined,
-    staleTime: 5_000,
+    staleTime: QUERY_STALE_TIME_MS,
     refetchInterval: (query) => {
       const brief = query.state.data;
-      if (!brief) return 8_000;
+      if (!brief) return BRIEF_POLL_MS;
       if (brief.agentStatus === "success" || brief.agentStatus === "failed") return false;
       if (brief.artifactPlan?.length || brief.artifactFulfillment?.length) return false;
-      return 8_000;
+      return BRIEF_POLL_MS;
     },
   });
 }
@@ -344,7 +344,7 @@ export function usePostCallReview(callId: string) {
           snap?.bantCoverage ?? merged.discoveryBantCoverage,
       };
     },
-    staleTime: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -446,7 +446,7 @@ export function usePostCallTasks() {
     queryKey: ["post-call-tasks", getImportVersion()],
     queryFn: async () =>
       Object.values(useDcImportsStore.getState().crmTasksByCallId).flat() as TaskItem[],
-    staleTime: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -459,7 +459,7 @@ export function useCoachingCandidates() {
       const api = await bffFetch<CoachingCandidate[]>("/api/coaching/candidates");
       return api ?? [];
     },
-    staleTime: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -470,8 +470,7 @@ export function useCoachingInsights() {
       const api = await bffFetch<CoachingInsight[]>("/api/coaching/insights");
       return api ?? [];
     },
-    staleTime: REFETCH_MS,
-    refetchInterval: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -485,8 +484,7 @@ export function useKbAssets() {
       }
       return res.json() as Promise<KBAsset[]>;
     },
-    staleTime: REFETCH_MS,
-    refetchInterval: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -498,7 +496,7 @@ export function useKbAsset(assetId: string) {
       if (api) return api;
       throw new Error(`Asset not found: ${assetId}`);
     },
-    staleTime: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -509,7 +507,7 @@ export function useKbWatchlist() {
       const api = await bffFetch<KbWatchlistItem[]>("/api/kb/watchlist");
       return api ?? [];
     },
-    staleTime: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -520,8 +518,7 @@ export function useKbProjects() {
       const api = await bffFetch<KBProject[]>("/api/kb/projects");
       return api ?? [];
     },
-    staleTime: REFETCH_MS,
-    refetchInterval: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -534,7 +531,7 @@ export function useKbProject(projectId: string) {
       throw new Error(`Project not found: ${projectId}`);
     },
     enabled: Boolean(projectId),
-    staleTime: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -545,7 +542,7 @@ export function useQuarterlyPatterns() {
       const api = await bffFetch<QuarterlyPattern[]>("/api/coaching/quarterly-patterns");
       return api ?? [];
     },
-    staleTime: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -556,7 +553,7 @@ export function useContentGaps() {
       const api = await bffFetch<ContentGap[]>("/api/content/gaps");
       return api ?? [];
     },
-    staleTime: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -668,8 +665,7 @@ export function usePreDcContentGenerationGaps() {
           return new Date(a.scheduledAt ?? 0).getTime() - new Date(b.scheduledAt ?? 0).getTime();
         });
     },
-    staleTime: REFETCH_MS,
-    refetchInterval: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -744,8 +740,7 @@ export function usePostDcContentGenerationGaps() {
       const { postRunMetaByCallId, emailDraftsByCallId } = useDcImportsStore.getState();
       return collectPostDcMissingGaps(calls, postRunMetaByCallId, emailDraftsByCallId);
     },
-    staleTime: REFETCH_MS,
-    refetchInterval: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -756,8 +751,7 @@ export function useAgentRuns() {
       const api = await bffFetch<AgentRun[]>("/api/agents/runs");
       return api ?? [];
     },
-    staleTime: REFETCH_MS,
-    refetchInterval: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -768,8 +762,7 @@ export function useAgentAudit() {
       const api = await bffFetch<ActivityEvent[]>("/api/agents/audit");
       return api ?? [];
     },
-    staleTime: REFETCH_MS,
-    refetchInterval: REFETCH_MS,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 

@@ -107,12 +107,9 @@ class ContentStudioRepository:
         return out
 
     def _enrich_template_api(self, api: Dict[str, Any], row: Dict[str, Any]) -> Dict[str, Any]:
-        settings = get_settings()
         thumb_path = row.get("thumbnail_storage_path") or row.get("thumbnailStoragePath")
-        if thumb_path and settings.supabase_configured:
-            signed = self._signed_url(settings.content_templates_bucket, str(thumb_path))
-            if signed:
-                api["thumbnailUrl"] = signed
+        if thumb_path:
+            api["thumbnailUrl"] = f"/api/content/templates/{api['id']}/slides/1"
         source_path = self.resolve_template_source_path_from_row(row)
         if source_path:
             api["hasSourceFile"] = True
@@ -159,7 +156,11 @@ class ContentStudioRepository:
                 q = (
                     get_supabase()
                     .table("content_templates")
-                    .select("*")
+                    .select(
+                        "id,name,artifact_type,status,page_count,tags,"
+                        "thumbnail_storage_path,css_variables,created_at,ingest_error,"
+                        "source_file_name,source_storage_path,metadata"
+                    )
                     .order("created_at", desc=True)
                 )
                 if artifact_type:

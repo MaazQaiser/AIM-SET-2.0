@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { TemplateScratchBuilder } from "@/components/content/template-scratch-builder";
 
 export default function NewTemplatePage() {
-  redirect("/content/templates/upload");
+  return <TemplateScratchBuilder />;
 }

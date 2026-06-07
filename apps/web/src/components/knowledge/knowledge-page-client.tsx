@@ -39,7 +39,7 @@ export function KnowledgePageClient() {
 
   return (
     <PageShell size="wide">
-      <PageHeader className="flex items-center justify-between gap-4">
+      <PageHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Knowledge base</h1>
           <p className="text-sm text-muted-foreground mt-1">

@@ -270,7 +270,7 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
   const content = (
     <div className={cn("space-y-5", embedded && "mt-1")}>
       {!embedded && (
-        <PageHeader className="flex flex-wrap items-start justify-between gap-4">
+        <PageHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Project repo</h1>
             <p className="mt-1 text-sm text-muted-foreground">

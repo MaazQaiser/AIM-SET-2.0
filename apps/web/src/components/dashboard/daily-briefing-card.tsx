@@ -102,7 +102,7 @@ export function DailyBriefingCard({ enabled = true }: { enabled?: boolean }) {
             <Sparkles className="h-4 w-4 shrink-0 text-warning" />
             <span className="type-title text-foreground">Daily briefing</span>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+          <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 sm:justify-end">
             <Button
               type="button"
               variant="ghost"

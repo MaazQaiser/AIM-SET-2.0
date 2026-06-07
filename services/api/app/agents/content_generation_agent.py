@@ -5,7 +5,7 @@ import html as html_lib
 import re
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, Generator, List, Optional, Set, Tuple
 
 from dc_core.evidence import AgentEnvelope, Citation, validate_envelope
 from dc_core.tenancy import TenantContext
@@ -2107,3 +2107,895 @@ def _tighten_sentence(text: str, *, prefix: str = "") -> str:
     if len(clean) > 180:
         clean = clean[:177].rstrip(" ,.;:") + "..."
     return f"{prefix}{clean}" if prefix and not clean.lower().startswith(prefix.lower()) else clean
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Real-time streaming chat agent
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _build_chat_system_prompt(
+    *,
+    project: Dict[str, Any],
+    brief: Dict[str, Any],
+    template: Optional[Dict[str, Any]],
+    kb_hits: List[Dict[str, Any]],
+) -> str:
+    artifact_type = str(project.get("artifactType") or "deck")
+    artifact_label = {
+        "deck": "presentation deck",
+        "one_pager": "one-pager",
+        "image": "visual/image asset",
+    }.get(artifact_type, "content")
+    title = str(project.get("title") or "Untitled")
+
+    # ── Template context ─────────────────────────────────────────────────────
+    if template:
+        tpl_name = str(template.get("name") or "Custom template")
+        meta = template.get("metadata") or {}
+        slides_meta = (meta.get("slides") or []) if isinstance(meta, dict) else []
+        slide_count = int(template.get("pageCount") or template.get("page_count") or 0) or len(slides_meta)
+        if slides_meta:
+            slide_lines = ", ".join(
+                f"Slide {s.get('slide')}: {s.get('name') or s.get('title') or 'Untitled'}"
+                for s in slides_meta[:14]
+                if isinstance(s, dict)
+            )
+            tpl_context = f"{tpl_name} — {slide_count} slides ({slide_lines})"
+        elif slide_count:
+            tpl_context = f"{tpl_name} — {slide_count} slides"
+        else:
+            slots = _extract_template_slots(str(template.get("html") or ""))
+            tpl_context = tpl_name + (f" (slot types: {', '.join(slots[:8])})" if slots else "")
+    else:
+        tpl_context = "None selected (user can pick one from the right panel)"
+        slide_count = 0
+
+    # ── Suggestion context (rich brief from content gap / pre-DC / post-DC) ──
+    has_suggestion = _has_suggestion_context(brief)
+    suggestion_plan = _get_suggestion_plan(brief)
+
+    suggestion_section = ""
+    if has_suggestion:
+        sug_parts: List[str] = []
+
+        asset_name = str(brief.get("asset_name") or title).strip()
+        generation_reason = str(brief.get("generation_reason") or "").strip()
+        needed_for = str(brief.get("needed_for") or "").strip()
+        account_name = str(brief.get("account_name") or "").strip()
+        lead_name = str(brief.get("lead_name") or "").strip()
+        industry = str(brief.get("industry") or "").strip()
+        content_reqs = str(
+            brief.get("content_requirements") or brief.get("what_to_create") or ""
+        ).strip()
+        source = str(brief.get("source") or "").strip()
+        lead_count = int(brief.get("lead_count") or 0)
+        leads_raw = brief.get("leads") or []
+
+        sug_parts.append(f"- Asset requested: {asset_name}")
+        if source:
+            label = {"pre-dc": "Pre-call (Pre-DC)", "post-dc": "Post-call (Post-DC)"}.get(source, source)
+            sug_parts.append(f"- Source workflow: {label}")
+        if generation_reason:
+            sug_parts.append(f"- Why it's needed: {generation_reason}")
+        if needed_for:
+            sug_parts.append(f"- Needed for: {needed_for}")
+        if account_name:
+            sug_parts.append(f"- Account/company: {account_name}")
+        if lead_name:
+            sug_parts.append(f"- Primary contact: {lead_name}")
+        if industry:
+            sug_parts.append(f"- Industry: {industry}")
+        if content_reqs:
+            sug_parts.append(f"- What to create: {content_reqs}")
+        if lead_count > 1:
+            sug_parts.append(f"- Reusable across: {lead_count} leads")
+            if isinstance(leads_raw, list):
+                names = [
+                    str(l.get("account_name") or l.get("leadName") or "")
+                    for l in leads_raw[:5]
+                    if isinstance(l, dict)
+                ]
+                names = [n for n in names if n]
+                if names:
+                    sug_parts.append(f"  Accounts: {', '.join(names)}")
+
+        # Evidence from suggestion plan
+        if suggestion_plan:
+            evidence = suggestion_plan.get("evidence") or {}
+            projects_ev = evidence.get("projects") or []
+            kb_ev = evidence.get("kb_assets") or []
+            if projects_ev:
+                pnames = [str(p.get("title") or "Project") for p in projects_ev[:4] if isinstance(p, dict)]
+                sug_parts.append(f"- Evidence projects: {', '.join(pnames)}")
+            if kb_ev:
+                knames = [str(k.get("title") or "KB asset") for k in kb_ev[:4] if isinstance(k, dict)]
+                sug_parts.append(f"- KB evidence: {', '.join(knames)}")
+
+            plan_summary = str(suggestion_plan.get("plan_summary") or "").strip()
+            if plan_summary:
+                sug_parts.append(f"- Plan summary: {plan_summary}")
+
+        suggestion_section = "\n".join(sug_parts)
+
+    # ── Planned slide outline (from suggestion_plan.slide_plan) ──────────────
+    planned_outline_section = ""
+    if suggestion_plan:
+        slide_plan = suggestion_plan.get("slide_plan") or []
+        if slide_plan and isinstance(slide_plan, list):
+            outline_lines: List[str] = []
+            for sp in slide_plan:
+                if not isinstance(sp, dict):
+                    continue
+                n = sp.get("slide", "?")
+                heading = str(sp.get("heading") or sp.get("title") or "Slide").strip()
+                body = str(sp.get("body") or sp.get("intent") or "").strip()
+                mode = str(sp.get("mode") or "generate").strip()
+                mode_tag = " [reuse KB]" if mode == "reuse" else ""
+                body_snippet = f": {body[:90]}" if body else ""
+                outline_lines.append(f"  Slide {n} – {heading}{body_snippet}{mode_tag}")
+            if outline_lines:
+                planned_outline_section = "\n".join(outline_lines)
+
+    # ── Generic brief fields (audience, style, key messages) ─────────────────
+    audience = str(brief.get("audience") or "").strip()
+    context_style = str(brief.get("content_context") or brief.get("style") or "").strip()
+    points = brief.get("pain_points_coverage") or brief.get("key_points") or []
+    points_lines = [str(p).strip() for p in (points if isinstance(points, list) else []) if str(p).strip()]
+    slide_count_brief = int(brief.get("slide_count") or 0)
+
+    generic_parts: List[str] = []
+    if audience:
+        generic_parts.append(f"- Audience: {audience}")
+    if context_style:
+        generic_parts.append(f"- Style/context: {context_style}")
+    if points_lines:
+        generic_parts.append(f"- Key messages: {'; '.join(points_lines[:5])}")
+    if slide_count_brief and not planned_outline_section:
+        generic_parts.append(f"- Desired slide count: {slide_count_brief}")
+    brief_section = "\n".join(generic_parts) if generic_parts else (
+        "Nothing gathered yet." if not has_suggestion else ""
+    )
+
+    # ── KB assets ─────────────────────────────────────────────────────────────
+    if kb_hits:
+        kb_lines = [
+            f"- {str(h.get('title') or h.get('asset_title') or 'KB doc')}"
+            + (f": {str(h.get('chunk_text') or '')[:80]}..." if h.get("chunk_text") else "")
+            for h in kb_hits[:5]
+        ]
+        kb_section = "\n".join(kb_lines)
+    else:
+        kb_section = "No KB assets found. User can upload content to the knowledge base."
+
+    # ── Slide count / generation instructions ─────────────────────────────────
+    effective_slide_count = slide_count or slide_count_brief or (
+        len(suggestion_plan.get("slide_plan") or []) if suggestion_plan else 0
+    )
+    if effective_slide_count:
+        slide_instruction = (
+            f"The outline MUST have exactly {effective_slide_count} slides"
+            + (f" (from the selected template '{template.get('name')}')" if template else " (from the suggestion plan)")
+            + "."
+        )
+    else:
+        slide_instruction = "Propose a slide count that fits the content scope (typically 8-12 for a deck)."
+
+    # ── Behavioral mode ───────────────────────────────────────────────────────
+    if has_suggestion:
+        # Rich context already available — skip the Q&A phase
+        behavioral_rules = """## Behavioral Rules (Suggestion Context Mode)
+You already have rich context from a content gap analysis. DO NOT ask for context that's already available above.
+
+1. **First message / greeting** — Briefly acknowledge the suggestion context (asset, account, why it's needed) in 1-2 sentences, then immediately present a proposed slide outline based on the planned slides above. End with "Ready to generate — shall I go ahead?"
+2. **User approves / says yes / "go ahead"** — Write 1 line confirming then place `<generate_now/>` on its own line.
+3. **User wants changes** — Make the requested change to the outline, confirm briefly, and ask "Shall I generate now?" again.
+4. **Slide-level edit after generation** — End the reply with `<update_slide n="N">exact instructions</update_slide>`.
+5. **Keep it short** — 2-4 sentences plus the outline. Do NOT re-explain the suggestion context the user already sees above the chat.
+6. **Be specific** — Reference the account name, asset name, and the reason it's needed when relevant. Make it feel tailored, not generic."""
+    else:
+        # No suggestion context — normal conversational Q&A flow
+        behavioral_rules = """## Behavioral Rules
+1. **Greeting** — If the user greets you (hi/hello/hey), respond warmly in 1-2 lines and ask what they want to create.
+2. **Context gathering** — Ask ONE focused question at a time. Stop after you have: audience, key messages, and use case. Never ask more than 2 questions at once.
+3. **Outline proposal** — When you have enough context, propose a numbered slide-by-slide outline. Format: `Slide N – [Title]: [1-line description]`. Match template slide count exactly if one is selected.
+4. **Generation trigger** — After proposing an outline, if the user says "generate", "go ahead", "looks good", "yes", "do it", or explicitly approves, write your final reply then end with `<generate_now/>` on its own line.
+5. **Slide edit** — When the user asks to change a specific slide, write what you'll change then end with `<update_slide n="N">exact change instructions</update_slide>` on its own line.
+6. **Keep it concise** — 2-4 sentences per reply unless you're showing a full outline.
+7. **Be intelligent** — Reference the KB, reason about what the user needs, adapt your tone."""
+
+    # ── Assemble prompt ───────────────────────────────────────────────────────
+    prompt_parts = [
+        f'You are the Content Studio AI for a B2B sales enablement platform. You help users create {artifact_label}s through natural, intelligent conversation — not a scripted Q&A bot.',
+        "",
+        "## Current Project",
+        f'- Title: "{title}"',
+        f"- Type: {artifact_label}",
+        f"- Template: {tpl_context}",
+    ]
+
+    if suggestion_section:
+        prompt_parts += ["", "## Content Gap Context (pre-loaded from suggestion)", suggestion_section]
+
+    if planned_outline_section:
+        prompt_parts += ["", "## Planned Slide Structure (from suggestion analysis)", planned_outline_section]
+
+    if brief_section:
+        prompt_parts += ["", "## Additional Context", brief_section]
+
+    prompt_parts += ["", "## Knowledge Base Content Available", kb_section]
+    prompt_parts += ["", f"## Slide Count Requirement\n{slide_instruction}"]
+    prompt_parts += ["", behavioral_rules]
+    prompt_parts += [
+        "",
+        "## Output Signals (place at the very end of your message, nothing after them)",
+        "- `<generate_now/>` — triggers full HTML content generation",
+        "- `<update_slide n=\"N\">plain English instructions</update_slide>` — triggers a targeted slide patch",
+        "",
+        "## Critical",
+        "- NEVER include signal tags unless the user is ready to generate or explicitly asked for a slide edit.",
+        "- When the user asks about KB content, answer based on the Knowledge Base section above.",
+        "- If asked about KB content and none matches, say so honestly.",
+    ]
+
+    return "\n".join(prompt_parts)
+
+
+def _messages_to_openai_history(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Convert stored project messages to OpenAI multi-turn chat format."""
+    out: List[Dict[str, Any]] = []
+    for msg in messages:
+        role = str(msg.get("role") or "user")
+        if role not in ("user", "assistant"):
+            continue
+        content = msg.get("content") or {}
+        if isinstance(content, dict):
+            text = str(
+                content.get("text")
+                or content.get("message")
+                or (
+                    " ".join(str(q) for q in content["ask"] if q)
+                    if isinstance(content.get("ask"), list)
+                    else str(content.get("ask") or "")
+                )
+            ).strip()
+        else:
+            text = str(content).strip()
+        # Strip internal signal tags from history so model doesn't repeat them
+        text = re.sub(r"<generate_now\s*/>", "", text).strip()
+        text = re.sub(r"<update_slide[^>]*>.*?</update_slide>", "", text, flags=re.DOTALL).strip()
+        if text:
+            out.append({"role": role, "content": text})
+    return out[-24:]  # Last 12 turns to keep context window manageable
+
+
+def stream_studio_chat(
+    ctx: TenantContext,
+    *,
+    project_id: str,
+    user_message: str,
+    template_id: Optional[str] = None,
+    generate: bool = False,
+    repo: Optional[ContentStudioRepository] = None,
+) -> Generator[str, None, None]:
+    """Stream a real-time GPT chat turn for the Content Studio as Server-Sent Events."""
+    repo = repo or get_content_studio_repository()
+    settings = get_settings()
+
+    def _sse(payload: Dict[str, Any]) -> str:
+        return f"data: {json.dumps(payload)}\n\n"
+
+    project = repo.get_project(ctx, project_id)
+    if not project:
+        yield _sse({"type": "error", "text": "Project not found"})
+        yield "data: [DONE]\n\n"
+        return
+
+    brief = _normalize_brief(project.get("brief"))
+    artifact_type = str(project.get("artifactType") or brief.get("artifact_type") or "deck")
+    brief["artifact_type"] = artifact_type
+    title = str(project.get("title") or "Generated content")
+
+    tpl_id = template_id or project.get("templateId")
+    chosen_template = repo.get_template(ctx, tpl_id) if tpl_id else None
+
+    try:
+        kb_hits = _retrieve_studio_kb_hits(ctx, f"{title} {user_message}")
+    except Exception:
+        kb_hits = []
+
+    clean_msg = strip_secrets(user_message) if user_message else ""
+
+    # ── Fast-path: explicit generate request (Generate button) ──────────────
+    if generate:
+        repo.add_message(
+            ctx, project_id,
+            role="user",
+            content={"text": clean_msg or "Generate the content now"},
+            turn_type="chat",
+        )
+        tpl_name = str(chosen_template.get("name") or "template") if chosen_template else "deck"
+        yield _sse({"type": "token", "text": f"Generating your {tpl_name}…"})
+        try:
+            brief = _brief_with_defaults(brief)
+            repo.update_project(ctx, project_id, {"brief": brief})
+            runtime = get_content_generation_runtime(ctx)
+            # Use template-preserving generation when a template is selected
+            if chosen_template and str(chosen_template.get("html") or "").strip():
+                envelope = _generate_with_template_preservation(
+                    ctx,
+                    project_id=project_id,
+                    project=project,
+                    brief=brief,
+                    template=chosen_template,
+                    clean_msg=clean_msg,
+                    repo=repo,
+                    settings=settings,
+                    runtime=runtime,
+                )
+            else:
+                envelope = _generate_deck_from_plan(
+                    ctx,
+                    project_id=project_id,
+                    project=project,
+                    brief=brief,
+                    clean_msg=clean_msg,
+                    template_id=tpl_id,
+                    repo=repo,
+                    settings=settings,
+                    runtime=runtime,
+                )
+            result = envelope.result if hasattr(envelope, "result") else {}
+            repo.add_message(
+                ctx, project_id,
+                role="assistant",
+                content={"text": str(result.get("message") or "Content generated. Review the preview and make any edits.")},
+                turn_type="html",
+            )
+            yield _sse({
+                "type": "revision",
+                "revision_id": result.get("revision_id"),
+                "html": result.get("html"),
+                "template_id": result.get("template_id"),
+                "message": result.get("message"),
+            })
+        except Exception as exc:
+            yield _sse({"type": "error", "text": f"Generation failed: {exc}"})
+        yield "data: [DONE]\n\n"
+        return
+
+    # ── Normal chat turn: stream GPT response ───────────────────────────────
+    repo.add_message(ctx, project_id, role="user", content={"text": clean_msg}, turn_type="chat")
+
+    system = _build_chat_system_prompt(
+        project=project,
+        brief=brief,
+        template=chosen_template,
+        kb_hits=kb_hits,
+    )
+    prior_messages = repo.list_messages(ctx, project_id)
+    # Exclude the user message we just added (last item) so it goes in as user turn
+    history = _messages_to_openai_history(prior_messages[:-1])
+
+    openai_messages: List[Dict[str, Any]] = [{"role": "system", "content": system}]
+    openai_messages.extend(history)
+    openai_messages.append({"role": "user", "content": clean_msg})
+
+    full_text = ""
+
+    if not settings.openai_api_key:
+        fallback = (
+            "I'm running in offline mode and need an OpenAI API key to respond intelligently. "
+            "Please set OPENAI_API_KEY in your environment and restart the API service."
+        )
+        yield _sse({"type": "token", "text": fallback})
+        full_text = fallback
+    else:
+        try:
+            from openai import OpenAI as _OpenAI
+            oai = _OpenAI(api_key=settings.openai_api_key, timeout=90.0)
+            stream = oai.chat.completions.create(
+                model="gpt-5.4-mini",
+                messages=openai_messages,
+                stream=True,
+                max_completion_tokens=2048,
+                temperature=0.72,
+            )
+            for chunk in stream:
+                delta = (chunk.choices[0].delta.content or "") if chunk.choices else ""
+                if delta:
+                    full_text += delta
+                    yield _sse({"type": "token", "text": delta})
+        except Exception as exc:
+            err = f"Agent error: {exc}"
+            yield _sse({"type": "error", "text": err})
+            full_text = err
+
+    # Save clean assistant message (strip signal tags for stored text)
+    display_text = re.sub(r"<generate_now\s*/>", "", full_text).strip()
+    display_text = re.sub(r"<update_slide[^>]*>.*?</update_slide>", "", display_text, flags=re.DOTALL).strip()
+    repo.add_message(ctx, project_id, role="assistant", content={"text": display_text}, turn_type="chat")
+
+    # Update brief from the chat context
+    if display_text:
+        updated_brief = _update_brief_from_reply(brief, display_text)
+        if updated_brief != brief:
+            repo.update_project(ctx, project_id, {"brief": updated_brief})
+            brief = updated_brief
+
+    # ── Detect generation signal ─────────────────────────────────────────────
+    has_generate_signal = bool(re.search(r"<generate_now\s*/>", full_text))
+    update_match = re.search(
+        r"<update_slide\s+n=[\"']?(\d+)[\"']?[^>]*>(.*?)</update_slide>",
+        full_text,
+        re.DOTALL | re.IGNORECASE,
+    )
+
+    if has_generate_signal:
+        try:
+            brief = _brief_with_defaults(brief)
+            repo.update_project(ctx, project_id, {"brief": brief})
+            runtime = get_content_generation_runtime(ctx)
+            # Use template-preserving generation when a template is selected
+            if chosen_template and str(chosen_template.get("html") or "").strip():
+                envelope = _generate_with_template_preservation(
+                    ctx,
+                    project_id=project_id,
+                    project=project,
+                    brief=brief,
+                    template=chosen_template,
+                    clean_msg=clean_msg,
+                    repo=repo,
+                    settings=settings,
+                    runtime=runtime,
+                )
+            else:
+                envelope = _generate_deck_from_plan(
+                    ctx,
+                    project_id=project_id,
+                    project=project,
+                    brief=brief,
+                    clean_msg=clean_msg,
+                    template_id=tpl_id,
+                    repo=repo,
+                    settings=settings,
+                    runtime=runtime,
+                )
+            result = envelope.result if hasattr(envelope, "result") else {}
+            yield _sse({
+                "type": "revision",
+                "revision_id": result.get("revision_id"),
+                "html": result.get("html"),
+                "template_id": result.get("template_id"),
+                "message": result.get("message"),
+            })
+        except Exception as exc:
+            yield _sse({"type": "error", "text": f"Generation failed: {exc}"})
+
+    elif update_match:
+        slide_num = int(update_match.group(1))
+        update_desc = update_match.group(2).strip()
+        try:
+            latest = repo.latest_revision(ctx, project_id)
+            if latest and settings.openai_api_key:
+                current_html = str(latest.get("html") or "")
+                slide_pat = re.compile(
+                    rf'(<section[^>]*data-slide=["\']?{slide_num}["\']?[^>]*>)(.*?)(</section>)',
+                    re.DOTALL | re.IGNORECASE,
+                )
+                slide_match = slide_pat.search(current_html)
+                current_slide_html = slide_match.group(0) if slide_match else ""
+
+                from openai import OpenAI as _OpenAI
+                oai = _OpenAI(api_key=settings.openai_api_key, timeout=60.0)
+                patch_resp = oai.chat.completions.create(
+                    model="gpt-5.4-mini",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are an HTML slide editor. "
+                                "Return ONLY the updated <section class=\"slide\" data-slide=\"N\"> ... </section> HTML. "
+                                "No explanation, no markdown fences, just the section element."
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": (
+                                f"Current slide HTML:\n{current_slide_html}\n\n"
+                                f"Change instruction: {update_desc}\n\n"
+                                "Return the updated section HTML only."
+                            ),
+                        },
+                    ],
+                    max_completion_tokens=1024,
+                    temperature=0.5,
+                )
+                new_slide_html = (patch_resp.choices[0].message.content or "").strip()
+                if new_slide_html and "<section" in new_slide_html.lower():
+                    if slide_match:
+                        merged_html = slide_pat.sub(new_slide_html, current_html, count=1)
+                    else:
+                        merged_html = current_html + "\n" + new_slide_html
+                    rev = repo.create_revision(
+                        ctx, project_id,
+                        html=merged_html,
+                        citations=latest.get("citations") or [],
+                        template_id=tpl_id,
+                    )
+                    repo.update_project(ctx, project_id, {"status": "preview"})
+                    yield _sse({
+                        "type": "revision",
+                        "revision_id": rev["id"],
+                        "html": merged_html,
+                        "template_id": tpl_id,
+                    })
+        except Exception as exc:
+            yield _sse({"type": "error", "text": f"Slide update failed: {exc}"})
+
+    yield "data: [DONE]\n\n"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Template-preserving generation helpers
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _strip_data_urls(html: str) -> Tuple[str, Dict[str, str]]:
+    """Replace long base64 data: URIs with short placeholders to reduce LLM context."""
+    placeholders: Dict[str, str] = {}
+    counter: List[int] = [0]
+
+    def _sub(m: re.Match) -> str:  # type: ignore[type-arg]
+        key = f"__DURL_{counter[0]}__"
+        placeholders[key] = m.group(0)
+        counter[0] += 1
+        return key
+
+    stripped = re.sub(
+        r'data:[a-z][a-z0-9!#$&\-^_]*/[a-z0-9\-+.]+;base64,[A-Za-z0-9+/=]{40,}',
+        _sub,
+        html,
+    )
+    return stripped, placeholders
+
+
+def _restore_data_urls(html: str, placeholders: Dict[str, str]) -> str:
+    for key, value in placeholders.items():
+        html = html.replace(key, value)
+    return html
+
+
+def _extract_template_slide_sections(template_html: str) -> List[str]:
+    """Return each <section data-slide="N"> element from a template document."""
+    pattern = re.compile(
+        r'<section[^>]*\bdata-slide=["\']?\d+["\']?[^>]*>.*?</section>',
+        re.DOTALL | re.IGNORECASE,
+    )
+    return [m.group(0) for m in pattern.finditer(template_html)]
+
+
+def _extract_template_head(template_html: str) -> str:
+    """Extract everything inside <head> (styles, meta, etc.)."""
+    m = re.search(r'<head[^>]*>(.*?)</head>', template_html, re.DOTALL | re.IGNORECASE)
+    return m.group(1).strip() if m else ""
+
+
+def _describe_slide_slots(slide_html: str) -> str:
+    """Return a compact description of what text slots a slide exposes."""
+    parts: List[str] = []
+    if re.search(r'data-role=["\']heading["\']|class=["\'][^"\']*(?:slide-title|title-text)\b', slide_html, re.I):
+        parts.append("heading")
+    if re.search(r'class=["\'][^"\']*(?:slide-kicker|eyebrow|slot-label|section-marker)\b', slide_html, re.I):
+        parts.append("kicker")
+    if re.search(r'data-role=["\']body["\']|class=["\'][^"\']*slide-body\b', slide_html, re.I):
+        parts.append("body")
+    if re.search(r'<h[12]\b', slide_html, re.I) and "heading" not in parts:
+        parts.append("heading(h1/h2)")
+    if re.search(r'<p\b', slide_html, re.I) and "body" not in parts:
+        parts.append("body(p)")
+    if re.search(r'<ul\b|<ol\b', slide_html, re.I):
+        parts.append("bullets")
+    return ", ".join(parts) if parts else "decorative"
+
+
+def _replace_first_element_text(
+    html: str, opening_pattern: str, new_text: str
+) -> Tuple[str, bool]:
+    """Find the first element whose opening tag matches ``opening_pattern``
+    and replace its inner text, preserving the opening/closing tags themselves."""
+    m = re.search(opening_pattern, html, re.IGNORECASE)
+    if not m:
+        return html, False
+    tag_m = re.match(r"<(\w+)", m.group(0))
+    if not tag_m:
+        return html, False
+    tag = tag_m.group(1)
+    after = html[m.end():]
+    close = f"</{tag}>"
+    close_pos = after.lower().find(close.lower())
+    if close_pos < 0:
+        return html, False
+    escaped = html_lib.escape(new_text)
+    return html[: m.end()] + escaped + html[m.end() + close_pos :], True
+
+
+def _inject_slide_content(slide_html: str, content: Dict[str, Any], slide_num: int) -> str:
+    """Inject generated text into a template slide's text slots.
+    All HTML structure, classes, inline styles, images, and decorative elements
+    are preserved exactly — only visible text is changed."""
+    heading = str(content.get("heading") or "").strip()
+    kicker = str(content.get("kicker") or "").strip()
+    body = str(content.get("body") or "").strip()
+    subheading = str(content.get("subheading") or "").strip()
+    bullets = [str(b).strip() for b in (content.get("bullets") or []) if str(b).strip()]
+
+    result = slide_html
+
+    # Kicker / label — try all common class names used by templates
+    if kicker:
+        replaced = False
+        for kicker_pattern in [
+            r'<[^>]+class=["\'][^"\']*slide-kicker[^"\']*["\'][^>]*>',
+            r'<[^>]+class=["\'][^"\']*\beyebrow\b[^"\']*["\'][^>]*>',
+            r'<[^>]+class=["\'][^"\']*\bslot-label\b[^"\']*["\'][^>]*>',
+            r'<[^>]+class=["\'][^"\']*\bsection-marker\b[^"\']*["\'][^>]*>',
+        ]:
+            result, replaced = _replace_first_element_text(result, kicker_pattern, kicker)
+            if replaced:
+                break
+
+    # Heading — data-role="heading" → h1 → h2
+    if heading:
+        replaced = False
+        result, replaced = _replace_first_element_text(
+            result, r'<[^>]+data-role=["\']heading["\'][^>]*>', heading
+        )
+        if not replaced:
+            result, replaced = _replace_first_element_text(result, r"<h1[^>]*>", heading)
+        if not replaced:
+            result, _ = _replace_first_element_text(result, r"<h2[^>]*>", heading)
+
+    # Body — data-role="body" → class slide-body → first <p>
+    body_text = body or subheading
+    if body_text:
+        replaced = False
+        result, replaced = _replace_first_element_text(
+            result, r'<[^>]+data-role=["\']body["\'][^>]*>', body_text
+        )
+        if not replaced:
+            result, replaced = _replace_first_element_text(
+                result, r'<[^>]+class=["\'][^"\']*slide-body[^"\']*["\'][^>]*>', body_text
+            )
+        if not replaced:
+            result, _ = _replace_first_element_text(result, r"<p[^>]*>", body_text)
+
+    # Bullets
+    if bullets:
+        li_html = "".join(f"<li>{html_lib.escape(b)}</li>" for b in bullets[:8])
+        result = re.sub(
+            r"(<(?:ul|ol)[^>]*>).*?(</(?:ul|ol)>)",
+            rf"\g<1>{li_html}\2",
+            result,
+            count=1,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+
+    return result
+
+
+def _parse_slide_content_json(text: str, expected_count: int) -> Dict[int, Dict[str, Any]]:
+    """Parse the slide content JSON returned by the LLM."""
+    text = text.strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE).strip()
+    text = re.sub(r"\s*```$", "", text).strip()
+
+    data: Any = None
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        if m:
+            try:
+                data = json.loads(m.group(0))
+            except json.JSONDecodeError:
+                return {}
+
+    if not isinstance(data, dict):
+        return {}
+
+    slides_list = data.get("slides") or []
+    if not isinstance(slides_list, list):
+        return {}
+
+    out: Dict[int, Dict[str, Any]] = {}
+    for i, item in enumerate(slides_list, start=1):
+        if isinstance(item, dict):
+            num = int(item.get("slide") or i)
+            out[num] = item
+    return out
+
+
+def _generate_with_template_preservation(
+    ctx: TenantContext,
+    *,
+    project_id: str,
+    project: Dict[str, Any],
+    brief: Dict[str, Any],
+    template: Dict[str, Any],
+    clean_msg: str,
+    repo: ContentStudioRepository,
+    settings: Any,
+    runtime: Dict[str, Any],
+) -> AgentEnvelope:
+    """Generate a deck by filling AI content INTO the template's existing slide HTML.
+    Backgrounds, logos, images, layout, and all CSS are 100% preserved.
+    Only heading / body / kicker / bullet text slots are updated."""
+    tpl_id = str(template.get("id") or "")
+    tpl_html = str(template.get("html") or "")
+    title = str(project.get("title") or "Generated Deck")
+    audience = str(brief.get("audience") or "Executive stakeholders").strip()
+    context_str = str(brief.get("content_context") or brief.get("style") or "B2B sales enablement").strip()
+    raw_points = brief.get("pain_points_coverage") or brief.get("key_points") or []
+    points: List[str] = [str(p).strip() for p in (raw_points if isinstance(raw_points, list) else []) if str(p).strip()]
+
+    # KB context
+    try:
+        kb_hits, citations = _retrieve_studio_evidence(
+            ctx, project=project, brief=brief, user_message=clean_msg, settings=settings
+        )
+    except Exception:
+        kb_hits, citations = [], []
+    if not citations:
+        citations = _brief_citations(project_id, brief)
+
+    # Extract slides from template
+    slide_sections = _extract_template_slide_sections(tpl_html)
+    slide_count = len(slide_sections)
+
+    if slide_count == 0:
+        # No parseable sections → fall back to standard generation
+        return _generate_deck_from_plan(
+            ctx,
+            project_id=project_id,
+            project=project,
+            brief=brief,
+            clean_msg=clean_msg,
+            template_id=tpl_id,
+            repo=repo,
+            settings=settings,
+            runtime=runtime,
+        )
+
+    head_content = _extract_template_head(tpl_html)
+
+    # Strip data URLs from slide HTML before sending to LLM.
+    # IMPORTANT: use a single counter across all slides so each placeholder key
+    # is unique — if we reset to 0 per slide, slide 2+ overwrite slide 1's
+    # entries in all_placeholders and the wrong background gets restored.
+    stripped_sections: List[str] = []
+    all_placeholders: Dict[str, str] = {}
+    _global_counter: List[int] = [0]
+
+    def _strip_section(html: str) -> str:
+        ph = all_placeholders  # share the same dict
+        counter = _global_counter
+
+        def _sub(m: re.Match) -> str:  # type: ignore[type-arg]
+            key = f"__DURL_{counter[0]}__"
+            ph[key] = m.group(0)
+            counter[0] += 1
+            return key
+
+        return re.sub(
+            r'data:[a-z][a-z0-9!#$&\-^_]*/[a-z0-9\-+.]+;base64,[A-Za-z0-9+/=]{40,}',
+            _sub,
+            html,
+        )
+
+    for sec in slide_sections:
+        stripped_sections.append(_strip_section(sec))
+
+    slide_descriptions = "\n".join(
+        f"  Slide {i + 1}: {_describe_slide_slots(sec)}"
+        for i, sec in enumerate(stripped_sections)
+    )
+    kb_text = "\n".join(
+        f"  - {str(h.get('title') or 'KB doc')}: {str(h.get('chunk_text') or '')[:120]}"
+        for h in kb_hits[:4]
+    ) or "  (none)"
+    points_text = "; ".join(points[:5]) if points else f"Key benefits and value of {title}"
+
+    content_prompt = (
+        f"Generate slide content for a B2B sales enablement deck titled '{title}' with {slide_count} slides.\n\n"
+        f"Context:\n"
+        f"  Project title: {title}\n"
+        f"  Audience: {audience}\n"
+        f"  Key messages: {points_text}\n"
+        f"  Style / context: {context_str}\n"
+        f"  KB sources:\n{kb_text}\n\n"
+        f"Template slide structure (what text slots each slide has):\n{slide_descriptions}\n\n"
+        "Rules:\n"
+        "  - Slide 1 is typically a cover/title slide — use a short punchy headline\n"
+        "  - Last slide is typically next steps or CTA\n"
+        "  - kicker = 2-4 word category label (e.g. 'The Problem', 'Our Approach')\n"
+        "  - heading = concise slide title, max 10 words\n"
+        "  - body = 1-2 sentence description (omit for decorative slides)\n"
+        "  - bullets = short phrases, max 4, only if slide structure has a bullet list\n"
+        "  - For 'decorative' slides include the entry but leave fields empty/null\n\n"
+        f"Return ONLY this JSON with exactly {slide_count} slides (no markdown, no explanation):\n"
+        '{"slides": [{"slide": 1, "kicker": "...", "heading": "...", "subheading": "...", "body": "...", "bullets": []}]}'
+    )
+
+    completion = LlmClient(openai_api_key=settings.openai_api_key or None).complete(
+        system=(
+            "You are a B2B sales content expert. "
+            "Generate structured slide content as compact JSON. "
+            "Focus on executive clarity and business impact."
+        ),
+        user=content_prompt,
+        max_tokens=3000,
+        model="gpt-5.4-mini",
+        fallback_model="gpt-5.4-mini",
+    )
+
+    slide_contents = _parse_slide_content_json(completion.text, slide_count)
+
+    # Inject content into each template slide, restoring data URLs afterwards
+    filled_sections: List[str] = []
+    for i, (orig_sec, stripped_sec) in enumerate(zip(slide_sections, stripped_sections), start=1):
+        content = slide_contents.get(i) or {}
+        if content:
+            filled_stripped = _inject_slide_content(stripped_sec, content, i)
+            filled = _restore_data_urls(filled_stripped, all_placeholders)
+        else:
+            filled = orig_sec  # decorative slide — keep exactly as the template
+        filled_sections.append(filled)
+
+    # Reassemble full document preserving template styles
+    body_html = "\n".join(filled_sections)
+    full_html = (
+        "<!DOCTYPE html><html>"
+        f"<head><meta charset='utf-8'>{head_content}</head>"
+        "<body style='margin:0;padding:0;background:#e8eef7;'>"
+        f"<div style='display:flex;flex-direction:column;gap:0;'>{body_html}</div>"
+        "</body></html>"
+    )
+
+    tpl_name = str(template.get("name") or "template")
+    message = (
+        f"Generated {slide_count} slides using the {tpl_name} template. "
+        "The layout, colors, backgrounds, and logos are all preserved from the template — "
+        "only the content has been filled in. Let me know what you'd like to change."
+    )
+
+    rev = repo.create_revision(
+        ctx,
+        project_id,
+        html=full_html,
+        citations=[c.model_dump() for c in citations],
+        template_id=tpl_id,
+    )
+    repo.update_project(ctx, project_id, {"status": "preview", "templateId": tpl_id, "brief": brief})
+
+    envelope = AgentEnvelope(
+        agent="content_generation",
+        operation="html_generate",
+        result={
+            "project_id": project_id,
+            "turn_type": "html",
+            "message": message,
+            "revision_id": rev["id"],
+            "html": full_html,
+            "template_id": tpl_id,
+        },
+        citations=citations,
+        confidence=0.92,
+        cost={
+            "tokens": completion.tokens_in + completion.tokens_out,
+            "usd": completion.cost_usd,
+            "model": completion.model,
+        },
+        trace_id=completion.trace_id,
+        creative=True,
+    )
+    validate_envelope(envelope)
+    return envelope

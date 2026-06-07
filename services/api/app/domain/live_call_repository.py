@@ -23,6 +23,10 @@ def _fallback_tenant_key(ctx: TenantContext) -> str:
     return ctx.clerk_org_id or ctx.tenant_id or ctx.user_id or "local-dev"
 
 
+def _memory_keys(ctx: TenantContext, clerk_key: str) -> List[str]:
+    return list(dict.fromkeys([clerk_key, _fallback_tenant_key(ctx)]))
+
+
 def _resolve_live_tenant(ctx: TenantContext) -> tuple[str, str, bool]:
     try:
         tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
@@ -76,7 +80,8 @@ class LiveCallRepository:
             except Exception:
                 pass
         store = get_memory_store()
-        store.live_sessions.setdefault(clerk_key, {})[call_id] = row
+        for key in _memory_keys(ctx, clerk_key):
+            store.live_sessions.setdefault(key, {})[call_id] = row
         return row
 
     def get_session(self, ctx: TenantContext, call_id: str) -> Optional[Dict[str, Any]]:
@@ -172,8 +177,10 @@ class LiveCallRepository:
                 ).execute()
             except Exception:
                 pass
-        get_memory_store().live_sessions.setdefault(clerk_key, {})[call_id] = linked
-        return get_memory_store().live_sessions[clerk_key][call_id]
+        store = get_memory_store()
+        for key in _memory_keys(ctx, clerk_key):
+            store.live_sessions.setdefault(key, {})[call_id] = linked
+        return store.live_sessions[clerk_key][call_id]
 
     def append_transcript_event(
         self,
@@ -453,9 +460,11 @@ class LiveCallRepository:
                 ).eq("tenant_id", tenant_uuid).eq("call_id", call_id).execute()
             except Exception:
                 pass
-        sess = get_memory_store().live_sessions.setdefault(clerk_key, {}).get(call_id) or {}
+        store = get_memory_store()
+        sess = store.live_sessions.setdefault(clerk_key, {}).get(call_id) or {}
         sess.update({"status": "ended", "ended_at": ended_at, "summary": summary})
-        get_memory_store().live_sessions.setdefault(clerk_key, {})[call_id] = sess
+        for key in _memory_keys(ctx, clerk_key):
+            store.live_sessions.setdefault(key, {})[call_id] = sess
         return sess
 
 

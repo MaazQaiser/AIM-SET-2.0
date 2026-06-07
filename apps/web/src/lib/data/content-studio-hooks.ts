@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { bffFetch } from "@/lib/api/bff-fetch";
+import { QUERY_STALE_TIME_MS } from "@/lib/data/query-cache";
 import type {
   ContentExportResult,
   ContentTemplate,
@@ -41,32 +42,43 @@ export function useStudioProjects() {
       const api = await bffFetch<StudioProject[]>("/api/content/studio/projects");
       return api ?? [];
     },
-    staleTime: 15_000,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
-export function useStudioProject(projectId: string) {
+export function useStudioProject(
+  projectId: string,
+  options: { includeLatest?: boolean } = {}
+) {
+  const includeLatest = options.includeLatest ?? true;
   return useQuery({
-    queryKey: ["studio-project", projectId],
+    queryKey: ["studio-project", projectId, { includeLatest }],
     queryFn: async () => {
-      const api = await bffFetch<StudioProjectDetail>(`/api/content/studio/projects/${projectId}`);
+      const query = includeLatest ? "" : "?includeLatest=false";
+      const api = await bffFetch<StudioProjectDetail>(
+        `/api/content/studio/projects/${projectId}${query}`
+      );
       if (!api) throw new Error("Project not found");
       return api;
     },
     enabled: Boolean(projectId),
-    refetchInterval: 5_000,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
 export function useContentTemplates(artifactType?: string) {
+  // Always fetch ALL templates with a single stable cache key, then filter
+  // client-side. This avoids a race condition where changing the query key
+  // (undefined → "deck") briefly shows [] while the new fetch is in-flight.
   return useQuery({
-    queryKey: ["content-templates", artifactType],
+    queryKey: ["content-templates"],
     queryFn: async () => {
-      const qs = artifactType ? `?artifactType=${encodeURIComponent(artifactType)}` : "";
-      const api = await bffFetch<ContentTemplate[]>(`/api/content/templates${qs}`);
+      const api = await bffFetch<ContentTemplate[]>("/api/content/templates");
       return api ?? [];
     },
-    staleTime: 10_000,
+    staleTime: QUERY_STALE_TIME_MS,
+    select: (all) =>
+      artifactType ? all.filter((t) => !t.artifactType || t.artifactType === artifactType) : all,
     refetchInterval: (q) => {
       const data = q.state.data;
       if (data?.some((t) => t.status === "processing")) return 3_000;
@@ -84,7 +96,7 @@ export function useContentTemplate(templateId?: string) {
       return api;
     },
     enabled: Boolean(templateId),
-    staleTime: 30_000,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -115,6 +127,7 @@ export function useStudioRevision(projectId: string, revisionId?: string) {
       return api;
     },
     enabled: Boolean(projectId && revisionId),
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 

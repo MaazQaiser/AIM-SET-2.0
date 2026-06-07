@@ -1,488 +1,513 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Send } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Bot, Send, Sparkles } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Textarea } from "@dc-copilot/ui/components/textarea";
+import { TemplatePicker } from "@/components/content/template-picker";
 import { cn } from "@/lib/cn";
-import { useStudioMessage } from "@/lib/data/content-studio-hooks";
-import type { StudioTurnResult } from "@/types/content_studio";
+import type { ContentTemplate, StudioTurnResult } from "@/types/content_studio";
 
-interface Message {
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface StoredMessage {
   id: string;
   role: string;
   content: Record<string, unknown>;
   turnType?: string | null;
 }
 
-interface DisplayMessage extends Message {
-  animate?: boolean;
-  local?: boolean;
-  tone?: "default" | "error";
+interface DisplayMessage {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  isStreaming?: boolean;
+  isError?: boolean;
+}
+
+interface StreamRevision {
+  revision_id?: string;
+  html?: string;
+  template_id?: string;
+  message?: string;
+}
+
+// ─── SSE event types coming from the backend ─────────────────────────────────
+interface SseToken { type: "token"; text: string }
+interface SseRevision { type: "revision"; revision_id?: string; html?: string; template_id?: string; message?: string }
+interface SseError { type: "error"; text: string }
+type SseEvent = SseToken | SseRevision | SseError;
+
+// ─── Props ───────────────────────────────────────────────────────────────────
+
+export interface StudioChatHandle {
+  sendGenerate: () => void;
+  hasTemplate: () => boolean;
 }
 
 export function StudioChat({
   projectId,
   messages,
   onTurn,
+  onRefetch,
   selectedTemplateId,
+  onTemplateSelect,
+  templates = [],
+  isLoadingTemplates = false,
+  recommendedTemplateIds,
   hasSuggestionContext = false,
   isBootstrapping = false,
+  chatRef,
 }: {
   projectId: string;
-  messages: Message[];
+  messages: StoredMessage[];
   onTurn: (result: StudioTurnResult) => void;
+  onRefetch: () => void;
   selectedTemplateId?: string;
+  onTemplateSelect?: (id: string) => void;
+  templates?: ContentTemplate[];
+  isLoadingTemplates?: boolean;
+  recommendedTemplateIds?: string[];
   hasSuggestionContext?: boolean;
   isBootstrapping?: boolean;
+  chatRef?: React.RefObject<StudioChatHandle | null>;
 }) {
   const [input, setInput] = useState("");
-  const [transientMessages, setTransientMessages] = useState<DisplayMessage[]>([]);
-  const [animatedServerIds, setAnimatedServerIds] = useState<Set<string>>(new Set());
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+  const [streamError, setStreamError] = useState("");
+  const [showRequired, setShowRequired] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const seenServerIdsRef = useRef<Set<string> | null>(null);
-  const send = useStudioMessage(projectId);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const persistedMessages = useMemo<DisplayMessage[]>(
-    () =>
-      messages.map((message) => ({
-        ...message,
-        animate: animatedServerIds.has(message.id),
-      })),
-    [messages, animatedServerIds]
-  );
-
-  const animatedTransientSignatures = useMemo(
-    () =>
-      new Set(
-        transientMessages
-          .filter((message) => message.animate)
-          .map((message) => messageSignature(message))
-      ),
-    [transientMessages]
-  );
-
-  const persistedSignatures = useMemo(
-    () => new Set(persistedMessages.map((message) => messageSignature(message))),
-    [persistedMessages]
-  );
-
-  const displayMessages = useMemo(() => {
-    const persisted = persistedMessages.filter(
-      (message) => !animatedTransientSignatures.has(messageSignature(message))
-    );
-    const transient = transientMessages.filter(
-      (message) => message.animate || !persistedSignatures.has(messageSignature(message))
-    );
-    return [...persisted, ...transient];
-  }, [animatedTransientSignatures, persistedMessages, persistedSignatures, transientMessages]);
-
+  // Expose sendGenerate for the parent page to call via the Generate button
   useEffect(() => {
-    const currentIds = new Set(messages.map((message) => message.id));
-    if (seenServerIdsRef.current === null) {
-      seenServerIdsRef.current = currentIds;
-      return;
+    if (chatRef) {
+      (chatRef as React.MutableRefObject<StudioChatHandle | null>).current = {
+        hasTemplate: () => Boolean(selectedTemplateId),
+        sendGenerate: () => {
+          if (!selectedTemplateId) {
+            setShowRequired(true);
+            return;
+          }
+          setShowRequired(false);
+          void sendMessage("", true);
+        },
+      };
     }
-
-    const seen = seenServerIdsRef.current;
-    const newAssistantIds = messages
-      .filter((message) => {
-        if (message.role !== "assistant" || seen.has(message.id)) return false;
-        return !animatedTransientSignatures.has(messageSignature(message));
-      })
-      .map((message) => message.id);
-
-    if (newAssistantIds.length > 0) {
-      setAnimatedServerIds((prev) => {
-        const next = new Set(prev);
-        for (const id of newAssistantIds) next.add(id);
-        return next;
-      });
-    }
-    seenServerIdsRef.current = currentIds;
-  }, [animatedTransientSignatures, messages]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   });
 
-  async function handleSend() {
-    if (!input.trim() || send.isPending) return;
-    const text = input.trim();
-    setInput("");
-    const userMessage: DisplayMessage = {
-      id: `local-user-${Date.now()}`,
-      role: "user",
-      content: { text },
-      local: true,
-    };
-    setTransientMessages((prev) => [...prev, userMessage]);
+  // Convert stored server messages → display messages
+  const persistedDisplay = useMemo<DisplayMessage[]>(() => {
+    return messages.map((msg) => ({
+      id: msg.id,
+      role: (msg.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
+      text: extractText(msg.content),
+    }));
+  }, [messages]);
 
-    try {
-      const envelope = await send.mutateAsync({
-        message: text,
-        templateId: selectedTemplateId,
-        generate: false,
-      });
-      const assistantMessage: DisplayMessage = {
-        id: `local-assistant-${envelope.result.revision_id ?? Date.now()}`,
-        role: "assistant",
-        content: envelope.result as unknown as Record<string, unknown>,
-        turnType: envelope.result.turn_type,
-        animate: true,
-        local: true,
-      };
-      setTransientMessages((prev) => [...prev, assistantMessage]);
-      onTurn(envelope.result);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "The agent could not complete that turn.";
-      setTransientMessages((prev) => [
-        ...prev,
-        {
-          id: `local-error-${Date.now()}`,
-          role: "assistant",
-          content: { text: message },
-          animate: true,
-          local: true,
-          tone: "error",
-        },
-      ]);
+  // Auto-scroll on new content
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [persistedDisplay, streamingText]);
+
+  // ── Core streaming send ───────────────────────────────────────────────────
+
+  const sendMessage = useCallback(
+    async (text: string, generate = false) => {
+      const trimmedText = text.trim();
+      if (!trimmedText && !generate) return;
+      if (isStreaming) return;
+
+      setInput("");
+      setStreamError("");
+      setStreamingText("");
+      setIsStreaming(true);
+
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
+
+      try {
+        const response = await fetch(
+          `/api/content/studio/projects/${projectId}/chat`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: trimmedText || (generate ? "Generate the content now" : ""),
+              templateId: selectedTemplateId,
+              generate,
+            }),
+            signal: abortRef.current.signal,
+          }
+        );
+
+        if (!response.ok || !response.body) {
+          const errText = await response.text().catch(() => "Request failed");
+          setStreamError(errText || "Request failed");
+          setIsStreaming(false);
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let accumulatedText = "";
+        let pendingRevision: StreamRevision | null = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const blocks = buffer.split("\n\n");
+          buffer = blocks.pop() ?? "";
+
+          for (const block of blocks) {
+            for (const line of block.split("\n")) {
+              if (!line.startsWith("data: ")) continue;
+              const data = line.slice(6).trim();
+
+              if (data === "[DONE]") {
+                break;
+              }
+
+              let event: SseEvent;
+              try {
+                event = JSON.parse(data) as SseEvent;
+              } catch {
+                continue;
+              }
+
+              if (event.type === "token") {
+                accumulatedText += event.text;
+                // Strip signal tags from display text
+                const displayChunk = cleanSignalTags(accumulatedText);
+                setStreamingText(displayChunk);
+              } else if (event.type === "revision") {
+                pendingRevision = event;
+              } else if (event.type === "error") {
+                setStreamError(event.text);
+              }
+            }
+          }
+        }
+
+        // Stream finished — trigger side effects
+        if (pendingRevision) {
+          onTurn({
+            project_id: projectId,
+            turn_type: "html",
+            html: pendingRevision.html,
+            revision_id: pendingRevision.revision_id,
+            template_id: pendingRevision.template_id,
+            message: pendingRevision.message,
+          });
+        }
+
+        onRefetch();
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          // User cancelled — no error
+        } else {
+          setStreamError(err instanceof Error ? err.message : "Unexpected error");
+        }
+      } finally {
+        setStreamingText("");
+        setIsStreaming(false);
+      }
+    },
+    [isStreaming, projectId, selectedTemplateId, onTurn, onRefetch]
+  );
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void sendMessage(input);
     }
   }
 
-  function handleAnimationDone(message: DisplayMessage) {
-    if (message.local) {
-      setTransientMessages((prev) =>
-        prev.map((item) => (item.id === message.id ? { ...item, animate: false } : item))
-      );
-      return;
-    }
-    setAnimatedServerIds((prev) => {
-      if (!prev.has(message.id)) return prev;
-      const next = new Set(prev);
-      next.delete(message.id);
-      return next;
-    });
-  }
+  const isEmpty = persistedDisplay.length === 0 && !streamingText && !isStreaming && !isBootstrapping;
 
   return (
-    <div className="flex flex-col h-full border border-border rounded-lg bg-card">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[320px]">
-        {displayMessages.length === 0 && !send.isPending && !isBootstrapping && (
+    <div className="flex flex-col h-full border border-border rounded-lg bg-card overflow-hidden">
+      {/* Message list */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[320px]">
+
+        {isEmpty && !hasSuggestionContext && (
           <div className="rounded-md border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-            {hasSuggestionContext
-              ? "Loading your suggested plan from discovery context…"
-              : "What should we create first?"}
+            Start the conversation — tell me what you'd like to create.
           </div>
         )}
-        {displayMessages.length === 0 && (send.isPending || isBootstrapping) && (
-          <div className="mr-10 flex items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground animate-in fade-in-0 slide-in-from-bottom-1">
-            <Bot className="h-4 w-4" />
+
+        {isEmpty && hasSuggestionContext && (
+          <div className="rounded-md border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+            Loading your suggested plan from discovery context…
+          </div>
+        )}
+
+        {(isBootstrapping && persistedDisplay.length === 0) && (
+          <AssistantBubble isStreaming>
             <TypingDots />
-            <span>Preparing your slide plan…</span>
-          </div>
+            <span className="ml-1 text-sm">Preparing your plan…</span>
+          </AssistantBubble>
         )}
-        {displayMessages.map((message) => (
-          <ChatMessage
-            key={message.id}
-            message={message}
-            onQuestionClick={(question) => setInput(question.endsWith("?") ? `${question} ` : question)}
-            onAnimationDone={() => handleAnimationDone(message)}
-          />
+
+        {persistedDisplay.map((msg) => (
+          msg.role === "user" ? (
+            <UserBubble key={msg.id} text={msg.text} />
+          ) : (
+            <AssistantBubble key={msg.id}>
+              <FormattedText text={msg.text} />
+            </AssistantBubble>
+          )
         ))}
-        {send.isPending && (
-          <div className="mr-10 flex items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground animate-in fade-in-0 slide-in-from-bottom-1">
-            <Bot className="h-4 w-4" />
-            <TypingDots />
-          </div>
+
+        {/* Live streaming bubble */}
+        {isStreaming && streamingText && (
+          <AssistantBubble isStreaming>
+            <FormattedText text={streamingText} />
+            <span className="inline-block ml-0.5 h-4 w-1 bg-current animate-cursor translate-y-0.5" />
+          </AssistantBubble>
         )}
+
+        {/* Thinking indicator — before any text arrives */}
+        {isStreaming && !streamingText && (
+          <AssistantBubble isStreaming>
+            <TypingDots />
+          </AssistantBubble>
+        )}
+
+        {/* Error bubble */}
+        {streamError && (
+          <AssistantBubble isError>
+            <span className="text-sm">{streamError}</span>
+          </AssistantBubble>
+        )}
+
         <div ref={bottomRef} />
       </div>
-      <div className="p-3 border-t border-border flex gap-2">
-        <Textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Reply with details or ask for a tweak..."
-          rows={2}
-          className="resize-none"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void handleSend();
-            }
-          }}
-        />
-        <Button
-          size="icon"
-          onClick={() => void handleSend()}
-          disabled={send.isPending || !input.trim()}
-          aria-label="Send message"
-        >
-          <Send className="h-4 w-4" />
-        </Button>
+
+      {/* Input bar */}
+      <div className="shrink-0 border-t border-border p-3 space-y-2">
+        {onTemplateSelect ? (
+          <TemplatePicker
+            templates={templates}
+            recommendedIds={recommendedTemplateIds}
+            selectedId={selectedTemplateId}
+            onSelect={(id) => {
+              setShowRequired(false);
+              onTemplateSelect(id);
+            }}
+            isLoading={isLoadingTemplates}
+            showRequired={showRequired}
+          />
+        ) : null}
+        <div className="flex gap-2 items-end">
+          <Textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={isStreaming ? "Agent is thinking…" : "Reply with details or ask for a change…"}
+            rows={2}
+            disabled={isStreaming}
+            className="resize-none flex-1 text-sm"
+          />
+          <Button
+            size="icon"
+            onClick={() => void sendMessage(input)}
+            disabled={isStreaming || !input.trim()}
+            aria-label="Send message"
+          >
+            {isStreaming ? (
+              <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );
 }
 
-function ChatMessage({
-  message,
-  onQuestionClick,
-  onAnimationDone,
-}: {
-  message: DisplayMessage;
-  onQuestionClick: (question: string) => void;
-  onAnimationDone: () => void;
-}) {
-  const isUser = message.role === "user";
-  const text = messageText(message);
-  const questions = isUser ? [] : extractQuestionPrompts(message.content);
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
+function UserBubble({ text }: { text: string }) {
+  if (!text) return null;
   return (
-    <div className={cn("flex animate-in fade-in-0 slide-in-from-bottom-1", isUser ? "justify-end" : "justify-start")}>
+    <div className="flex justify-end">
+      <div className="max-w-[86%] rounded-2xl rounded-br-sm px-3.5 py-2.5 text-sm bg-primary text-primary-foreground shadow-sm">
+        <div className="mb-0.5 text-[11px] font-semibold opacity-70">You</div>
+        <p className="whitespace-pre-wrap leading-relaxed">{text}</p>
+      </div>
+    </div>
+  );
+}
+
+function AssistantBubble({
+  children,
+  isStreaming = false,
+  isError = false,
+}: {
+  children: React.ReactNode;
+  isStreaming?: boolean;
+  isError?: boolean;
+}) {
+  return (
+    <div className="flex justify-start">
       <div
         className={cn(
-          "max-w-[86%] rounded-md px-3 py-2 text-sm shadow-soft-xs",
-          isUser
-            ? "bg-primary text-primary-foreground"
-            : "border border-border/70 bg-muted/60 text-foreground",
-          message.tone === "error" && "border-destructive/40 bg-destructive/10 text-destructive"
+          "max-w-[92%] rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm shadow-sm",
+          isError
+            ? "border border-destructive/40 bg-destructive/10 text-destructive"
+            : "border border-border/60 bg-muted/50 text-foreground",
+          isStreaming && !isError && "border-primary/20 bg-primary/5"
         )}
       >
-        <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium opacity-75">
-          {!isUser && <Bot className="h-3.5 w-3.5" />}
-          <span>{isUser ? "You" : "Agent"}</span>
+        <div className="mb-0.5 flex items-center gap-1 text-[11px] font-semibold opacity-60">
+          <Bot className="h-3 w-3" />
+          Agent
         </div>
-        <p className="whitespace-pre-wrap leading-6">
-          <TypingText text={text} active={Boolean(message.animate && !isUser)} onDone={onAnimationDone} />
-        </p>
-        {questions.length > 0 && (
-          <div className="mt-3 flex flex-col gap-1.5">
-            {questions.map((question) => (
-              <button
-                key={question}
-                type="button"
-                onClick={() => onQuestionClick(question)}
-                className="rounded-md border border-border bg-background px-2 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-accent"
-              >
-                {question}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="leading-relaxed">{children}</div>
       </div>
     </div>
   );
 }
 
-function TypingText({
-  text,
-  active,
-  onDone,
-}: {
-  text: string;
-  active: boolean;
-  onDone: () => void;
-}) {
-  const [visible, setVisible] = useState(active ? "" : text);
-  const doneRef = useRef(false);
-  const onDoneRef = useRef(onDone);
+function FormattedText({ text }: { text: string }) {
+  if (!text) return null;
 
-  useEffect(() => {
-    onDoneRef.current = onDone;
-  }, [onDone]);
-
-  useEffect(() => {
-    doneRef.current = false;
-    if (!active) {
-      setVisible(text);
-      return;
-    }
-
-    setVisible("");
-    let index = 0;
-    const step = Math.max(1, Math.ceil(text.length / 120));
-    const timer = window.setInterval(() => {
-      index = Math.min(text.length, index + step);
-      setVisible(text.slice(0, index));
-      if (index >= text.length) {
-        window.clearInterval(timer);
-        if (!doneRef.current) {
-          doneRef.current = true;
-          window.setTimeout(() => onDoneRef.current(), 450);
-        }
-      }
-    }, 14);
-
-    return () => window.clearInterval(timer);
-  }, [active, text]);
-
+  // Render numbered slide outlines with subtle formatting
+  const lines = text.split("\n");
   return (
-    <>
-      {visible}
-      {active && visible.length < text.length && (
-        <span className="ml-0.5 inline-block h-4 w-1 translate-y-0.5 bg-current animate-cursor" />
-      )}
-    </>
+    <div className="space-y-0.5 whitespace-pre-wrap text-sm">
+      {lines.map((line, i) => {
+        const isSlide = /^slide\s+\d+\s*[–—-]/i.test(line.trim());
+        return (
+          <p
+            key={i}
+            className={cn(
+              "leading-relaxed",
+              isSlide && "font-medium text-foreground/90 mt-1.5 first:mt-0"
+            )}
+          >
+            {line || "\u00a0"}
+          </p>
+        );
+      })}
+    </div>
   );
 }
 
 function TypingDots() {
   return (
-    <span className="inline-flex items-center gap-1" aria-label="Agent is typing">
+    <span className="inline-flex items-center gap-1" aria-label="Agent is thinking">
       {[0, 1, 2].map((dot) => (
         <span
           key={dot}
           className="h-1.5 w-1.5 rounded-full bg-current animate-bounce"
-          style={{ animationDelay: `${dot * 120}ms` }}
+          style={{ animationDelay: `${dot * 140}ms` }}
         />
       ))}
     </span>
   );
 }
 
-function messageText(message: Message): string {
-  if (message.role === "user") {
-    return stringField(message.content, "text") || "";
+// Starter prompt chips shown when the chat is empty
+export function StarterPrompts({
+  artifactType,
+  onSelect,
+}: {
+  artifactType: string;
+  onSelect: (text: string) => void;
+}) {
+  const prompts =
+    artifactType === "one_pager"
+      ? [
+          "Create a one-pager for a healthcare solution",
+          "Build an executive summary for a new product",
+          "Draft a competitive battlecard one-pager",
+        ]
+      : artifactType === "image"
+        ? [
+            "Create a social media visual for a product launch",
+            "Design a hero banner for a tech event",
+          ]
+        : [
+            "Build a pitch deck for a retail prospect",
+            "Create a 10-slide executive overview",
+            "Design a case study presentation for a customer win",
+          ];
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {prompts.map((p) => (
+        <button
+          key={p}
+          type="button"
+          onClick={() => onSelect(p)}
+          className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-foreground"
+        >
+          <Sparkles className="h-3 w-3 shrink-0 text-primary/70" />
+          {p}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function extractText(content: Record<string, unknown>): string {
+  if (!content) return "";
+  const direct = content.text ?? content.message;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+
+  // Legacy scripted message formats
+  const ask = content.ask;
+  if (Array.isArray(ask) && ask.length > 0) {
+    return ask.map((q) => String(q)).join("\n");
   }
+  if (typeof ask === "string" && ask.trim()) return ask.trim();
 
-  const content = message.content;
-  const directText = stringField(content, "text");
-  if (directText) return directText;
-
-  const outline = slideOutlineText(content);
-  const slidePlan = arrayField(content, "slide_plan").filter(isRecord);
-  const planOutline = slidePlan.length > 0 ? slideOutlineText({ slide_outline: slidePlan }) : "";
-  if (outline || planOutline) {
-    const intro =
-      stringField(content, "message") ||
-      "Here is the proposed slide plan. Tell me what to change on any slide, or click Generate when it looks right.";
-    const kbLines = kbMatchesText(content);
-    return [intro, kbLines, planOutline || outline].filter(Boolean).join("\n\n");
-  }
-
-  const turnType = stringField(content, "turn_type") || message.turnType || "";
-  const askItems = extractAskItems(content);
-  if (askItems.length > 0 && turnType !== "outline") {
-    if (askItems.length === 1 && !isQuestionPrompt(askItems[0])) {
-      return askItems[0];
-    }
-    return "I need a little more detail before I draft:";
-  }
-
-  const recommended = arrayField(content, "recommended_templates");
-  if (turnType === "recommend" || recommended.length > 0) {
-    const lines = recommended
-      .map((item, index) => {
-        if (!isRecord(item)) return "";
-        const rationale = stringField(item, "rationale");
-        return rationale ? `${index + 1}. ${rationale}` : "";
+  // Slide outline
+  const outline = content.slide_outline;
+  if (Array.isArray(outline) && outline.length > 0) {
+    const intro = typeof content.message === "string" ? content.message + "\n\n" : "";
+    const slides = outline
+      .map((item) => {
+        if (typeof item !== "object" || !item) return "";
+        const s = item as Record<string, unknown>;
+        const num = s.slide ?? "";
+        const heading = s.heading ?? "Slide";
+        const body = s.body ? `\n  ${s.body}` : "";
+        return `Slide ${num} – ${heading}${body}`;
       })
-      .filter(Boolean);
-    return ["I found templates that fit this content.", ...lines].join("\n");
+      .filter(Boolean)
+      .join("\n");
+    return (intro + slides).trim();
   }
 
-  if (turnType === "html" || stringField(content, "revision_id")) {
-    const assistantMessage = stringField(content, "message");
-    return (
-      assistantMessage ||
-      "Draft is ready in the preview. Send a note if you want me to tighten the story, change tone, or revise a specific slide."
-    );
+  const turnType = content.turn_type;
+  if (turnType === "html" || content.revision_id) {
+    return typeof content.message === "string" && content.message
+      ? content.message
+      : "Draft is ready in the preview. Tell me what to change or refine.";
   }
 
-  if (turnType === "patch" || isRecord(content.patch)) {
-    const assistantMessage = stringField(content, "message");
-    if (assistantMessage) return assistantMessage;
-    const slide = isRecord(content.patch) ? stringField(content.patch, "slide") : "";
-    return slide ? `Updated slide ${slide}. The preview has the latest version.` : "Updated the draft. The preview has the latest version.";
+  if (typeof content.message === "string" && content.message.trim()) {
+    return content.message.trim();
   }
 
-  const assistantMessage = stringField(content, "message");
-  if (assistantMessage) return assistantMessage;
-
-  return "I captured that. Send the next detail when you are ready.";
-}
-
-function messageSignature(message: Message): string {
-  return `${message.role}:${messageText(message)}`;
-}
-
-function kbMatchesText(content: Record<string, unknown>): string {
-  const matches = arrayField(content, "kb_matches").filter(isRecord);
-  if (matches.length === 0) return "";
-
-  const lines = matches
-    .map((item, index) => {
-      const title = stringField(item, "title") || "Knowledge base document";
-      const snippet = stringField(item, "snippet");
-      return snippet ? `${index + 1}. ${title} — ${snippet}` : `${index + 1}. ${title}`;
-    })
-    .filter(Boolean);
-
-  return lines.length > 0 ? ["Related KB content:", ...lines].join("\n") : "";
-}
-
-function slideOutlineText(content: Record<string, unknown>): string {
-  const outline = arrayField(content, "slide_outline").filter(isRecord);
-  if (outline.length === 0) return "";
-
-  return outline
-    .map((item) => {
-      const slide = Number(item.slide) || 0;
-      const label = slide > 0 ? `Slide ${String(slide).padStart(2, "0")}` : "Slide";
-      const heading = stringField(item, "heading") || "Untitled";
-      const body = stringField(item, "body");
-      const visual = stringField(item, "visual");
-      const mode = stringField(item, "mode");
-      const evidence = stringField(item, "evidence") || stringField(item, "citation_source");
-      const reuse = isRecord(item.reuse) ? item.reuse : null;
-      const reuseText = reuse
-        ? `Reuse: ${stringField(reuse, "source_vertical") || "KB"} slide ${stringField(reuse, "source_slide_index") || "?"}`
-        : "";
-      const modeLabel =
-        mode === "reuse" ? "[Reuse]" : mode === "hybrid" ? "[Hybrid]" : mode === "generate" ? "[Generate]" : "";
-      return [
-        `${label}${modeLabel ? ` ${modeLabel}` : ""}: ${heading}`,
-        body ? `Body: ${body}` : "",
-        visual ? `Visual: ${visual}` : "",
-        evidence ? `Evidence: ${evidence}` : "",
-        reuseText,
-      ]
-        .filter(Boolean)
-        .join("\n");
-    })
-    .join("\n\n");
-}
-
-function extractAskItems(content: Record<string, unknown>): string[] {
-  return arrayField(content, "ask")
-    .map((item) => String(item).trim())
-    .filter(Boolean)
-    .slice(0, 3);
-}
-
-function extractQuestionPrompts(content: Record<string, unknown>): string[] {
-  return extractAskItems(content).filter(isQuestionPrompt);
-}
-
-function isQuestionPrompt(text: string): boolean {
-  const value = text.trim().toLowerCase();
-  if (!value || value.startsWith("requirements captured")) return false;
-  return value.endsWith("?") || value.startsWith("what ") || value.startsWith("who ") || value.startsWith("should ");
-}
-
-function stringField(obj: Record<string, unknown>, key: string): string {
-  const value = obj[key];
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "number") return String(value);
   return "";
 }
 
-function arrayField(obj: Record<string, unknown>, key: string): unknown[] {
-  const value = obj[key];
-  return Array.isArray(value) ? value : [];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+function cleanSignalTags(text: string): string {
+  return text
+    .replace(/<generate_now\s*\/>/g, "")
+    .replace(/<update_slide[^>]*>[\s\S]*?<\/update_slide>/g, "")
+    .trimEnd();
 }

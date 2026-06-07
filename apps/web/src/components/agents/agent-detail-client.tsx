@@ -108,7 +108,7 @@ export function AgentDetailClient({ agentId }: { agentId: AgentId }) {
           <span className="text-sm font-medium">{meta.display_name}</span>
         </div>
 
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-semibold">{meta.display_name}</h1>
@@ -121,7 +121,7 @@ export function AgentDetailClient({ agentId }: { agentId: AgentId }) {
               Operations: {meta.operations.join(", ")}
             </p>
           </div>
-          <Link href={`/agents/${agentId}/config`}>
+          <Link href={`/agents/${agentId}/config`} className="shrink-0">
             <Button variant="outline" className="gap-2 shrink-0">
               <Settings className="h-4 w-4" />
               Configure

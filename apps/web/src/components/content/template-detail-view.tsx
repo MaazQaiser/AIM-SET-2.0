@@ -4,36 +4,31 @@ import { useMemo } from "react";
 import { BookOpen, Check, Code2, FileText, Image, Layers, LayoutTemplate, Palette, Pencil, Table, Type } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@dc-copilot/ui/components/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
+import { cn } from "@dc-copilot/ui/lib/cn";
 import { useContentTemplate } from "@/lib/data/content-studio-hooks";
 import { resolveTemplatePreviewMode } from "@/lib/content-studio/template-preview";
 import { TemplateSourcePreview } from "@/components/content/template-source-preview";
 import type { ContentTemplate, ContentTemplateSlideMetadata } from "@/types/content_studio";
 
-interface TemplateDetailDialogProps {
-  templateId?: string | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+const SLIDE_WIDTH = 1280;
+const SLIDE_HEIGHT = 720;
+const PREVIEW_SCALE = 0.72;
+
+interface TemplateDetailViewProps {
+  templateId: string;
+  className?: string;
   onUseTemplate?: (templateId: string) => void;
   selectedTemplateId?: string;
 }
 
-export function TemplateDetailDialog({
+export function TemplateDetailView({
   templateId,
-  open,
-  onOpenChange,
+  className,
   onUseTemplate,
   selectedTemplateId,
-}: TemplateDetailDialogProps) {
-  const detail = useContentTemplate(templateId ?? undefined);
+}: TemplateDetailViewProps) {
+  const detail = useContentTemplate(templateId);
   const template = detail.data;
   const templateHtml = template?.html ?? "";
   const templateCss = useMemo(() => extractCssFromHtml(templateHtml), [templateHtml]);
@@ -51,37 +46,23 @@ export function TemplateDetailDialog({
   function handleUseTemplate() {
     if (!template?.id || !onUseTemplate) return;
     onUseTemplate(template.id);
-    onOpenChange(false);
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[92vh] max-w-6xl flex-col overflow-hidden">
-        <DialogHeader className="shrink-0 pr-8">
-          <DialogTitle className="flex items-center gap-2">
-            <Code2 className="h-4 w-4" />
-            {template?.name ?? "Template details"}
-          </DialogTitle>
-          <DialogDescription>
-            {showSourcePreview
-              ? "Compare the original uploaded file with the generated HTML/CSS version before using this template."
-              : "Explore the generated preview, structure, source, and styling before using this template."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="min-h-0 overflow-y-auto pr-1">
+    <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", className)}>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {detail.isLoading ? (
             <p className="py-8 text-sm text-muted-foreground">Loading template details…</p>
           ) : template ? (
-            <div className="space-y-4">
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
               <TemplateMetadata
                 template={template}
                 cssVariableCount={cssVariables.length}
                 showSourceFile={showSourcePreview}
               />
 
-              <Tabs defaultValue="preview">
-                <TabsList>
+              <Tabs defaultValue="preview" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <TabsList className="shrink-0">
                   <TabsTrigger value="preview">
                     {showSourcePreview ? "Original preview" : "Generated preview"}
                   </TabsTrigger>
@@ -96,26 +77,22 @@ export function TemplateDetailDialog({
                     </>
                   ) : null}
                 </TabsList>
-                <TabsContent value="preview" className="mt-3">
-                  <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">
-                    <div className="min-w-0">
+                <TabsContent
+                  value="preview"
+                  className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+                >
+                  <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">
+                    <div className="flex min-h-0 min-w-0 flex-col">
                       {showSourcePreview ? (
-                        <TemplateSourcePreview template={template} />
+                        <TemplateSourcePreview template={template} className="min-h-0 flex-1" />
                       ) : compiledPreviewHtml ? (
-                        <div className="h-[62vh] overflow-hidden rounded-md border bg-neutral-900">
-                          <iframe
-                            title="Template preview"
-                            srcDoc={compiledPreviewHtml}
-                            className="h-full w-full"
-                            sandbox="allow-same-origin allow-scripts"
-                          />
-                        </div>
+                        <ScaledHtmlPreview html={compiledPreviewHtml} title="Template preview" />
                       ) : template.thumbnailUrl ? (
-                        <div className="h-[62vh] overflow-auto rounded-md border bg-white p-4">
+                        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-md border bg-white p-4">
                           <img
                             src={template.thumbnailUrl}
                             alt=""
-                            className="mx-auto max-h-full max-w-full rounded border object-contain"
+                            className="max-h-full max-w-full rounded border object-contain"
                           />
                         </div>
                       ) : (
@@ -128,8 +105,11 @@ export function TemplateDetailDialog({
                   </div>
                 </TabsContent>
                 {showGeneratedPreviewTab ? (
-                  <TabsContent value="generated" className="mt-3">
-                    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">
+                  <TabsContent
+                    value="generated"
+                    className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+                  >
+                    <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">
                       <GeneratedTemplatePreview
                         html={compiledPreviewHtml}
                         ingestError={template.ingestError}
@@ -138,7 +118,7 @@ export function TemplateDetailDialog({
                     </div>
                   </TabsContent>
                 ) : null}
-                <TabsContent value="details" className="mt-3">
+                <TabsContent value="details" className="mt-2 min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden">
                   <div className="space-y-3">
                     <TemplateUnderstandingPanel template={template} />
                     <TemplateVariableList variables={cssVariables} />
@@ -151,13 +131,13 @@ export function TemplateDetailDialog({
                 </TabsContent>
                 {showCodeTabs ? (
                   <>
-                    <TabsContent value="html" className="mt-3">
-                      <pre className="max-h-[60vh] overflow-auto rounded-md border bg-muted/20 p-3 text-xs whitespace-pre-wrap break-all">
+                    <TabsContent value="html" className="mt-2 min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden">
+                      <pre className="rounded-md border bg-muted/20 p-3 text-xs whitespace-pre-wrap break-all">
                         {templateHtml || "No HTML found for this template."}
                       </pre>
                     </TabsContent>
-                    <TabsContent value="css" className="mt-3">
-                      <pre className="max-h-[60vh] overflow-auto rounded-md border bg-muted/20 p-3 text-xs whitespace-pre-wrap break-all">
+                    <TabsContent value="css" className="mt-2 min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden">
+                      <pre className="rounded-md border bg-muted/20 p-3 text-xs whitespace-pre-wrap break-all">
                         {templateCss || "No <style> CSS block found in this template HTML."}
                       </pre>
                     </TabsContent>
@@ -170,25 +150,24 @@ export function TemplateDetailDialog({
           )}
         </div>
 
-        {onUseTemplate && template && (
-          <DialogFooter className="shrink-0 border-t pt-4">
-            <Button type="button" onClick={handleUseTemplate} disabled={isSelected}>
-              {isSelected ? (
-                <>
-                  <Check className="mr-1 h-4 w-4" />
-                  Selected
-                </>
-              ) : (
-                <>
-                  <LayoutTemplate className="mr-1 h-4 w-4" />
-                  Use template
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        )}
-      </DialogContent>
-    </Dialog>
+      {onUseTemplate && template && (
+        <div className="mt-4 flex shrink-0 justify-end border-t pt-4">
+          <Button type="button" onClick={handleUseTemplate} disabled={isSelected}>
+            {isSelected ? (
+              <>
+                <Check className="mr-1 h-4 w-4" />
+                Selected
+              </>
+            ) : (
+              <>
+                <LayoutTemplate className="mr-1 h-4 w-4" />
+                Use template
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -202,7 +181,7 @@ function TemplateMetadata({
   showSourceFile?: boolean;
 }) {
   return (
-    <div className="grid gap-3 rounded-md border bg-muted/20 p-3 md:grid-cols-[minmax(0,1fr)_auto]">
+    <div className="grid shrink-0 gap-3 rounded-md border bg-muted/20 p-3 md:grid-cols-[minmax(0,1fr)_auto]">
       <div className="min-w-0 space-y-2">
         <div className="flex flex-wrap gap-1">
           <Badge variant="outline">{template.artifactType}</Badge>
@@ -236,6 +215,33 @@ function TemplateMetadata({
   );
 }
 
+function ScaledHtmlPreview({ html, title }: { html: string; title: string }) {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-md border bg-neutral-900 p-3">
+      <div
+        className="shrink-0 overflow-hidden rounded-sm shadow-lg"
+        style={{
+          width: SLIDE_WIDTH * PREVIEW_SCALE,
+          height: SLIDE_HEIGHT * PREVIEW_SCALE,
+        }}
+      >
+        <iframe
+          title={title}
+          srcDoc={html}
+          className="border-0"
+          sandbox="allow-same-origin allow-scripts"
+          style={{
+            width: SLIDE_WIDTH,
+            height: SLIDE_HEIGHT,
+            transform: `scale(${PREVIEW_SCALE})`,
+            transformOrigin: "top left",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function GeneratedTemplatePreview({
   html,
   ingestError,
@@ -245,7 +251,7 @@ function GeneratedTemplatePreview({
 }) {
   if (!html) {
     return (
-      <div className="flex h-[62vh] flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-muted/10 p-6 text-center">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-muted/10 p-6 text-center">
         <Code2 className="h-6 w-6 text-muted-foreground" />
         <div className="space-y-1">
           <p className="text-sm font-medium">Generated HTML/CSS preview is not available yet.</p>
@@ -263,16 +269,7 @@ function GeneratedTemplatePreview({
     );
   }
 
-  return (
-    <div className="h-[62vh] overflow-hidden rounded-md border bg-neutral-900">
-      <iframe
-        title="Generated HTML/CSS template preview"
-        srcDoc={html}
-        className="h-full w-full"
-        sandbox="allow-same-origin allow-scripts"
-      />
-    </div>
-  );
+  return <ScaledHtmlPreview html={html} title="Generated HTML/CSS template preview" />;
 }
 
 function TemplateUnderstandingPanel({
@@ -299,7 +296,7 @@ function TemplateUnderstandingPanel({
     <div
       className={
         compact
-          ? "flex h-[62vh] flex-col gap-0 overflow-hidden rounded-md border bg-background"
+          ? "flex min-h-0 flex-col gap-0 overflow-hidden rounded-md border bg-background xl:h-full"
           : "rounded-md border bg-background"
       }
     >

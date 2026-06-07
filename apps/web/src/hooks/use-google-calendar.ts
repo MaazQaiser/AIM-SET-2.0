@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { QUERY_STALE_TIME_MS } from "@/lib/data/query-cache";
 import type { CalendarMappedCall, GoogleCalendar, } from "@/types/integrations";
 
 // ── Query keys ──────────────────────────────────────────────────────────────
@@ -29,7 +30,7 @@ export function useGoogleCalendarConnection() {
         lastSyncAt?: string;
       }>;
     },
-    staleTime: 60_000,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -44,7 +45,7 @@ export function useGoogleCalendars(enabled = true) {
       const data = await res.json() as { calendars: GoogleCalendar[] };
       return data.calendars;
     },
-    staleTime: 5 * 60_000,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 
@@ -58,8 +59,7 @@ export function useCalendarEvents(days = 14, enabled = true) {
       if (!res.ok) throw new Error("Failed to fetch calendar events");
       return res.json() as Promise<{ calls: CalendarMappedCall[]; syncedAt: string }>;
     },
-    staleTime: 2 * 60_000,      // re-fetch every 2 minutes
-    refetchInterval: 5 * 60_000, // background poll every 5 minutes
+    staleTime: QUERY_STALE_TIME_MS,
   });
 }
 

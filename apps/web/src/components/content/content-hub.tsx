@@ -93,7 +93,7 @@ export function ContentHub() {
       className={hideHubChrome ? "!max-w-none !p-0 !space-y-0 h-full min-h-0" : undefined}
     >
       {!hideHubChrome ? (
-        <PageHeader className="flex items-start justify-between gap-4">
+        <PageHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Knowledge Base</h1>
             <p className="text-sm text-muted-foreground mt-1">

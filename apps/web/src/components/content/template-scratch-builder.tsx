@@ -13,11 +13,12 @@ import {
   Plus,
   Save,
   Trash2,
+  Type,
   Upload,
   X,
 } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
-import { Button } from "@dc-copilot/ui/components/button";
+import { Button, buttonVariants } from "@dc-copilot/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import { Input } from "@dc-copilot/ui/components/input";
 import { Label } from "@dc-copilot/ui/components/label";
@@ -27,15 +28,23 @@ import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import {
   buildScratchTemplateDocument,
   createScratchSlide,
-  parseScratchTags,
+  SCRATCH_FONT_OPTIONS,
   SCRATCH_LAYOUT_OPTIONS,
+  type ScratchLogoAsset,
   type ScratchSlideDraft,
   type ScratchSlideLayout,
+  type ScratchTemplateFont,
 } from "@/lib/content-studio/scratch-template";
 import { compileTemplateDocument } from "@/lib/content-studio/template-editor";
 import { useCreateTemplate } from "@/lib/data/content-studio-hooks";
 
-const MAX_IMAGE_BYTES = 3_500_000;
+const QUICK_ADD_LAYOUTS: Array<{ layout: ScratchSlideLayout; label: string }> = [
+  { layout: "cover", label: "Cover" },
+  { layout: "section", label: "Section" },
+  { layout: "blank", label: "Blank" },
+];
+const PREVIEW_SCALE = 0.34;
+const MAX_IMAGE_BYTES = 3.5 * 1024 * 1024;
 
 function readImageDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -49,10 +58,11 @@ function readImageDataUrl(file: File): Promise<string> {
 export function TemplateScratchBuilder() {
   const create = useCreateTemplate();
   const [name, setName] = useState("Scratch deck template");
-  const [tagsText, setTagsText] = useState("scratch, deck");
   const [accentColor, setAccentColor] = useState("#2563eb");
+  const [textColor, setTextColor] = useState("#0f172a");
+  const [fontFamily, setFontFamily] = useState<ScratchTemplateFont>("urbanist");
   const [logoDataUrl, setLogoDataUrl] = useState("");
-  const [logoName, setLogoName] = useState("");
+  const [logoFileName, setLogoFileName] = useState("");
   const [slides, setSlides] = useState<ScratchSlideDraft[]>([createScratchSlide(1)]);
   const [activeSlideId, setActiveSlideId] = useState(slides[0]?.id ?? "");
   const [error, setError] = useState("");
@@ -63,20 +73,39 @@ export function TemplateScratchBuilder() {
     slides.findIndex((slide) => slide.id === activeSlideId)
   );
   const activeSlide = slides[activeIndex] ?? slides[0];
+  const activeSlideTextColor = activeSlide.textColor ?? textColor;
+  const isBlankSlide = activeSlide.layout === "blank";
+  const logos = useMemo<ScratchLogoAsset[]>(
+    () =>
+      logoDataUrl
+        ? [
+            {
+              id: "logo",
+              label: "Logo",
+              dataUrl: logoDataUrl,
+              fileName: logoFileName,
+              isPrimary: true,
+            },
+          ]
+        : [],
+    [logoDataUrl, logoFileName]
+  );
 
   const compiled = useMemo(
     () =>
       buildScratchTemplateDocument({
         name,
         accentColor,
-        tags: parseScratchTags(tagsText),
-        logoDataUrl,
-        logoName,
+        textColor,
+        fontFamily,
+        tags: [],
+        logos,
         slides,
       }),
-    [accentColor, logoDataUrl, logoName, name, slides, tagsText]
+    [accentColor, fontFamily, logos, name, slides, textColor]
   );
   const previewHtml = useMemo(() => compileTemplateDocument(compiled.html, compiled.css), [compiled]);
+  const previewFrameHeight = Math.max(1, slides.length) * 740;
 
   function updateActiveSlide(patch: Partial<ScratchSlideDraft>) {
     setSlides((current) =>
@@ -85,7 +114,7 @@ export function TemplateScratchBuilder() {
   }
 
   function addSlide(layout: ScratchSlideLayout = "section") {
-    const next = createScratchSlide(slides.length + 1, layout);
+    const next = { ...createScratchSlide(slides.length + 1, layout), textColor };
     setSlides((current) => [...current, next]);
     setActiveSlideId(next.id);
   }
@@ -118,7 +147,12 @@ export function TemplateScratchBuilder() {
     const dataUrl = await readCheckedImage(file);
     if (!dataUrl) return;
     setLogoDataUrl(dataUrl);
-    setLogoName(file.name);
+    setLogoFileName(file.name);
+  }
+
+  function removeLogo() {
+    setLogoDataUrl("");
+    setLogoFileName("");
   }
 
   async function handleBackgroundUpload(file?: File | null) {
@@ -160,7 +194,7 @@ export function TemplateScratchBuilder() {
       const saved = await create.mutateAsync({
         name: name.trim(),
         artifactType: "deck",
-        tags: parseScratchTags(tagsText),
+        tags: [],
         html: compiled.html,
         css: compiled.css,
       });
@@ -189,7 +223,7 @@ export function TemplateScratchBuilder() {
               <Badge variant="secondary">Slide skeleton</Badge>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Build the base slide structure, then add background images and a logo before saving.
+              Build the base slide structure, then choose fonts, add background images, and place logos before saving.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -224,15 +258,6 @@ export function TemplateScratchBuilder() {
               <Input id="scratch-name" value={name} onChange={(event) => setName(event.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="scratch-tags">Tags</Label>
-              <Input
-                id="scratch-tags"
-                value={tagsText}
-                onChange={(event) => setTagsText(event.target.value)}
-                placeholder="enterprise, pitch, vertical"
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="scratch-accent" className="flex items-center gap-2">
                 <Palette className="h-4 w-4" />
                 Accent
@@ -249,42 +274,97 @@ export function TemplateScratchBuilder() {
               </div>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="scratch-font" className="flex items-center gap-2">
+                <Type className="h-4 w-4" />
+                Font
+              </Label>
+              <select
+                id="scratch-font"
+                value={fontFamily}
+                onChange={(event) => setFontFamily(event.target.value as ScratchTemplateFont)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {SCRATCH_FONT_OPTIONS.map((font) => (
+                  <option key={font.value} value={font.value}>
+                    {font.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="scratch-text-color" className="flex items-center gap-2">
+                <Type className="h-4 w-4" />
+                Default font color
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="scratch-text-color"
+                  type="color"
+                  value={textColor}
+                  onChange={(event) => setTextColor(event.target.value)}
+                  className="h-10 w-14 p-1"
+                />
+                <Input value={textColor} onChange={(event) => setTextColor(event.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="scratch-logo">Logo</Label>
-              <Input
-                id="scratch-logo"
-                type="file"
-                accept="image/*"
-                onChange={(event) => {
-                  void handleLogoUpload(event.target.files?.[0]);
-                  event.currentTarget.value = "";
-                }}
-              />
-              {logoDataUrl ? (
-                <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs">
-                  <span className="truncate">{logoName || "Logo added"}</span>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="scratch-logo"
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(event) => {
+                    void handleLogoUpload(event.target.files?.[0]);
+                    event.currentTarget.value = "";
+                  }}
+                />
+                <Label
+                  htmlFor="scratch-logo"
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "w-32 cursor-pointer justify-start"
+                  )}
+                >
+                  <Upload className="h-4 w-4" />
+                  Upload logo
+                </Label>
+                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                  {logoFileName || "No file"}
+                </span>
+                {logoDataUrl ? (
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => {
-                      setLogoDataUrl("");
-                      setLogoName("");
-                    }}
+                    onClick={removeLogo}
                     aria-label="Remove logo"
                   >
                     <X className="h-4 w-4" />
                   </Button>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label>Slide list</Label>
-                <Button type="button" size="sm" variant="outline" onClick={() => addSlide()}>
-                  <Plus className="h-4 w-4" />
-                  Add
-                </Button>
+              <Label>Add slide</Label>
+              <div className="flex flex-wrap gap-2">
+                {QUICK_ADD_LAYOUTS.map(({ layout, label }) => (
+                  <Button
+                    key={layout}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => addSlide(layout)}
+                  >
+                    <Plus className="h-4 w-4" />
+                    {label}
+                  </Button>
+                ))}
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Slide list</Label>
               <div className="space-y-2">
                 {slides.map((slide, index) => (
                   <button
@@ -302,7 +382,9 @@ export function TemplateScratchBuilder() {
                       <span className="block text-[11px] font-medium text-muted-foreground">
                         Slide {index + 1}
                       </span>
-                      <span className="block truncate font-medium">{slide.title || "Untitled"}</span>
+                      <span className="block truncate font-medium">
+                        {slide.layout === "blank" ? "Blank slide" : slide.title || "Untitled"}
+                      </span>
                     </span>
                     <Badge variant="outline" className="shrink-0 capitalize">
                       {slide.layout.replace(/_/g, " ")}
@@ -329,7 +411,13 @@ export function TemplateScratchBuilder() {
                   type="button"
                   variant={activeSlide.layout === option.value ? "secondary" : "outline"}
                   size="sm"
-                  onClick={() => updateActiveSlide({ layout: option.value })}
+                  onClick={() =>
+                    updateActiveSlide(
+                      option.value === "blank"
+                        ? { layout: option.value, title: "", kicker: "", body: "" }
+                        : { layout: option.value }
+                    )
+                  }
                 >
                   {option.label}
                 </Button>
@@ -337,14 +425,16 @@ export function TemplateScratchBuilder() {
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
-              <div className="space-y-2">
-                <Label htmlFor="scratch-kicker">Kicker</Label>
-                <Input
-                  id="scratch-kicker"
-                  value={activeSlide.kicker}
-                  onChange={(event) => updateActiveSlide({ kicker: event.target.value })}
-                />
-              </div>
+              {!isBlankSlide ? (
+                <div className="space-y-2">
+                  <Label htmlFor="scratch-kicker">Kicker</Label>
+                  <Input
+                    id="scratch-kicker"
+                    value={activeSlide.kicker}
+                    onChange={(event) => updateActiveSlide({ kicker: event.target.value })}
+                  />
+                </div>
+              ) : null}
               <div className="space-y-2">
                 <Label htmlFor="scratch-bg-color">Background</Label>
                 <div className="flex gap-2">
@@ -361,25 +451,52 @@ export function TemplateScratchBuilder() {
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="scratch-slide-text-color" className="flex items-center gap-2">
+                  <Type className="h-4 w-4" />
+                  Font color
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="scratch-slide-text-color"
+                    type="color"
+                    value={activeSlideTextColor}
+                    onChange={(event) => updateActiveSlide({ textColor: event.target.value })}
+                    className="h-10 w-14 p-1"
+                  />
+                  <Input
+                    value={activeSlideTextColor}
+                    onChange={(event) => updateActiveSlide({ textColor: event.target.value })}
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="scratch-title">Slide title</Label>
-              <Input
-                id="scratch-title"
-                value={activeSlide.title}
-                onChange={(event) => updateActiveSlide({ title: event.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="scratch-body">Body</Label>
-              <Textarea
-                id="scratch-body"
-                value={activeSlide.body}
-                onChange={(event) => updateActiveSlide({ body: event.target.value })}
-                className="min-h-[118px] resize-none"
-              />
-            </div>
+            {!isBlankSlide ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="scratch-title">Slide title</Label>
+                  <Input
+                    id="scratch-title"
+                    value={activeSlide.title}
+                    onChange={(event) => updateActiveSlide({ title: event.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="scratch-body">Body</Label>
+                  <Textarea
+                    id="scratch-body"
+                    value={activeSlide.body}
+                    onChange={(event) => updateActiveSlide({ body: event.target.value })}
+                    className="min-h-[118px] resize-none"
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Blank slides have no preset text blocks. Set the background, font color, and optional background image.
+              </p>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="scratch-bg-image">Background image</Label>
@@ -437,29 +554,29 @@ export function TemplateScratchBuilder() {
             </CardTitle>
           </CardHeader>
           <CardContent className="h-[calc(100%-4rem)] min-h-[620px]">
-            <div className="h-full overflow-hidden rounded-md border bg-white">
-              <iframe
-                title="Scratch template preview"
-                srcDoc={previewHtml}
-                className="h-full w-full"
-                sandbox="allow-same-origin"
-              />
+            <div className="h-full overflow-auto rounded-md border bg-white p-3">
+              <div
+                style={{
+                  height: previewFrameHeight * PREVIEW_SCALE,
+                  width: 1280 * PREVIEW_SCALE,
+                }}
+              >
+                <iframe
+                  title="Scratch template preview"
+                  srcDoc={previewHtml}
+                  className="border-0"
+                  sandbox="allow-same-origin"
+                  style={{
+                    height: previewFrameHeight,
+                    transform: `scale(${PREVIEW_SCALE})`,
+                    transformOrigin: "top left",
+                    width: 1280,
+                  }}
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      <div className="flex flex-wrap justify-end gap-2">
-        <Button variant="outline" asChild>
-          <Link href="/content/templates/upload">
-            <Upload className="h-4 w-4" />
-            Upload instead
-          </Link>
-        </Button>
-        <Button type="button" onClick={() => void handleSave()} disabled={create.isPending}>
-          {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save template
-        </Button>
       </div>
     </PageShell>
   );

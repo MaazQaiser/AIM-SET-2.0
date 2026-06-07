@@ -68,6 +68,10 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
   const [instruction, setInstruction] = useState("");
   const [saveError, setSaveError] = useState("");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [previewParts, setPreviewParts] = useState({
+    html: STARTER_TEMPLATE_HTML,
+    css: STARTER_TEMPLATE_CSS,
+  });
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "assistant",
@@ -87,10 +91,22 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
   }, [detail.data, isEdit]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
-  });
+    const timer = window.setTimeout(() => {
+      setPreviewParts({ html, css });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [css, html]);
 
-  const previewHtml = useMemo(() => compileTemplateDocument(html, css), [html, css]);
+  useEffect(() => {
+    if (messages.length > 0 || assist.isPending) {
+      bottomRef.current?.scrollIntoView({ block: "end" });
+    }
+  }, [assist.isPending, messages]);
+
+  const previewHtml = useMemo(
+    () => compileTemplateDocument(previewParts.html, previewParts.css),
+    [previewParts.css, previewParts.html]
+  );
   const draft = useMemo<ContentTemplateDraft>(
     () => ({
       name,

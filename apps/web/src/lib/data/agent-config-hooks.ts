@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { QUERY_STALE_TIME_MS } from "@/lib/data/query-cache";
 import type { AgentConfig, AgentId } from "@/types/agents";
 
 const CONFIG_FETCH_TIMEOUT_MS = 12_000;
@@ -41,7 +42,7 @@ export function useAgentConfig(agentId: AgentId) {
   return useQuery({
     queryKey: ["agent-config", agentId],
     queryFn: () => fetchAgentConfig(agentId),
-    staleTime: 30_000,
+    staleTime: QUERY_STALE_TIME_MS,
     retry: 1,
   });
 }

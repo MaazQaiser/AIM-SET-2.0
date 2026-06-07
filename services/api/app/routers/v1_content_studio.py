@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import Response
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from dc_core.tenancy import TenantContext
@@ -44,6 +44,12 @@ class CreateProjectBody(BaseModel):
 
 class StudioMessageBody(BaseModel):
     message: str
+    templateId: Optional[str] = None
+    generate: bool = False
+
+
+class StudioChatBody(BaseModel):
+    message: str = ""
     templateId: Optional[str] = None
     generate: bool = False
 
@@ -443,6 +449,7 @@ def _link_gap_to_project(
 @router.get("/studio/projects/{project_id}")
 def get_project(
     project_id: str,
+    include_latest: bool = Query(True, alias="includeLatest"),
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> Dict[str, Any]:
     project = get_content_studio_repository().get_project(ctx, project_id)
@@ -450,7 +457,7 @@ def get_project(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     messages = get_content_studio_repository().list_messages(ctx, project_id)
     revisions = get_content_studio_repository().list_revisions(ctx, project_id)
-    latest = get_content_studio_repository().latest_revision(ctx, project_id)
+    latest = get_content_studio_repository().latest_revision(ctx, project_id) if include_latest else None
     return {"project": project, "messages": messages, "revisions": revisions, "latestRevision": latest}
 
 
@@ -492,6 +499,40 @@ def post_message(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/studio/projects/{project_id}/chat")
+def chat_stream(
+    project_id: str,
+    body: StudioChatBody,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> StreamingResponse:
+    """Real-time streaming chat endpoint — returns Server-Sent Events."""
+    from app.agents.content_generation_agent import stream_studio_chat
+
+    def _generate():
+        try:
+            yield from stream_studio_chat(
+                ctx,
+                project_id=project_id,
+                user_message=body.message,
+                template_id=body.templateId,
+                generate=body.generate,
+            )
+        except Exception as exc:
+            import json as _json
+            yield f"data: {_json.dumps({'type': 'error', 'text': str(exc)})}\n\n"
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.get("/studio/projects/{project_id}/revisions/{revision_id}")

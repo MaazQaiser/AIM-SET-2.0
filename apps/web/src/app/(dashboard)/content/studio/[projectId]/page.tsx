@@ -1,23 +1,19 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   BookOpenCheck,
+  ChevronDown,
   ChevronLeft,
-  Database,
+  ChevronRight,
   Download,
-  Eye,
-  FileText,
-  Layers,
-  Plus,
   RotateCcw,
-  Send,
   Sparkles,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@dc-copilot/ui/components/popover";
 import { Button } from "@dc-copilot/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import {
   Dialog,
   DialogContent,
@@ -28,9 +24,8 @@ import {
 } from "@dc-copilot/ui/components/dialog";
 import { Input } from "@dc-copilot/ui/components/input";
 import { Label } from "@dc-copilot/ui/components/label";
-import { StudioChat } from "@/components/content/studio-chat";
+import { StudioChat, type StudioChatHandle } from "@/components/content/studio-chat";
 import { StudioPreview } from "@/components/content/studio-preview";
-import { TemplatePicker } from "@/components/content/template-picker";
 import { SuggestionContextBar } from "@/components/content/suggestion-context-bar";
 import {
   useContentTemplates,
@@ -38,10 +33,8 @@ import {
   useSaveRevisionToKb,
   useStudioBootstrap,
   useStudioExport,
-  useStudioMessage,
   useStudioProject,
   useStudioRevision,
-  useSubmitStudioProject,
 } from "@/lib/data/content-studio-hooks";
 import type { StudioKbSaveFormat, StudioTurnResult } from "@/types/content_studio";
 
@@ -49,16 +42,16 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
   const { projectId } = use(params);
   const searchParams = useSearchParams();
   void searchParams.get("suggestionId");
-  const { data, refetch } = useStudioProject(projectId);
+  const { data, refetch } = useStudioProject(projectId, { includeLatest: false });
   const project = data?.project;
   const templates = useContentTemplates(project?.artifactType);
   const exportMut = useStudioExport(projectId);
-  const generateMut = useStudioMessage(projectId);
   const bootstrapMut = useStudioBootstrap(projectId);
   const restoreMut = useRestoreStudioRevision(projectId);
   const saveToKbMut = useSaveRevisionToKb(projectId);
-  const submitMut = useSubmitStudioProject();
+
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>();
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string | undefined>();
   const [previewRevisionId, setPreviewRevisionId] = useState<string | undefined>();
   const [actionMessage, setActionMessage] = useState<string>("");
@@ -67,23 +60,28 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
   const [saveTitle, setSaveTitle] = useState("");
   const [saveTags, setSaveTags] = useState("generated, content-studio");
   const [saveFormat, setSaveFormat] = useState<StudioKbSaveFormat>("pdf");
+  const [isGenerating, setIsGenerating] = useState(false);
   const bootstrapAttemptedRef = useRef(false);
-  const previewRevision = useStudioRevision(projectId, previewRevisionId);
+  const chatRef = useRef<StudioChatHandle | null>(null);
 
-  const latestHtml = previewHtml ?? data?.latestRevision?.html;
-  const revisionId = previewRevisionId ?? data?.latestRevision?.id;
+  useEffect(() => {
+    const pickTemplate = searchParams.get("pickTemplate");
+    if (pickTemplate) {
+      setSelectedTemplateId(pickTemplate);
+    }
+  }, [searchParams]);
+
   const brief = (project?.brief ?? {}) as Record<string, unknown>;
   const suggestionPlan = brief.suggestion_plan as import("@/types/content_studio").SuggestionPlan | undefined;
-  const evidenceProjects = suggestionPlan?.evidence?.projects ?? [];
-  const evidenceKbAssets = suggestionPlan?.evidence?.kb_assets ?? [];
-  const reusedSlides = (suggestionPlan?.slide_plan ?? []).filter((slide) => slide.mode === "reuse" || slide.reuse);
-  const planSlideCount =
-    suggestionPlan?.slide_plan?.length ??
-    (Array.isArray(brief.slide_outline) ? brief.slide_outline.length : 0);
-  const canGenerateDeck =
-    project?.artifactType !== "deck" || planSlideCount > 0 || Boolean(data?.messages?.length);
   const hasSuggestionContext = Boolean(
-    brief.generation_reason || brief.needed_for || brief.asset_name || suggestionPlan
+    brief.generation_reason ||
+    brief.needed_for ||
+    brief.asset_name ||
+    brief.content_requirements ||
+    brief.what_to_create ||
+    brief.account_name ||
+    brief.source_asset ||
+    suggestionPlan
   );
   const artifactLabel =
     project?.artifactType === "one_pager"
@@ -91,13 +89,55 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
       : project?.artifactType === "image"
         ? "image"
         : "deck";
+  const sortedRevisions = useMemo(
+    () =>
+      [...(data?.revisions ?? [])].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      ),
+    [data?.revisions]
+  );
+  const activeRevisionIndex = useMemo(() => {
+    if (sortedRevisions.length === 0) return -1;
+    if (previewRevisionId) {
+      const index = sortedRevisions.findIndex((revision) => revision.id === previewRevisionId);
+      return index >= 0 ? index : sortedRevisions.length - 1;
+    }
+    return sortedRevisions.length - 1;
+  }, [previewRevisionId, sortedRevisions]);
+  const latestRevisionId =
+    sortedRevisions.length > 0 ? sortedRevisions[sortedRevisions.length - 1]?.id : undefined;
+  const latestRevision = useStudioRevision(projectId, latestRevisionId);
+  const previewRevision = useStudioRevision(projectId, previewRevisionId);
+  const activeRevision = previewRevisionId
+    ? previewRevision.data
+    : latestRevision.data ?? data?.latestRevision;
+  const latestHtml = previewHtml ?? activeRevision?.html;
+  const revisionId = previewRevisionId ?? activeRevision?.id ?? latestRevisionId;
+  const viewingOlderVersion =
+    activeRevisionIndex >= 0 && activeRevisionIndex < sortedRevisions.length - 1;
 
-  function onTurn(result: StudioTurnResult) {
+  function selectRevisionByIndex(index: number) {
+    const revision = sortedRevisions[index];
+    if (!revision) return;
+
+    const isLatest = index === sortedRevisions.length - 1;
+    if (isLatest) {
+      setPreviewRevisionId(undefined);
+      setPreviewHtml(undefined);
+      setActionMessage("");
+      return;
+    }
+
+    setPreviewHtml(undefined);
+    setPreviewRevisionId(revision.id);
+  }
+
+  const onTurn = useCallback((result: StudioTurnResult) => {
     setPreviewRevisionId(undefined);
     setActionMessage("");
     if (result.html) {
       setPreviewHtml(result.html);
-      setActionMessage("Draft is ready. Save it to KB when you want it reused across the platform.");
+      setActionMessage("Draft ready — review the preview and ask for any changes.");
     }
     if (result.template_id) {
       setSelectedTemplateId(result.template_id);
@@ -105,21 +145,31 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
       const first = result.recommended_templates[0]?.template_id;
       if (first) setSelectedTemplateId(first);
     }
-    void refetch();
-  }
+  }, []);
 
+  const onRefetch = useCallback(() => {
+    void refetch();
+  }, [refetch]);
+
+  // Bootstrap from suggestion context (first load only).
+  // Also runs when the only existing messages are seeded user messages (deep-link path),
+  // i.e. no assistant reply has been sent yet.
   useEffect(() => {
     if (!project || bootstrapAttemptedRef.current) return;
-    if ((data?.messages?.length ?? 0) > 0) return;
     if (!hasSuggestionContext) return;
+
+    const messages = data?.messages ?? [];
+    const hasAssistantReply = messages.some((m) => m.role === "assistant");
+    if (hasAssistantReply) return; // already bootstrapped
 
     bootstrapAttemptedRef.current = true;
     void bootstrapMut.mutateAsync().then((envelope) => {
       if (envelope.operation === "studio_bootstrap_skipped") return;
       onTurn(envelope.result);
     });
-  }, [bootstrapMut, data?.messages?.length, hasSuggestionContext, project]);
+  }, [bootstrapMut, data?.messages, hasSuggestionContext, onTurn, project]);
 
+  // Load a specific revision for preview
   useEffect(() => {
     const html = previewRevision.data?.html;
     if (!html) return;
@@ -154,17 +204,9 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
       return;
     }
     const title = saveTitle.trim() || project?.title || "Generated Studio Asset";
-    const tags = saveTags
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter(Boolean);
+    const tags = saveTags.split(",").map((tag) => tag.trim()).filter(Boolean);
     setActionMessage(`Saving ${saveFormat.toUpperCase()} to KB...`);
-    const result = await saveToKbMut.mutateAsync({
-      revisionId,
-      title,
-      tags,
-      format: saveFormat,
-    });
+    const result = await saveToKbMut.mutateAsync({ revisionId, title, tags, format: saveFormat });
     setSaveDialogOpen(false);
     setActionMessage(`Saved ${result.format?.toUpperCase() ?? saveFormat.toUpperCase()} to KB as ${result.asset.title}.`);
   }
@@ -180,26 +222,18 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
     setSaveDialogOpen(true);
   }
 
-  async function handleGenerateSlides() {
-    const envelope = await generateMut.mutateAsync({
-      message: `Generate the ${artifactLabel} now using gathered requirements and sensible defaults for any missing details. Do not ask follow-up questions unless generation is impossible.`,
-      templateId: selectedTemplateId ?? project?.templateId ?? undefined,
-      generate: true,
-    });
-    onTurn(envelope.result);
-  }
-
-  async function handleSubmitReview() {
-    if (!revisionId) {
-      window.alert("Generate a preview before submitting for review.");
+  // Generate button — delegates to the chat's streaming generate path.
+  // Template selection is mandatory; if missing the chat will highlight the picker.
+  function handleGenerateClick() {
+    if (!chatRef.current?.hasTemplate()) {
+      // The chat component will flash the required indicator on the picker
+      chatRef.current?.sendGenerate();
       return;
     }
-    try {
-      await submitMut.mutateAsync(projectId);
-      await refetch();
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Failed to submit for review");
-    }
+    setIsGenerating(true);
+    setActionMessage("");
+    chatRef.current.sendGenerate();
+    setTimeout(() => setIsGenerating(false), 1000);
   }
 
   if (!project) {
@@ -212,69 +246,111 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col space-y-4 p-6">
+      {/* Sticky header */}
       <div className="sticky top-0 z-30 -mx-6 shrink-0 space-y-4 border-b border-border/60 bg-background/90 px-6 py-4 backdrop-blur-md">
         <Link
           href="/content?tab=studio"
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4" />
-          Knowledge Base
+          Content Studio
         </Link>
 
         {!hideSuggestion && Boolean(brief.generation_reason || brief.asset_name || suggestionPlan) ? (
           <SuggestionContextBar brief={brief} onDismiss={() => setHideSuggestion(true)} />
         ) : null}
 
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-xl font-semibold">{project.title}</h1>
-            <p className="text-xs text-muted-foreground capitalize">
-              {project.artifactType} · ${project.costUsd.toFixed(2)} spent · cap $1.50
-            </p>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <p className="capitalize">
+                {project.artifactType} · ${project.costUsd.toFixed(2)} spent · cap $1.50
+              </p>
+              {sortedRevisions.length > 0 ? (
+                <div className="flex items-center gap-1">
+                  <span>Version</span>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6"
+                    disabled={activeRevisionIndex <= 0}
+                    onClick={() => selectRevisionByIndex(activeRevisionIndex - 1)}
+                    aria-label="Previous version"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </Button>
+                  <span className="min-w-[2.75rem] text-center tabular-nums text-foreground">
+                    {activeRevisionIndex + 1}/{sortedRevisions.length}
+                  </span>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6"
+                    disabled={activeRevisionIndex >= sortedRevisions.length - 1}
+                    onClick={() => selectRevisionByIndex(activeRevisionIndex + 1)}
+                    aria-label="Next version"
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                  {viewingOlderVersion ? (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      disabled={restoreMut.isPending}
+                      onClick={() => void handleRestore(sortedRevisions[activeRevisionIndex].id)}
+                      aria-label="Restore this version"
+                      title="Restore this version"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
             <Button
               size="sm"
-              disabled={generateMut.isPending || !canGenerateDeck}
-              onClick={() => void handleGenerateSlides()}
+              onClick={handleGenerateClick}
+              disabled={isGenerating}
             >
               <Sparkles className="h-3 w-3 mr-1" />
-              {generateMut.isPending ? "Generating..." : `Generate ${artifactLabel}`}
+              {isGenerating ? "Generating…" : `Generate ${artifactLabel}`}
             </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={!revisionId || submitMut.isPending}
-              onClick={() => void handleSubmitReview()}
-            >
-              <Send className="h-3 w-3 mr-1" />
-              {submitMut.isPending ? "Submitting…" : "Submit for review"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!revisionId || exportMut.isPending}
-              onClick={() => void handleExport("pdf")}
-            >
-              <Download className="h-3 w-3 mr-1" />
-              PDF
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!revisionId || exportMut.isPending}
-              onClick={() => void handleExport("png")}
-            >
-              PNG
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!revisionId || exportMut.isPending}
-              onClick={() => void handleExport("pptx")}
-            >
-              PPTX
-            </Button>
+            <Popover open={downloadOpen} onOpenChange={setDownloadOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!revisionId || exportMut.isPending}
+                >
+                  <Download className="h-3 w-3 mr-1" />
+                  {exportMut.isPending ? "Downloading…" : "Download"}
+                  <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-36 p-1">
+                {(["pdf", "png", "pptx"] as const).map((fmt) => (
+                  <button
+                    key={fmt}
+                    type="button"
+                    className="w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted disabled:opacity-50"
+                    disabled={exportMut.isPending}
+                    onClick={() => {
+                      setDownloadOpen(false);
+                      void handleExport(fmt);
+                    }}
+                  >
+                    {fmt.toUpperCase()}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
             <Button
               size="sm"
               variant="outline"
@@ -295,160 +371,31 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0">
+        {/* Chat panel */}
         <div className="lg:col-span-4 min-h-0 flex flex-col">
           <StudioChat
             projectId={projectId}
             messages={data?.messages ?? []}
             onTurn={onTurn}
+            onRefetch={onRefetch}
             selectedTemplateId={selectedTemplateId ?? project.templateId ?? undefined}
+            onTemplateSelect={setSelectedTemplateId}
+            templates={templates.data ?? []}
+            isLoadingTemplates={templates.isLoading}
+            recommendedTemplateIds={project.recommendedTemplateIds}
             hasSuggestionContext={hasSuggestionContext}
             isBootstrapping={bootstrapMut.isPending}
+            chatRef={chatRef}
           />
         </div>
-        <div className="lg:col-span-5 min-h-0">
+
+        {/* Preview panel */}
+        <div className="lg:col-span-8 min-h-0">
           <StudioPreview html={latestHtml} />
-        </div>
-        <div className="lg:col-span-3 space-y-4 overflow-y-auto">
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between gap-2">
-                <CardTitle className="text-sm">Templates</CardTitle>
-                <Button size="sm" variant="ghost" asChild>
-                  <Link href="/content?tab=templates">
-                    <Plus className="mr-1 h-3.5 w-3.5" />
-                    Manage
-                  </Link>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <TemplatePicker
-                templates={templates.data ?? []}
-                recommendedIds={project.recommendedTemplateIds}
-                selectedId={selectedTemplateId ?? project.templateId ?? undefined}
-                onSelect={setSelectedTemplateId}
-              />
-            </CardContent>
-          </Card>
-          {suggestionPlan && (evidenceProjects.length > 0 || evidenceKbAssets.length > 0 || reusedSlides.length > 0) && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Evidence plan</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {suggestionPlan.plan_summary && (
-                  <p className="text-xs leading-relaxed text-muted-foreground">{suggestionPlan.plan_summary}</p>
-                )}
-                {evidenceProjects.length > 0 && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-                      <Database className="h-3.5 w-3.5 text-muted-foreground" />
-                      Project database
-                    </div>
-                    <div className="space-y-1.5">
-                      {evidenceProjects.slice(0, 4).map((project) => (
-                        <div key={project.asset_id} className="rounded-md border border-border/70 p-2">
-                          <p className="truncate text-xs font-medium text-foreground">{project.title}</p>
-                          {project.snippet && (
-                            <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
-                              {project.snippet}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {evidenceKbAssets.length > 0 && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-                      <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                      KB assets
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {evidenceKbAssets.slice(0, 5).map((asset) => (
-                        <Link
-                          key={asset.asset_id}
-                          href={`/content?tab=library&asset=${encodeURIComponent(asset.asset_id)}`}
-                          className="inline-flex max-w-full items-center rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
-                        >
-                          <span className="truncate">{asset.title}</span>
-                          {asset.slide_count ? (
-                            <span className="ml-1 shrink-0 text-[10px]">({asset.slide_count})</span>
-                          ) : null}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {reusedSlides.length > 0 && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-                      <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                      Reused slides
-                    </div>
-                    <div className="space-y-1">
-                      {reusedSlides.map((slide) => (
-                        <p key={slide.slide} className="text-[11px] text-muted-foreground">
-                          <span className="font-medium text-foreground">Slide {slide.slide}</span>
-                          {slide.reuse
-                            ? ` from ${slide.reuse.source_vertical || "KB"} slide ${slide.reuse.source_slide_index}`
-                            : " uses KB content"}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-          {data?.revisions && data.revisions.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Versions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1">
-                {data.revisions.map((r) => (
-                  <div
-                    key={r.id}
-                    className="flex items-center justify-between gap-2 rounded-md border border-border/70 p-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-medium text-foreground">
-                        {r.id === data.latestRevision?.id ? "Latest version" : "Saved version"}
-                      </p>
-                      <p className="truncate text-[11px] text-muted-foreground">{r.createdAt}</p>
-                    </div>
-                    <div className="flex shrink-0 gap-1">
-                      <Button
-                        size="icon"
-                        variant={previewRevisionId === r.id ? "secondary" : "ghost"}
-                        className="h-7 w-7"
-                        disabled={previewRevision.isFetching && previewRevisionId === r.id}
-                        onClick={() => setPreviewRevisionId(r.id)}
-                        aria-label="Preview version"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        disabled={restoreMut.isPending || r.id === data.latestRevision?.id}
-                        onClick={() => void handleRestore(r.id)}
-                        aria-label="Restore version"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
 
+      {/* Save to KB dialog */}
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -457,25 +404,23 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
               Choose the file format and tags. The saved asset will be ingested into the knowledge base.
             </DialogDescription>
           </DialogHeader>
-
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label htmlFor="studio-kb-title">Save as</Label>
               <Input
                 id="studio-kb-title"
                 value={saveTitle}
-                onChange={(event) => setSaveTitle(event.target.value)}
+                onChange={(e) => setSaveTitle(e.target.value)}
                 placeholder="Generated sales deck"
                 disabled={saveToKbMut.isPending}
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="studio-kb-format">Extension</Label>
               <select
                 id="studio-kb-format"
                 value={saveFormat}
-                onChange={(event) => setSaveFormat(event.target.value as StudioKbSaveFormat)}
+                onChange={(e) => setSaveFormat(e.target.value as StudioKbSaveFormat)}
                 disabled={saveToKbMut.isPending}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -484,19 +429,17 @@ export default function StudioProjectPage({ params }: { params: Promise<{ projec
                 <option value="csv">CSV</option>
               </select>
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="studio-kb-tags">Tags</Label>
               <Input
                 id="studio-kb-tags"
                 value={saveTags}
-                onChange={(event) => setSaveTags(event.target.value)}
+                onChange={(e) => setSaveTags(e.target.value)}
                 placeholder="generated, proposal, healthcare"
                 disabled={saveToKbMut.isPending}
               />
             </div>
           </div>
-
           <DialogFooter>
             <Button
               type="button"
