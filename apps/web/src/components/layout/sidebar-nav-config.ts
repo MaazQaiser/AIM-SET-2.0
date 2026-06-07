@@ -19,7 +19,6 @@ export const mainNavItems: SidebarNavItem[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/calls", label: "Calls", icon: Phone },
   { href: "/agents", label: "Agents", icon: Bot },
-  { href: "/content", label: "Knowledge Base", icon: FileText },
   { href: "/coaching", label: "Coaching", icon: GraduationCap },
   { href: "/governance", label: "Governance", icon: Shield },
   { href: "/analytics/landing-pages", label: "Lead hubs", icon: FileText },
