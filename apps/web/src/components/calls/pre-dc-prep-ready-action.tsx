@@ -36,8 +36,8 @@ export function PreDcPrepReadyAction({
     <div className={cn("inline-flex items-center gap-2", className)}>
       {isReady ? (
         <Badge
-          variant="outline"
-          className="h-6 gap-1 border-success/40 bg-success/10 text-success type-label"
+          variant="success"
+          className="h-7 gap-1.5 border-transparent bg-success px-3 text-white type-label font-bold"
         >
           <CheckCircle2 className="h-3 w-3" aria-hidden />
           Prep ready
@@ -48,14 +48,19 @@ export function PreDcPrepReadyAction({
         size="sm"
         variant={isReady ? "outline" : "default"}
         className={cn(
-          compact ? "h-8 rounded-full px-4 type-body font-bold" : "",
+          compact
+            ? isReady
+              ? "h-7 gap-1.5 rounded-full px-2.5 type-caption font-semibold shadow-none"
+              : "h-8 rounded-full px-4 type-body font-bold"
+            : "",
           !isReady && isIntercom && "bg-[#111111] text-white hover:bg-[#111111]/90"
         )}
         onClick={handleClick}
+        aria-label={isReady ? "Undo ready" : "Mark prep as ready"}
       >
         {isReady ? (
           <>
-            <CircleDashed className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+            <CircleDashed className="h-3 w-3" aria-hidden />
             Undo ready
           </>
         ) : (

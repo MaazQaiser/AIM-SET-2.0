@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { scoreToTone } from "@/lib/live/sentiment-display";
+import { hasSentimentScore, scoreToTone, type SentimentScore } from "@/lib/live/sentiment-display";
 import { cn } from "@/lib/cn";
 import type { SentimentSignal, TranscriptEvent } from "@/types";
 
@@ -59,7 +59,7 @@ function segmentOpacity(tone: SentimentTone): number {
 function buildSentimentPoints(
   sentimentSignals: SentimentSignal[],
   transcript: TranscriptEvent[],
-  customerScore: number
+  customerScore: SentimentScore
 ): SentimentPoint[] {
   const currentTone = scoreToTone(customerScore);
   const customerSignals = sentimentSignals.filter((s) => s.speakerRole === "customer");
@@ -73,6 +73,7 @@ function buildSentimentPoints(
       current: false,
     }));
 
+    if (!hasSentimentScore(customerScore) || currentTone == null) return history;
     const lastTimestamp = history[history.length - 1]?.timestamp ?? 0;
     return [
       ...history,
@@ -98,6 +99,7 @@ function buildSentimentPoints(
       tone: e.sentiment as SentimentTone,
       current: false,
     }));
+    if (!hasSentimentScore(customerScore) || currentTone == null) return history;
     const lastTimestamp = history[history.length - 1]?.timestamp ?? 0;
     return [
       ...history,
@@ -111,16 +113,7 @@ function buildSentimentPoints(
     ];
   }
 
-  const fallbackScore =
-    currentTone === "positive" ? 0.55 : currentTone === "negative" ? -0.55 : 0.08;
-
-  return Array.from({ length: 6 }, (_, i) => ({
-    id: `fallback-${i}`,
-    timestamp: i * 20,
-    score: i === 5 ? fallbackScore : i < 2 ? 0.06 : fallbackScore * 0.5,
-    tone: (i === 5 ? currentTone : "neutral") as SentimentTone,
-    current: i === 5,
-  }));
+  return [];
 }
 
 function formatTime(seconds: number) {
@@ -271,7 +264,7 @@ export function LiveSentimentLineChart({
   className,
 }: {
   transcript: TranscriptEvent[];
-  customerScore: number;
+  customerScore: SentimentScore;
   sentimentSignals?: SentimentSignal[];
   compact?: boolean;
   className?: string;

@@ -12,6 +12,24 @@ import {
 } from "@/lib/live/pain-display";
 
 describe("buildRunningSummaryLines", () => {
+  it("stays empty before the live transcript starts", () => {
+    const lines = buildRunningSummaryLines({
+      accountName: "Acme Corp",
+      leadName: "Jane Doe",
+      intent: { label: "cost_reduction", display: "Cost reduction", confidence: 0.8 },
+      intentLabel: undefined,
+      checklist: {
+        bantCoverage: 0.5,
+        bant: { budget: "partial", authority: "unknown", need: "confirmed", timeline: "unknown" },
+        items: [],
+        openGaps: [],
+      } as never,
+      transcript: [],
+    });
+
+    expect(lines).toEqual([]);
+  });
+
   it("builds discrete lines without pain points", () => {
     const lines = buildRunningSummaryLines({
       accountName: "Acme Corp",
@@ -37,10 +55,51 @@ describe("buildRunningSummaryLines", () => {
     });
 
     expect(lines[0]).toContain("Jane Doe at Acme Corp");
-    expect(lines.some((line) => line.includes("Primary intent"))).toBe(true);
+    expect(lines.some((line) => line.includes("buyer seems focused"))).toBe(true);
     expect(lines.some((line) => line.includes("BANT coverage"))).toBe(true);
-    expect(lines.some((line) => line.includes("Most recent customer comment"))).toBe(true);
+    expect(lines.some((line) => line.includes("The latest thing they said"))).toBe(true);
     expect(lines.some((line) => line.toLowerCase().includes("pain"))).toBe(false);
+  });
+
+  it("describes discovery gaps in conversational language", () => {
+    const lines = buildRunningSummaryLines({
+      accountName: "Debug Fixed Cost",
+      leadName: "Buyer",
+      intent: { label: "technical_deep_dive", display: "Technical deep dive", confidence: 0.8 },
+      intentLabel: undefined,
+      checklist: {
+        bantCoverage: 0.88,
+        bant: {
+          budget: "confirmed",
+          authority: "partial",
+          need: "confirmed",
+          timeline: "confirmed",
+        },
+        items: [
+          { id: "authority", label: "Authority", status: "partial", tier: "bant" },
+          { id: "next_step", label: "Next step", status: "pending", tier: "bant" },
+        ],
+        openGaps: ["authority", "next_step"],
+      } as never,
+      transcript: [
+        {
+          id: "1",
+          speakerId: "c1",
+          speakerName: "Customer",
+          speakerRole: "customer",
+          text: "Please include CFO-level ROI and a clear decision process before the next review.",
+          timestamp: 1,
+        },
+      ],
+    }).join(" ");
+
+    expect(lines).toContain("The buyer seems focused on a technical deep dive.");
+    expect(lines).toContain(
+      "You've got about 88% BANT coverage; the main open piece is the next step and authority is partly there but still needs specifics."
+    );
+    expect(lines).toContain("The latest thing they said was");
+    expect(lines).not.toContain("Still to cover:");
+    expect(lines).not.toContain("Partially covered:");
   });
 
   it("clamps lines when not expanded", () => {
@@ -124,6 +183,22 @@ describe("pain display helpers", () => {
     expect(summary).not.toMatch(/^honestly/i);
     expect(summary.length).toBeLessThanOrEqual(101);
     expect(summary).toContain("operators live in spreadsheets");
+  });
+
+  it("uses the concrete pain instead of a vague emotional tail", () => {
+    const summary = painSummary({
+      id: "p2",
+      text: "that's the pain keeping me up at night.",
+      evidence:
+        "Manual brand-standard audits are the bottleneck before we open the next regional wave — that's the pain keeping me up at night.",
+      source: "emergent",
+      confidence: 0.9,
+      timestamp: 2,
+    });
+
+    expect(summary).toBe(
+      "Manual brand-standard audits are the bottleneck before we open the next regional wave"
+    );
   });
 
   it("returns evidence when it differs from summary text", () => {

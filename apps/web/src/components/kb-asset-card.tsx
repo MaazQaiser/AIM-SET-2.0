@@ -31,6 +31,7 @@ interface KBAssetCardProps {
 
 export function KBAssetCard({ asset, onPreview }: KBAssetCardProps) {
   const status = asset.status ?? "ready";
+  const assetTypeLabel = asset.type === "case-study" ? "knowledge asset" : asset.type.replace(/-/g, " ");
 
   return (
     <Card className="flex h-full flex-col">
@@ -50,7 +51,7 @@ export function KBAssetCard({ asset, onPreview }: KBAssetCardProps) {
         <div className="min-w-0 flex-1">
           <p className="type-body font-medium text-foreground line-clamp-2">{asset.title}</p>
           <p className="type-caption text-muted-foreground mt-0.5 capitalize">
-            {asset.type} · v{asset.version}
+            {assetTypeLabel} · v{asset.version}
           </p>
           {asset.fileName && (
             <p className="type-caption text-muted-foreground mt-1 truncate" title={asset.fileName}>

@@ -58,9 +58,10 @@ class LiveCallRepository:
             if provider_meeting_id and not existing.get("provider_meeting_id"):
                 return self.link_provider_meeting(ctx, call_id, provider_meeting_id, provider=provider)
             return existing
+        initial_status = "live" if provider_meeting_id else None
         row = {
             "call_id": call_id,
-            "status": "live",
+            "status": initial_status,
             "provider": provider,
             "provider_meeting_id": provider_meeting_id,
             "started_at": _now_iso(),
@@ -74,7 +75,7 @@ class LiveCallRepository:
                     {
                         "tenant_id": tenant_uuid,
                         "call_id": call_id,
-                        "status": "live",
+                        "status": initial_status,
                         "provider": provider,
                         "provider_meeting_id": provider_meeting_id,
                         "summary": {},
@@ -153,7 +154,7 @@ class LiveCallRepository:
     ) -> Dict[str, Any]:
         sess = self.get_session(ctx, call_id) or {
             "call_id": call_id,
-            "status": "live",
+            "status": None,
             "provider": provider,
             "provider_meeting_id": None,
             "started_at": _now_iso(),
@@ -163,6 +164,7 @@ class LiveCallRepository:
         tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
         linked = {
             **sess,
+            "status": "live",
             "provider_meeting_id": provider_meeting_id,
             "provider": provider,
         }
@@ -172,7 +174,7 @@ class LiveCallRepository:
                     {
                         "tenant_id": tenant_uuid,
                         "call_id": call_id,
-                        "status": linked.get("status", "live"),
+                        "status": "live",
                         "provider": provider,
                         "provider_meeting_id": provider_meeting_id,
                         "summary": linked.get("summary") or {},
@@ -191,6 +193,7 @@ class LiveCallRepository:
         call_id: str,
         event: Dict[str, Any],
     ) -> Dict[str, Any]:
+        self.mark_session_live(ctx, call_id, provider=event.get("provider", "recall"))
         tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
         event_id = event.get("id") or str(uuid.uuid4())
         row = {
@@ -272,6 +275,52 @@ class LiveCallRepository:
         if len(store.transcript_events[clerk_key][call_id]) > 500:
             store.transcript_events[clerk_key][call_id] = store.transcript_events[clerk_key][call_id][-500:]
         return row
+
+    def mark_session_live(
+        self,
+        ctx: TenantContext,
+        call_id: str,
+        *,
+        provider: str = "recall",
+    ) -> Dict[str, Any]:
+        existing = self.get_session(ctx, call_id) or {
+            "call_id": call_id,
+            "status": None,
+            "provider": provider,
+            "provider_meeting_id": None,
+            "started_at": _now_iso(),
+            "ended_at": None,
+            "summary": {},
+        }
+        if existing.get("status") == "live":
+            return existing
+
+        tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
+        live = {
+            **existing,
+            "status": "live",
+            "provider": existing.get("provider") or provider,
+            "started_at": existing.get("started_at") or _now_iso(),
+            "ended_at": None,
+        }
+        if tenant_resolved and get_settings().supabase_configured:
+            try:
+                get_supabase().table("call_live_sessions").upsert(
+                    {
+                        "tenant_id": tenant_uuid,
+                        "call_id": call_id,
+                        "status": "live",
+                        "provider": live.get("provider") or provider,
+                        "provider_meeting_id": live.get("provider_meeting_id"),
+                        "summary": live.get("summary") or {},
+                    }
+                ).execute()
+            except Exception:
+                pass
+        store = get_memory_store()
+        for key in _memory_keys(ctx, clerk_key):
+            store.live_sessions.setdefault(key, {})[call_id] = live
+        return live
 
     def update_transcript_event_analysis(
         self,
@@ -474,7 +523,7 @@ class LiveCallRepository:
 def _session_from_row(row: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "call_id": row.get("call_id"),
-        "status": row.get("status", "live"),
+        "status": row.get("status"),
         "provider": row.get("provider", "recall"),
         "provider_meeting_id": row.get("provider_meeting_id"),
         "started_at": row.get("started_at"),

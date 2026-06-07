@@ -37,24 +37,24 @@ Generated for DC Copilot test fixtures.
 - Nurture: 3
 - Opportunity: 7
 
-## Rescheduled upcoming Pre-DC (Jun 5–9, 2026)
+## Rescheduled upcoming Pre-DC (Jun 8–12, 2026)
 
 | Company | Date | Time |
 |---------|------|------|
-| SentinelGuard Security Inc. | 06/05/2026 | 7:00 pm |
-| Brightwell Community Schools | 06/05/2026 | 8:00 pm |
-| Lumora Learning Group | 06/05/2026 | 9:00 pm |
-| HavenPoint Resident Services | 06/06/2026 | 10:00 pm |
-| Caldera Health Networks | 06/06/2026 | 7:00 pm |
-| ClariMind AI Advisory | 06/06/2026 | 9:00 pm |
-| Iridia Pediatric Group | 06/07/2026 | 7:00 pm |
-| Athenaeum Online Schools | 06/07/2026 | 8:30 pm |
-| Brevix AI Strategy Partners | 06/08/2026 | 10:00 pm |
-| Strataguard Protective Services | 06/08/2026 | 6:00 pm |
-| TerraNimbus Wellness | 06/08/2026 | 8:00 pm |
-| Nimbus AI Labs | 06/09/2026 | 11:30 pm |
-| Kestrel Charter Academy Network | 06/09/2026 | 7:30 pm |
-| Argentum Surgical Centers | 06/09/2026 | 9:00 pm |
+| Caldera Health Networks | 06/08/2026 | 7:00 pm |
+| Brightwell Community Schools | 06/08/2026 | 8:00 pm |
+| Iridia Pediatric Group | 06/08/2026 | 9:00 pm |
+| SentinelGuard Security Inc. | 06/09/2026 | 7:00 pm |
+| ClariMind AI Advisory | 06/09/2026 | 9:00 pm |
+| HavenPoint Resident Services | 06/09/2026 | 10:00 pm |
+| Athenaeum Online Schools | 06/10/2026 | 8:30 pm |
+| Lumora Learning Group | 06/10/2026 | 9:00 pm |
+| Strataguard Protective Services | 06/11/2026 | 6:00 pm |
+| TerraNimbus Wellness | 06/11/2026 | 8:00 pm |
+| Brevix AI Strategy Partners | 06/11/2026 | 10:00 pm |
+| Kestrel Charter Academy Network | 06/12/2026 | 7:30 pm |
+| Argentum Surgical Centers | 06/12/2026 | 9:00 pm |
+| Nimbus AI Labs | 06/12/2026 | 11:30 pm |
 
 ## Pre-DC with May dates retained (Post-DC completed)
 

@@ -48,27 +48,27 @@ export function BantLiveStatusBars({
   className?: string;
 }) {
   return (
-    <div
-      className={cn("flex items-end gap-2 shrink-0", className)}
-      role="group"
-      aria-label="BANT live status"
-    >
+    <div className={cn("flex shrink-0 items-center gap-1.5", className)}>
       {BANT_KEYS.map((key) => {
         const status = checklist?.bant[key] ?? "unknown";
         const tone = bantBarTone(status, key);
         return (
-          <div key={key} className="flex min-w-[2.25rem] flex-col items-center gap-1">
-            <div
+          <div key={key} className="flex items-center justify-center">
+            <span
               className={cn(
-                "h-1.5 w-full rounded-full transition-colors",
-                tone === "complete" && "bg-success",
-                tone === "partial" && "bg-success/40",
-                tone === "open" && "bg-muted"
+                "inline-flex h-6 w-6 items-center justify-center rounded-full border type-caption font-semibold transition-colors",
+                tone === "complete" && "border-success bg-success text-success-foreground",
+                tone === "partial" && "border-warning/50 bg-warning/20 text-warning-foreground",
+                tone === "open" && "border-border bg-muted/70 text-muted-foreground"
               )}
               title={`${bantLabels[key]}: ${bantStatusLabel(status, key)}`}
-            />
-            <span className="type-caption font-medium text-muted-foreground">
-              {bantShort[key]}
+            >
+              <span aria-hidden>
+                {bantShort[key]}
+              </span>
+              <span className="sr-only">
+                {bantLabels[key]}: {bantStatusLabel(status, key)}
+              </span>
             </span>
           </div>
         );

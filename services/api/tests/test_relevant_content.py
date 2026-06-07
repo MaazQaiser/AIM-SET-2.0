@@ -25,6 +25,12 @@ def test_build_relevant_content_splits_documents_and_projects(monkeypatch):
         ]
 
     class FakeRepo:
+        def list_assets(self, _ctx):
+            return []
+
+        def list_asset_chunk_texts(self, *_args, **_kwargs):
+            return []
+
         def get_asset_row(self, _tenant_uuid, asset_id, _clerk_key):
             if asset_id == "kb-deck-1":
                 return {
@@ -45,6 +51,7 @@ def test_build_relevant_content_splits_documents_and_projects(monkeypatch):
         "app.agents.relevant_content.resolve_kb_tenant",
         lambda _ctx: ("tenant-a", "tenant-a"),
     )
+    monkeypatch.setattr("app.agents.relevant_content.list_kb_projects", lambda _ctx: [])
 
     out = build_relevant_content(
         ctx,
@@ -53,4 +60,91 @@ def test_build_relevant_content_splits_documents_and_projects(monkeypatch):
     )
 
     assert any(d["format"] == "pdf" for d in out["relevantDocuments"])
-    assert any(p["source"] == "dc_notes" for p in out["relevantProjects"])
+    assert all(p["source"] != "dc_notes" for p in out["relevantProjects"])
+
+
+def test_build_relevant_content_uses_library_deck_and_project_fallbacks(monkeypatch):
+    ctx = TenantContext(tenant_id="tenant-health", user_id="u1", clerk_org_id="tenant-health")
+
+    class FakeRepo:
+        def list_assets(self, _ctx):
+            return [
+                {
+                    "id": "kb-healthcare-deck",
+                    "title": "Healthcare",
+                    "type": "deck",
+                    "fileName": "Healthcare.pptx",
+                    "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    "tags": [],
+                    "status": "ready",
+                    "chunkCount": 13,
+                },
+                {
+                    "id": "kb-fintech-deck",
+                    "title": "Fintech",
+                    "type": "deck",
+                    "fileName": "Fintech.pptx",
+                    "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    "tags": [],
+                    "status": "ready",
+                    "chunkCount": 10,
+                },
+            ]
+
+        def list_asset_chunk_texts(self, _ctx, asset_id, limit=20):
+            if asset_id == "kb-healthcare-deck":
+                return ["Healthcare patient portal and practice management proof points."]
+            return []
+
+        def get_asset_row(self, *_args, **_kwargs):
+            return None
+
+    monkeypatch.setattr("app.agents.relevant_content._kb_search", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr("app.agents.relevant_content.get_kb_repository", lambda: FakeRepo())
+    monkeypatch.setattr(
+        "app.agents.relevant_content.resolve_kb_tenant",
+        lambda _ctx: ("tenant-health", "tenant-health"),
+    )
+    monkeypatch.setattr(
+        "app.agents.relevant_content.list_kb_projects",
+        lambda _ctx: [
+            {
+                "id": "project-care",
+                "title": "iCareManager",
+                "projectName": "iCareManager",
+                "companyName": "iCareManager",
+                "summary": "Care management platform in the Healthcare vertical.",
+                "industry": "Healthcare",
+                "domain": "Care Management",
+                "functionalSolution": "Patient and care-team workflow management.",
+                "technicalSolution": "Healthcare portal and scheduling workflow.",
+                "fields": {},
+                "sourceAssetId": "kb-project-csv",
+                "sourceAssetTitle": "Project repository",
+            },
+            {
+                "id": "project-fintech",
+                "title": "Fintech Payments",
+                "summary": "Payments project.",
+                "industry": "Financial Services",
+                "fields": {},
+                "sourceAssetId": "kb-project-csv",
+                "sourceAssetTitle": "Project repository",
+            },
+        ],
+    )
+
+    out = build_relevant_content(
+        ctx,
+        "Iridia Pediatric Group",
+        {
+            "needs": "Healthcare ERP plus patient portal build",
+            "industry": "Hospitals and Health Care",
+            "company_description": "Pediatric practice with EHR, billing, and scheduling workflows.",
+        },
+    )
+
+    assert out["relevantDocuments"][0]["assetId"] == "kb-healthcare-deck"
+    assert out["relevantDocuments"][0]["format"] == "pptx"
+    assert out["relevantProjects"][0]["id"] == "project-care"
+    assert out["relevantProjects"][0]["source"] == "project_database"

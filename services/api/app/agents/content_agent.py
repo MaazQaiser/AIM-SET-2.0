@@ -9,6 +9,7 @@ from dc_core.tenancy import TenantContext
 from dc_llm.client import LlmClient
 from dc_tools.retrieve_kb import default_embed_fn, retrieve_kb
 
+from app.agents.relevant_content import filter_library_kb_hits
 from app.config import get_settings
 from app.domain.agent_config_repository import get_agent_config_repository
 from app.domain.kb_repository import get_kb_repository
@@ -45,17 +46,24 @@ def generate_pre_dc_brief(
     query = account_name + " " + research.get("needs", "")
 
     def vector_search(tid: str, embedding: List[float], limit: int) -> List[Dict[str, Any]]:
-        return repo.match_chunks(tenant_uuid, embedding, limit=limit, clerk_key=memory_key)
+        raw = repo.match_chunks(
+            tenant_uuid,
+            embedding,
+            limit=max(limit * 6, limit + 30),
+            clerk_key=memory_key,
+        )
+        return filter_library_kb_hits(raw)[:limit]
 
     embed_fn = default_embed_fn if settings.openai_configured or settings.openai_api_key else None
     hits = retrieve_kb(
         tenant_uuid,
         query,
         limit=5,
-        chunks=get_memory_store().kb_chunks.get(memory_key, []),
+        chunks=filter_library_kb_hits(get_memory_store().kb_chunks.get(memory_key, [])),
         embed_fn=embed_fn,
         vector_search_fn=vector_search if embed_fn else None,
     )
+    hits = filter_library_kb_hits(hits)
 
     system = load_prompt("content/pre_dc_brief/v1.0.0.md")
     user = (

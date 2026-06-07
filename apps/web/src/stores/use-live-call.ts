@@ -25,9 +25,9 @@ interface LiveCallState {
   bantSignals: BantSignal[];
   sentimentSignals: SentimentSignal[];
   elapsedSeconds: number;
-  sentimentAE: number;
+  sentimentAE: number | null;
   salesRepTone: SalesRepToneCue | null;
-  sentimentCustomer: number;
+  sentimentCustomer: number | null;
   customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
   intentSnapshot: IntentSnapshot | null;
@@ -48,8 +48,8 @@ interface LiveCallState {
   dismissNudge: (id: string) => void;
   acceptNudge: (id: string) => void;
   updateSentiment: (
-    ae: number,
-    customer: number,
+    ae: number | null,
+    customer: number | null,
     shift?: SentimentShift | null,
     salesRepTone?: SalesRepToneCue | null,
     customerSentiment?: CustomerSentimentCue | null
@@ -64,8 +64,8 @@ interface LiveCallState {
   hydrateFromStoredSession: (payload: {
     transcript: TranscriptEvent[];
     suggestionLog: SuggestionLogEntry[];
-    sentimentAE: number;
-    sentimentCustomer: number;
+    sentimentAE: number | null;
+    sentimentCustomer: number | null;
   }) => void;
   tickElapsed: () => void;
   reset: () => void;
@@ -79,9 +79,9 @@ const initialState = {
   bantSignals: [],
   sentimentSignals: [],
   elapsedSeconds: 0,
-  sentimentAE: 0,
+  sentimentAE: null,
   salesRepTone: null,
-  sentimentCustomer: 0,
+  sentimentCustomer: null,
   customerSentiment: null,
   sentimentShift: null,
   intentSnapshot: null,

@@ -90,7 +90,7 @@ export const BRIEF_SIDEBAR_CARD_SCROLL_MAX = "min(32rem,calc(100vh-8rem))";
 /** Main column brief cards — same sticky header + inner scroll pattern as sidebar. */
 export const BRIEF_MAIN_CARD_SCROLL_MAX = "min(40rem,calc(100vh-10rem))";
 
-/** Relevant content — half the main column cap, scroll inside. */
+/** KB matches — half the main column cap, scroll inside. */
 export const BRIEF_RELEVANT_CONTENT_SCROLL_MAX = "min(20rem,calc((100vh - 10rem) / 2))";
 
 export interface BriefDetailCardProps {

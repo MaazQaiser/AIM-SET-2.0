@@ -9,14 +9,15 @@ import {
   shiftDirectionEmoji,
   shiftEmoji,
   toneEmoji,
+  type SentimentScore,
 } from "@/lib/live/sentiment-display";
 import type { CustomerSentimentCue, SalesRepToneCue, SentimentShift } from "@/types";
 import { cn } from "@/lib/cn";
 
 interface SentimentDisplayPanelProps {
-  aeScore: number;
+  aeScore: SentimentScore;
   salesRepTone?: SalesRepToneCue | null;
-  customerScore: number;
+  customerScore: SentimentScore;
   customerSentiment?: CustomerSentimentCue | null;
   shift?: SentimentShift | null;
   className?: string;
@@ -30,12 +31,14 @@ function SentimentChip({
   toneOverride,
 }: {
   label: string;
-  score: number;
+  score: SentimentScore;
   value?: string;
   helper?: string;
-  toneOverride?: ReturnType<typeof scoreToTone>;
+  toneOverride?: Exclude<ReturnType<typeof scoreToTone>, null>;
 }) {
-  const tone = toneOverride ?? scoreToTone(score);
+  const tone = toneOverride ?? scoreToTone(score) ?? "neutral";
+  const scoreIcon = scoreEmoji(score);
+  const toneIcon = toneEmoji(tone);
   return (
     <div
       className={cn(
@@ -45,15 +48,17 @@ function SentimentChip({
         tone === "neutral" && "border-border bg-muted/30"
       )}
     >
-      <span className="text-xl leading-none" aria-hidden>
-        {scoreEmoji(score)}
-      </span>
+      {scoreIcon && (
+        <span className="text-xl leading-none" aria-hidden>
+          {scoreIcon}
+        </span>
+      )}
       <div className="min-w-0">
         <p className="type-caption font-medium text-muted-foreground">
           {label}
         </p>
         <p className="type-label text-foreground leading-snug">
-          {toneEmoji(tone)} {value ?? formatSentimentScore(score)}
+          {[toneIcon, value ?? formatSentimentScore(score)].filter(Boolean).join(" ")}
         </p>
         {helper && (
           <p className="mt-0.5 type-caption leading-snug text-muted-foreground">{helper}</p>

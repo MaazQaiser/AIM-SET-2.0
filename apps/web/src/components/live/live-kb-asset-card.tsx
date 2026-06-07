@@ -9,7 +9,7 @@ import type { KBAsset } from "@/types";
 
 const typeConfig: Record<string, { icon: typeof FileText; label: string }> = {
   deck: { icon: Presentation, label: "Deck" },
-  "case-study": { icon: FileText, label: "Case Study" },
+  "case-study": { icon: FileText, label: "Knowledge Asset" },
   image: { icon: ImageIcon, label: "Image" },
   "one-pager": { icon: Layout, label: "OnePager" },
   architecture: { icon: MapIcon, label: "Architecture" },

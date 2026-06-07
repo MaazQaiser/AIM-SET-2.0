@@ -1,25 +1,31 @@
 import type { CustomerSentimentCue, SalesRepToneCue, SentimentShift } from "@/types";
 
 export type SentimentTone = "positive" | "neutral" | "negative";
+export type SentimentScore = number | null | undefined;
 
-export function scoreToTone(score: number): SentimentTone {
+export function hasSentimentScore(score: SentimentScore): score is number {
+  return typeof score === "number" && Number.isFinite(score);
+}
+
+export function scoreToTone(score: SentimentScore): SentimentTone | null {
+  if (!hasSentimentScore(score)) return null;
   if (score > 0.2) return "positive";
   if (score < -0.2) return "negative";
   return "neutral";
 }
 
-export function toneEmoji(tone: SentimentTone): string {
+export function toneEmoji(tone: SentimentTone | null): string {
   switch (tone) {
     case "positive":
       return "😊";
     case "negative":
       return "😟";
     default:
-      return "😐";
+      return "";
   }
 }
 
-export function scoreEmoji(score: number): string {
+export function scoreEmoji(score: SentimentScore): string {
   return toneEmoji(scoreToTone(score));
 }
 
@@ -31,15 +37,24 @@ export function shiftDirectionEmoji(direction: SentimentShift["direction"]): str
   return direction === "positive" ? "↗️" : "↘️";
 }
 
-export function formatSentimentScore(score: number): string {
+export function formatSentimentScore(score: SentimentScore): string {
+  if (!hasSentimentScore(score)) return "No signal";
   const pct = Math.round(Math.abs(score) * 100);
-  const tone = scoreToTone(score);
+  const tone = scoreToTone(score) ?? "neutral";
   if (tone === "neutral") return "Neutral";
   return tone === "positive" ? `+${pct}% upbeat` : `-${pct}% concern`;
 }
 
-export function fallbackSalesRepToneCue(score: number): SalesRepToneCue {
-  const tone = scoreToTone(score);
+export function fallbackSalesRepToneCue(score: SentimentScore): SalesRepToneCue {
+  if (!hasSentimentScore(score)) {
+    return {
+      label: "Waiting for signal",
+      guidance: "Sales rep tone will appear once the call transcript starts.",
+      tone: "neutral",
+      source: "fallback",
+    };
+  }
+  const tone = scoreToTone(score) ?? "neutral";
   if (tone === "positive") {
     return {
       label: "Confident support",
@@ -65,7 +80,7 @@ export function fallbackSalesRepToneCue(score: number): SalesRepToneCue {
 }
 
 export function resolveSalesRepToneCue(
-  score: number,
+  score: SentimentScore,
   cue?: SalesRepToneCue | null
 ): SalesRepToneCue {
   if (cue?.label?.trim()) {
@@ -73,15 +88,23 @@ export function resolveSalesRepToneCue(
       label: cue.label.trim(),
       guidance:
         cue.guidance?.trim() || fallbackSalesRepToneCue(score).guidance,
-      tone: cue.tone ?? scoreToTone(score),
+      tone: cue.tone ?? scoreToTone(score) ?? "neutral",
       source: cue.source,
     };
   }
   return fallbackSalesRepToneCue(score);
 }
 
-export function fallbackCustomerSentimentCue(score: number): CustomerSentimentCue {
-  const tone = scoreToTone(score);
+export function fallbackCustomerSentimentCue(score: SentimentScore): CustomerSentimentCue {
+  if (!hasSentimentScore(score)) {
+    return {
+      label: "Waiting for signal",
+      guidance: "Customer sentiment will appear once the call transcript starts.",
+      tone: "neutral",
+      source: "fallback",
+    };
+  }
+  const tone = scoreToTone(score) ?? "neutral";
   if (tone === "positive") {
     return {
       label: "Buying confidence",
@@ -107,7 +130,7 @@ export function fallbackCustomerSentimentCue(score: number): CustomerSentimentCu
 }
 
 export function resolveCustomerSentimentCue(
-  score: number,
+  score: SentimentScore,
   cue?: CustomerSentimentCue | null
 ): CustomerSentimentCue {
   if (cue?.label?.trim()) {
@@ -115,7 +138,7 @@ export function resolveCustomerSentimentCue(
       label: cue.label.trim(),
       guidance:
         cue.guidance?.trim() || fallbackCustomerSentimentCue(score).guidance,
-      tone: cue.tone ?? scoreToTone(score),
+      tone: cue.tone ?? scoreToTone(score) ?? "neutral",
       source: cue.source,
     };
   }

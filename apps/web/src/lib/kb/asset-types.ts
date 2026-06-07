@@ -2,7 +2,6 @@ import type { AssetType } from "@/types";
 
 export const KB_ASSET_TYPES: { value: AssetType; label: string }[] = [
   { value: "deck", label: "Deck" },
-  { value: "case-study", label: "Case Study" },
   { value: "image", label: "Image" },
   { value: "architecture", label: "Architecture Diagram" },
   { value: "battlecard", label: "Battle Card" },
@@ -14,7 +13,7 @@ const EXTENSION_ASSET_TYPE: Record<string, AssetType> = {
   ".pptx": "deck",
   ".ppt": "deck",
   ".docx": "one-pager",
-  ".csv": "case-study",
+  ".csv": "one-pager",
   ".png": "image",
   ".jpg": "image",
   ".jpeg": "image",

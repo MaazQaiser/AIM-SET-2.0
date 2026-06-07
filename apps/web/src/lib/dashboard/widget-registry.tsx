@@ -204,7 +204,7 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
   },
   {
     id: "brief.pre-deck",
-    title: "Pre-call deck",
+    title: "AI draft deck",
     category: "content",
     column: "center",
     sortOrder: 0.25,
@@ -219,7 +219,7 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
   },
   {
     id: "brief.workflow-artifacts",
-    title: "Discovery Call Artifacts",
+    title: "Call assets",
     category: "content",
     column: "center",
     sortOrder: 0.5,
@@ -253,10 +253,10 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
   },
   {
     id: "brief.deck",
-    title: "Recommended deck",
+    title: "Best existing deck",
     category: "content",
     column: "center",
-    sortOrder: 3,
+    sortOrder: 0.2,
     render: ({ brief, call }) => (
       <BriefDeckCard
         recommendedDeck={brief.recommendedDeck}
@@ -267,7 +267,7 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
   },
   {
     id: "brief.relevant-content",
-    title: "Relevant content",
+    title: "KB matches",
     category: "content",
     column: "center",
     sortOrder: 3.5,

@@ -10,6 +10,7 @@ from dc_kb.chunking import split_text
 from dc_kb.extract import extract_document
 
 from app.config import get_settings
+from app.domain.kb_constants import ALLOWED_ASSET_TYPES, EXTENSION_ASSET_TYPE
 from app.domain.kb_repository import get_kb_repository
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.memory_store import get_memory_store
@@ -40,6 +41,11 @@ def test_csv_extract_windows_1252_en_dash():
     Path(path).unlink(missing_ok=True)
     assert doc.chunks
     assert "\u2013" in doc.chunks[0].text or "Acme" in doc.chunks[0].text
+
+
+def test_csv_upload_defaults_to_one_pager_asset_type():
+    assert EXTENSION_ASSET_TYPE[".csv"] == "one-pager"
+    assert "case-study" not in ALLOWED_ASSET_TYPES
 
 
 def test_csv_extract_and_ingest_memory(monkeypatch):

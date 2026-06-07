@@ -308,7 +308,7 @@ ALTER TABLE agent_configs ENABLE ROW LEVEL SECURITY;
 CREATE TABLE IF NOT EXISTS call_live_sessions (
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   call_id TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'live' CHECK (status IN ('live', 'ended')),
+  status TEXT CHECK (status IS NULL OR status IN ('live', 'ended')),
   provider TEXT NOT NULL DEFAULT 'recall',
   provider_meeting_id TEXT,
   started_at TIMESTAMPTZ NOT NULL DEFAULT now(),

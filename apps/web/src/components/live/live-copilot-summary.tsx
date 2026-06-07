@@ -144,7 +144,7 @@ function InlineExpandToggle({
       {" "}
       <button
         type="button"
-        className="inline type-label text-primary underline-offset-2 hover:underline"
+        className="inline rounded-sm bg-gradient-to-r from-primary via-violet-500 to-sky-500 bg-clip-text type-label font-semibold text-transparent underline decoration-violet-400/70 underline-offset-2 transition-colors hover:decoration-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
         onClick={onToggle}
       >
         {expanded ? collapseLabel : expandLabel}
@@ -155,7 +155,10 @@ function InlineExpandToggle({
 
 function previewText(text: string, max = INSIGHT_PREVIEW_MAX): string {
   if (text.length <= max) return text;
-  return `${text.slice(0, max).trim()}…`;
+  const clipped = text.slice(0, max).trimEnd();
+  const lastSpace = clipped.lastIndexOf(" ");
+  const wordSafeClip = lastSpace > Math.round(max * 0.65) ? clipped.slice(0, lastSpace) : clipped;
+  return `${wordSafeClip}…`;
 }
 
 function PainPointRow({
@@ -170,7 +173,7 @@ function PainPointRow({
   const summary = painSummary(pain);
   const quote = painQuote(pain);
   const hasDetails = Boolean(quote) || summary.length > INSIGHT_PREVIEW_MAX;
-  const lineText = previewText(summary);
+  const lineText = expanded ? summary : previewText(summary);
 
   return (
     <div className="border-b border-border/40 py-2 last:border-b-0">
@@ -179,7 +182,6 @@ function PainPointRow({
           <TooltipTrigger asChild>
             <span
               className="mt-0.5 inline-flex shrink-0 rounded-full p-0.5"
-              tabIndex={0}
               aria-label="Pain point"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-orange-500" aria-hidden />
@@ -188,7 +190,10 @@ function PainPointRow({
           <TooltipContent side="top">Pain point</TooltipContent>
         </Tooltip>
 
-        <p className="min-w-0 flex-1 truncate type-body text-foreground" title={summary}>
+        <p
+          className={cn("min-w-0 flex-1 type-body text-foreground", !expanded && "truncate")}
+          title={summary}
+        >
           {lineText}
         </p>
 
@@ -207,12 +212,9 @@ function PainPointRow({
         )}
       </div>
 
-      {expanded && hasDetails && (
+      {expanded && quote && (
         <div className="mt-1.5 space-y-1 pl-3.5 type-label leading-relaxed text-muted-foreground">
-          {summary.length > INSIGHT_PREVIEW_MAX && (
-            <p className="text-foreground/80">{summary}</p>
-          )}
-          {quote && <p>&ldquo;{quote}&rdquo;</p>}
+          <p>&ldquo;{quote}&rdquo;</p>
         </div>
       )}
     </div>
@@ -341,7 +343,7 @@ function LiveInsightRow({
       <div className={cn("flex min-w-0 gap-2", expanded ? "items-start" : "items-center")}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="inline-flex shrink-0 rounded p-0.5" tabIndex={0}>
+            <span className="inline-flex shrink-0 rounded p-0.5">
               <Icon className={cn("h-3.5 w-3.5", accent)} aria-hidden />
               <span className="sr-only">{tooltip}</span>
             </span>

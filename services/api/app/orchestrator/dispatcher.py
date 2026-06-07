@@ -233,7 +233,7 @@ class Orchestrator:
             documents = existing.get("relevantDocuments") or []
             projects = existing.get("relevantProjects") or []
             deck = existing.get("recommendedDeck")
-            if documents or projects or deck:
+            if documents or deck:
                 return {
                     "relevantDocuments": documents,
                     "relevantProjects": projects,

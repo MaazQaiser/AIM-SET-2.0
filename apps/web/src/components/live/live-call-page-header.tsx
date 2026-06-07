@@ -8,7 +8,7 @@ import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import { DemoTranscriptPlayer } from "@/components/live/demo-transcript-player";
 import { RecallBotLauncher } from "@/components/live/recall-bot-launcher";
 import { ParticipantAvatar } from "@/components/participant-avatar";
-import { scoreToTone } from "@/lib/live/sentiment-display";
+import { hasSentimentScore, scoreToTone } from "@/lib/live/sentiment-display";
 import { cn } from "@/lib/cn";
 import { useLiveCall } from "@/stores/use-live-call";
 import type { Call } from "@/types";
@@ -59,8 +59,9 @@ export function LiveCallPageHeader({
   const isConnected = useLiveCall((s) => s.isConnected);
   const sentimentCustomer = useLiveCall((s) => s.sentimentCustomer);
   const sentimentTone = scoreToTone(sentimentCustomer);
-  const sentimentLabel =
-    sentimentTone === "positive"
+  const sentimentLabel = !hasSentimentScore(sentimentCustomer)
+    ? "No signal"
+    : sentimentTone === "positive"
       ? "Positive"
       : sentimentTone === "negative"
         ? "Cooling"
@@ -111,7 +112,7 @@ export function LiveCallPageHeader({
               "inline-flex items-center gap-1 rounded-full px-2.5 py-1 type-caption font-medium",
               sentimentTone === "positive" && "bg-success/10 text-success",
               sentimentTone === "negative" && "bg-destructive/10 text-destructive",
-              sentimentTone === "neutral" && "bg-muted text-muted-foreground"
+              (sentimentTone === "neutral" || sentimentTone == null) && "bg-muted text-muted-foreground"
             )}
           >
             <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />

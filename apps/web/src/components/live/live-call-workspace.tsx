@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, ChevronRight, Hash, Mic, PanelLeftClose } from "lucide-react";
+import { Activity, BookOpen, ChevronRight, Hash, Mic, PanelLeftClose } from "lucide-react";
 import { Card } from "@dc-copilot/ui/components/card";
 import { Button } from "@dc-copilot/ui/components/button";
 import { BotChatPanel } from "@/components/bot-chat-panel";
-import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
-import { DemoTranscriptPlayer } from "@/components/live/demo-transcript-player";
 import {
   LiveColumnHeader,
   liveColumnHorizontalPadding,
@@ -17,9 +15,12 @@ import { buildCopilotInsights } from "@/lib/live/build-copilot-insights";
 import { BantLiveWidget } from "@/components/live/bant-live-widget";
 import { LiveKeywordsBar, LiveSentimentBar } from "@/components/live/live-metrics-rail";
 import { LiveCallPageHeader } from "@/components/live/live-call-page-header";
+import { LiveRelevantContentWidget } from "@/components/live/live-relevant-content-widget";
+import { LiveWidgetAccordionCard } from "@/components/live/live-widget-accordion-card";
 import { PostDcReviewScreen } from "@/components/post-dc/post-dc-review-screen";
 import { TranscriptViewer } from "@/components/transcript-viewer";
 import type { CallBrief } from "@/lib/brief-types";
+import { resolveCustomerSentimentCue } from "@/lib/live/sentiment-display";
 import type { BantSignal, DiscoveryChecklistState } from "@dc-copilot/types";
 import type {
   Call,
@@ -56,9 +57,9 @@ export interface LiveCallWorkspaceProps {
   intentLabel?: string;
   intentSnapshot: IntentSnapshot | null;
   keywordStats: KeywordStats | null;
-  sentimentAE: number;
+  sentimentAE: number | null;
   salesRepTone: SalesRepToneCue | null;
-  sentimentCustomer: number;
+  sentimentCustomer: number | null;
   customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
   sentimentSignals: SentimentSignal[];
@@ -113,6 +114,8 @@ export function LiveCallWorkspace({
   );
 
   const openGaps = checklist?.openGaps ?? [];
+  const customerCue = resolveCustomerSentimentCue(sentimentCustomer, customerSentiment);
+  const customerTone = customerCue.tone;
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1280px)");
@@ -187,28 +190,50 @@ export function LiveCallWorkspace({
     <BantLiveWidget
       checklist={checklist}
       bantSignals={bantSignals}
-      className="min-h-0 min-w-0 shrink-0"
+      className="min-w-0"
     />
   );
 
   const keywordsCard = (
-    <Card className="flex min-h-0 shrink-0 flex-col overflow-hidden">
-      <LiveColumnHeader icon={Hash} title="Keywords" />
-      <div className={cn("max-h-[min(28vh,220px)] overflow-y-auto [scrollbar-width:thin]", liveColumnScrollPadding)}>
+    <LiveWidgetAccordionCard
+      icon={Hash}
+      title="Keywords"
+      defaultOpen={false}
+      bodyClassName={cn(
+        "max-h-[min(22vh,180px)] overflow-y-auto [scrollbar-width:thin]",
+        liveColumnScrollPadding
+      )}
+    >
         <LiveKeywordsBar
           embedded
           keywordStats={keywordStats}
           keywords={keywords}
           transcript={transcript}
         />
-      </div>
-    </Card>
+    </LiveWidgetAccordionCard>
   );
 
   const signalsCard = (
-    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <LiveColumnHeader icon={Activity} title="Signals" />
-      <div className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto [scrollbar-width:thin]", liveColumnScrollPadding)}>
+    <LiveWidgetAccordionCard
+      icon={Activity}
+      title="Signals"
+      extra={
+        <span
+          className={cn(
+            "max-w-[12rem] truncate rounded-full px-2 py-0.5 type-caption font-medium",
+            customerTone === "positive" && "bg-success/10 text-success",
+            customerTone === "negative" && "bg-destructive/10 text-destructive",
+            customerTone === "neutral" && "bg-muted text-muted-foreground"
+          )}
+        >
+          Customer · {customerCue.label}
+        </span>
+      }
+      bodyClassName={cn(
+        "max-h-[min(27vh,245px)] overflow-y-auto [scrollbar-width:thin]",
+        liveColumnScrollPadding
+      )}
+    >
         <LiveSentimentBar
           embedded
           transcript={transcript}
@@ -218,15 +243,36 @@ export function LiveCallWorkspace({
           customerSentiment={customerSentiment}
           sentimentShift={sentimentShift}
           sentimentSignals={sentimentSignals}
+          hideCustomerMetric
+          signalLimit={4}
         />
-      </div>
-    </Card>
+    </LiveWidgetAccordionCard>
+  );
+
+  const relevantContentCard = (
+    <LiveWidgetAccordionCard
+      icon={BookOpen}
+      title="Relevant Content"
+      summary="Projects and presentations"
+      bodyClassName="min-h-0"
+    >
+      <LiveRelevantContentWidget
+        callId={callId}
+        call={call}
+        brief={brief}
+        accountName={accountName}
+        leadName={leadName}
+        keywords={keywords}
+        transcript={transcript}
+      />
+    </LiveWidgetAccordionCard>
   );
 
   const signalsColumnInner = (
-    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto pr-1 [scrollbar-width:thin]">
       {bantWidget}
       {signalsCard}
+      {relevantContentCard}
       {keywordsCard}
     </div>
   );
@@ -348,6 +394,15 @@ export function LiveCallWorkspace({
                       phase="live"
                       surface="live_dc"
                       className="h-full min-h-0"
+                      context={{
+                        transcriptTail: transcript.slice(-8).map((event) => ({
+                          speaker: event.speakerName,
+                          role: event.speakerRole,
+                          text: event.text,
+                          keywords: event.keywords,
+                          sentiment: event.sentiment,
+                        })),
+                      }}
                       accountName={accountName}
                       brief={brief}
                       intentLabel={intentLabel}

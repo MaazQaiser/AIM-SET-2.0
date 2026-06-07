@@ -14,6 +14,16 @@ function painDedupeKey(text: string): string {
   return normalizePainText(text).slice(0, 80);
 }
 
+function isVaguePainLabel(text: string): boolean {
+  const normalized = normalizePainText(text);
+  return (
+    /^that'?s the pain\b/.test(normalized) ||
+    /^this is the pain\b/.test(normalized) ||
+    /^the pain keeping\b/.test(normalized) ||
+    /^pain keeping\b/.test(normalized)
+  );
+}
+
 export function painsAreSimilar(a: string, b: string): boolean {
   const na = normalizePainText(a);
   const nb = normalizePainText(b);
@@ -44,9 +54,12 @@ function summarizePainQuote(raw: string): string {
 
   const dashParts = text.split(/\s*[—–-]\s+/);
   if (dashParts.length > 1) {
+    const beforeDash = dashParts[0]?.trim() ?? "";
     const afterDash = dashParts.slice(1).join(" — ").trim();
-    if (afterDash.length >= 20) {
+    if (afterDash.length >= 20 && !isVaguePainLabel(afterDash)) {
       text = afterDash;
+    } else if (beforeDash.length >= 20) {
+      text = beforeDash;
     }
   }
 
@@ -61,6 +74,10 @@ function summarizePainQuote(raw: string): string {
 export function painSummary(pain: PainSignal): string {
   const text = pain.text.trim();
   const quote = pain.evidence?.trim();
+
+  if (quote && isVaguePainLabel(text)) {
+    return summarizePainQuote(quote);
+  }
 
   if (quote && quote !== text && text.length <= SUMMARY_MAX && !quote.startsWith(text.slice(0, 40))) {
     return text;

@@ -1,6 +1,7 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
+import { AiGradientText } from "@/components/ai-gradient-text";
 import { useWidgetSize } from "@/components/dashboard-grid/dashboard-widget";
 import { BriefDetailCard, briefMainBody } from "@/components/pre-call/brief-detail-card";
 import { parseSummaryHighlights, type SummaryHighlightRule } from "@/lib/brief-summary-highlights";
@@ -31,6 +32,20 @@ const STAGE_BADGE_CLASS: Record<CompanyStage, string> = {
   SMB: "border-teal-300/80 bg-teal-50/90 text-teal-900",
 };
 const NEEDS_CONTENT_FALLBACK = "Needs/content is not identified yet.";
+const BAD_CONTENT_TOPIC_RE = /\bprepare content around\s+(?:tk|tkxel)(?:\s+\d{1,2}\/\d{1,2}\/\d{2,4})?(?:\s+\d{1,2}:\d{2}\s*(?:am|pm)?)?/i;
+const NON_CONTENT_TOPICS = new Set([
+  "",
+  "-",
+  "n/a",
+  "na",
+  "none",
+  "not known",
+  "unknown",
+  "tk",
+  "tkxel",
+  "high level overview",
+  NEEDS_CONTENT_FALLBACK.toLowerCase(),
+]);
 
 function sortedRelevantProjects(brief: CallBrief): NonNullable<CallBrief["relevantProjects"]> {
   return [...(brief.relevantProjects ?? [])].sort(
@@ -235,6 +250,93 @@ function cleanRelevanceSection(section: BriefSummarySection, brief: CallBrief): 
   return hasKbMatch ? { ...section, content: fallbackRelevanceText(brief) } : section;
 }
 
+function isUsefulActionTopic(value: string): boolean {
+  const clean = value.replace(/\s+/g, " ").trim().replace(/\.$/, "");
+  const lower = clean.toLowerCase();
+  if (NON_CONTENT_TOPICS.has(lower)) return false;
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(clean)) return false;
+  if (/^\d{1,2}:\d{2}\s*(?:am|pm)?$/i.test(clean)) return false;
+  if (/^(?:sdr|ae)\s*:/i.test(clean)) return false;
+  if (/\b(?:sent|emailed|responded|asked to set up|agreed to|scheduled|booked)\b/i.test(clean)) {
+    return false;
+  }
+  return Boolean(clean);
+}
+
+function researchTopic(brief: CallBrief): string {
+  const preferredLabels = [
+    "Intersection w/ Tkxel",
+    "Intersection areas b/w tkxel & company",
+    "Described needs",
+    "Have they described their needs",
+    "Need",
+    "Need-PreDC",
+    "Other information",
+    "Other Information",
+    "Industry",
+    "Industry - PreDC",
+  ];
+  for (const label of preferredLabels) {
+    const value = (brief.researchSections ?? [])
+      .flatMap((section) => section.items ?? [])
+      .find((item) => item.label.toLowerCase() === label.toLowerCase())
+      ?.value;
+    const topic = businessNeedText(value ?? "", true);
+    if (isUsefulActionTopic(topic)) return topic;
+  }
+  return "";
+}
+
+function summaryTopic(value: string): string {
+  const sentences = withoutOutreachDetails(value)
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim());
+  const patterns = [
+    /\bscoping\s+(?:a|an|the)?\s*(.+?)(?:[.!?]|$)/i,
+    /\bevaluating\s+(?:a|an|the)?\s*(.+?)(?:[.!?]|$)/i,
+    /\bseeking\s+(?:a|an|the)?\s*(.+?)(?:[.!?]|$)/i,
+    /\blooking for\s+(?:a|an|the)?\s*(.+?)(?:[.!?]|$)/i,
+  ];
+
+  for (const sentence of sentences) {
+    for (const pattern of patterns) {
+      const topic = sentence.match(pattern)?.[1]?.trim().replace(/\.$/, "");
+      if (topic && isUsefulActionTopic(topic)) return topic;
+    }
+  }
+  return "";
+}
+
+function suggestedActionTopic(brief: CallBrief): string {
+  const research = researchTopic(brief);
+  if (research) return research;
+
+  const pain = (brief.pains ?? [])
+    .map((item) => item.text ?? "")
+    .map((text) => painPointText(text, true))
+    .find((text) => isUsefulActionTopic(text));
+  if (pain) return pain;
+
+  const summary = summaryTopic(brief.aiSummary ?? "");
+  if (summary) return summary;
+
+  const need = businessNeedText(brief.aiSummary ?? "", true);
+  if (isUsefulActionTopic(need)) return need;
+  return "";
+}
+
+function cleanSuggestedActionSection(section: BriefSummarySection, brief: CallBrief): BriefSummarySection {
+  const content = section.content ?? "";
+  if (!BAD_CONTENT_TOPIC_RE.test(content)) return section;
+
+  const topic = suggestedActionTopic(brief);
+  const cleanContent = topic
+    ? `Use the discovery call to validate the main need, confirm timeline and decision process, and prepare relevant content around ${topic}.`
+    : "Use the discovery call to validate the main need, confirm timeline and decision process, and identify which sales assets should be prepared next.";
+
+  return { ...section, content: cleanContent };
+}
+
 function cleanSummarySection(section: BriefSummarySection, brief: CallBrief): BriefSummarySection {
   if (section.id === "customer_profile") {
     return cleanCustomerProfileSection(section, brief);
@@ -244,6 +346,9 @@ function cleanSummarySection(section: BriefSummarySection, brief: CallBrief): Br
   }
   if (section.id === "relevance") {
     return cleanRelevanceSection(section, brief);
+  }
+  if (section.id === "suggested_action") {
+    return cleanSuggestedActionSection(section, brief);
   }
   return section;
 }
@@ -280,12 +385,11 @@ function resolveSummarySections(brief: CallBrief): BriefSummarySection[] {
     const fallbackById = Object.fromEntries(
       fallbackSections.map((section) => [section.id, section]),
     ) as Record<BriefSummarySection["id"], BriefSummarySection>;
-    return normalizeSummarySections(
-      SUMMARY_SECTION_ORDER.map((id) => byId.get(id) ?? fallbackById[id])
-    )!;
+    const orderedSections = SUMMARY_SECTION_ORDER.map((id) => byId.get(id) ?? fallbackById[id]);
+    return normalizeSummarySections(orderedSections) ?? orderedSections;
   }
 
-  return normalizeSummarySections(fallbackSections)!;
+  return normalizeSummarySections(fallbackSections) ?? fallbackSections;
 }
 
 function ValueBadge({
@@ -402,6 +506,35 @@ function HighlightedSummary({
   );
 }
 
+function SummarySectionTitle({
+  section,
+  intercom,
+}: {
+  section: BriefSummarySection;
+  intercom: boolean;
+}) {
+  const className = "type-kicker leading-none";
+
+  if (section.id === "customer_profile") {
+    return (
+      <AiGradientText as="h3" className={className}>
+        {section.title}
+      </AiGradientText>
+    );
+  }
+
+  return (
+    <h3
+      className={cn(
+        className,
+        intercom ? "text-[#7b7b78]" : "text-muted-foreground"
+      )}
+    >
+      {section.title}
+    </h3>
+  );
+}
+
 export function BriefAISummary({ brief, call }: BriefAISummaryProps) {
   const { isIntercom } = useThemePreview();
   const { data: workflowConfig } = useAgentConfig("workflow");
@@ -449,23 +582,21 @@ export function BriefAISummary({ brief, call }: BriefAISummaryProps) {
           "The workflow summarizes imported lead research into one readout. The relevance section shows relevant project count, project names, and the overall KB match percentage.",
       }}
     >
-      <div className="space-y-3 min-w-0">
-          {summarySections.map((section) => (
-            <section
-              key={section.id}
-              className="space-y-2 border-t border-border/60 pt-3 first:border-t-0 first:pt-0"
-            >
-              <p className="type-label text-muted-foreground">
-                {section.title}
-              </p>
-              <HighlightedSummary
-                text={section.content}
-                clamp={!isCenter && compact}
-                rules={highlightRules}
-                intercomMarks={isIntercom}
-              />
-            </section>
-          ))}
+      <div className="space-y-2.5 min-w-0">
+        {summarySections.map((section) => (
+          <section
+            key={section.id}
+            className="space-y-1.5 border-t border-border/60 pt-2.5 first:border-t-0 first:pt-0"
+          >
+            <SummarySectionTitle section={section} intercom={isIntercom} />
+            <HighlightedSummary
+              text={section.content}
+              clamp={!isCenter && compact}
+              rules={highlightRules}
+              intercomMarks={isIntercom}
+            />
+          </section>
+        ))}
       </div>
     </BriefDetailCard>
   );

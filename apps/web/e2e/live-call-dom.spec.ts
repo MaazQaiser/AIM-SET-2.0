@@ -209,7 +209,7 @@ test.describe("Live call cockpit — DOM + API", () => {
       timeout: 15_000,
     });
 
-    await expect(page.getByText(/Primary intent|Latest pain signal/i).first()).toBeVisible();
+    await expect(page.getByText(/buyer seems focused|Latest pain signal/i).first()).toBeVisible();
     await expect(
       page.getByText(/commercial|timeline|budget|discovery|focus/i).first()
     ).toBeVisible();
@@ -332,7 +332,7 @@ test.describe("Live call cockpit — DOM + API", () => {
 
     await expect
       .poll(async () => (await page.locator("body").innerText()).replace(/\s+/g, " "))
-      .toMatch(/Budget Confirmed|Budget Partially qualified|Partially covered: [^.]*Budget/i);
+      .toMatch(/Budget Confirmed|Budget Partially qualified|Budget is partly there/i);
     const bodyText = (await page.locator("body").innerText()).replace(/\s+/g, " ");
     expect(bodyText).not.toMatch(/Still to cover: [^.]*Budget/i);
     expect(bodyText).not.toMatch(/Still to cover: [^.]*Timeline/i);

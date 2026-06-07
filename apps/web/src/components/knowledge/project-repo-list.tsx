@@ -75,26 +75,6 @@ function ProjectRepoViewToggle({
   );
 }
 
-function ProjectRepoStats({ projects }: { projects: KBProject[] }) {
-  const industryCount = new Set(projects.map((project) => project.industry).filter(Boolean)).size;
-  const sourceCount = new Set(projects.flatMap((project) => project.sourceAssetIds ?? [project.sourceAssetId])).size;
-
-  return (
-    <div className="grid gap-3 sm:grid-cols-3">
-      {[
-        { label: "Projects", value: projects.length.toLocaleString() },
-        { label: "Industries", value: industryCount.toLocaleString() },
-        { label: "KB sources", value: sourceCount.toLocaleString() },
-      ].map((stat) => (
-        <div key={stat.label} className="rounded-lg border border-border bg-card px-4 py-3">
-          <p className="type-label text-muted-foreground">{stat.label}</p>
-          <p className="mt-1 type-screen-title text-foreground">{stat.value}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function ProjectRepoTable({ projects }: { projects: KBProject[] }) {
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card">
@@ -251,21 +231,18 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
   const { data: projects = [], isLoading } = useKbProjects();
   const [search, setSearch] = useState("");
   const [industryFilter, setIndustryFilter] = useState("All");
-  const [domainFilter, setDomainFilter] = useState("All");
   const [view, setView] = useState<ProjectRepoView>("table");
 
   const industryFilters = useMemo(() => ["All", ...uniqueProjectValues(projects, "industry", 7)], [projects]);
-  const domainFilters = useMemo(() => ["All", ...uniqueProjectValues(projects, "domain", 7)], [projects]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return projects.filter((project) => {
       const matchesSearch = !q || projectSearchText(project).includes(q);
       const matchesIndustry = industryFilter === "All" || project.industry === industryFilter;
-      const matchesDomain = domainFilter === "All" || project.domain === domainFilter;
-      return matchesSearch && matchesIndustry && matchesDomain;
+      return matchesSearch && matchesIndustry;
     });
-  }, [domainFilter, industryFilter, projects, search]);
+  }, [industryFilter, projects, search]);
 
   const content = (
     <div className={cn("space-y-5", embedded && "mt-1")}>
@@ -286,8 +263,6 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
         </PageHeader>
       )}
 
-      <ProjectRepoStats projects={projects} />
-
       <div className="space-y-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <SearchInput
@@ -299,39 +274,18 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
           />
           <div className="flex flex-wrap items-center gap-2">
             <ProjectRepoViewToggle view={view} onChange={setView} />
-            {embedded && (
-              <Button asChild variant="outline" size="sm">
-                <Link href="/knowledge/projects">
-                  <ArrowUpRight className="h-4 w-4" />
-                  Open repo
-                </Link>
-              </Button>
-            )}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className="w-16 shrink-0 type-label text-muted-foreground">Industry</span>
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
           {industryFilters.map((filter) => (
             <FilterChip
               key={`industry-${filter}`}
               active={filter === industryFilter}
               onClick={() => setIndustryFilter(filter)}
+              className="h-7 px-2.5 type-caption"
             >
-              {filter === "All" ? "All industries" : filter}
-            </FilterChip>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className="w-16 shrink-0 type-label text-muted-foreground">Domain</span>
-          {domainFilters.map((filter) => (
-            <FilterChip
-              key={`domain-${filter}`}
-              active={filter === domainFilter}
-              onClick={() => setDomainFilter(filter)}
-            >
-              {filter === "All" ? "All domains" : filter}
+              {filter === "All" ? "All" : filter}
             </FilterChip>
           ))}
         </div>

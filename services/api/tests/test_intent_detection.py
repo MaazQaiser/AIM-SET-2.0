@@ -30,10 +30,10 @@ def test_sentiment_uncertainty_phrase_is_negative():
     assert r["score"] < 0
 
 
-def test_sentiment_pain_language_is_negative():
+def test_sentiment_pain_language_is_neutral_business_context():
     r = analyze_sentiment("Manual audits are a bottleneck and this is a nightmare")
-    assert r["label"] == "negative"
-    assert r["score"] < 0
+    assert r["label"] == "neutral"
+    assert r["score"] == 0
 
 
 def test_keyword_routing_budget():
@@ -100,6 +100,33 @@ def test_analyze_segment_prioritizes_pain_point_nudge():
     assert out["nudge"]["message"].startswith("Customer raised:")
     assert "bottleneck" in out["nudge"]["message"]
     assert out["intent_update"]["pains"]
+    assert out["transcript"]["sentiment"] == "neutral"
+    assert out["sentiment"]["customer"] == 0
+    assert out["sentiment"]["signal"] is None
+    assert out["sentiment"]["customerSentiment"]["label"] == "Pain stated"
+    assert out["sentiment"]["customerSentiment"]["tone"] == "neutral"
+
+
+def test_internal_speaker_pain_language_does_not_create_customer_pain():
+    ctx = TenantContext(tenant_id="test-tenant-internal-pain-not-customer", user_id="u1")
+    call_id = "call-test-internal-pain-not-customer"
+
+    out = analyze_segment(
+        ctx,
+        call_id,
+        {
+            "id": "internal-pain-segment-1",
+            "text": "This is a real pain point in healthcare operations and manual intake is a bottleneck.",
+            "speakerId": "ae-sarah",
+            "speakerName": "Sarah",
+            "speakerRole": "ae",
+            "timestamp": 70,
+        },
+    )
+
+    assert out["intent_update"]["pains"] == []
+    assert out["operation"] == "intent_snapshot"
+    assert out["nudge"] is None
 
 
 def test_analyze_segment_emits_sentiment_signal_and_ignores_neutral_filler():
@@ -196,6 +223,30 @@ def test_internal_speaker_discovery_question_gets_actionable_tone_cue():
     assert out["sentiment"]["salesRepTone"]["guidance"].startswith("Good direction")
 
 
+def test_internal_speaker_industry_pain_context_is_not_negative_tone():
+    ctx = TenantContext(tenant_id="test-tenant-sales-rep-pain-context-tone", user_id="u1")
+    call_id = "call-test-sales-rep-pain-context-tone"
+
+    out = analyze_segment(
+        ctx,
+        call_id,
+        {
+            "id": "sentiment-signal-sales-rep-pain-context",
+            "text": "Yes, this is a real pain point in the industry and teams often struggle with it.",
+            "speakerId": "ae-sarah",
+            "speakerName": "Sarah",
+            "speakerRole": "ae",
+            "timestamp": 35,
+        },
+    )
+
+    assert out["transcript"]["sentiment"] == "neutral"
+    assert out["sentiment"]["ae"] == 0
+    assert out["sentiment"]["signal"] is None
+    assert out["sentiment"]["salesRepTone"]["label"] == "Steady delivery"
+    assert out["sentiment"]["salesRepTone"]["tone"] == "neutral"
+
+
 def test_analyze_segment_detects_positive_customer_recovery_shift():
     ctx = TenantContext(tenant_id="test-tenant-positive-shift", user_id="u1")
     call_id = "call-test-positive-shift"
@@ -205,7 +256,7 @@ def test_analyze_segment_detects_positive_customer_recovery_shift():
         call_id,
         {
             "id": "positive-shift-1",
-            "text": "Manual compliance audits are a nightmare and a bottleneck.",
+            "text": "I'm not sure how you can help us, and I'm skeptical this will fit.",
             "speakerId": "cust-1",
             "speakerName": "Alex",
             "speakerRole": "customer",
@@ -268,7 +319,8 @@ def test_analyze_segment_survives_tenant_resolution_failure(monkeypatch):
 
     out = analyze_segment(ctx, call_id, segment)
 
-    assert out["transcript"]["sentiment"] == "negative"
-    assert out["sentiment"]["customer"] < 0
+    assert out["transcript"]["sentiment"] == "neutral"
+    assert out["sentiment"]["customer"] == 0
+    assert out["sentiment"]["signal"] is None
     assert out["operation"] == "proactive_nudge"
     assert out["nudge"]["message"].startswith("Customer raised:")

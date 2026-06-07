@@ -23,8 +23,12 @@ export function ContentLibraryTab({ onDetailModeChange }: ContentLibraryTabProps
   const searchParams = useSearchParams();
   const assetParam = searchParams.get("asset");
   const persona = usePersona();
-  const { data: assets = [] } = useKbAssets();
-  const { data: watchlist = [] } = useKbWatchlist();
+  const showWatchlist = persona === "content-owner" || persona === "leadership";
+  const [libraryTab, setLibraryTab] = useState("assets");
+  const { data: assets = [], isLoading: assetsLoading } = useKbAssets();
+  const { data: watchlist = [] } = useKbWatchlist({
+    enabled: showWatchlist && libraryTab === "watchlist",
+  });
   const [search, setSearch] = useState("");
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
@@ -41,7 +45,6 @@ export function ContentLibraryTab({ onDetailModeChange }: ContentLibraryTabProps
   }, [assets, search]);
 
   const grouped = useMemo(() => groupAssetsByLibraryColumn(filtered), [filtered]);
-  const showWatchlist = persona === "content-owner" || persona === "leadership";
 
   const selectedAsset = useMemo(
     () => filtered.find((asset) => asset.id === selectedAssetId) ?? null,
@@ -86,14 +89,20 @@ export function ContentLibraryTab({ onDetailModeChange }: ContentLibraryTabProps
   const browseLayout = (
     <div className="space-y-4">
       <SearchInput
-        placeholder="Search slide decks, case studies, and other assets..."
+        placeholder="Search slide decks and other assets..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         wrapperClassName="w-full sm:max-w-lg"
         aria-label="Search assets"
       />
 
-      {filtered.length > 0 ? (
+      {assetsLoading && assets.length === 0 ? (
+        <Card>
+          <CardContent className="p-6 type-body text-muted-foreground">
+            Loading knowledge assets...
+          </CardContent>
+        </Card>
+      ) : filtered.length > 0 ? (
         <ContentLibraryColumns grouped={grouped} onSelectAsset={handleSelectAsset} />
       ) : (
         <EmptyState
@@ -108,7 +117,7 @@ export function ContentLibraryTab({ onDetailModeChange }: ContentLibraryTabProps
   return (
     <>
       {showWatchlist && !detailOpen ? (
-        <Tabs defaultValue="assets" variant="underline">
+        <Tabs value={libraryTab} onValueChange={setLibraryTab} variant="underline">
           <TabsList>
             <TabsTrigger value="assets">Library</TabsTrigger>
             <TabsTrigger value="watchlist">Watchlist</TabsTrigger>

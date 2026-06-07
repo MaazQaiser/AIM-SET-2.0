@@ -4,7 +4,12 @@ import { useMemo } from "react";
 import { LiveCollapsibleSection } from "@/components/live/live-collapsible-section";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { formatChecklistDisplayGaps } from "@/lib/live/bant-display";
-import { scoreEmoji, scoreToTone } from "@/lib/live/sentiment-display";
+import {
+  hasSentimentScore,
+  scoreEmoji,
+  scoreToTone,
+  type SentimentScore,
+} from "@/lib/live/sentiment-display";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
 import type { CallIntent, PainSignal, SentimentShift } from "@/types";
 import { cn } from "@/lib/cn";
@@ -14,8 +19,8 @@ interface LiveCallActionSummaryProps {
   intent?: CallIntent | null;
   pains: PainSignal[];
   nextActions?: string[];
-  sentimentAE: number;
-  sentimentCustomer: number;
+  sentimentAE: SentimentScore;
+  sentimentCustomer: SentimentScore;
   sentimentShift: SentimentShift | null;
   checklist: DiscoveryChecklistState | null;
   className?: string;
@@ -48,6 +53,10 @@ function MetricTile({
       {hint && <p className="type-caption text-muted-foreground mt-0.5 line-clamp-2">{hint}</p>}
     </div>
   );
+}
+
+function withOptionalEmoji(emoji: string, label: string): string {
+  return [emoji, label].filter(Boolean).join(" ");
 }
 
 export function LiveCallActionSummary({
@@ -130,14 +139,14 @@ export function LiveCallActionSummary({
     intentLabel ||
     pains.length > 0 ||
     bantPct != null ||
-    sentimentAE !== 0 ||
-    sentimentCustomer !== 0;
+    hasSentimentScore(sentimentAE) ||
+    hasSentimentScore(sentimentCustomer);
 
   if (!hasLiveSignals) return null;
 
   const summaryParts = [
-    `${scoreEmoji(sentimentAE)} Rep tone`,
-    `${scoreEmoji(sentimentCustomer)} Customer`,
+    hasSentimentScore(sentimentAE) ? withOptionalEmoji(scoreEmoji(sentimentAE), "Rep tone") : null,
+    hasSentimentScore(sentimentCustomer) ? withOptionalEmoji(scoreEmoji(sentimentCustomer), "Customer") : null,
     intentDisplay,
     bantPct != null ? `${bantPct}% BANT` : null,
   ].filter(Boolean);
@@ -166,7 +175,11 @@ export function LiveCallActionSummary({
           />
           <MetricTile
             label="Customer sentiment"
-            value={`${scoreEmoji(sentimentCustomer)} ${scoreToTone(sentimentCustomer)}`}
+            value={
+              hasSentimentScore(sentimentCustomer)
+                ? withOptionalEmoji(scoreEmoji(sentimentCustomer), scoreToTone(sentimentCustomer) ?? "neutral")
+                : "No signal"
+            }
             hint={
               sentimentShift
                 ? `${sentimentShift.direction === "negative" ? "📉" : "📈"} Shift detected`

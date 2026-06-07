@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,6 +18,8 @@ from app.domain.memory_store import get_memory_store
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.tenant_service import get_tenant_service
 from app.services.office_preview import slide_storage_path
+
+_ASSET_LIST_CACHE_TTL_SECONDS = 30
 
 
 def _now_iso() -> str:
@@ -53,31 +56,57 @@ def _row_to_asset(row: Dict[str, Any]) -> Dict[str, Any]:
 class KbRepository:
     def __init__(self) -> None:
         self._tenants = get_tenant_service()
+        self._asset_list_cache: Dict[Tuple[str, str], Tuple[float, List[Dict[str, Any]]]] = {}
 
     def _ctx_keys(self, ctx: TenantContext) -> Tuple[str, str]:
         return resolve_kb_tenant(ctx)
 
+    def _asset_cache_key(self, tenant_uuid: str, clerk_key: str) -> Tuple[str, str]:
+        return (tenant_uuid, clerk_key)
+
+    def _clear_asset_list_cache(
+        self,
+        tenant_uuid: Optional[str] = None,
+        clerk_key: Optional[str] = None,
+    ) -> None:
+        if tenant_uuid and clerk_key:
+            self._asset_list_cache.pop(self._asset_cache_key(tenant_uuid, clerk_key), None)
+            return
+        self._asset_list_cache.clear()
+
     def list_assets(self, ctx: TenantContext) -> List[Dict[str, Any]]:
         tenant_uuid, clerk_key = self._ctx_keys(ctx)
         settings = get_settings()
+        cache_key = self._asset_cache_key(tenant_uuid, clerk_key)
+        cached = self._asset_list_cache.get(cache_key)
+        if cached and time.monotonic() - cached[0] < _ASSET_LIST_CACHE_TTL_SECONDS:
+            return [dict(asset) for asset in cached[1]]
 
         if settings.supabase_configured:
             try:
                 supabase = get_supabase()
                 result = (
                     supabase.table("kb_assets")
-                    .select("*")
+                    .select(
+                        "id,title,asset_type,tags,uploaded_at,version,effectiveness_score,"
+                        "status,file_name,mime_type,chunk_count,ingest_error,"
+                        "preview_slide_count,preview_storage_path"
+                    )
                     .eq("tenant_id", tenant_uuid)
                     .order("uploaded_at", desc=True)
                     .execute()
                 )
                 rows = result.data or []
                 if rows:
-                    return [_row_to_asset(r) for r in rows]
+                    assets = [_row_to_asset(r) for r in rows]
+                    self._asset_list_cache[cache_key] = (time.monotonic(), assets)
+                    return [dict(asset) for asset in assets]
             except Exception:
                 pass
 
-        return get_memory_store().list_kb_assets(clerk_key)
+        assets = get_memory_store().list_kb_assets(clerk_key)
+        self._asset_list_cache[cache_key] = (time.monotonic(), [dict(asset) for asset in assets])
+        return assets
 
     def get_asset(self, ctx: TenantContext, asset_id: str) -> Optional[Dict[str, Any]]:
         assets = self.list_assets(ctx)
@@ -222,6 +251,7 @@ class KbRepository:
                 supabase.table("kb_assets").insert(asset_row).execute()
                 inserted = supabase.table("kb_ingest_jobs").insert(job_row).execute()
                 job = (inserted.data or [job_row])[0]
+                self._clear_asset_list_cache(tenant_uuid, clerk_key)
                 return {"asset": _row_to_asset(asset_row), "job": self._job_to_api(job)}
             except Exception as exc:
                 raise RuntimeError(f"Failed to persist upload: {exc}") from exc
@@ -231,6 +261,7 @@ class KbRepository:
         api_asset = _row_to_asset(asset_row)
         store.kb_assets.setdefault(clerk_key, []).append(api_asset)
         store.kb_ingest_jobs.setdefault(clerk_key, []).append(job_row)
+        self._clear_asset_list_cache(tenant_uuid, clerk_key)
         return {"asset": api_asset, "job": self._job_to_api(job_row)}
 
     def download_file(self, ctx: TenantContext, storage_path: str) -> bytes:
@@ -286,6 +317,7 @@ class KbRepository:
             try:
                 supabase = get_supabase()
                 supabase.table("kb_assets").update(patch).eq("tenant_id", tenant_id).eq("id", asset_id).execute()
+                self._clear_asset_list_cache()
             except Exception:
                 pass
 
@@ -295,6 +327,7 @@ class KbRepository:
                     asset["hasPreview"] = len(slide_pngs) > 0
                     asset["previewSlideCount"] = len(slide_pngs)
                     asset["previewStoragePath"] = None
+            self._clear_asset_list_cache(tenant_id, clerk_key)
         return len(slide_pngs)
 
     def delete_preview_slides(
@@ -345,6 +378,7 @@ class KbRepository:
                 supabase.table("kb_assets").update({"preview_storage_path": preview_path}).eq(
                     "tenant_id", tenant_id
                 ).eq("id", asset_id).execute()
+                self._clear_asset_list_cache()
                 return preview_path
             except Exception:
                 pass
@@ -354,6 +388,7 @@ class KbRepository:
                 if asset["id"] == asset_id:
                     asset["hasPreview"] = True
                     asset["previewStoragePath"] = preview_path
+            self._clear_asset_list_cache(tenant_id, clerk_key)
         return preview_path
 
     def get_job(self, ctx: TenantContext, job_id: str) -> Optional[Dict[str, Any]]:
@@ -468,6 +503,7 @@ class KbRepository:
             try:
                 supabase = get_supabase()
                 supabase.table("kb_assets").update(patch).eq("tenant_id", tenant_id).eq("id", asset_id).execute()
+                self._clear_asset_list_cache()
                 return
             except Exception:
                 pass
@@ -480,6 +516,7 @@ class KbRepository:
                         asset["ingestError"] = ingest_error
                     if chunk_count is not None:
                         asset["chunkCount"] = chunk_count
+                    self._clear_asset_list_cache(tenant_id, clerk_key)
 
     def update_asset_metadata(
         self,
@@ -494,6 +531,7 @@ class KbRepository:
             try:
                 supabase = get_supabase()
                 supabase.table("kb_assets").update({"metadata": metadata}).eq("tenant_id", tenant_id).eq("id", asset_id).execute()
+                self._clear_asset_list_cache()
                 return
             except Exception:
                 pass
@@ -502,6 +540,7 @@ class KbRepository:
             for asset in get_memory_store().kb_assets.get(clerk_key, []):
                 if asset["id"] == asset_id:
                     asset["metadata"] = metadata
+                    self._clear_asset_list_cache(tenant_id, clerk_key)
                     return
 
     def delete_chunks_for_asset(self, tenant_id: str, asset_id: str, clerk_key: Optional[str] = None) -> None:
@@ -708,6 +747,7 @@ class KbRepository:
                 supabase.table("kb_chunks").delete().eq("tenant_id", tenant_uuid).eq("asset_id", asset_id).execute()
                 supabase.table("kb_ingest_jobs").delete().eq("tenant_id", tenant_uuid).eq("asset_id", asset_id).execute()
                 supabase.table("kb_assets").delete().eq("tenant_id", tenant_uuid).eq("id", asset_id).execute()
+                self._clear_asset_list_cache(tenant_uuid, clerk_key)
                 return True
             except Exception:
                 pass
@@ -723,6 +763,7 @@ class KbRepository:
             slide_path = slide_storage_path(tenant_uuid, asset_id, i)
             if slide_path in store.kb_files:
                 del store.kb_files[slide_path]
+        self._clear_asset_list_cache(tenant_uuid, clerk_key)
         return True
 
     def requeue_asset(self, ctx: TenantContext, asset_id: str) -> Optional[Dict[str, Any]]:

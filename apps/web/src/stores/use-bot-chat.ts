@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import type { BotChatMessage, BotChatMode } from "@/lib/bot-chat/types";
 
 interface CallChatState {
@@ -16,6 +16,7 @@ interface BotChatStore {
   appendMessage: (callId: string, mode: BotChatMode, message: BotChatMessage) => void;
   appendGroupFromWs: (callId: string, message: BotChatMessage) => void;
   seedGroupWelcome: (callId: string, accountName?: string) => void;
+  resetCall: (callId: string) => void;
 }
 
 export const EMPTY_BOT_CHAT_MESSAGES: BotChatMessage[] = [];
@@ -25,6 +26,12 @@ const defaultCallState = (): CallChatState => ({
   directMessages: EMPTY_BOT_CHAT_MESSAGES,
   groupMessages: EMPTY_BOT_CHAT_MESSAGES,
 });
+
+const noopStorage: StateStorage = {
+  getItem: () => null,
+  setItem: () => undefined,
+  removeItem: () => undefined,
+};
 
 export const useBotChatStore = create<BotChatStore>()(
   persist(
@@ -92,9 +99,20 @@ export const useBotChatStore = create<BotChatStore>()(
           createdAt: Date.now(),
         });
       },
+
+      resetCall: (callId) =>
+        set((s) => {
+          if (!s.byCallId[callId]) return {};
+          const next = { ...s.byCallId };
+          delete next[callId];
+          return { byCallId: next };
+        }),
     }),
     {
       name: "dc-bot-chat-v1",
+      storage: createJSONStorage(() =>
+        typeof window === "undefined" ? noopStorage : window.localStorage
+      ),
       partialize: (s) => ({ byCallId: s.byCallId }),
     }
   )

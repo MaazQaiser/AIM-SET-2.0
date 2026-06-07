@@ -65,3 +65,42 @@ def test_get_relevant_content_refresh_rebuilds(monkeypatch):
     out = orch.get_relevant_content(ctx, call_id, refresh=True)
     assert out["cached"] is False
     assert out["relevantDocuments"][0]["title"] == "New deck"
+
+
+def test_get_relevant_content_rebuilds_project_only_cache(monkeypatch):
+    ctx = TenantContext(tenant_id="t-rel-project-only", user_id="u1")
+    call_id = "call-rel-project-only"
+    orch = Orchestrator()
+
+    clerk_key = ctx.tenant_id
+    get_memory_store().save_call_brief(
+        clerk_key,
+        call_id,
+        {
+            "callId": call_id,
+            "relevantDocuments": [],
+            "relevantProjects": [{"id": "stale", "title": "Stale project", "relevanceScore": 1}],
+        },
+    )
+
+    monkeypatch.setattr(
+        "app.orchestrator.dispatcher.build_relevant_content",
+        lambda *_a, **_k: {
+            "relevantDocuments": [{"assetId": "new", "title": "Healthcare deck", "relevanceScore": 1.0}],
+            "relevantProjects": [],
+        },
+    )
+    monkeypatch.setattr(
+        orch,
+        "_pre_dc_fields_for_call",
+        lambda *_a, **_k: {"Company Name-PreDC": "Iridia Pediatric Group"},
+    )
+    monkeypatch.setattr(
+        orch.calls,
+        "get_call",
+        lambda *_a, **_k: {"accountName": "Iridia Pediatric Group"},
+    )
+
+    out = orch.get_relevant_content(ctx, call_id, refresh=False)
+    assert out["cached"] is False
+    assert out["relevantDocuments"][0]["title"] == "Healthcare deck"

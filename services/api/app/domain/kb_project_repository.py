@@ -17,13 +17,14 @@ from app.domain.kb_tenancy import resolve_kb_tenant
 PROJECT_TITLE_KEYS = (
     "project name",
     "project",
-    "case study",
     "customer project",
     "client project",
     "opportunity name",
     "name",
     "title",
 )
+
+PROJECT_EXCLUDED_FIELD_KEYS = {"case study"}
 
 COMPANY_KEYS = (
     "company name",
@@ -51,6 +52,7 @@ IMPORTANT_FIELDS = {
 
 PROJECT_ASSET_HINTS = ("project", "sale enablement")
 PROJECT_CACHE_TTL_SECONDS = 60
+PROJECT_SUMMARY_PLACEHOLDER = "No project summary indexed yet."
 _PROJECT_CACHE: Dict[str, Tuple[float, Tuple[str, ...], List[Dict[str, Any]]]] = {}
 
 
@@ -179,18 +181,401 @@ def _compact(value: str, limit: int = 260) -> str:
     return f"{text[: limit - 3].rstrip()}..."
 
 
+def _project_lookup_key(value: Any) -> str:
+    return _norm_key(str(value or ""))
+
+
+def _looks_like_url(value: str) -> bool:
+    return value.lower().startswith(("http://", "https://"))
+
+
+def _is_noise_project_segment(segment: str) -> bool:
+    normalized = _norm_key(segment)
+    if not normalized:
+        return True
+    if normalized in {
+        "xp",
+        "cb",
+        "ui/ux",
+        "ui ux",
+        "uiux",
+        "dedicated team",
+        "fixed price",
+        "design",
+        "branding",
+        "engineering",
+        "discovery",
+        "discovery workshop",
+        "pre assessment",
+        "pre assesment",
+        "additional project",
+    }:
+        return True
+    if re.fullmatch(r"(?:sow|po)(?:\s*#?\s*[\w-]+)?", normalized, flags=re.IGNORECASE):
+        return True
+    if re.fullmatch(r"\d+(?:\s*-\s*\d+)*", normalized):
+        return True
+    if re.fullmatch(r"[a-z]{0,4}\s*\d{3,}(?:\s*-\s*\d+)*", normalized, flags=re.IGNORECASE):
+        return True
+    return False
+
+
+def _fallback_title_from_metadata(
+    important: Dict[str, str],
+    company: str,
+    raw_title: str,
+) -> str:
+    for key in ("domain", "subDomain", "functionalSolution", "technicalSolution", "industry", "sector"):
+        value = _clean_text(important.get(key))
+        if value and not _looks_like_url(value):
+            suffix = "" if "project" in value.lower() else " Project"
+            return _compact(f"{value}{suffix}", 96)
+    if company:
+        return company
+    return raw_title
+
+
+def _clean_project_display_title(
+    value: Any,
+    *,
+    company: str = "",
+    important: Optional[Dict[str, str]] = None,
+) -> str:
+    raw_title = _clean_text(value)
+    if not raw_title:
+        return ""
+
+    important = important or {}
+    title = re.sub(r"https?://\S+", " ", raw_title).strip()
+    if not title:
+        return _fallback_title_from_metadata(important, company, raw_title)
+
+    title = re.sub(
+        r"\(\s*(?:\d[\d\s-]*|design|ui\s*/?\s*ux|fixed price|branding|discovery)\s*\)",
+        " ",
+        title,
+        flags=re.IGNORECASE,
+    )
+    title = re.sub(
+        r"\bSOW\s*[-#]?\s*\d*(?:-\d+)*(?:\s*\([^)]*\))?",
+        " ",
+        title,
+        flags=re.IGNORECASE,
+    )
+    title = re.sub(r"\bPO\s*#?\s*\d*\b", " ", title, flags=re.IGNORECASE)
+    title = re.sub(r"^([A-Z]{2,5})\s*-\s*", r"\1 - ", title)
+    title = re.sub(r"(?<=[A-Za-z])-\s+(?=[A-Z][A-Za-z])", " - ", title)
+
+    segments = [
+        segment.strip(" -,:#")
+        for segment in re.split(r"\s+-\s+", title)
+        if segment.strip(" -,:#")
+    ]
+    useful_segments = [segment for segment in segments if not _is_noise_project_segment(segment)]
+
+    if useful_segments:
+        if len(useful_segments) == 2 and not useful_segments[0].isupper():
+            title = " ".join(useful_segments)
+        else:
+            title = " - ".join(useful_segments)
+
+    title = re.sub(r"\b(?:SOW|PO)\b\s*#?\s*", " ", title, flags=re.IGNORECASE)
+    title = re.sub(r"\b\d{3,}(?:-\d+)*\b", " ", title)
+    title = re.sub(r"\s+\d+\s*$", "", title)
+    title = re.sub(r"\s+", " ", title).strip(" -,:#")
+    return title or _fallback_title_from_metadata(important, company, raw_title)
+
+
+INDUSTRY_NORMALIZATIONS = {
+    "information technology & services": "Software & IT Services",
+    "information technology and services": "Software & IT Services",
+    "software & i": "Software & IT Services",
+    "software and it services": "Software & IT Services",
+}
+
+PROJECT_VERTICAL_OVERRIDES = {
+    _project_lookup_key(title): metadata
+    for title, metadata in (
+        ("XTM - UI/UX", {"industry": "Financial Services", "domain": "Workforce Payments"}),
+        ("XP-ZYVLY-SOW#8 (47204-1)", {"industry": "Software & IT Services", "domain": "Custom Application Development"}),
+        ("XP-Care- AI Like Me -SOW-43395-1", {"industry": "Healthcare", "domain": "AI Care Companion"}),
+        ("XP - Smile APP - 19915 - 3", {"industry": "Software & IT Services", "domain": "Mobile App Development"}),
+        ("Volantio - Dedicated Team - SOW#1", {"industry": "Aviation & Travel", "domain": "Airline Operations"}),
+        ("Vocable", {"industry": "Marketing & Advertising", "domain": "Content Marketing"}),
+        ("VisionInvest- SOW#1 PO#00095", {"industry": "Financial Services", "domain": "Enterprise AI & Data Intelligence"}),
+        ("VisionInvest- SOW#1 PO#", {"industry": "Financial Services", "domain": "Enterprise AI & Data Intelligence"}),
+        ("Tkxel - Payit", {"industry": "Financial Services", "domain": "Digital Payments"}),
+        ("The REACH Institute", {"industry": "Healthcare", "domain": "Behavioral Health Training"}),
+        ("Terravirtua", {"industry": "Media & Entertainment", "domain": "Digital Collectibles"}),
+        ("Swaay Media", {"industry": "Media & Publishing", "domain": "Digital Media Platform"}),
+        ("Super Soccer Stars", {"industry": "Sports & Recreation", "domain": "Class Scheduling & Enrollment"}),
+        ("SpoonFed - UIUX", {"industry": "Food & Beverage", "domain": "Catering Management"}),
+        ("Slavens & Associates Real Estate Inc.", {"industry": "Real Estate", "domain": "Property Transaction Marketplace"}),
+        ("Skyvantage", {"industry": "Aviation & Travel", "domain": "Airline Booking Platform"}),
+        ("SimpSocial", {"industry": "Automotive", "domain": "Dealership CRM"}),
+        ("Signature Pharmacy", {"industry": "Healthcare", "domain": "Online Pharmacy"}),
+        ("Signal", {"industry": "Security", "domain": "Security Operations ERP"}),
+        ("SchoolTracks - UI/UX", {"industry": "Education", "domain": "Classroom Management"}),
+        ("Savearound", {"industry": "Retail & Consumer Services", "domain": "Mobile App Modernization"}),
+        ("SalesProphet - Pre Assesment - SOW#1", {"industry": "Software & IT Services", "domain": "Sales Automation"}),
+        ("Safe Haven Defence - ERP Platform", {"industry": "Defense & Security", "domain": "ERP Platform"}),
+        ("RumbleUp", {"industry": "Civic & Political Organizations", "domain": "Campaign Messaging"}),
+        ("RTS", {"industry": "Staffing & Recruiting", "domain": "Employee Onboarding"}),
+        ("Riverside - UI/UX", {"industry": "Financial Services", "domain": "Trading Workflow UX"}),
+        ("Replenium", {"industry": "E-Commerce", "domain": "Recurring Orders"}),
+        ("REI BLACKBOOK", {"industry": "Real Estate", "domain": "Real Estate CRM"}),
+        ("REI - Document Generation Platform - Additional Project", {"industry": "Real Estate", "domain": "Document Generation"}),
+        ("PSAV", {"industry": "Events & Hospitality", "domain": "Field Service Mobile App"}),
+        ("ProPM", {"industry": "Software & IT Services", "domain": "Project Management"}),
+        ("ProfitOptics", {"industry": "Wholesale Distribution", "domain": "Pricing Portal"}),
+        ("PeopleGuru", {"industry": "Human Resources", "domain": "HRMS Mobile App"}),
+        ("Pendulum - Branding", {"industry": "Media Intelligence", "domain": "Narrative Intelligence"}),
+        ("Pendulum", {"industry": "Media Intelligence", "domain": "Narrative Intelligence"}),
+        ("PBD West (Design)", {"industry": "Convenience Retail", "domain": "CRM UX Modernization"}),
+        ("PBD", {"industry": "Convenience Retail", "domain": "Retail Buying Network"}),
+        ("OutcomesX", {"industry": "Social Impact & Nonprofit", "domain": "Impact Marketplace"}),
+        ("One Click Contractor", {"industry": "Construction", "domain": "Contractor Sales & Estimation"}),
+        ("Omniscient - Dedicated Team - SOW#1", {"industry": "Risk & Compliance", "domain": "Event Monitoring"}),
+        ("OMNI AI LLC - Discovery Workshop", {"industry": "Software & IT Services", "domain": "AI Discovery Workshop"}),
+        ("Omne LLC", {"industry": "Manufacturing", "domain": "Manufacturing ERP"}),
+        ("Omar Hospital - Discovery", {"industry": "Healthcare", "domain": "Patient Services Mobile App"}),
+        ("Ollivate - FIXED PRICE - SOW#1", {"industry": "Education", "domain": "Gamified Learning"}),
+        ("ODSY- GenAI", {"industry": "Corporate Services", "domain": "GenAI Analytics"}),
+        ("Kettle Space - UI/UX", {"industry": "Real Estate", "domain": "Coworking Space Management"}),
+        ("Kenmore Air Harbor", {"industry": "Aviation & Travel", "domain": "Flight Reservations"}),
+        ("Joshua Olson", {"industry": "Education", "domain": "Gamified Learning"}),
+        ("Inspire eLearning", {"industry": "Education", "domain": "Learning Management"}),
+        ("Insphere AI Platform", {"industry": "Software & IT Services", "domain": "Sales Enablement AI"}),
+        ("Incours", {"industry": "Education", "domain": "Learning Marketplace"}),
+        ("Impact Genome", {"industry": "Social Impact & Nonprofit", "domain": "Impact Measurement"}),
+        ("iCareManager - Engineering - SOW#1", {"industry": "Healthcare", "domain": "Care Management"}),
+        ("Haystack", {"industry": "Legal Services", "domain": "eDiscovery & Legal Staffing"}),
+        ("GlobalDrum", {"industry": "Media & Entertainment", "domain": "Social Audience Platform"}),
+        ("GlobalCare", {"industry": "Healthcare", "domain": "Telehealth Mobile Support"}),
+        ("Gift Local", {"industry": "Retail & Consumer Services", "domain": "Gift Card Marketplace"}),
+        ("Galpin Motors", {"industry": "Automotive", "domain": "Customer Loyalty Mobile App"}),
+        ("Funding Metrics", {"industry": "Financial Services", "domain": "Merchant Financing"}),
+        ("FINAFY", {"industry": "Financial Services", "domain": "Financial Product Marketplace"}),
+        ("Fetch AI - UIUX", {"industry": "Software & IT Services", "domain": "Cloud & AI Website UX"}),
+        ("Fasset", {"industry": "Financial Services", "domain": "Crypto Asset Platform"}),
+        ("Epilogue Systems", {"industry": "Education", "domain": "Digital Adoption & Training"}),
+        ("EDS", {"industry": "Education", "domain": "School Operations CMMS"}),
+        ("eDOC", {"industry": "Financial Services", "domain": "Digital Transaction Management"}),
+        ("Ediseed Analytics", {"industry": "Professional Services", "domain": "EDI Analytics"}),
+        ("ED - LMS Platform", {"industry": "Education", "domain": "Driver Education LMS"}),
+        ("Digno", {"industry": "Human Resources", "domain": "Performance & Rewards"}),
+        ("Digimax - UIUX", {"industry": "Marketing & Advertising", "domain": "Website Modernization"}),
+        ("Crowdbotics - Wordle", {"industry": "Gaming", "domain": "Word Puzzle Game"}),
+        ("Crowdbotics - Wagl", {"industry": "Hospitality", "domain": "Recommendation Platform"}),
+        ("Crowdbotics - Furgis Corey", {"industry": "Pet Services", "domain": "Service Scheduling"}),
+        ("Comet Electronics, LLC", {"industry": "Transportation & Logistics", "domain": "Rail IoT Monitoring"}),
+        ("Cloud 5", {"industry": "Hospitality", "domain": "Guest Communications Platform"}),
+        ("Cireson", {"industry": "Software & IT Services", "domain": "IT Service Management"}),
+        ("CanvsAI - ASA Pro", {"industry": "Market Research", "domain": "AI Research Assistant"}),
+        ("Canvs AI", {"industry": "Market Research", "domain": "Text Analytics"}),
+        ("CB - ZYVLY - SOW# 8 (47204-1)", {"industry": "Software & IT Services", "domain": "Custom Application Development"}),
+        ("CB - Smile APP - 19915 - 2", {"industry": "Software & IT Services", "domain": "Mobile App Development"}),
+        ("CafeZupas", {"industry": "Food & Beverage", "domain": "Restaurant Operations"}),
+        ("Bright Line Eating", {"industry": "Healthcare", "domain": "Weight Loss Subscription"}),
+        ("BBJ La Tavola formerly BBJ Linen", {"industry": "Events & Hospitality", "domain": "Event Rental ERP"}),
+        ("BBJ AI POC", {"industry": "Events & Hospitality", "domain": "AI Customer Support"}),
+        ("AZAQ - ReliaDOT", {"industry": "Consumer Goods & Distribution", "domain": "Trade Spend & Onboarding"}),
+        ("AZAQ - AI & Digital Strategy", {"industry": "Financial Services", "domain": "Enterprise AI & GRC"}),
+        ("Axora LLC - Dedicated Team - SOW#1", {"industry": "Energy & Industrial", "domain": "Dedicated Engineering Team"}),
+        ("ASAP", {"industry": "Semiconductors & Electronics", "domain": "Parts Distribution"}),
+        ("Accufin - Jira Admin Services", {"industry": "Accounting & Finance", "domain": "Atlassian Workflow Automation"}),
+        ("AbsenceSoft LLC", {"industry": "Human Resources", "domain": "Leave & Accommodation Management"}),
+    )
+}
+
+INDUSTRY_KEYWORD_RULES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
+    ("Education", ("school", "classroom", "student", "lms", "learning", "course", "training", "exam")),
+    ("Healthcare", ("health", "hospital", "patient", "doctor", "pharmacy", "medical", "prescription")),
+    ("Financial Services", ("bank", "loan", "credit card", "investment", "trading", "payment", "finance")),
+    ("Aviation & Travel", ("airline", "flight", "aviation", "travel", "reservation")),
+    ("Real Estate", ("real estate", "property", "realtor", "tenant")),
+    ("Automotive", ("automotive", "dealership", "car dealership", "vehicle")),
+    ("Security", ("security", "guard", "incident", "patrol")),
+    ("Food & Beverage", ("restaurant", "catering", "food", "kitchen")),
+    ("E-Commerce", ("ecommerce", "e-commerce", "online store", "order management")),
+    ("Human Resources", ("hrms", "human resource", "payroll", "employee", "onboarding")),
+    ("Manufacturing", ("manufacturing", "factory", "production")),
+    ("Legal Services", ("legal", "attorney", "law firm", "ediscovery")),
+    ("Software & IT Services", ("software", "it service", "technology company", "cloud", "saas")),
+)
+
+DOMAIN_INDUSTRY_HINTS: Tuple[Tuple[str, str], ...] = (
+    ("information technology", "Software & IT Services"),
+    ("data management", "Data & Analytics"),
+    ("e-commerce", "E-Commerce"),
+    ("human resource management", "Human Resources"),
+)
+
+DOMAIN_KEYWORD_RULES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
+    ("Learning Management", ("lms", "learning", "course", "training", "exam")),
+    ("CRM", ("crm", "lead management", "contact management")),
+    ("ERP Platform", ("erp", "resource allocation", "inventory management")),
+    ("AI & Data Intelligence", ("ai", "genai", "machine learning", "data analytics", "analytics")),
+    ("E-Commerce Platform", ("ecommerce", "e-commerce", "online store", "order management")),
+    ("Mobile App", ("mobile app", "react native", "ios", "android")),
+    ("UI/UX Design", ("ui/ux", "figma", "design revamp", "user interface")),
+    ("Business Intelligence & Reporting", ("power bi", "reporting", "dashboard")),
+    ("Workflow Automation", ("workflow", "automation", "jira")),
+)
+
+
+def _normalized_industry(value: Any) -> str:
+    cleaned = _clean_text(value)
+    if not cleaned:
+        return ""
+    return INDUSTRY_NORMALIZATIONS.get(cleaned.lower(), cleaned)
+
+
+def _project_haystack(project: Dict[str, Any]) -> str:
+    fields = project.get("fields") or {}
+    parts = [
+        project.get("title"),
+        project.get("projectName"),
+        project.get("rawProjectName"),
+        project.get("companyName"),
+        project.get("summary"),
+        project.get("problemStatement"),
+        project.get("functionalSolution"),
+        project.get("technicalSolution"),
+        project.get("businessOutcome"),
+        project.get("industry"),
+        project.get("domain"),
+        project.get("subDomain"),
+        *fields.values(),
+    ]
+    return " ".join(str(part or "") for part in parts).lower()
+
+
+def _has_placeholder_summary(project: Dict[str, Any]) -> bool:
+    return _clean_text(project.get("summary")) in {"", PROJECT_SUMMARY_PLACEHOLDER}
+
+
+def _friendly_project_focus(project: Dict[str, Any]) -> str:
+    title = _clean_project_display_title(
+        project.get("projectName") or project.get("title"),
+        company=_clean_text(project.get("companyName")),
+    )
+    company = _clean_text(project.get("companyName"))
+    if not title or _looks_like_url(title):
+        return ""
+    if company and _norm_key(title) in _norm_key(company):
+        return ""
+
+    focus = title
+    if company:
+        focus = re.sub(re.escape(company), " ", focus, flags=re.IGNORECASE)
+    focus = re.sub(r"https?://\S+", " ", focus)
+    focus = re.sub(r"\([^)]*\d[^)]*\)", " ", focus)
+    focus = re.sub(r"\b(?:SOW|PO)\s*#?\s*[\w-]*\b", " ", focus, flags=re.IGNORECASE)
+    focus = re.sub(r"\b(?:XP|CB)\b", " ", focus, flags=re.IGNORECASE)
+    focus = re.sub(r"\b(?:UI\s*/?\s*UX|FIXED PRICE|Dedicated Team|Additional Project)\b", " ", focus, flags=re.IGNORECASE)
+    focus = re.sub(r"\b\d{3,}(?:-\d+)*\b", " ", focus)
+    focus = re.sub(r"[-_#]+", " ", focus)
+    focus = re.sub(r"\s+", " ", focus).strip(" -,:")
+    focus = re.sub(r"\s+\d+\s*$", "", focus).strip(" -,:")
+    return focus
+
+
+def _synthetic_project_summary(project: Dict[str, Any]) -> str:
+    company = _clean_text(project.get("companyName"))
+    industry = _clean_text(project.get("industry") or project.get("sector"))
+    domain = _clean_text(project.get("domain") or project.get("subDomain"))
+    stage = _clean_text(project.get("companyStage"))
+    focus = _friendly_project_focus(project)
+
+    if domain and company:
+        summary = f"{domain} project for {company}"
+    elif domain:
+        summary = f"Knowledge-base project reference focused on {domain}"
+    elif company:
+        summary = f"Project engagement for {company}"
+    else:
+        summary = "Knowledge-base project reference"
+
+    if industry and industry.lower() not in summary.lower():
+        summary += f" in the {industry} vertical"
+    if focus and focus.lower() not in summary.lower():
+        summary += f", centered on {focus}"
+    if stage:
+        summary += f". Company stage: {stage}."
+    else:
+        summary += "."
+    return _compact(summary, 300)
+
+
+def _infer_from_keywords(haystack: str, rules: Tuple[Tuple[str, Tuple[str, ...]], ...]) -> str:
+    for label, keywords in rules:
+        if any(keyword in haystack for keyword in keywords):
+            return label
+    return ""
+
+
+def _infer_industry_from_domain(project: Dict[str, Any]) -> str:
+    haystack = " ".join(
+        str(project.get(key) or "").lower()
+        for key in ("domain", "subDomain", "sector")
+    )
+    for needle, industry in DOMAIN_INDUSTRY_HINTS:
+        if needle in haystack:
+            return industry
+    return ""
+
+
+def _enrich_project_metadata(project: Dict[str, Any]) -> Dict[str, Any]:
+    enriched = dict(project)
+    override = next(
+        (
+            PROJECT_VERTICAL_OVERRIDES.get(_project_lookup_key(enriched.get(key)))
+            for key in ("rawProjectName", "projectName", "title")
+            if PROJECT_VERTICAL_OVERRIDES.get(_project_lookup_key(enriched.get(key)))
+        ),
+        None,
+    )
+    haystack = _project_haystack(enriched)
+
+    industry = _normalized_industry(enriched.get("industry"))
+    if override and override.get("industry"):
+        industry = override["industry"]
+    elif not industry:
+        industry = _infer_industry_from_domain(enriched) or _infer_from_keywords(haystack, INDUSTRY_KEYWORD_RULES)
+    if industry:
+        enriched["industry"] = industry
+
+    domain = _clean_text(enriched.get("domain"))
+    if not domain and override and override.get("domain"):
+        domain = override["domain"]
+    elif not domain:
+        domain = _infer_from_keywords(haystack, DOMAIN_KEYWORD_RULES)
+    if domain:
+        enriched["domain"] = domain
+
+    if _has_placeholder_summary(enriched):
+        enriched["summary"] = _synthetic_project_summary(enriched)
+
+    return enriched
+
+
 def _row_to_project(
     fields: Dict[str, str],
     *,
     asset: Dict[str, Any],
 ) -> Optional[Dict[str, Any]]:
     company = _field_lookup(fields, COMPANY_KEYS)
-    project_name = _field_lookup(fields, PROJECT_TITLE_KEYS)
-    title = project_name or company
-    if not title:
+    raw_project_name = _field_lookup(fields, PROJECT_TITLE_KEYS)
+    raw_title = raw_project_name or company
+    if not raw_title:
         return None
 
-    normalized_fields = {key: _clean_text(value) for key, value in fields.items() if _clean_text(value)}
+    normalized_fields = {
+        key: _clean_text(value)
+        for key, value in fields.items()
+        if _clean_text(value) and _norm_key(key) not in PROJECT_EXCLUDED_FIELD_KEYS
+    }
     if len(normalized_fields) <= 1:
         return None
 
@@ -207,12 +592,19 @@ def _row_to_project(
         or important.get("businessOutcome")
         or ""
     )
-    summary = _compact(summary_source, 300) if summary_source else "No project summary indexed yet."
+    summary = _compact(summary_source, 300) if summary_source else PROJECT_SUMMARY_PLACEHOLDER
+    display_title = _clean_project_display_title(
+        raw_title,
+        company=company,
+        important=important,
+    )
+    title = display_title or raw_title
 
     project = {
-        "id": _project_id(company or title, title),
+        "id": _project_id(company or raw_title, raw_title),
         "title": title,
-        "projectName": project_name or title,
+        "projectName": title,
+        "rawProjectName": raw_project_name or raw_title,
         "companyName": company or None,
         "summary": summary,
         "fields": normalized_fields,
@@ -316,7 +708,7 @@ def list_kb_projects(ctx: TenantContext) -> List[Dict[str, Any]]:
             existing = projects_by_id.get(project["id"])
             projects_by_id[project["id"]] = _merge_project(existing, project) if existing else project
 
-    projects = list(projects_by_id.values())
+    projects = [_enrich_project_metadata(project) for project in projects_by_id.values()]
     projects.sort(
         key=lambda item: (
             str(item.get("sourceUploadedAt") or ""),

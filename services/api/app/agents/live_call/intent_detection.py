@@ -10,6 +10,7 @@ from dc_core.evidence import Citation
 from dc_core.tenancy import TenantContext
 from dc_tools.retrieve_kb import default_embed_fn, retrieve_kb
 
+from app.agents.relevant_content import filter_library_kb_hits
 from app.config import get_settings
 from app.domain.agent_config_repository import get_agent_config_repository
 from app.domain.calls_service import CallsService
@@ -144,8 +145,11 @@ def _detect_pains(
     session: LiveCallSession,
     call_id: str,
     timestamp: float,
+    speaker_role: str,
 ) -> List[Dict[str, Any]]:
     new_pains: List[Dict[str, Any]] = []
+    if _is_internal_speaker(speaker_role):
+        return new_pains
 
     for pain in session.brief_context.pains:
         pain_text = pain.get("text") or ""
@@ -402,12 +406,16 @@ def _customer_sentiment_cue(
         lowered,
     ):
         return {
-            "label": "Pain exposed",
-            "guidance": "Validate the pain, quantify business impact, then connect the next answer to that outcome.",
-            "tone": "negative",
+            "label": "Pain stated",
+            "guidance": "Capture this as discovery evidence; only treat it as sentiment risk if the buyer expresses concern, doubt, or frustration.",
+            "tone": "neutral",
             "source": "live-call-agent",
         }
-    if re.search(r"\b(not sure|concerned|worried|skeptical|doubt|uncertain|risk|delay)\b", lowered):
+    if re.search(
+        r"\b(not\s+sure\s+(?:how\s+)?(?:you|your|this|that|it|the\s+(?:solution|platform|product|approach))|"
+        r"concerned|worried|frustrated|skeptical|doubt|uncertain\s+(?:about|whether))\b",
+        lowered,
+    ):
         return {
             "label": "Decision risk",
             "guidance": "Clarify the doubt, ask what would reduce risk, and avoid pushing before trust recovers.",
@@ -491,18 +499,25 @@ def _retrieve_kb_hits(ctx: TenantContext, query: str, limit: int = 3) -> List[Di
     repo = get_kb_repository()
 
     def vector_search(tid: str, embedding: List[float], lim: int) -> List[Dict[str, Any]]:
-        return repo.match_chunks(tenant_uuid, embedding, limit=lim, clerk_key=clerk_key)
+        raw = repo.match_chunks(
+            tenant_uuid,
+            embedding,
+            limit=max(lim * 6, lim + 30),
+            clerk_key=clerk_key,
+        )
+        return filter_library_kb_hits(raw)[:lim]
 
     embed_fn = default_embed_fn if settings.openai_configured or settings.openai_api_key else None
     try:
-        return retrieve_kb(
+        hits = retrieve_kb(
             tenant_uuid,
             query,
             limit=limit,
-            chunks=get_memory_store().kb_chunks.get(clerk_key, []),
+            chunks=filter_library_kb_hits(get_memory_store().kb_chunks.get(clerk_key, [])),
             embed_fn=embed_fn,
             vector_search_fn=vector_search if embed_fn else None,
         )
+        return filter_library_kb_hits(hits)
     except Exception:
         _logger.exception("live KB retrieval failed")
         return []
@@ -569,7 +584,7 @@ def analyze_segment(
         if customer_sentiment:
             session.last_customer_sentiment = _public_customer_sentiment(customer_sentiment)
 
-    new_pains = _detect_pains(text, session, call_id, timestamp)
+    new_pains = _detect_pains(text, session, call_id, timestamp, speaker_role)
     shift = _detect_sentiment_shift(session, speaker_role, sentiment["score"], timestamp)
 
     transcript_payload = {
@@ -701,7 +716,7 @@ def analyze_segment(
                         "citation": {
                             "id": str(uuid.uuid4()),
                             "title": "Knowledge base",
-                            "type": "case-study",
+                            "type": "one-pager",
                             "excerpt": excerpt,
                         },
                     }
