@@ -46,8 +46,8 @@ const AGENT_CONFIG: Record<
     className: "text-sky-700 bg-sky-100 dark:bg-sky-950/40 dark:text-sky-300",
   },
   content_generation: {
-    icon: Mail,
-    label: "Studio",
+    icon: FileText,
+    label: "Content Studio",
     className: "text-indigo-600 bg-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-300",
   },
 };
@@ -62,10 +62,12 @@ function TodoRow({
   todo,
   done,
   onToggle,
+  isLast,
 }: {
   todo: AiTodo;
   done: boolean;
   onToggle: () => void;
+  isLast?: boolean;
 }) {
   const cfg = AGENT_CONFIG[todo.agent];
   const Icon = cfg.icon;
@@ -73,8 +75,9 @@ function TodoRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
-        done ? "opacity-50 bg-muted/30" : "bg-card hover:bg-muted/40"
+        "flex items-center gap-3 rounded-none border-0 bg-transparent px-0 py-2.5 transition-colors",
+        !isLast && "border-b border-border",
+        done ? "opacity-50" : "hover:opacity-80"
       )}
     >
       <button
@@ -95,7 +98,7 @@ function TodoRow({
       <TodoRowContent todo={todo} done={done} cfg={cfg} />
       <Link
         href={todo.href}
-        className="shrink-0 p-1 text-muted-foreground hover:text-foreground"
+        className="shrink-0 text-muted-foreground hover:text-foreground"
         aria-label="Open"
       >
         <ChevronRight className="h-4 w-4" />
@@ -178,7 +181,7 @@ export function AiTodoList() {
 
   return (
     <Card className="flex h-[380px] flex-col">
-      <CardHeader className="pb-3">
+      <CardHeader className="shrink-0 pb-3 pt-5 px-5">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
@@ -196,7 +199,7 @@ export function AiTodoList() {
           </p>
         )}
       </CardHeader>
-      <CardContent className="min-h-0 flex-1 overflow-y-auto pt-0 space-y-2">
+      <CardContent className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-0">
         {todos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center rounded-lg border border-dashed bg-muted/20">
             <CheckCircle2 className="h-8 w-8 text-success mb-2" />
@@ -204,12 +207,13 @@ export function AiTodoList() {
             <p className="mt-1 type-caption text-muted-foreground">The agents are quiet.</p>
           </div>
         ) : (
-          todos.map((todo) => (
+          todos.map((todo, index) => (
             <TodoRow
               key={todo.id}
               todo={todo}
               done={doneIds.has(todo.id)}
               onToggle={() => toggle(todo.id)}
+              isLast={index === todos.length - 1}
             />
           ))
         )}

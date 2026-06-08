@@ -1,9 +1,21 @@
 "use client";
 
 import { useMemo } from "react";
-import { addHours, isWithinInterval } from "date-fns";
+import { addHours, format, isWithinInterval } from "date-fns";
 import { latestPostDcHref } from "@/lib/dashboard/call-links";
-import { useCalls, useCoachingInsights, usePostCallTasks } from "@/lib/data/hooks";
+import {
+  useCalls,
+  useCoachingInsights,
+  usePostCallTasks,
+  usePreDcContentGenerationGaps,
+} from "@/lib/data/hooks";
+import { useClpOrgAnalytics, useLandingPage } from "@/lib/data/clp-hooks";
+import {
+  callOpportunityValue,
+  callScheduleDate,
+  todaysOpenCalls,
+} from "@/lib/dashboard/call-metrics";
+import { buildArtifactStudioHref } from "@/lib/content-studio/artifact-studio-href";
 import type { AgentId } from "@/types/agents";
 
 export type AiTodoAgent = AgentId;
@@ -18,22 +30,40 @@ export interface AiTodo {
   href: string;
 }
 
-function parseRevenue(raw?: string): number {
-  if (!raw) return 0;
-  const m = raw.match(/[\d.]+/);
-  return m ? Number.parseFloat(m[0]) : 0;
+function contentTypeLabel(type: string): string {
+  if (type === "case_study") return "case study";
+  if (type === "one_pager") return "one-pager";
+  if (type === "demo_script") return "demo script";
+  return type.replace(/_/g, " ");
 }
 
 export function useAiTodos() {
   const { data: calls = [] } = useCalls();
   const { data: coachingInsights = [] } = useCoachingInsights();
   const { data: taskList = [] } = usePostCallTasks();
+  const { data: contentGaps = [] } = usePreDcContentGenerationGaps();
+  const { data: clpAnalytics } = useClpOrgAnalytics();
+  const topClpAccount = clpAnalytics?.topAccounts?.[0];
+  const latestCompletedCall = useMemo(
+    () =>
+      [...calls]
+        .filter((call) => call.status === "completed")
+        .sort(
+          (a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime()
+        )[0],
+    [calls]
+  );
+  const topClpCallId = topClpAccount?.callId ?? latestCompletedCall?.id;
+  const { data: topLandingPage } = useLandingPage(topClpCallId ?? "");
 
   const todos = useMemo(() => {
     const items: AiTodo[] = [];
     const now = new Date();
     const in24h = addHours(now, 24);
     const in2h = addHours(now, 2);
+    const todayCalls = todaysOpenCalls(calls, now);
+    const todayCallIds = new Set(todayCalls.map((call) => call.id));
+    const todayContentGaps = contentGaps.filter((gap) => todayCallIds.has(gap.callId));
 
     const pendingTasks = taskList.filter((t) => t.status === "pending_approval");
     if (pendingTasks.length > 0) {
@@ -47,6 +77,102 @@ export function useAiTodos() {
         agent: "post_dc",
         priority: "high",
         href: latestPostDcHref(calls),
+      });
+    }
+
+    for (const call of todayCalls) {
+      const at = callScheduleDate(call);
+      const lead = call.leadName
+        ? `${call.leadName}${call.leadTitle ? ` · ${call.leadTitle}` : ""}`
+        : call.accountName;
+      const urgent =
+        call.status === "live" ||
+        (Number.isFinite(at.getTime()) && isWithinInterval(at, { start: now, end: in2h }));
+
+      items.push({
+        id: `todo-call-prep-${call.id}`,
+        title:
+          call.status === "live"
+            ? `Run live cockpit for ${call.accountName}`
+            : `Prep for ${call.accountName}`,
+        subtitle: `${Number.isFinite(at.getTime()) ? format(at, "h:mm a") : "Today"} · ${lead} · review brief, pains, and discovery questions`,
+        agent: "live-call",
+        priority: urgent ? "high" : "medium",
+        href: call.status === "live" ? `/calls/${call.id}/live` : `/calls/${call.id}`,
+      });
+    }
+
+    for (const gap of todayContentGaps) {
+      const type = contentTypeLabel(gap.type);
+      items.push({
+        id: `todo-content-${gap.id}`,
+        title: `Generate ${type} for ${gap.accountName}`,
+        subtitle: gap.name,
+        agent: "content_generation",
+        priority: gap.priority <= 1 ? "high" : "medium",
+        href: gap.studioHref,
+      });
+    }
+
+    const callsWithAiContent = new Set(todayContentGaps.map((gap) => gap.callId));
+    for (const call of todayCalls.filter((c) => !callsWithAiContent.has(c.id))) {
+      items.push({
+        id: `todo-deck-${call.id}`,
+        title: `Prepare deck for ${call.accountName}`,
+        subtitle: "Tailor proof points and story before the call",
+        agent: "content_generation",
+        priority: "medium",
+        href: buildArtifactStudioHref({
+          type: "deck",
+          callId: call.id,
+          accountName: call.accountName,
+          leadName: call.leadName,
+          assetName: `${call.accountName} discovery deck`,
+        }),
+      });
+    }
+
+    const topClpAccountName =
+      topLandingPage?.branding.accountName ??
+      topClpAccount?.accountName ??
+      latestCompletedCall?.accountName;
+    const topClpStats = topLandingPage?.stats;
+    if (topClpCallId && topLandingPage?.status === "published") {
+      const activityParts = topClpStats
+        ? [
+            `${topClpStats.uniqueVisitors} visitor${topClpStats.uniqueVisitors === 1 ? "" : "s"}`,
+            `${topClpStats.documentOpens} document open${topClpStats.documentOpens === 1 ? "" : "s"}`,
+            `${topClpStats.proposalOpens} proposal view${topClpStats.proposalOpens === 1 ? "" : "s"}`,
+          ]
+        : ["Published lead hub", "check buyer engagement"];
+      items.push({
+        id: `todo-clp-activity-${topClpCallId}`,
+        title: `Review lead hub activity${topClpAccountName ? ` for ${topClpAccountName}` : ""}`,
+        subtitle: activityParts.join(" · "),
+        agent: "post_dc",
+        priority:
+          (topClpStats?.unreadNotifications ?? 0) > 0 || (topClpStats?.proposalOpens ?? 0) > 0
+            ? "high"
+            : "medium",
+        href: `/calls/${topClpCallId}/landing-page/activity`,
+      });
+    } else if (topClpCallId && topLandingPage?.status === "draft") {
+      items.push({
+        id: `todo-clp-draft-${topClpCallId}`,
+        title: `Finish lead hub${topClpAccountName ? ` for ${topClpAccountName}` : ""}`,
+        subtitle: "Draft customer landing page · polish and publish",
+        agent: "post_dc",
+        priority: "medium",
+        href: `/calls/${topClpCallId}/landing-page`,
+      });
+    } else if (clpAnalytics && clpAnalytics.publishedCount > 0) {
+      items.push({
+        id: "todo-clp-analytics",
+        title: "Review lead hub analytics",
+        subtitle: `${clpAnalytics.publishedCount} published · ${clpAnalytics.totalUniqueVisitors} visitor${clpAnalytics.totalUniqueVisitors === 1 ? "" : "s"} · ${clpAnalytics.totalLinkOpens} link open${clpAnalytics.totalLinkOpens === 1 ? "" : "s"}`,
+        agent: "post_dc",
+        priority: clpAnalytics.totalUniqueVisitors > 0 ? "medium" : "low",
+        href: "/analytics/landing-pages",
       });
     }
 
@@ -79,26 +205,6 @@ export function useAiTodos() {
       }
     }
 
-    for (const call of calls) {
-      const at = new Date(call.scheduledAt);
-      if (
-        (call.status === "upcoming" || call.status === "live") &&
-        isWithinInterval(at, { start: now, end: in2h })
-      ) {
-        const lead = call.leadName
-          ? `${call.leadName}${call.leadTitle ? ` · ${call.leadTitle}` : ""}`
-          : call.accountName;
-        items.push({
-          id: `todo-prep-${call.id}`,
-          title: `Prep for ${call.accountName}`,
-          subtitle: lead,
-          agent: "live-call",
-          priority: "high",
-          href: call.status === "live" ? `/calls/${call.id}/live` : `/calls/${call.id}`,
-        });
-      }
-    }
-
     const priorityOrder: Record<AiTodoPriority, number> = {
       high: 0,
       medium: 1,
@@ -107,7 +213,17 @@ export function useAiTodos() {
     items.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
     return items;
-  }, [calls, coachingInsights, taskList]);
+  }, [
+    calls,
+    clpAnalytics,
+    coachingInsights,
+    contentGaps,
+    latestCompletedCall,
+    taskList,
+    topClpAccount,
+    topClpCallId,
+    topLandingPage,
+  ]);
 
   const counts = useMemo(
     () => ({
@@ -119,21 +235,10 @@ export function useAiTodos() {
   );
 
   const topOpportunityCall = useMemo(() => {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
-    const todayCalls = calls.filter((c) => {
-      const d = new Date(c.scheduledAt);
-      return (
-        (c.status === "upcoming" || c.status === "live") &&
-        d >= todayStart &&
-        d <= todayEnd
-      );
-    });
+    const todayCalls = todaysOpenCalls(calls);
     if (todayCalls.length === 0) return calls.find((c) => c.status === "upcoming");
     return [...todayCalls].sort(
-      (a, b) => parseRevenue(b.annualRevenue) - parseRevenue(a.annualRevenue)
+      (a, b) => callOpportunityValue(b) - callOpportunityValue(a)
     )[0];
   }, [calls]);
 

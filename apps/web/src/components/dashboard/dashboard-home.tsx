@@ -9,7 +9,6 @@ import { UnifiedAgenda } from "./unified-agenda";
 import { QuickActions } from "./quick-actions";
 import { LeadershipDashboardExtras } from "./leadership-dashboard";
 import { DashboardImportPrompt } from "./dashboard-import-prompt";
-import { DashboardClpActivity } from "./dashboard-clp-activity";
 import { PageShell } from "@/components/layout/page-shell";
 
 export function DashboardHome() {
@@ -39,7 +38,6 @@ export function DashboardHome() {
         <AiTodoList />
         <UnifiedAgenda />
       </div>
-      <DashboardClpActivity />
       <QuickActions />
     </PageShell>
   );

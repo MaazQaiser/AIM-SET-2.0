@@ -1,11 +1,12 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { format, isSameDay, startOfDay } from "date-fns";
+import { format } from "date-fns";
 import { useClerkGate } from "@/components/providers/clerk-gate";
 import { PageHeader } from "@/components/layout/page-shell";
 import { useCalls, usePostCallTasks } from "@/lib/data/hooks";
 import { isLocalAuthBypassEnabled } from "@/lib/auth-mode";
+import { todaysOpenCalls } from "@/lib/dashboard/call-metrics";
 
 function getSalutation(hour: number): string {
   if (hour >= 23 || hour < 5) return "Working late";
@@ -46,12 +47,7 @@ function AssistantGreetingBody({
   const hour = new Date().getHours();
   const salutation = getSalutation(hour);
 
-  const today = startOfDay(new Date());
-  const todaysCalls = calls.filter(
-    (c) =>
-      (c.status === "upcoming" || c.status === "live") &&
-      isSameDay(new Date(c.scheduledAt), today)
-  );
+  const todaysCalls = todaysOpenCalls(calls);
   const pendingApprovals = taskList.filter((t) => t.status === "pending_approval").length;
 
   const dateLine = format(new Date(), "EEEE, MMMM d");
