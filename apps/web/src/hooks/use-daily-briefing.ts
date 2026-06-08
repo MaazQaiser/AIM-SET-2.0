@@ -52,13 +52,6 @@ function buildBriefingPayload(
   };
 }
 
-async function fetchCachedBriefing(date: string): Promise<DailyBriefingResult | null> {
-  const res = await fetch(`/api/agents/briefing?date=${encodeURIComponent(date)}`);
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error("Briefing failed");
-  return res.json() as Promise<DailyBriefingResult>;
-}
-
 async function generateBriefing(
   payload: ReturnType<typeof buildBriefingPayload>,
   date: string,
@@ -82,20 +75,21 @@ export function useDailyBriefing(enabled = true) {
   const { data: calls = [] } = useCalls();
   const { topOpportunityCall, pendingApprovalCount, todos } = useAiTodos();
   const briefingDate = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
-  const payload = buildBriefingPayload(
-    calls,
-    topOpportunityCall,
-    pendingApprovalCount,
-    todos
+  const payload = useMemo(
+    () =>
+      buildBriefingPayload(
+        calls,
+        topOpportunityCall,
+        pendingApprovalCount,
+        todos
+      ),
+    [calls, pendingApprovalCount, todos, topOpportunityCall]
   );
+  const payloadSignature = useMemo(() => JSON.stringify(payload), [payload]);
 
   const query = useQuery({
-    queryKey: ["daily-briefing", briefingDate],
-    queryFn: async () => {
-      const cached = await fetchCachedBriefing(briefingDate);
-      if (cached) return cached;
-      return generateBriefing(payload, briefingDate, false);
-    },
+    queryKey: ["daily-briefing", briefingDate, payloadSignature],
+    queryFn: async () => generateBriefing(payload, briefingDate, true),
     enabled,
     staleTime: Infinity,
     retry: 1,
@@ -105,12 +99,15 @@ export function useDailyBriefing(enabled = true) {
     setRefreshing(true);
     try {
       const fresh = await generateBriefing(payload, briefingDate, true);
-      queryClient.setQueryData(["daily-briefing", briefingDate], fresh);
+      queryClient.setQueryData(
+        ["daily-briefing", briefingDate, payloadSignature],
+        fresh
+      );
       return fresh;
     } finally {
       setRefreshing(false);
     }
-  }, [briefingDate, payload, queryClient]);
+  }, [briefingDate, payload, payloadSignature, queryClient]);
 
   return {
     ...query,

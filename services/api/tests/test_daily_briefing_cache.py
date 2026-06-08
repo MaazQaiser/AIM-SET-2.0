@@ -72,3 +72,37 @@ def test_daily_briefing_refresh_regenerates(monkeypatch):
     assert refreshed.status_code == 200
     assert refreshed.json()["cached"] is False
     assert refreshed.json()["paragraph"] != "Stored paragraph"
+
+
+def test_daily_briefing_regenerates_when_context_changes(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    get_memory_store().daily_briefings.clear()
+
+    headers = {"x-tenant-id": CTX.tenant_id, "x-user-id": CTX.user_id}
+    first = client.post(
+        "/api/v1/agents/briefing",
+        json={"todaysCallCount": 0, "pendingApprovalCount": 0},
+        headers=headers,
+    )
+    assert first.status_code == 200
+    assert first.json()["cached"] is False
+    assert "No discovery calls" in first.json()["paragraph"]
+
+    changed = client.post(
+        "/api/v1/agents/briefing",
+        json={
+            "todaysCallCount": 1,
+            "pendingApprovalCount": 0,
+            "topOpportunity": {
+                "accountName": "Brightwell Community Schools",
+                "leadName": "Adrian Washington",
+            },
+        },
+        headers=headers,
+    )
+    assert changed.status_code == 200
+    assert changed.json()["cached"] is False
+    assert "Brightwell Community Schools" in changed.json()["paragraph"]
