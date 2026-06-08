@@ -41,7 +41,8 @@ import {
 import { compileTemplateDocument } from "@/lib/content-studio/template-editor";
 import {
   compactSlidesForSave,
-  PARENT_TEMPLATE_MAX_IMAGE_BYTES,
+  dataUrlToFile,
+  ensureSlideImageUrls,
   uploadParentTemplateAsset,
 } from "@/lib/content-studio/parent-template-assets";
 import { useParentTemplate, useSaveParentTemplate } from "@/lib/data/content-studio-hooks";
@@ -115,6 +116,7 @@ export function ParentTemplateBuilder() {
 
   const [activeSlideId, setActiveSlideId] = useState(() => startSlides[0]?.id ?? "");
   const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const hydratedFromIdRef = useRef<string | null>(null);
 
@@ -238,31 +240,54 @@ export function ParentTemplateBuilder() {
       setError("Use an image file.");
       return false;
     }
-    if (file.size > PARENT_TEMPLATE_MAX_IMAGE_BYTES) {
-      setError("Image is too large. Maximum size is 52 MB.");
-      return false;
-    }
     return true;
   }
 
   async function handleSave() {
     setError("");
+    setIsSaving(true);
     try {
+      let resolvedLogoUrl = logoUrl;
+      if (!resolvedLogoUrl && logoDataUrl) {
+        resolvedLogoUrl = await uploadParentTemplateAsset(
+          dataUrlToFile(logoDataUrl, logoFileName || "logo.png")
+        );
+        setLogoUrl(resolvedLogoUrl);
+        setLogoDataUrl("");
+      }
+
+      const preparedStart = await ensureSlideImageUrls(startSlides);
+      const preparedEnd = await ensureSlideImageUrls(endSlides);
+      setStartSlides(preparedStart);
+      setEndSlides(preparedEnd);
+
       const draft: FixedSlidesDraft = {
-        startSlides: compactSlidesForSave(startSlides),
-        endSlides: compactSlidesForSave(endSlides),
+        startSlides: compactSlidesForSave(preparedStart),
+        endSlides: compactSlidesForSave(preparedEnd),
         accentColor,
         textColor,
         fontFamily,
-        ...(logoUrl ? { logoUrl } : {}),
+        ...(resolvedLogoUrl ? { logoUrl: resolvedLogoUrl } : {}),
       };
+      const saveLogos: ScratchLogoAsset[] = resolvedLogoUrl
+        ? [
+            {
+              id: "logo",
+              label: "Logo",
+              dataUrl: "",
+              url: resolvedLogoUrl,
+              fileName: logoFileName,
+              isPrimary: true,
+            },
+          ]
+        : [];
       const compiledForSave = buildScratchTemplateDocument({
         name: "Parent Template",
         accentColor,
         textColor,
         fontFamily,
         tags: [],
-        logos,
+        logos: saveLogos,
         fixedStartSlides: draft.startSlides,
         slides: [],
         fixedEndSlides: draft.endSlides,
@@ -279,6 +304,8 @@ export function ParentTemplateBuilder() {
       setLastSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save parent template.");
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -339,8 +366,12 @@ export function ParentTemplateBuilder() {
             ) : (
               <span className="text-xs text-amber-600">Not saved yet — using default slides</span>
             )}
-            <Button type="button" onClick={() => void handleSave()} disabled={save.isPending}>
-              {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            <Button type="button" onClick={() => void handleSave()} disabled={isSaving || save.isPending}>
+              {isSaving || save.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
               {existing || lastSavedAt ? "Update parent template" : "Save parent template"}
             </Button>
           </div>

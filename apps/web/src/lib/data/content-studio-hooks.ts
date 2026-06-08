@@ -279,11 +279,8 @@ export function useCreateTemplate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: ContentTemplateDraft) => {
-      const res = await fetch("/api/content/templates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const { createTemplateDirect } = await import("@/lib/content-studio/parent-template-assets");
+      const res = await createTemplateDirect(body);
       if (!res.ok) throw new Error(await res.text());
       return res.json() as Promise<ContentTemplate>;
     },
@@ -296,21 +293,16 @@ export function useUpdateTemplate(templateId?: string) {
   return useMutation({
     mutationFn: async (body: ContentTemplateDraft) => {
       if (!templateId) throw new Error("Template id is required");
-      const res = await fetch(`/api/content/templates/${templateId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const { createTemplateDirect, patchTemplateDirect } = await import(
+        "@/lib/content-studio/parent-template-assets"
+      );
+      const res = await patchTemplateDirect(templateId, body);
       if (res.ok) return res.json() as Promise<ContentTemplate>;
 
       // Final safety net: if update target is stale/missing, create a fresh
       // template from the current editor draft instead of failing the save.
       if (res.status === 404) {
-        const createRes = await fetch("/api/content/templates", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
+        const createRes = await createTemplateDirect(body);
         if (!createRes.ok) throw new Error(await createRes.text());
         return createRes.json() as Promise<ContentTemplate>;
       }
@@ -363,11 +355,10 @@ export function useSaveParentTemplate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: ContentTemplateDraft) => {
-      const res = await fetch("/api/content/templates/parent", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const { saveParentTemplateDirect } = await import(
+        "@/lib/content-studio/parent-template-assets"
+      );
+      const res = await saveParentTemplateDirect(body);
       if (!res.ok) throw new Error(await res.text());
       return res.json() as Promise<ContentTemplate>;
     },

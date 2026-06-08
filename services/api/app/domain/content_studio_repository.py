@@ -658,9 +658,10 @@ class ContentStudioRepository:
         file_name: str,
     ) -> Dict[str, str]:
         settings = get_settings()
-        if len(file_bytes) > settings.kb_max_upload_bytes:
+        max_bytes = settings.kb_max_upload_bytes
+        if len(file_bytes) > max_bytes:
             raise ValueError(
-                f"Image exceeds upload limit ({settings.kb_max_upload_bytes // (1024 * 1024)} MB)."
+                f"Image exceeds upload limit ({max(1, max_bytes // (1024 * 1024))} MB)."
             )
         ext = Path(file_name).suffix.lower()
         if ext not in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}:

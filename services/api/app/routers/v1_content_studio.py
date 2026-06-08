@@ -27,7 +27,12 @@ from dc_core.tenancy import TenantContext
 
 from app.config import get_settings
 from app.deps import get_tenant_context
-from app.domain.content_studio_repository import ARTIFACT_TYPES, TEMPLATE_EXTENSIONS, get_content_studio_repository
+from app.domain.content_studio_repository import (
+    ARTIFACT_TYPES,
+    PARENT_TEMPLATE_TAG,
+    TEMPLATE_EXTENSIONS,
+    get_content_studio_repository,
+)
 from app.orchestrator.dispatcher import Orchestrator
 from app.domain.kb_repository import get_kb_repository
 from app.domain.kb_tenancy import resolve_kb_tenant
@@ -201,6 +206,82 @@ class TemplatePatchBody(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
 
 
+def _upload_token_context(
+    authorization: Optional[str] = None,
+    x_upload_token: Optional[str] = None,
+) -> TenantContext:
+    token = authorization or x_upload_token or ""
+    return _tenant_context_from_upload_token(token)
+
+
+def _save_parent_template(ctx: TenantContext, body: TemplateBody) -> Dict[str, Any]:
+    name = (body.name or PARENT_TEMPLATE_TAG).strip()
+    if not name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Template name is required")
+    if body.artifactType not in ARTIFACT_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid artifactType")
+
+    try:
+        validate_template_html(body.html, body.css)
+        document = build_template_document(body.html, body.css)
+        _, resolved_css = split_template_parts(document)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    tags = list({PARENT_TEMPLATE_TAG, *(t.strip() for t in (body.tags or []) if str(t).strip())})
+    metadata = {**(body.metadata or {}), "isParentTemplate": True}
+    css_variables = extract_css_variables(resolved_css)
+    page_count = count_template_pages(document, body.artifactType)
+
+    repo = get_content_studio_repository()
+    existing = repo.get_parent_template(ctx)
+    if existing and existing.get("id"):
+        tpl = repo.update_template(
+            ctx,
+            str(existing["id"]),
+            {
+                "name": name,
+                "artifactType": body.artifactType,
+                "html": document,
+                "cssVariables": css_variables,
+                "tags": tags,
+                "metadata": metadata,
+                "pageCount": page_count,
+            },
+        )
+        if tpl:
+            return tpl
+
+    return repo.create_manual_template(
+        ctx,
+        name=name,
+        artifact_type=body.artifactType,
+        html=document,
+        css_variables=css_variables,
+        tags=tags,
+        page_count=page_count,
+        metadata=metadata,
+    )
+
+
+async def _upload_parent_template_asset_bytes(
+    *,
+    file_bytes: bytes,
+    file_name: str,
+    ctx: TenantContext,
+) -> Dict[str, str]:
+    if not file_bytes:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing file")
+    try:
+        return get_content_studio_repository().upload_parent_asset(
+            ctx,
+            file_bytes=file_bytes,
+            file_name=file_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)) from exc
+
+
 class TemplateAssistBody(BaseModel):
     name: str = "Untitled template"
     artifactType: str = "deck"
@@ -217,11 +298,7 @@ def list_templates(
     return get_content_studio_repository().list_templates(ctx, artifact_type=artifact_type)
 
 
-@router.post("/templates")
-def create_template(
-    body: TemplateBody,
-    ctx: TenantContext = Depends(get_tenant_context),
-) -> Dict[str, Any]:
+def _create_template_from_body(ctx: TenantContext, body: TemplateBody) -> Dict[str, Any]:
     name = body.name.strip()
     if not name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Template name is required")
@@ -244,6 +321,24 @@ def create_template(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/templates")
+def create_template(
+    body: TemplateBody,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    return _create_template_from_body(ctx, body)
+
+
+@router.post("/templates/direct")
+def create_template_direct(
+    body: TemplateBody,
+    authorization: Optional[str] = Header(default=None),
+    x_upload_token: Optional[str] = Header(default=None, alias="x-upload-token"),
+) -> Dict[str, Any]:
+    ctx = _upload_token_context(authorization, x_upload_token)
+    return _create_template_from_body(ctx, body)
 
 
 @router.post("/templates/assist")
@@ -280,16 +375,36 @@ async def upload_parent_template_asset(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> Dict[str, str]:
     data = await file.read()
-    if not data:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing file")
-    try:
-        return get_content_studio_repository().upload_parent_asset(
-            ctx,
-            file_bytes=data,
-            file_name=file.filename or "asset.png",
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return await _upload_parent_template_asset_bytes(
+        file_bytes=data,
+        file_name=file.filename or "asset.png",
+        ctx=ctx,
+    )
+
+
+@router.post("/templates/parent/assets/direct")
+async def upload_parent_template_asset_direct(
+    file: UploadFile = File(...),
+    authorization: Optional[str] = Header(default=None),
+    x_upload_token: Optional[str] = Header(default=None, alias="x-upload-token"),
+) -> Dict[str, str]:
+    ctx = _upload_token_context(authorization, x_upload_token)
+    data = await file.read()
+    return await _upload_parent_template_asset_bytes(
+        file_bytes=data,
+        file_name=file.filename or "asset.png",
+        ctx=ctx,
+    )
+
+
+@router.put("/templates/parent/direct")
+def save_parent_template_direct(
+    body: TemplateBody,
+    authorization: Optional[str] = Header(default=None),
+    x_upload_token: Optional[str] = Header(default=None, alias="x-upload-token"),
+) -> Dict[str, Any]:
+    ctx = _upload_token_context(authorization, x_upload_token)
+    return _save_parent_template(ctx, body)
 
 
 @router.get("/templates/parent/assets/{asset_name}")
@@ -405,11 +520,10 @@ def get_template_preview_pdf(
     )
 
 
-@router.patch("/templates/{template_id}")
-def update_template(
+def _update_template_from_body(
+    ctx: TenantContext,
     template_id: str,
     body: TemplatePatchBody,
-    ctx: TenantContext = Depends(get_tenant_context),
 ) -> Dict[str, Any]:
     existing = get_content_studio_repository().get_template(ctx, template_id)
     if not existing:
@@ -448,6 +562,26 @@ def update_template(
     if not tpl:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
     return tpl
+
+
+@router.patch("/templates/{template_id}")
+def update_template(
+    template_id: str,
+    body: TemplatePatchBody,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    return _update_template_from_body(ctx, template_id, body)
+
+
+@router.patch("/templates/{template_id}/direct")
+def update_template_direct(
+    template_id: str,
+    body: TemplatePatchBody,
+    authorization: Optional[str] = Header(default=None),
+    x_upload_token: Optional[str] = Header(default=None, alias="x-upload-token"),
+) -> Dict[str, Any]:
+    ctx = _upload_token_context(authorization, x_upload_token)
+    return _update_template_from_body(ctx, template_id, body)
 
 
 @router.delete("/templates/{template_id}")

@@ -38,6 +38,11 @@ import {
   type ScratchSlideLayout,
   type ScratchTemplateFont,
 } from "@/lib/content-studio/scratch-template";
+import {
+  dataUrlToFile,
+  ensureSlideImageUrls,
+  uploadParentTemplateAsset,
+} from "@/lib/content-studio/parent-template-assets";
 import { compileTemplateDocument } from "@/lib/content-studio/template-editor";
 import { useCreateTemplate, useParentTemplate } from "@/lib/data/content-studio-hooks";
 
@@ -87,17 +92,6 @@ const QUICK_ADD_LAYOUTS: Array<{ layout: ScratchSlideLayout; label: string }> = 
   { layout: "blank", label: "Blank" },
 ];
 const PREVIEW_SCALE = 0.34;
-const MAX_IMAGE_BYTES = 3.5 * 1024 * 1024;
-
-function readImageDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("Could not read image file."));
-    reader.readAsDataURL(file);
-  });
-}
-
 export function TemplateScratchBuilder() {
   const create = useCreateTemplate();
   const { data: parentTemplate } = useParentTemplate();
@@ -106,6 +100,7 @@ export function TemplateScratchBuilder() {
   const [textColor, setTextColor] = useState("#0f172a");
   const [fontFamily, setFontFamily] = useState<ScratchTemplateFont>("urbanist");
   const [logoDataUrl, setLogoDataUrl] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
   const [logoFileName, setLogoFileName] = useState("");
 
   // Fixed slides at the start (1 slide) and end (6 slides) of every template.
@@ -158,18 +153,19 @@ export function TemplateScratchBuilder() {
   }
   const logos = useMemo<ScratchLogoAsset[]>(
     () =>
-      logoDataUrl
+      logoUrl || logoDataUrl
         ? [
             {
               id: "logo",
               label: "Logo",
-              dataUrl: logoDataUrl,
+              dataUrl: logoUrl ? "" : logoDataUrl,
+              url: logoUrl || undefined,
               fileName: logoFileName,
               isPrimary: true,
             },
           ]
         : [],
-    [logoDataUrl, logoFileName]
+    [logoDataUrl, logoFileName, logoUrl]
   );
 
   // Defer the preview inputs so the editor stays responsive during fast edits.
@@ -241,41 +237,44 @@ export function TemplateScratchBuilder() {
   }
 
   async function handleLogoUpload(file?: File | null) {
-    if (!file) return;
-    const dataUrl = await readCheckedImage(file);
-    if (!dataUrl) return;
-    setLogoDataUrl(dataUrl);
-    setLogoFileName(file.name);
+    if (!file || !(await validateImageFile(file))) return;
+    try {
+      const url = await uploadParentTemplateAsset(file);
+      setLogoUrl(url);
+      setLogoDataUrl("");
+      setLogoFileName(file.name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload logo.");
+    }
   }
 
   function removeLogo() {
     setLogoDataUrl("");
+    setLogoUrl("");
     setLogoFileName("");
   }
 
   async function handleBackgroundUpload(file?: File | null) {
-    if (!file) return;
-    const dataUrl = await readCheckedImage(file);
-    if (!dataUrl) return;
-    updateActiveSlide({ backgroundImageDataUrl: dataUrl, backgroundImageName: file.name });
+    if (!file || !(await validateImageFile(file))) return;
+    try {
+      const url = await uploadParentTemplateAsset(file);
+      updateActiveSlide({
+        backgroundImageUrl: url,
+        backgroundImageDataUrl: "",
+        backgroundImageName: file.name,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload background image.");
+    }
   }
 
-  async function readCheckedImage(file: File): Promise<string | null> {
+  async function validateImageFile(file: File): Promise<boolean> {
     setError("");
     if (!file.type.startsWith("image/")) {
       setError("Use an image file for backgrounds or logos.");
-      return null;
+      return false;
     }
-    if (file.size > MAX_IMAGE_BYTES) {
-      setError("Use images under 3.5 MB for this scratch template flow.");
-      return null;
-    }
-    try {
-      return await readImageDataUrl(file);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not read image file.");
-      return null;
-    }
+    return true;
   }
 
   async function handleSave() {
@@ -289,12 +288,49 @@ export function TemplateScratchBuilder() {
       return;
     }
     try {
+      let resolvedLogoUrl = logoUrl;
+      if (!resolvedLogoUrl && logoDataUrl) {
+        resolvedLogoUrl = await uploadParentTemplateAsset(
+          dataUrlToFile(logoDataUrl, logoFileName || "logo.png")
+        );
+        setLogoUrl(resolvedLogoUrl);
+        setLogoDataUrl("");
+      }
+      const preparedStart = await ensureSlideImageUrls(fixedStartSlides);
+      const preparedMiddle = await ensureSlideImageUrls(slides);
+      const preparedEnd = await ensureSlideImageUrls(fixedEndSlides);
+      setFixedStartSlides(preparedStart);
+      setSlides(preparedMiddle);
+      setFixedEndSlides(preparedEnd);
+      const saveLogos: ScratchLogoAsset[] = resolvedLogoUrl
+        ? [
+            {
+              id: "logo",
+              label: "Logo",
+              dataUrl: "",
+              url: resolvedLogoUrl,
+              fileName: logoFileName,
+              isPrimary: true,
+            },
+          ]
+        : [];
+      const compiledForSave = buildScratchTemplateDocument({
+        name: name.trim(),
+        accentColor,
+        textColor,
+        fontFamily,
+        tags: [],
+        logos: saveLogos,
+        fixedStartSlides: preparedStart,
+        slides: preparedMiddle,
+        fixedEndSlides: preparedEnd,
+      });
       const saved = await create.mutateAsync({
         name: name.trim(),
         artifactType: "deck",
         tags: [],
-        html: compiled.html,
-        css: compiled.css,
+        html: compiledForSave.html,
+        css: compiledForSave.css,
       });
       setLastSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
       window.location.href = `/content/templates/${saved.id}/edit`;

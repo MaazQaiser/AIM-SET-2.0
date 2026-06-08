@@ -4,7 +4,7 @@ import { getInternalApiSecret, getPublicApiUrl } from "@/lib/public-env";
 import { NextResponse } from "next/server";
 
 const TEMPLATE_UPLOAD_TOKEN_SCOPE = "content-template-upload";
-const TOKEN_TTL_SECONDS = 10 * 60;
+const TOKEN_TTL_SECONDS = 30 * 60;
 
 function base64url(value: Buffer | string): string {
   return Buffer.from(value).toString("base64url");
@@ -38,8 +38,14 @@ export async function POST() {
   const payloadSegment = base64url(JSON.stringify(payload));
   const token = `${payloadSegment}.${sign(payloadSegment, secret)}`;
 
+  const apiBase = getPublicApiUrl();
+  const templateApiBase = `${apiBase}/api/v1/content/templates`;
   return NextResponse.json({
-    uploadUrl: `${getPublicApiUrl()}/api/v1/content/templates/upload/direct`,
+    uploadUrl: `${templateApiBase}/upload/direct`,
+    parentAssetUploadUrl: `${templateApiBase}/parent/assets/direct`,
+    parentSaveUrl: `${templateApiBase}/parent/direct`,
+    templateCreateUrl: `${templateApiBase}/direct`,
+    templateApiBase,
     token,
     expiresAt: new Date(payload.exp * 1000).toISOString(),
   });

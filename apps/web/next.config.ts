@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@dc-copilot/ui"],
   experimental: {
     // Clerk proxy.ts buffers request bodies; raise limit for KB file uploads (API allows ~50MB).
-    proxyClientMaxBodySize: "52mb",
+    proxyClientMaxBodySize: "100mb",
   },
   turbopack: {
     root: repoRoot,

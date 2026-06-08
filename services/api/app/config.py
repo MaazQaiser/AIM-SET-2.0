@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     internal_secret: str = ""
     openai_api_key: str = ""
     kb_storage_bucket: str = "kb-assets"
-    kb_max_upload_bytes: int = 52_428_800
+    kb_max_upload_bytes: int = 104_857_600
     kb_embedding_model: str = "text-embedding-3-small"
     kb_embedding_dimensions: int = 0
     kb_worker_poll_interval_ms: int = 2000
