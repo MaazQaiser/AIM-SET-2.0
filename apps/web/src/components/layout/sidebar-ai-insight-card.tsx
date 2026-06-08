@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Home } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -17,7 +18,13 @@ function insightMessage(todos: AiTodo[]): string {
 
 export function SidebarAiInsightCard() {
   const { todos } = useAiTodos();
-  const message = insightMessage(todos);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const message = mounted ? insightMessage(todos) : "Press ⌘K to search";
 
   return (
     <div className={styles.aiInsightWrap}>

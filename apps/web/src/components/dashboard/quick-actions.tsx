@@ -52,11 +52,11 @@ export function QuickActions() {
   const { data: calls = [] } = useCalls();
 
   return (
-    <section className="space-y-1.5">
-      <h2 className="type-section-title text-muted-foreground">
+    <section className="space-y-1">
+      <h2 className="type-label text-muted-foreground">
         Quick actions
       </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1.5">
+      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
         {ACTIONS.map((action) => {
           const Icon = action.icon;
           const link = action.href(calls);
@@ -70,21 +70,23 @@ export function QuickActions() {
                   "hover:border-white/90 hover:shadow-[0_2px_10px_rgb(17_17_17/0.06)]"
                 )}
               >
-                <CardContent className="flex flex-col gap-2 p-4">
+                <CardContent className="flex min-h-[58px] items-center gap-2.5 p-2.5">
                   <div
                     className={cn(
-                      "flex h-9 w-9 items-center justify-center rounded-lg",
+                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
                       "border border-white/60 bg-white/45 text-primary",
                       "shadow-[inset_0_1px_0_rgb(255_255_255/0.85)]",
                       "backdrop-blur-sm"
                     )}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-3.5 w-3.5" />
                   </div>
-                  <p className="type-panel-title text-foreground">{action.label}</p>
-                  <p className="type-caption text-muted-foreground">
-                    {action.description}
-                  </p>
+                  <div className="min-w-0">
+                    <p className="truncate type-label text-foreground">{action.label}</p>
+                    <p className="truncate type-caption text-muted-foreground">
+                      {action.description}
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             </Link>

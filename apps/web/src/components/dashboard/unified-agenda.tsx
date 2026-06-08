@@ -2,14 +2,14 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { addDays, format, isSameDay, isToday, isTomorrow, startOfDay } from "date-fns";
+import { format, isSameDay, isToday, isTomorrow, startOfDay } from "date-fns";
 import { Clock, ChevronRight } from "lucide-react";
 import { GoogleMeetIcon } from "@/components/icons/google-meet-icon";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { useCalls } from "@/lib/data/hooks";
-import { parseDiscoveryDateTime } from "@/lib/dc-notes/parse-discovery";
+import { callScheduleDate, upcomingOpenCalls } from "@/lib/dashboard/call-metrics";
 import type { Call } from "@/types";
 import { cn } from "@/lib/cn";
 
@@ -26,35 +26,12 @@ export interface AgendaItem {
   status?: Call["status"];
 }
 
-/** Dashboard agenda: today and tomorrow; full schedule on /calls. */
-
-function isAgendaDay(at: Date): boolean {
-  return isToday(at) || isTomorrow(at);
-}
+/** Dashboard calls list: next open discovery calls; full schedule on /calls. */
 
 function daySectionLabel(day: Date): string {
   if (isToday(day)) return "Today";
   if (isTomorrow(day)) return "Tomorrow";
   return format(day, "EEEE");
-}
-
-function callAgendaDate(call: Call): Date {
-  if (call.discoveryCallDatePkt?.trim()) {
-    const parsed = parseDiscoveryDateTime(
-      call.discoveryCallDatePkt,
-      call.discoveryCallTimePkt ?? ""
-    );
-    if (parsed) return new Date(parsed);
-  }
-  return new Date(call.scheduledAt);
-}
-
-function shouldIncludeCall(call: Call): boolean {
-  if (call.status === "completed" || call.status === "no-show") return false;
-  if (call.status === "live") return true;
-  const at = callAgendaDate(call);
-  if (!Number.isFinite(at.getTime())) return false;
-  return isAgendaDay(at);
 }
 
 function MeetIconChip({ meetingUrl, isLive }: { meetingUrl?: string; isLive?: boolean }) {
@@ -130,11 +107,9 @@ export function UnifiedAgenda() {
   const agendaItems = useMemo(() => {
     const list: AgendaItem[] = [];
 
-    for (const call of calls) {
-      if (!shouldIncludeCall(call)) continue;
-      const at = callAgendaDate(call);
-      const displayAt =
-        call.status === "live" && !isAgendaDay(at) ? new Date() : at;
+    for (const call of upcomingOpenCalls(calls).slice(0, 8)) {
+      const at = callScheduleDate(call);
+      const displayAt = call.status === "live" ? new Date() : at;
 
       list.push({
         id: `call-${call.id}`,
@@ -161,8 +136,14 @@ export function UnifiedAgenda() {
   }, [calls]);
 
   const grouped = useMemo(() => {
-    const days = [startOfDay(new Date()), startOfDay(addDays(new Date(), 1))];
-    return days
+    const seenDays = new Map<string, Date>();
+    for (const item of agendaItems) {
+      const day = startOfDay(new Date(item.scheduledAt));
+      seenDays.set(day.toISOString(), day);
+    }
+
+    return [...seenDays.values()]
+      .sort((a, b) => a.getTime() - b.getTime())
       .map((day) => ({
         day,
         label: daySectionLabel(day),
@@ -178,17 +159,17 @@ export function UnifiedAgenda() {
       <CardHeader className="shrink-0 pb-3 pt-5 px-5">
         <CardTitle className="flex items-center gap-2">
           <Clock className="h-[18px] w-[18px] shrink-0 text-muted-foreground" />
-          Your agenda
+          Upcoming calls
         </CardTitle>
         <p className="mt-1 type-caption text-muted-foreground">
-          Today and tomorrow — discovery calls
+          Next discovery calls
         </p>
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col px-5 pb-5 pt-0">
         <div className="min-h-0 flex-1 overflow-y-auto pr-0.5 space-y-4">
           {grouped.length === 0 ? (
             <div className="space-y-2 rounded-lg border border-dashed px-4 py-10 text-center type-body-sm text-muted-foreground">
-              <p>Nothing scheduled for today or tomorrow.</p>
+              <p>No upcoming calls scheduled.</p>
               <Link href="/calls" className="type-caption text-primary hover:underline">
                 View full calendar
               </Link>

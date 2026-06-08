@@ -1,139 +1,227 @@
 "use client";
 
-import { Sparkles, DollarSign, Target, AlertCircle, RefreshCw, Loader2 } from "lucide-react";
-import { Button } from "@dc-copilot/ui/components/button";
+import { useMemo, type ReactNode } from "react";
+import { Sparkles } from "lucide-react";
 import { Card, CardContent } from "@dc-copilot/ui/components/card";
-import { useAiTodos } from "@/hooks/use-ai-todos";
-import { useDailyBriefing } from "@/hooks/use-daily-briefing";
-import { useCalls } from "@/lib/data/hooks";
-import { isSameDay, startOfDay } from "date-fns";
-import { toast } from "sonner";
+import {
+  callOpportunityValue,
+  callScheduleDate,
+  formatOpportunityValue,
+  todaysOpenCalls,
+  totalOpportunityValue,
+} from "@/lib/dashboard/call-metrics";
+import {
+  useCalls,
+  usePreDcContentGenerationGaps,
+  type PreDcContentGenerationGap,
+} from "@/lib/data/hooks";
+import type { Call } from "@/types";
 
-function buildFallbackParagraph(
-  todaysCallsCount: number,
-  top: ReturnType<typeof useAiTodos>["topOpportunityCall"],
-  pendingApprovalCount: number,
-  briefsNotReady: number
-): string {
-  const account = top?.accountName ?? "your pipeline";
-  const revenue = top?.annualRevenue;
-  const lead = top?.leadName;
+type ContentPrepItem = {
+  callId: string;
+  type: string;
+  source: "ai" | "strategic";
+};
 
-  if (todaysCallsCount === 0) {
-    return (
-      "No discovery calls on the calendar today. Use the time to clear pending approvals, " +
-      "review coaching insights, or prep for upcoming meetings in the week view."
-    );
+type AttentionItem = {
+  call: Call;
+  score: number;
+};
+
+const CONTENT_TYPE_LABEL: Record<string, string> = {
+  deck: "Deck",
+  case_study: "Case study",
+  one_pager: "One-pager",
+  demo_script: "Demo script",
+  battlecard: "Battlecard",
+  architecture: "Architecture",
+};
+
+function contentTypeLabel(type: string, plural = false): string {
+  const label = CONTENT_TYPE_LABEL[type] ?? "Content";
+  if (!plural) return label;
+  if (label === "Case study") return "Case studies";
+  return `${label}s`;
+}
+
+function hasOpenBant(call: Call): boolean {
+  const bant = call.bant;
+  if (!bant) return true;
+  return [bant.budget, bant.authority, bant.need, bant.timeline].some(
+    (status) => status !== "confirmed"
+  );
+}
+
+function buildContentPrepItems(
+  todaysCalls: Call[],
+  gaps: PreDcContentGenerationGap[],
+  gapsLoading: boolean
+): ContentPrepItem[] {
+  const todayIds = new Set(todaysCalls.map((call) => call.id));
+  const callTimeById = new Map(
+    todaysCalls.map((call) => [call.id, callScheduleDate(call).getTime()])
+  );
+  const aiItems = gaps
+    .filter((gap) => todayIds.has(gap.callId))
+    .sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return (callTimeById.get(a.callId) ?? 0) - (callTimeById.get(b.callId) ?? 0);
+    })
+    .map((gap): ContentPrepItem => ({
+      callId: gap.callId,
+      type: gap.type,
+      source: "ai",
+    }));
+
+  if (aiItems.length > 0 || gapsLoading) return aiItems;
+
+  return todaysCalls.slice(0, 3).map((call) => ({
+    callId: call.id,
+    type: "deck",
+    source: "strategic",
+  }));
+}
+
+function buildAttentionItems(
+  todaysCalls: Call[],
+  contentPrepItems: ContentPrepItem[]
+): AttentionItem[] {
+  const contentCountByCall = new Map<string, number>();
+  for (const item of contentPrepItems) {
+    contentCountByCall.set(item.callId, (contentCountByCall.get(item.callId) ?? 0) + 1);
   }
-  if (top) {
-    let paragraph = `Your highest-value touchpoint today is ${account}${revenue ? ` (${revenue})` : ""}. `;
-    if (lead) {
-      paragraph += `${lead} is on the invite — anchor discovery on their stated pains before pricing enters the room. `;
-    }
-    if (pendingApprovalCount > 0) {
-      paragraph += `You have ${pendingApprovalCount} post-call item${pendingApprovalCount > 1 ? "s" : ""} waiting for approval — clearing those before your first call keeps the Task Agent from stalling outbound follow-ups.`;
-    } else if (briefsNotReady > 0) {
-      paragraph += `${briefsNotReady} brief${briefsNotReady > 1 ? "s are" : " is"} still generating; open each pre-DC view once the Content Agent finishes.`;
-    } else {
-      paragraph += "All briefs are ready — skim the AI summary on each call page before you join.";
-    }
-    return paragraph;
+
+  return todaysCalls
+    .map((call) => {
+      const contentCount = contentCountByCall.get(call.id) ?? 0;
+      const opportunity = callOpportunityValue(call);
+      const needsBant = hasOpenBant(call);
+      const score =
+        opportunity / 1_000_000 +
+        contentCount * 20 +
+        (call.briefReady ? 0 : 16) +
+        (needsBant ? 8 : 0) +
+        (call.status === "live" ? 30 : 0);
+
+      return { call, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+}
+
+function prepLabel(items: ContentPrepItem[], loading: boolean): string {
+  if (loading && items.length === 0) return "Checking prep";
+  if (items.length === 0) return "Prep clear";
+
+  const countByType = new Map<string, number>();
+  for (const item of items) {
+    countByType.set(item.type, (countByType.get(item.type) ?? 0) + 1);
   }
-  return `You have ${todaysCallsCount} call${todaysCallsCount > 1 ? "s" : ""} today. Prioritise prep on accounts with the strongest revenue signal and confirm pod coverage for technical depth.`;
+
+  const [primaryType, primaryCount] = [...countByType.entries()].sort(
+    (a, b) => b[1] - a[1]
+  )[0] ?? ["content", items.length];
+  const primaryLabel = contentTypeLabel(primaryType, primaryCount !== 1).toLowerCase();
+  const remainder = items.length - primaryCount;
+
+  if (remainder > 0) {
+    return `${items.length} prep items (${primaryCount} ${primaryLabel} + ${remainder} more)`;
+  }
+
+  return `${items.length} ${primaryLabel}`;
+}
+
+function leadFocusLabel(call?: Call): string {
+  if (!call) return "No urgent lead";
+  return call.leadName ? `${call.leadName} at ${call.accountName}` : call.accountName;
+}
+
+function Highlight({ children }: { children: ReactNode }) {
+  return (
+    <span className="font-semibold text-foreground underline decoration-warning/45 decoration-2 underline-offset-4">
+      {children}
+    </span>
+  );
 }
 
 export function DailyBriefingCard({ enabled = true }: { enabled?: boolean }) {
   const { data: calls = [] } = useCalls();
-  const { topOpportunityCall, pendingApprovalCount, todos } = useAiTodos();
-  const { data: briefing, isLoading, refresh, isRefreshing } = useDailyBriefing(enabled);
+  const { data: contentGaps = [], isLoading: contentGapsLoading } =
+    usePreDcContentGenerationGaps();
 
-  const today = startOfDay(new Date());
-  const todaysCalls = calls.filter(
-    (c) =>
-      (c.status === "upcoming" || c.status === "live") &&
-      isSameDay(new Date(c.scheduledAt), today)
+  const todaysCalls = useMemo(() => todaysOpenCalls(calls), [calls]);
+  const totalOpportunity = useMemo(
+    () => totalOpportunityValue(todaysCalls),
+    [todaysCalls]
   );
-  const briefsNotReady = todaysCalls.filter((c) => !c.briefReady).length;
-  const highPriorityTodos = todos.filter((t) => t.priority === "high").length;
-
-  const top = topOpportunityCall;
-  const revenue = top?.annualRevenue;
-  const stage = top?.dealStage ?? "Discovery";
-
-  const paragraph =
-    briefing?.paragraph ??
-    buildFallbackParagraph(
-      todaysCalls.length,
-      top,
-      pendingApprovalCount,
-      briefsNotReady
-    );
-  const statChips = (
-    <>
-      {revenue && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-3 py-1 type-caption font-medium text-foreground">
-          <DollarSign className="h-3 w-3 text-warning" />
-          Top opp: {revenue}
-        </span>
-      )}
-      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 type-caption font-medium text-foreground">
-        <Target className="h-3 w-3" />
-        {stage}
-      </span>
-      {todaysCalls.length > 0 && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 type-caption text-muted-foreground">
-          {todaysCalls.length} call{todaysCalls.length !== 1 ? "s" : ""} today
-        </span>
-      )}
-      {highPriorityTodos > 0 && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-3 py-1 type-caption font-medium text-destructive">
-          <AlertCircle className="h-3 w-3" />
-          {highPriorityTodos} high-priority action{highPriorityTodos !== 1 ? "s" : ""}
-        </span>
-      )}
-    </>
+  const contentPrepItems = useMemo(
+    () => buildContentPrepItems(todaysCalls, contentGaps, contentGapsLoading),
+    [contentGaps, contentGapsLoading, todaysCalls]
   );
+  const attentionItems = useMemo(
+    () => buildAttentionItems(todaysCalls, contentPrepItems),
+    [contentPrepItems, todaysCalls]
+  );
+  const topOpportunity = todaysCalls
+    .slice()
+    .sort((a, b) => callOpportunityValue(b) - callOpportunityValue(a))[0];
+  const leadFocus = attentionItems[0]?.call ?? topOpportunity;
+  const prepText = prepLabel(contentPrepItems, contentGapsLoading);
+  const aiPrepCount = contentPrepItems.filter((item) => item.source === "ai").length;
+  const callsText = `${todaysCalls.length} call${todaysCalls.length === 1 ? "" : "s"}`;
+  const opportunityText =
+    totalOpportunity > 0 ? formatOpportunityValue(totalOpportunity) : "opportunity";
+  const leadText = leadFocusLabel(leadFocus);
+
+  const summary =
+    todaysCalls.length === 0
+      ? enabled
+        ? "No discovery calls are scheduled for today. Use the window to clear approvals, review upcoming accounts, and create the next reusable sales assets."
+        : "Dashboard data is still loading. The brief will summarize calls, opportunity, lead focus, and content prep once imports are ready."
+      : null;
 
   return (
     <Card>
-      <CardContent className="space-y-4 p-5 pt-5">
+      <CardContent className="space-y-3 p-5 pt-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <Sparkles className="h-4 w-4 shrink-0 text-warning" />
-            <span className="type-title text-foreground">Daily briefing</span>
-          </div>
-          <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 sm:justify-end">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 shrink-0"
-              aria-label="Refresh daily briefing"
-              disabled={isRefreshing}
-              onClick={() => {
-                void refresh()
-                  .then(() => toast.success("Daily briefing refreshed"))
-                  .catch(() => toast.error("Could not refresh briefing"));
-              }}
-            >
-              {isRefreshing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-            </Button>
-            {statChips}
+            <span className="type-title text-foreground">Daily brief</span>
           </div>
         </div>
-        {isLoading && !briefing ? (
-          <div className="space-y-2">
-            <div className="h-4 w-full animate-pulse rounded bg-muted" />
-            <div className="h-4 w-5/6 animate-pulse rounded bg-muted" />
-            <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
-          </div>
-        ) : (
-          <p className="type-body-sm leading-relaxed text-foreground/90">{paragraph}</p>
-        )}
+
+        <p className="max-w-5xl type-section-title leading-relaxed text-foreground">
+          {summary ?? (
+            <>
+              <Highlight>{callsText}</Highlight> today with{" "}
+              <Highlight>{opportunityText}</Highlight>{" "}
+              {totalOpportunity > 0 ? "in visible opportunity" : "still needing sizing"}.{" "}
+              {leadFocus ? (
+                <>
+                  <Highlight>{leadText}</Highlight> needs the first prep pass.
+                </>
+              ) : (
+                "No lead needs urgent attention yet."
+              )}{" "}
+              {contentGapsLoading && contentPrepItems.length === 0 ? (
+                "AI is checking the content gaps now."
+              ) : contentPrepItems.length > 0 ? (
+                <>
+                  <Highlight>{prepText}</Highlight> should be prepared
+                  {aiPrepCount > 0 ? (
+                    <>
+                      {" "}
+                      with <Highlight>AI suggestions</Highlight> ready
+                    </>
+                  ) : null}
+                  .
+                </>
+              ) : (
+                "No deck or content gaps are flagged yet."
+              )}
+            </>
+          )}
+        </p>
       </CardContent>
     </Card>
   );
