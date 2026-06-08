@@ -53,7 +53,7 @@ async function pollTemplate(
   templateId: string,
   onTemplate: (template: ContentTemplate) => void
 ): Promise<ContentTemplate> {
-  for (let i = 0; i < 160; i += 1) {
+  while (true) {
     const res = await fetch(`/api/content/templates/${templateId}`, { cache: "no-store" });
     if (!res.ok) throw new Error("Failed to check template processing status");
     const template = (await res.json()) as ContentTemplate;
@@ -61,7 +61,6 @@ async function pollTemplate(
     if (template.status === "ready" || template.status === "failed") return template;
     await new Promise((resolve) => setTimeout(resolve, 1500));
   }
-  throw new Error("Template processing timed out");
 }
 
 function combinedProgress(phase: UploadPhase, uploadPct: number, processingPct: number): number {

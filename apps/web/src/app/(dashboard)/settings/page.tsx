@@ -1,4 +1,4 @@
-import { Users, FileSpreadsheet, Plug, UserRound } from "lucide-react";
+import { Palette, Users, FileSpreadsheet, Plug, UserRound } from "lucide-react";
 import type { Metadata } from "next";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@dc-copilot/ui/components/card";
@@ -8,6 +8,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { AeNotificationPrefs } from "@/components/settings/ae-notification-prefs";
 import { DcNotesCsvImport } from "@/components/settings/dc-notes-csv-import";
+import { ThemeModeSwitcher } from "@/components/settings/theme-mode-switcher";
 import { IntegrationsTab } from "@/components/integrations/integrations-tab";
 import { SettingsAccountPanel } from "@/components/settings/settings-account-panel";
 import Link from "next/link";
@@ -53,6 +54,10 @@ export default function SettingsPage() {
             <Plug className="h-3.5 w-3.5" />
             Integrations
           </TabsTrigger>
+          <TabsTrigger value="appearance" className="gap-1.5">
+            <Palette className="h-3.5 w-3.5" />
+            Appearance
+          </TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="team" className="gap-1.5">
             <Users className="h-3.5 w-3.5" />
@@ -70,6 +75,18 @@ export default function SettingsPage() {
 
         <TabsContent value="integrations" className="mt-4">
           <IntegrationsTab />
+        </TabsContent>
+
+        <TabsContent value="appearance" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Appearance</CardTitle>
+              <CardDescription>Choose how DC Copilot looks on this device.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ThemeModeSwitcher />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="notifications" className="mt-4">

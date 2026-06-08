@@ -74,6 +74,7 @@ export function ContentHub() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const persona = usePersona();
+  const [mounted, setMounted] = useState(false);
   const { data: assets = [], isLoading: assetsLoading } = useKbAssets();
   const { data: projects = [], isLoading: projectsLoading } = useKbProjects();
   const { data: templates = [], isLoading: templatesLoading } = useContentTemplates();
@@ -91,6 +92,10 @@ export function ContentHub() {
 
   const [activeTab, setActiveTab] = useState<KnowledgeBaseTab>(resolvedTab);
   const [libraryDetailOpen, setLibraryDetailOpen] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     setActiveTab(resolvedTab);
@@ -114,13 +119,13 @@ export function ContentHub() {
           <div>
             <h1 className="type-page-title text-foreground">Knowledge Base</h1>
             <p className="mt-1 type-body-sm text-muted-foreground">
-              {assetsLoading && assets.length === 0
+              {!mounted || (assetsLoading && assets.length === 0)
                 ? "Loading assets..."
                 : `${assets.length} approved assets`}
-              {templates.length > 0 && (
+              {mounted && templates.length > 0 && (
                 <span> · {templates.length} template{templates.length === 1 ? "" : "s"}</span>
               )}
-              {toGenerateCount > 0 && (
+              {mounted && toGenerateCount > 0 && (
                 <span> · {toGenerateCount} to generate</span>
               )}
               {process.env.NEXT_PUBLIC_KB_SHARED === "true" && (
@@ -140,32 +145,42 @@ export function ContentHub() {
             <TabsTrigger value="projects">
               <TabLabel
                 label={TAB_LABELS.projects}
-                count={projectsLoading && projects.length === 0 ? null : projects.length}
+                count={
+                  !mounted || (projectsLoading && projects.length === 0) ? null : projects.length
+                }
               />
             </TabsTrigger>
             <TabsTrigger value="library">
               <TabLabel
                 label={TAB_LABELS.library}
-                count={assetsLoading && assets.length === 0 ? null : assets.length}
+                count={!mounted || (assetsLoading && assets.length === 0) ? null : assets.length}
               />
             </TabsTrigger>
             <TabsTrigger value="suggestions">
               <TabLabel
                 label={TAB_LABELS.suggestions}
-                count={suggestionsLoading && toGenerateCount === 0 ? null : toGenerateCount}
+                count={
+                  !mounted || (suggestionsLoading && toGenerateCount === 0)
+                    ? null
+                    : toGenerateCount
+                }
               />
             </TabsTrigger>
             <TabsTrigger value="templates">
               <TabLabel
                 label={TAB_LABELS.templates}
-                count={templatesLoading && templates.length === 0 ? null : templates.length}
+                count={
+                  !mounted || (templatesLoading && templates.length === 0)
+                    ? null
+                    : templates.length
+                }
               />
             </TabsTrigger>
             <TabsTrigger value="studio">
               <TabLabel
                 label={TAB_LABELS.studio}
                 count={
-                  studioProjectsLoading && studioProjects.length === 0
+                  !mounted || (studioProjectsLoading && studioProjects.length === 0)
                     ? null
                     : studioProjects.length
                 }

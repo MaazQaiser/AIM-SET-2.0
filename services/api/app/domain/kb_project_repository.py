@@ -655,17 +655,21 @@ def _rows_for_asset(ctx: TenantContext, asset: Dict[str, Any]) -> List[Dict[str,
     if not row:
         return []
 
+    # Project CSVs must be parsed from the stored file. Ingest chunks batch rows into
+    # semicolon-delimited lines for search and lose fields when values contain ';'.
+    if _is_csv_asset(asset) and row.get("storage_path"):
+        try:
+            csv_rows = _parse_csv_rows(repo.download_file(ctx, str(row["storage_path"])))
+            if csv_rows:
+                return csv_rows
+        except Exception:
+            pass
+
     chunks = repo.list_asset_chunks(ctx, asset["id"], limit=1000) if int(asset.get("chunkCount") or 0) > 0 else []
     if chunks:
         rows = _parse_chunk_rows(chunks)
         if rows:
             return rows
-
-    if _is_csv_asset(asset) and row.get("storage_path"):
-        try:
-            return _parse_csv_rows(repo.download_file(ctx, str(row["storage_path"])))
-        except Exception:
-            pass
 
     return _parse_chunk_rows(chunks)
 

@@ -1,6 +1,31 @@
 from __future__ import annotations
 
-from app.domain.kb_project_repository import _enrich_project_metadata, _parse_csv_rows, _row_to_project
+from dc_core.tenancy import TenantContext
+
+from app.domain.kb_project_repository import (
+    _enrich_project_metadata,
+    _parse_csv_rows,
+    _row_to_project,
+    _rows_for_asset,
+)
+
+PROJECT_CSV = (
+    "Company Name,Project Name,Problem Statement,Technical Solution,LinkedIn Industry,Domain\n"
+    "Acme LLC,Acme Workflow,\"Manual approvals delayed teams\","
+    "\"Jira automation and reporting\",Software & IT Services,Operations Management\n"
+    "Beta Inc,Beta Portal,\"Legacy portal blocked sales\","
+    "\"React rebuild with SSO\",Software & IT Services,Customer Portal\n"
+).encode("utf-8")
+
+PARTIAL_CHUNK_ROWS = [
+    {
+        "chunk_index": 0,
+        "chunk_text": (
+            "Company Name: Acme LLC; Project Name: Acme Workflow; "
+            "Problem Statement: Manual approvals delayed teams"
+        ),
+    }
+]
 
 
 def test_parse_kb_project_csv_and_build_project():
@@ -203,6 +228,38 @@ def test_enriches_and_normalizes_existing_project_industry():
 
     assert enriched["industry"] == "E-Commerce"
     assert enriched["domain"] == "Recurring Orders"
+
+
+def test_rows_for_asset_prefers_full_csv_over_ingest_chunks(monkeypatch):
+    ctx = TenantContext(tenant_id="tenant-test", user_id="user-test", clerk_org_id="tenant-test")
+    asset = {
+        "id": "kb-project-csv",
+        "title": "Company Projects",
+        "fileName": "Company Projects.csv",
+        "chunkCount": 282,
+        "status": "ready",
+    }
+
+    class FakeRepo:
+        def get_asset_row(self, tenant_uuid, asset_id, clerk_key):
+            return {"storage_path": "kb/company-projects.csv"}
+
+        def download_file(self, ctx, storage_path):
+            return PROJECT_CSV
+
+        def list_asset_chunks(self, ctx, asset_id, limit=1000):
+            return PARTIAL_CHUNK_ROWS
+
+    monkeypatch.setattr(
+        "app.domain.kb_project_repository.get_kb_repository",
+        lambda: FakeRepo(),
+    )
+
+    rows = _rows_for_asset(ctx, asset)
+
+    assert len(rows) == 2
+    assert rows[0]["Company Name"] == "Acme LLC"
+    assert rows[1]["Project Name"] == "Beta Portal"
 
 
 def test_enriches_industry_from_existing_domain():

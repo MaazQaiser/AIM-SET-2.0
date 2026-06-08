@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Code2, Eye, Loader2, Save } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
@@ -25,7 +26,7 @@ import {
   TEMPLATE_ARTIFACT_TYPES,
   type TemplateArtifactType,
 } from "@/lib/content-studio/template-editor";
-import type { ContentTemplateDraft } from "@/types/content_studio";
+import type { ContentTemplate, ContentTemplateDraft } from "@/types/content_studio";
 
 interface TemplateEditorProps {
   templateId?: string;
@@ -33,10 +34,18 @@ interface TemplateEditorProps {
 
 export function TemplateEditor({ templateId }: TemplateEditorProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const isEdit = Boolean(templateId);
   const detail = useContentTemplate(templateId);
   const create = useCreateTemplate();
   const update = useUpdateTemplate(templateId);
+
+  const cachedTemplate = useMemo(() => {
+    if (!templateId) return undefined;
+    const list = queryClient.getQueryData<ContentTemplate[]>(["content-templates"]);
+    return list?.find((template) => template.id === templateId);
+  }, [queryClient, templateId, detail.data, detail.isError]);
+  const resolvedTemplate = detail.data ?? cachedTemplate;
 
   const [name, setName] = useState("New template");
   const [artifactType, setArtifactType] = useState<TemplateArtifactType>("deck");
@@ -51,14 +60,14 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
   });
 
   useEffect(() => {
-    if (!detail.data || !isEdit) return;
-    const parts = splitTemplateDocument(detail.data.html ?? "");
-    setName(detail.data.name);
-    setArtifactType(detail.data.artifactType);
-    setTagsText(detail.data.tags.join(", "));
+    if (!resolvedTemplate || !isEdit) return;
+    const parts = splitTemplateDocument(resolvedTemplate.html ?? "");
+    setName(resolvedTemplate.name);
+    setArtifactType(resolvedTemplate.artifactType);
+    setTagsText(resolvedTemplate.tags.join(", "));
     setHtml(parts.html);
     setCss(parts.css);
-  }, [detail.data, isEdit]);
+  }, [resolvedTemplate, isEdit]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -100,7 +109,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
     }
   }
 
-  if (isEdit && detail.isLoading) {
+  if (isEdit && detail.isLoading && !resolvedTemplate) {
     return (
       <div className="p-6">
         <p className="type-body-sm text-muted-foreground">Loading template editor...</p>
@@ -108,12 +117,28 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
     );
   }
 
-  if (isEdit && !detail.isLoading && !detail.data) {
+  if (isEdit && detail.isError && !resolvedTemplate) {
+    const message =
+      detail.error instanceof Error ? detail.error.message : "Failed to load template";
     return (
       <div className="p-6 space-y-3">
-        <p className="type-body-sm text-destructive">
-          Template not found or request timed out. Please go back to Templates and reopen it.
-        </p>
+        <p className="type-body-sm text-destructive">{message}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" variant="outline" onClick={() => void detail.refetch()}>
+            Retry
+          </Button>
+          <Link href="/content?tab=templates" className="type-body-sm text-primary underline">
+            Back to templates
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (isEdit && !resolvedTemplate) {
+    return (
+      <div className="p-6 space-y-3">
+        <p className="type-body-sm text-destructive">Template not found.</p>
         <Link href="/content?tab=templates" className="type-body-sm text-primary underline">
           Back to templates
         </Link>
@@ -153,6 +178,19 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
           </Button>
         </div>
       </div>
+
+      {detail.isError && resolvedTemplate ? (
+        <p className="shrink-0 type-body-sm text-amber-700">
+          Showing cached template data. Latest version could not be loaded — save carefully or retry.
+          <button
+            type="button"
+            className="ml-2 underline"
+            onClick={() => void detail.refetch()}
+          >
+            Retry
+          </button>
+        </p>
+      ) : null}
 
       {saveError ? <p className="shrink-0 type-body-sm text-destructive">{saveError}</p> : null}
 

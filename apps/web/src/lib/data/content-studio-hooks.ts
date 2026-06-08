@@ -92,12 +92,18 @@ export function useContentTemplate(templateId?: string) {
   return useQuery({
     queryKey: ["content-template", templateId],
     queryFn: async () => {
-      const api = await bffFetch<ContentTemplate>(`/api/content/templates/${templateId}`);
-      if (!api) throw new Error("Template not found");
-      return api;
+      const res = await fetch(`/api/content/templates/${templateId}`, { cache: "no-store" });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        if (res.status === 404) throw new Error("Template not found");
+        throw new Error(detail || `Failed to load template (${res.status})`);
+      }
+      return res.json() as Promise<ContentTemplate>;
     },
     enabled: Boolean(templateId),
     staleTime: QUERY_STALE_TIME_MS,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 8_000),
     // Show template instantly from list cache while fetching fresh detail.
     placeholderData: () => {
       if (!templateId) return undefined;

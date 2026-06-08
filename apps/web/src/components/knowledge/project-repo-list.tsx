@@ -309,14 +309,6 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
               ))}
             </select>
             <ProjectRepoViewToggle view={view} onChange={setView} />
-            {embedded && (
-              <Button asChild variant="outline" size="sm">
-                <Link href="/knowledge/projects">
-                  <ArrowUpRight className="h-4 w-4" />
-                  Open repo
-                </Link>
-              </Button>
-            )}
           </div>
         </div>
       </div>
