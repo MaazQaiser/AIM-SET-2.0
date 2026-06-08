@@ -1,7 +1,36 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import Link from "next/link";
+import { ClpClientEngagementSettings } from "@/components/landing-page/clp-client-engagement-settings";
+import { ClpKbAssetsPanel } from "@/components/landing-page/clp-kb-assets-panel";
+import { ClpPublicView } from "@/components/landing-page/clp-public-view";
+import { ClpSectionEditor } from "@/components/landing-page/clp-section-editor";
+import { PostDcClpActivityCard } from "@/components/post-dc/post-dc-clp-activity-card";
+import { PostDcClpAnalyticsWidget } from "@/components/post-dc/post-dc-clp-analytics-widget";
+import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
+import type { PostCallKbSuggestion } from "@/lib/brief-types";
+import { copyTextToClipboard } from "@/lib/clipboard";
+import {
+  useClpProposal,
+  useEnsureLandingPage,
+  usePublishLandingPage,
+  useUpdateLandingPage,
+} from "@/lib/data/clp-hooks";
+import { useCall, useCallBrief, usePostCallReview } from "@/lib/data/hooks";
+import { buildOptimisticLandingDraft } from "@/lib/landing-page/build-optimistic-draft";
+import { syncAssetSections } from "@/lib/landing-page/clp-editor-utils";
+import { useDcImportsStore } from "@/stores/use-dc-imports";
+import type { CustomerLandingPage } from "@dc-copilot/types";
+import { Badge } from "@dc-copilot/ui/components/badge";
+import { Button } from "@dc-copilot/ui/components/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@dc-copilot/ui/components/dialog";
+import { Input } from "@dc-copilot/ui/components/input";
 import {
   Copy,
   ExternalLink,
@@ -13,38 +42,9 @@ import {
   Rocket,
   Sparkles,
 } from "lucide-react";
-import { Badge } from "@dc-copilot/ui/components/badge";
-import { Button } from "@dc-copilot/ui/components/button";
-import { Input } from "@dc-copilot/ui/components/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@dc-copilot/ui/components/dialog";
-import { ClpClientEngagementSettings } from "@/components/landing-page/clp-client-engagement-settings";
-import { ClpKbAssetsPanel } from "@/components/landing-page/clp-kb-assets-panel";
-import { ClpPublicView } from "@/components/landing-page/clp-public-view";
-import { ClpSectionEditor } from "@/components/landing-page/clp-section-editor";
-import { PostDcClpActivityCard } from "@/components/post-dc/post-dc-clp-activity-card";
-import { PostDcClpAnalyticsWidget } from "@/components/post-dc/post-dc-clp-analytics-widget";
-import {
-  useClpProposal,
-  useEnsureLandingPage,
-  usePublishLandingPage,
-  useUpdateLandingPage,
-} from "@/lib/data/clp-hooks";
-import { useCall, useCallBrief, usePostCallReview } from "@/lib/data/hooks";
-import { copyTextToClipboard } from "@/lib/clipboard";
-import { BriefDetailCard } from "@/components/pre-call/brief-detail-card";
-import { buildOptimisticLandingDraft } from "@/lib/landing-page/build-optimistic-draft";
-import { syncAssetSections } from "@/lib/landing-page/clp-editor-utils";
-import { useDcImportsStore } from "@/stores/use-dc-imports";
+import Link from "next/link";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { CustomerLandingPage } from "@dc-copilot/types";
-import type { PostCallKbSuggestion } from "@/lib/brief-types";
 
 const EMPTY_KB_SUGGESTIONS: PostCallKbSuggestion[] = [];
 
@@ -57,8 +57,7 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
   const { data: review } = usePostCallReview(callId);
   const { data: brief } = useCallBrief(callId);
   const kbSuggestions =
-    useDcImportsStore((s) => s.postRunMetaByCallId[callId]?.kbSuggestions) ??
-    EMPTY_KB_SUGGESTIONS;
+    useDcImportsStore((s) => s.postRunMetaByCallId[callId]?.kbSuggestions) ?? EMPTY_KB_SUGGESTIONS;
   const { page, isLoading, isGenerating, generate, refetch } = useEnsureLandingPage(callId);
   const { data: proposal } = useClpProposal(callId);
   const update = useUpdateLandingPage(callId);
@@ -109,6 +108,11 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
     else toast.error("Click back into the page before copying");
   }
 
+  function openPublishDialog() {
+    setPreviewOpen(false);
+    setPublishOpen(true);
+  }
+
   if (!displayDraft && (isLoading || isGenerating)) {
     return (
       <div className="flex justify-center py-16">
@@ -152,10 +156,7 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
           <div className="flex flex-wrap items-center gap-2">
             <Globe className="h-5 w-5 shrink-0 text-primary" />
             <h2 className="type-section-title">Client landing page</h2>
-            <Badge
-              variant={isPublished ? "success" : "secondary"}
-              className="type-kicker"
-            >
+            <Badge variant={isPublished ? "success" : "secondary"} className="type-kicker">
               {isPublished && !editMode ? "Live" : "Planning"}
             </Badge>
             {isHydrating && (
@@ -193,9 +194,9 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
                 <Eye className="mr-1.5 h-3.5 w-3.5" />
                 Preview
               </Button>
-              <Button size="sm" onClick={() => setPublishOpen(true)}>
+              <Button size="sm" onClick={openPublishDialog}>
                 <Rocket className="mr-1.5 h-3.5 w-3.5" />
-                Launch
+                Publish
               </Button>
             </>
           ) : (
@@ -277,7 +278,8 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
           <BriefDetailCard title="Client feedback" icon={MessageSquare}>
             <div className="space-y-2">
               <p className="type-caption text-muted-foreground">
-                {displayDraft.settings?.allowChat !== false && displayDraft.settings?.allowComments !== false
+                {displayDraft.settings?.allowChat !== false &&
+                displayDraft.settings?.allowComments !== false
                   ? "Chat and section comments are enabled on the live page."
                   : displayDraft.settings?.allowChat !== false
                     ? "Live chat is enabled on the client page."
@@ -298,11 +300,28 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="left-0 top-0 flex h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-0 p-0">
-          <DialogHeader className="shrink-0 border-b px-6 py-3">
-            <DialogTitle>Preview as client</DialogTitle>
-            <DialogDescription>
-              This is how {accountName} will see the sales room.
-            </DialogDescription>
+          <DialogHeader className="shrink-0 border-b px-6 py-3 pr-16">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0 space-y-1">
+                <DialogTitle>Preview as client</DialogTitle>
+                <DialogDescription>
+                  This is how {accountName} will see the sales room.
+                </DialogDescription>
+              </div>
+              {isPlanning ? (
+                <Button size="sm" onClick={openPublishDialog}>
+                  <Rocket className="mr-1.5 h-3.5 w-3.5" />
+                  Publish
+                </Button>
+              ) : displayDraft.publicUrl ? (
+                <Button asChild variant="outline" size="sm">
+                  <a href={displayDraft.publicUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                    Open live page
+                  </a>
+                </Button>
+              ) : null}
+            </div>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto bg-background">
             <ClpPublicView
@@ -318,11 +337,11 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
       <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Launch client landing page</DialogTitle>
+            <DialogTitle>Publish client landing page</DialogTitle>
             <DialogDescription>
               Set a password your client will use to access the sales room. They enter their name
-              and email on each visit. After launch, share the link and track opens, deck previews,
-              and engagement.
+              and email on each visit. After publishing, share the link and track opens, deck
+              previews, and engagement.
             </DialogDescription>
           </DialogHeader>
           <Input
@@ -344,13 +363,13 @@ export function PostDcClientLandingColumn({ callId }: PostDcClientLandingColumnP
                     setPublishOpen(false);
                     setEditMode(false);
                     setPassword("");
-                    toast.success("Sales room launched — share the link with your client");
+                    toast.success("Sales room published — share the link with your client");
                   },
-                  onError: () => toast.error("Launch failed"),
+                  onError: () => toast.error("Publish failed"),
                 });
               }}
             >
-              Launch
+              Publish
             </Button>
           </DialogFooter>
         </DialogContent>

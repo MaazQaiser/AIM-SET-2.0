@@ -3,7 +3,9 @@
 import { Button } from "@dc-copilot/ui/components/button";
 import { Input } from "@dc-copilot/ui/components/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLiveCall } from "@/stores/use-live-call";
+import { useDcImportsStore } from "@/stores/use-dc-imports";
 import type { TranscriptEvent } from "@/types";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
@@ -29,6 +31,8 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<"idle" | "ready" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const setCallStatus = useDcImportsStore((s) => s.setCallStatus);
 
   const launchedUrlRef = useRef<string | null>(null);
 
@@ -63,6 +67,9 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
       launchedUrlRef.current = meetingUrlValue;
       setStatus("ready");
       setMessage(body.botId ? `Bot invited: ${body.botId}` : "Bot invited");
+      setCallStatus(callId, "completed");
+      void queryClient.invalidateQueries({ queryKey: ["calls"] });
+      void queryClient.invalidateQueries({ queryKey: ["call", callId] });
       startPolling();
     } catch (err) {
       setStatus("error");

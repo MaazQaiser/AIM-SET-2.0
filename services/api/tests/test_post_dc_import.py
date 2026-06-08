@@ -4,6 +4,13 @@ from app.domain.post_dc_import import (
     match_post_dc_to_call,
     post_dc_record_for_call,
 )
+from app.domain.calls_service import _resolve_call_status
+
+
+def test_completed_status_is_not_rewound_by_pre_dc_import():
+    assert _resolve_call_status("completed", "upcoming") == "completed"
+    assert _resolve_call_status("upcoming", "completed") == "completed"
+    assert _resolve_call_status("live", "upcoming") == "live"
 
 
 def test_match_post_dc_to_call_by_company_name():

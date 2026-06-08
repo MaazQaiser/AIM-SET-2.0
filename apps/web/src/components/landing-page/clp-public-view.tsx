@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Download, FileText } from "lucide-react";
+import { KbFileTypeIcon } from "@/components/knowledge/kb-file-type-icon";
+import { briefBodyClass, briefBodyForegroundClass } from "@/components/pre-call/brief-detail-card";
+import { cn } from "@/lib/cn";
+import { type KbFileFormat, resolveKbFileFormat } from "@/lib/kb/file-format";
+import { isCompanyPlaybookLandingAsset } from "@/lib/landing-page/clp-editor-utils";
 import type {
   ClpAssetRef,
   ClpComment,
@@ -9,13 +12,11 @@ import type {
   ClpSection,
   CustomerLandingPage,
 } from "@dc-copilot/types";
-import { cn } from "@/lib/cn";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Input } from "@dc-copilot/ui/components/input";
 import { Textarea } from "@dc-copilot/ui/components/textarea";
-import { KbFileTypeIcon } from "@/components/knowledge/kb-file-type-icon";
-import { briefBodyClass, briefBodyForegroundClass } from "@/components/pre-call/brief-detail-card";
-import { isCompanyPlaybookLandingAsset } from "@/lib/landing-page/clp-editor-utils";
+import { Download, Eye, FileText } from "lucide-react";
+import { useState } from "react";
 
 interface ClpPublicViewProps {
   page: CustomerLandingPage;
@@ -72,18 +73,14 @@ export function ClpPublicView({
             </a>
           ))}
           {proposal && (
-            <a
-              href="#proposal"
-              className="text-muted-foreground hover:text-foreground"
-              onClick={() => onProposalOpen?.()}
-            >
+            <a href="#proposal" className="text-muted-foreground hover:text-foreground">
               Proposal
             </a>
           )}
         </nav>
       </div>
 
-      <main className="max-w-3xl mx-auto px-6 py-8 space-y-10">
+      <main className="mx-auto max-w-5xl space-y-12 px-6 py-10">
         {sections.map((section) => (
           <section key={section.id} id={section.id} className="scroll-mt-20">
             {section.type !== "hero" && (
@@ -103,7 +100,7 @@ export function ClpPublicView({
                 )}
               </div>
             )}
-            {renderSection(section, page, onDocumentOpen)}
+            {renderSection(section, page, preview, onDocumentOpen)}
             {commentSection === section.id && (
               <div className="mt-3 space-y-2">
                 <Textarea
@@ -141,6 +138,7 @@ export function ClpPublicView({
             <h2 className="type-section-title mb-4">{proposal.title}</h2>
             <div
               className="prose prose-sm max-w-none rounded-lg border bg-card p-6"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: CLP proposal HTML is generated server-side and stored as the proposal body.
               dangerouslySetInnerHTML={{ __html: proposal.html }}
             />
           </section>
@@ -170,9 +168,9 @@ export function ClpPublicView({
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-2 type-body">
-                {chatMessages.map((m, i) => (
+                {chatMessages.map((m) => (
                   <div
-                    key={i}
+                    key={`${m.authorType}-${m.authorName}-${m.body}`}
                     className={cn(
                       "rounded-md px-2 py-1",
                       m.authorType === "visitor" ? "bg-primary/10 ml-4" : "bg-muted mr-4"
@@ -240,6 +238,7 @@ function assetRefsForSection(section: ClpSection, page: CustomerLandingPage): Cl
 function renderSection(
   section: ClpSection,
   page: CustomerLandingPage,
+  preview: boolean,
   onDocumentOpen?: (assetId: string) => void
 ) {
   if (section.type === "hero") {
@@ -272,8 +271,8 @@ function renderSection(
           isSummary ? briefBodyForegroundClass : cn(briefBodyClass, "text-muted-foreground")
         )}
       >
-        {section.bullets.map((b, i) => (
-          <li key={i} className="break-words">
+        {section.bullets.map((b) => (
+          <li key={b} className="break-words">
             {b}
           </li>
         ))}
@@ -284,38 +283,17 @@ function renderSection(
   const assetRefs = assetRefsForSection(section, page);
   if (assetRefs.length > 0) {
     return (
-      <div className="mt-3 space-y-2">
+      <div className="mt-5 space-y-4">
         {section.caption && <p className="type-body text-muted-foreground">{section.caption}</p>}
-        <ul className="space-y-2">
+        <ul className="grid gap-4 md:grid-cols-2">
           {assetRefs.map((ref) => (
-            <li
+            <SharedResourceCard
               key={ref.assetId}
-              className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5"
-            >
-              <KbFileTypeIcon fileName={ref.title} size="sm" />
-              <span className="min-w-0 flex-1 truncate type-body font-medium">{ref.title}</span>
-              <div className="flex shrink-0 gap-0.5">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="h-8 w-8"
-                  aria-label={`Preview ${ref.title}`}
-                  onClick={() => onDocumentOpen?.(ref.assetId)}
-                >
-                  <FileText className="h-4 w-4" />
-                </Button>
-                <Button asChild variant="ghost" size="icon-sm" className="h-8 w-8">
-                  <a
-                    href={`/api/kb/assets/${ref.assetId}/file`}
-                    download
-                    aria-label={`Download ${ref.title}`}
-                  >
-                    <Download className="h-4 w-4" />
-                  </a>
-                </Button>
-              </div>
-            </li>
+              page={page}
+              asset={ref}
+              preview={preview}
+              onDocumentOpen={onDocumentOpen}
+            />
           ))}
         </ul>
       </div>
@@ -325,8 +303,8 @@ function renderSection(
   if (section.links?.length) {
     return (
       <ul className="mt-3 space-y-1">
-        {section.links.map((l, i) => (
-          <li key={i}>
+        {section.links.map((l) => (
+          <li key={`${l.label}-${l.url}`}>
             <a
               href={l.url}
               className="type-body text-primary hover:underline"
@@ -346,4 +324,142 @@ function renderSection(
   }
 
   return null;
+}
+
+function publicAssetBasePath(page: CustomerLandingPage, assetId: string, preview: boolean) {
+  if (preview || !page.shareToken) {
+    return `/api/kb/assets/${encodeURIComponent(assetId)}`;
+  }
+  return `/api/public/clp/${encodeURIComponent(page.shareToken)}/assets/${encodeURIComponent(
+    assetId
+  )}`;
+}
+
+function publicAssetUrls(page: CustomerLandingPage, asset: ClpAssetRef, preview: boolean) {
+  const base = publicAssetBasePath(page, asset.assetId, preview);
+  return {
+    file: asset.downloadUrl && preview ? asset.downloadUrl : `${base}/file`,
+    preview: asset.previewUrl && preview ? asset.previewUrl : `${base}/preview`,
+    slide: `${base}/preview/slides/1`,
+  };
+}
+
+function assetFileName(asset: ClpAssetRef) {
+  return asset.fileName ?? asset.title;
+}
+
+function isImageFormat(format: KbFileFormat) {
+  return format === "png" || format === "jpg" || format === "jpeg" || format === "image";
+}
+
+function SharedResourceCard({
+  page,
+  asset,
+  preview,
+  onDocumentOpen,
+}: {
+  page: CustomerLandingPage;
+  asset: ClpAssetRef;
+  preview: boolean;
+  onDocumentOpen?: (assetId: string) => void;
+}) {
+  const fileName = assetFileName(asset);
+  const formatMeta = resolveKbFileFormat(fileName, asset.mimeType);
+  const urls = publicAssetUrls(page, asset, preview);
+  const previewHref = isImageFormat(formatMeta.format) ? urls.file : urls.preview;
+
+  return (
+    <li className="group overflow-hidden rounded-2xl border border-border bg-card shadow-soft-xs transition-colors hover:border-foreground/20">
+      <a
+        href={previewHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block"
+        onClick={() => onDocumentOpen?.(asset.assetId)}
+        aria-label={`Preview ${asset.title}`}
+      >
+        <AssetThumbnail asset={asset} urls={urls} format={formatMeta.format} />
+      </a>
+
+      <div className="space-y-3 p-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <KbFileTypeIcon fileName={fileName} mimeType={asset.mimeType} size="md" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate type-panel-title text-foreground">{asset.title}</p>
+            <p className="mt-0.5 truncate type-caption text-muted-foreground">
+              {formatMeta.label}
+              {asset.previewSlideCount ? ` · ${asset.previewSlideCount} slides` : ""}
+            </p>
+          </div>
+        </div>
+
+        {asset.caption ? (
+          <p className="line-clamp-2 type-caption leading-relaxed text-muted-foreground">
+            {asset.caption}
+          </p>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild size="sm" className="h-8 rounded-full">
+            <a
+              href={previewHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => onDocumentOpen?.(asset.assetId)}
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Preview
+            </a>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="h-8 rounded-full">
+            <a href={urls.file} download={fileName} aria-label={`Download ${asset.title}`}>
+              <Download className="h-3.5 w-3.5" />
+              Download
+            </a>
+          </Button>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function AssetThumbnail({
+  asset,
+  urls,
+  format,
+}: {
+  asset: ClpAssetRef;
+  urls: { file: string; preview: string; slide: string };
+  format: KbFileFormat;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const imageSrc = isImageFormat(format) ? urls.file : urls.slide;
+  const showPdfFrame = !imageFailed && (format === "pdf" || format === "docx");
+
+  return (
+    <div className="relative aspect-[16/10] overflow-hidden border-b border-border bg-muted/30">
+      {!imageFailed && !showPdfFrame ? (
+        <img
+          src={imageSrc}
+          alt={`${asset.title} preview`}
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+          onError={() => setImageFailed(true)}
+        />
+      ) : showPdfFrame ? (
+        <iframe
+          src={`${urls.preview}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+          title={`${asset.title} preview`}
+          className="h-[135%] w-full origin-top scale-[0.9] border-0 bg-card"
+        />
+      ) : (
+        <div className="flex h-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-muted/70 via-card to-muted/40 text-muted-foreground">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-card shadow-soft-xs">
+            <FileText className="h-8 w-8" />
+          </div>
+          <p className="type-caption font-medium">Preview available on open</p>
+        </div>
+      )}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background/80 to-transparent" />
+    </div>
+  );
 }

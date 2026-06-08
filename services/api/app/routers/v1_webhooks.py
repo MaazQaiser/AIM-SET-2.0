@@ -73,6 +73,10 @@ async def recall_transcript_webhook(
     if parsed.get("kind") == "session_start":
         cid = resolve_call_id(ctx, parsed, explicit_call_id=call_id)
         if cid:
+            try:
+                _orch.calls.mark_call_completed(ctx, cid)
+            except Exception:
+                _logger.exception("failed to mark call completed on Recall session start call_id=%s", cid)
             return {"ok": True, "call_id": cid, "status": "live"}
         return {"ok": True, "warning": "no call_id resolved for session start"}
 
@@ -154,6 +158,10 @@ async def demo_segment(
         repo = get_live_call_repository()
         await asyncio.to_thread(repo.get_or_create_session, ctx, call_id, provider="demo")
         await asyncio.to_thread(repo.append_transcript_event, ctx, call_id, event)
+        try:
+            await asyncio.to_thread(_orch.calls.mark_call_completed, ctx, call_id)
+        except Exception:
+            _logger.exception("failed to mark call completed on demo transcript call_id=%s", call_id)
 
         async def _analyze_and_broadcast() -> None:
             try:

@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { Call } from "@/types";
+import type { Call, CallStatus } from "@/types";
 import type {
   CallBrief,
   PostCallAgentEnvelope,
@@ -20,6 +20,7 @@ interface DcImportsState {
   preDcRecords: PreDCRecord[];
   postDcRecords: PostDCRecord[];
   calls: Call[];
+  statusOverridesByCallId: Record<string, CallStatus>;
   briefsByCallId: Record<string, CallBrief>;
   postReviewsByCallId: Record<string, PostCallReview>;
   emailDraftsByCallId: Record<string, PostCallEmailDraft>;
@@ -59,6 +60,8 @@ interface DcImportsState {
     status: PostDcWorkflowTaskStatus
   ) => void;
   setDiscoverySnapshot: (callId: string, snapshot: { openGaps: string[]; bantCoverage?: number }) => void;
+  setCallStatus: (callId: string, status: CallStatus, options?: { clearOverride?: boolean }) => void;
+  resetCallToPreDc: (callId: string) => void;
   preDcFileName: string | null;
   postDcFileName: string | null;
   importedAt: string | null;
@@ -73,6 +76,7 @@ const emptyState = {
   preDcRecords: [] as PreDCRecord[],
   postDcRecords: [] as PostDCRecord[],
   calls: [] as Call[],
+  statusOverridesByCallId: {} as Record<string, CallStatus>,
   briefsByCallId: {} as Record<string, CallBrief>,
   postReviewsByCallId: {} as Record<string, PostCallReview>,
   emailDraftsByCallId: {} as Record<string, PostCallEmailDraft>,
@@ -108,51 +112,62 @@ function applyBuilt(
 export const useDcImportsStore = create<DcImportsState>()((set, get) => ({
   ...emptyState,
   setPostCallArtifacts: (callId, artifacts) =>
-    set((s) => ({
-      postReviewsByCallId: artifacts.review
-        ? { ...s.postReviewsByCallId, [callId]: artifacts.review }
-        : s.postReviewsByCallId,
-      emailDraftsByCallId: artifacts.emailDraft
-        ? { ...s.emailDraftsByCallId, [callId]: artifacts.emailDraft }
-        : s.emailDraftsByCallId,
-      internalEmailDraftsByCallId: artifacts.internalEmailDraft
-        ? { ...s.internalEmailDraftsByCallId, [callId]: artifacts.internalEmailDraft }
-        : s.internalEmailDraftsByCallId,
-      crmTasksByCallId: artifacts.crmTasks
-        ? { ...s.crmTasksByCallId, [callId]: artifacts.crmTasks }
-        : s.crmTasksByCallId,
-      jiraTicketsByCallId:
-        artifacts.jiraTicket === undefined
-          ? s.jiraTicketsByCallId
-          : artifacts.jiraTicket
-            ? { ...s.jiraTicketsByCallId, [callId]: artifacts.jiraTicket }
-            : Object.fromEntries(Object.entries(s.jiraTicketsByCallId).filter(([id]) => id !== callId)),
-      postRunMetaByCallId:
-        artifacts.emailAttachments || artifacts.kbSuggestions || artifacts.envelope || artifacts.coaching
+    set((s) => {
+      const hasReview = Boolean(artifacts.review);
+      return {
+        calls: hasReview
+          ? s.calls.map((call) =>
+              call.id === callId ? { ...call, status: "completed" as const } : call
+            )
+          : s.calls,
+        statusOverridesByCallId: hasReview
+          ? { ...s.statusOverridesByCallId, [callId]: "completed" }
+          : s.statusOverridesByCallId,
+        postReviewsByCallId: artifacts.review
+          ? { ...s.postReviewsByCallId, [callId]: artifacts.review }
+          : s.postReviewsByCallId,
+        emailDraftsByCallId: artifacts.emailDraft
+          ? { ...s.emailDraftsByCallId, [callId]: artifacts.emailDraft }
+          : s.emailDraftsByCallId,
+        internalEmailDraftsByCallId: artifacts.internalEmailDraft
+          ? { ...s.internalEmailDraftsByCallId, [callId]: artifacts.internalEmailDraft }
+          : s.internalEmailDraftsByCallId,
+        crmTasksByCallId: artifacts.crmTasks
+          ? { ...s.crmTasksByCallId, [callId]: artifacts.crmTasks }
+          : s.crmTasksByCallId,
+        jiraTicketsByCallId:
+          artifacts.jiraTicket === undefined
+            ? s.jiraTicketsByCallId
+            : artifacts.jiraTicket
+              ? { ...s.jiraTicketsByCallId, [callId]: artifacts.jiraTicket }
+              : Object.fromEntries(Object.entries(s.jiraTicketsByCallId).filter(([id]) => id !== callId)),
+        postRunMetaByCallId:
+          artifacts.emailAttachments || artifacts.kbSuggestions || artifacts.envelope || artifacts.coaching
+            ? {
+                ...s.postRunMetaByCallId,
+                [callId]: {
+                  ...(s.postRunMetaByCallId[callId] ?? {}),
+                  ...(artifacts.emailAttachments ? { emailAttachments: artifacts.emailAttachments } : {}),
+                  ...(artifacts.kbSuggestions ? { kbSuggestions: artifacts.kbSuggestions } : {}),
+                  ...(artifacts.envelope ? { envelope: artifacts.envelope } : {}),
+                  ...(artifacts.coaching ? { coaching: artifacts.coaching } : {}),
+                },
+              }
+            : s.postRunMetaByCallId,
+        discoverySnapshotsByCallId: artifacts.discoverySnapshot
+          ? { ...s.discoverySnapshotsByCallId, [callId]: artifacts.discoverySnapshot }
+          : s.discoverySnapshotsByCallId,
+        workflowTaskStatusByCallId: artifacts.workflowTaskStatus
           ? {
-              ...s.postRunMetaByCallId,
+              ...s.workflowTaskStatusByCallId,
               [callId]: {
-                ...(s.postRunMetaByCallId[callId] ?? {}),
-                ...(artifacts.emailAttachments ? { emailAttachments: artifacts.emailAttachments } : {}),
-                ...(artifacts.kbSuggestions ? { kbSuggestions: artifacts.kbSuggestions } : {}),
-                ...(artifacts.envelope ? { envelope: artifacts.envelope } : {}),
-                ...(artifacts.coaching ? { coaching: artifacts.coaching } : {}),
+                ...(s.workflowTaskStatusByCallId[callId] ?? {}),
+                ...artifacts.workflowTaskStatus,
               },
             }
-          : s.postRunMetaByCallId,
-      discoverySnapshotsByCallId: artifacts.discoverySnapshot
-        ? { ...s.discoverySnapshotsByCallId, [callId]: artifacts.discoverySnapshot }
-        : s.discoverySnapshotsByCallId,
-      workflowTaskStatusByCallId: artifacts.workflowTaskStatus
-        ? {
-            ...s.workflowTaskStatusByCallId,
-            [callId]: {
-              ...(s.workflowTaskStatusByCallId[callId] ?? {}),
-              ...artifacts.workflowTaskStatus,
-            },
-          }
-        : s.workflowTaskStatusByCallId,
-    })),
+          : s.workflowTaskStatusByCallId,
+      };
+    }),
   setWorkflowTaskStatus: (callId, taskId, status) =>
     set((s) => ({
       workflowTaskStatusByCallId: {
@@ -167,6 +182,38 @@ export const useDcImportsStore = create<DcImportsState>()((set, get) => ({
     set((s) => ({
       discoverySnapshotsByCallId: { ...s.discoverySnapshotsByCallId, [callId]: snapshot },
     })),
+  setCallStatus: (callId, status, options) =>
+    set((s) => {
+      const { [callId]: _clearedOverride, ...remainingOverrides } = s.statusOverridesByCallId;
+      return {
+        calls: s.calls.map((call) => (call.id === callId ? { ...call, status } : call)),
+        statusOverridesByCallId:
+          options?.clearOverride === true
+            ? remainingOverrides
+            : { ...s.statusOverridesByCallId, [callId]: status },
+        importVersion: s.importVersion + 1,
+      };
+    }),
+  resetCallToPreDc: (callId) =>
+    set((s) => {
+      const stripCallId = <T>(source: Record<string, T>) =>
+        Object.fromEntries(Object.entries(source).filter(([id]) => id !== callId)) as Record<string, T>;
+      return {
+        calls: s.calls.map((call) =>
+          call.id === callId ? { ...call, status: "upcoming" as const } : call
+        ),
+        statusOverridesByCallId: { ...s.statusOverridesByCallId, [callId]: "upcoming" },
+        postReviewsByCallId: stripCallId(s.postReviewsByCallId),
+        emailDraftsByCallId: stripCallId(s.emailDraftsByCallId),
+        internalEmailDraftsByCallId: stripCallId(s.internalEmailDraftsByCallId),
+        crmTasksByCallId: stripCallId(s.crmTasksByCallId),
+        workflowTaskStatusByCallId: stripCallId(s.workflowTaskStatusByCallId),
+        jiraTicketsByCallId: stripCallId(s.jiraTicketsByCallId),
+        postRunMetaByCallId: stripCallId(s.postRunMetaByCallId),
+        discoverySnapshotsByCallId: stripCallId(s.discoverySnapshotsByCallId),
+        importVersion: s.importVersion + 1,
+      };
+    }),
   loadFromDb: async () => {
     try {
       const res = await fetch("/api/dc-notes");

@@ -21,14 +21,15 @@ import {
 import {
   BriefDetailCard,
   BriefDetailRow,
-  briefBodyClass,
   briefBodyForegroundClass,
   briefBodyMutedClass,
+  briefMainBody,
 } from "@/components/pre-call/brief-detail-card";
 import { PostDcExpandableCard } from "@/components/post-dc/post-dc-expandable-card";
 import { PostDcAiNextSteps } from "@/components/post-dc/post-dc-ai-next-steps";
 import { PostDcDeadlineNote } from "@/components/post-dc/post-dc-deadline-note";
 import { PostDcModalSection } from "@/components/post-dc/post-dc-modal-section";
+import { PlainMarkdownBold } from "@/components/post-dc/plain-markdown-bold";
 import type {
   PostCallEmailAttachmentFound,
   PostCallEmailAttachmentMissing,
@@ -99,11 +100,11 @@ export function PostSummaryCard({
         <li
           key={p}
           className={cn(
-            briefBodyForegroundClass,
-            "py-2.5 whitespace-pre-wrap break-words first:pt-0 last:pb-0 w-full"
+            briefMainBody,
+            "py-2.5 text-foreground/90 whitespace-pre-wrap break-words first:pt-0 last:pb-0 w-full"
           )}
         >
-          {p}
+          <PlainMarkdownBold text={p} />
         </li>
       ))}
     </ul>
@@ -130,11 +131,11 @@ export function PostSummaryCard({
                 <li
                   key={p}
                   className={cn(
-                    briefBodyForegroundClass,
-                    "py-3 whitespace-pre-wrap break-words first:pt-0 last:pb-0"
+                    briefMainBody,
+                    "py-3 text-foreground/90 whitespace-pre-wrap break-words first:pt-0 last:pb-0"
                   )}
                 >
-                  {p}
+                  <PlainMarkdownBold text={p} />
                 </li>
               ))}
             </ul>

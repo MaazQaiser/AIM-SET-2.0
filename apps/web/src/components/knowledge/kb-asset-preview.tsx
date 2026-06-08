@@ -111,7 +111,7 @@ export function KbAssetPreview({
           className
         )}
       >
-        <Loader2 className="h-5 w-5 animate-spin" />
+        <Loader2 className="h-5 w-5 animate-spin text-foreground" />
         Loading preview…
       </div>
     );

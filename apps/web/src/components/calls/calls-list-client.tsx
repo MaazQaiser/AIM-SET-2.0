@@ -94,7 +94,7 @@ function CallsTabPanels({
               <EmptyState
                 icon={Search}
                 title="No past calls"
-                description="Completed discovery calls will appear here."
+                description="Post-DC discovery calls will appear here."
               />
             ) : undefined
           }

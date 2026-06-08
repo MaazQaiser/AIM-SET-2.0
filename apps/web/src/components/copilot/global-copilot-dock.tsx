@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
-import { usePathname } from "next/navigation";
 import { BotChatPanel } from "@/components/bot-chat-panel";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useMemo } from "react";
 
 type GlobalSurface = "home" | "knowledge" | "content" | "agents" | "settings" | "global";
 
@@ -69,12 +69,18 @@ function contextFromPath(pathname: string): Record<string, string> {
 
 export function GlobalCopilotDock() {
   const pathname = usePathname() ?? "/";
+  const searchParams = useSearchParams();
 
   const isCallWorkspace = /^\/calls\/[^/]+/.test(pathname);
+  const isContentStudioPath =
+    pathname === "/content/studio" || pathname.startsWith("/content/studio/");
+  const isContentStudioTab =
+    pathname === "/content" &&
+    (searchParams.get("tab") === "studio" || searchParams.get("tab") === "drafts");
   const surface = useMemo(() => surfaceFromPath(pathname), [pathname]);
   const context = useMemo(() => contextFromPath(pathname), [pathname]);
 
-  if (isCallWorkspace) return null;
+  if (isCallWorkspace || isContentStudioPath || isContentStudioTab) return null;
 
   return (
     <BotChatPanel
