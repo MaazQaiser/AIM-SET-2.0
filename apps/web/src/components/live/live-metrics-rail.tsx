@@ -7,9 +7,11 @@ import { SuggestionLog } from "@/components/live/suggestion-log";
 import { buildLiveKeywordEntries } from "@/lib/live/keyword-filter";
 import {
   formatSentimentScore,
+  hasSentimentScore,
   resolveCustomerSentimentCue,
   resolveSalesRepToneCue,
   scoreToTone,
+  type SentimentScore,
 } from "@/lib/live/sentiment-display";
 import type { BantSignal } from "@/lib/live-types";
 import type { DiscoveryChecklistState } from "@dc-copilot/types";
@@ -70,9 +72,9 @@ interface LiveMetricsRailProps {
   keywordStats: KeywordStats | null;
   keywords: string[];
   transcript: TranscriptEvent[];
-  sentimentAE: number;
+  sentimentAE: SentimentScore;
   salesRepTone: SalesRepToneCue | null;
-  sentimentCustomer: number;
+  sentimentCustomer: SentimentScore;
   customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
   sentimentSignals: SentimentSignal[];
@@ -157,10 +159,11 @@ export function BantLiveTiles({ checklist }: { checklist: DiscoveryChecklistStat
   );
 }
 
-function scoreTextClass(score: number, toneOverride?: SentimentTone): string {
+function scoreTextClass(score: SentimentScore, toneOverride?: SentimentTone): string {
   const tone = toneOverride ?? scoreToTone(score);
   if (tone === "positive") return "text-success";
   if (tone === "negative") return "text-destructive";
+  if (!hasSentimentScore(score)) return "text-muted-foreground";
   return "text-warning";
 }
 
@@ -173,11 +176,11 @@ function SentimentMetricRow({
 }: {
   label: string;
   dataLabel?: string;
-  score: number;
+  score: SentimentScore;
   value?: string;
   toneOverride?: SentimentTone;
 }) {
-  const tone = toneOverride ?? scoreToTone(score);
+  const tone = toneOverride ?? scoreToTone(score) ?? "neutral";
   const normalizedDataLabel = dataLabel ?? label.toLowerCase().replace(/\s+/g, "-");
   return (
     <div
@@ -328,16 +331,20 @@ function SentimentSection({
   sentimentSignals,
   className,
   layout = "inline",
+  hideCustomerMetric = false,
+  signalLimit = 8,
 }: {
   transcript: TranscriptEvent[];
-  sentimentAE: number;
+  sentimentAE: SentimentScore;
   salesRepTone: SalesRepToneCue | null;
-  sentimentCustomer: number;
+  sentimentCustomer: SentimentScore;
   customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
   sentimentSignals: SentimentSignal[];
   className?: string;
   layout?: "inline" | "stack" | "stack-content";
+  hideCustomerMetric?: boolean;
+  signalLimit?: number;
 }) {
   const repToneCue = resolveSalesRepToneCue(sentimentAE, salesRepTone);
   const customerCue = resolveCustomerSentimentCue(sentimentCustomer, customerSentiment);
@@ -353,8 +360,9 @@ function SentimentSection({
       </span>
     </p>
   ) : null;
-  const decision = sentimentDecisionCue(customerCue);
-  const decisionCue = (
+  const hasCustomerSignal = hasSentimentScore(sentimentCustomer) || Boolean(customerSentiment?.label?.trim());
+  const decision = hasCustomerSignal ? sentimentDecisionCue(customerCue) : null;
+  const decisionCue = decision ? (
     <p
       className="border-b border-border/50 py-2.5 type-caption leading-snug text-muted-foreground last:border-b-0"
       data-testid="sentiment-decision-cue"
@@ -365,17 +373,19 @@ function SentimentSection({
         {decision.label}
       </span>
     </p>
-  );
+  ) : null;
 
   const metricsBlock = (
     <>
-      <SentimentMetricRow
-        label="Customer"
-        dataLabel="customer"
-        score={sentimentCustomer}
-        value={customerCue.label}
-        toneOverride={customerCue.tone}
-      />
+      {!hideCustomerMetric && (
+        <SentimentMetricRow
+          label="Customer"
+          dataLabel="customer"
+          score={sentimentCustomer}
+          value={customerCue.label}
+          toneOverride={customerCue.tone}
+        />
+      )}
       <SentimentMetricRow
         label="Sales rep tone"
         dataLabel="sales-rep"
@@ -402,7 +412,7 @@ function SentimentSection({
   const signalsBlock =
     sentimentSignals.length > 0 ? (
       <div className="mt-1" data-testid="sentiment-signals-section">
-        {[...sentimentSignals].reverse().slice(0, 8).map((signal) => (
+        {[...sentimentSignals].reverse().slice(0, signalLimit).map((signal) => (
           <SentimentSignalRow key={signal.id} signal={signal} />
         ))}
       </div>
@@ -454,16 +464,20 @@ export function LiveSentimentBar({
   sentimentSignals,
   className,
   embedded = false,
+  hideCustomerMetric = false,
+  signalLimit,
 }: {
   transcript: TranscriptEvent[];
-  sentimentAE: number;
+  sentimentAE: SentimentScore;
   salesRepTone: SalesRepToneCue | null;
-  sentimentCustomer: number;
+  sentimentCustomer: SentimentScore;
   customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
   sentimentSignals: SentimentSignal[];
   className?: string;
   embedded?: boolean;
+  hideCustomerMetric?: boolean;
+  signalLimit?: number;
 }) {
   const repToneCue = resolveSalesRepToneCue(sentimentAE, salesRepTone);
   const customerCue = resolveCustomerSentimentCue(sentimentCustomer, customerSentiment);
@@ -481,6 +495,8 @@ export function LiveSentimentBar({
           customerSentiment={customerSentiment}
           sentimentShift={sentimentShift}
           sentimentSignals={sentimentSignals}
+          hideCustomerMetric={hideCustomerMetric}
+          signalLimit={signalLimit}
         />
       </div>
     );
@@ -507,6 +523,8 @@ export function LiveSentimentBar({
           customerSentiment={customerSentiment}
           sentimentShift={sentimentShift}
           sentimentSignals={sentimentSignals}
+          hideCustomerMetric={hideCustomerMetric}
+          signalLimit={signalLimit}
         />
       </LiveCollapsibleSection>
     </div>

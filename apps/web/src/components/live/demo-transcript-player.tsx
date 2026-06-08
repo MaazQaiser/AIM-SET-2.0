@@ -8,7 +8,7 @@ import {
 } from "@/lib/demo/client-live-call-demo";
 import { getDemoTranscriptForCall } from "@/lib/demo-live-transcript";
 import { useLiveCall } from "@/stores/use-live-call";
-import { Play, Square } from "lucide-react";
+import { FastForward, Play, Square } from "lucide-react";
 import { useRef, useState } from "react";
 
 interface DemoTranscriptPlayerProps {
@@ -17,12 +17,19 @@ interface DemoTranscriptPlayerProps {
 }
 
 type DemoMode = "api" | "client";
+type PlaybackSpeed = "fast" | "normal";
+
+function playbackDelayMs(pauseAfterMs: number | undefined, speed: PlaybackSpeed): number {
+  if (speed === "fast") return 140;
+  return pauseAfterMs ?? 2000;
+}
 
 export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
   const [playing, setPlaying] = useState(false);
   const [lineIndex, setLineIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<DemoMode | null>(null);
+  const [activeSpeed, setActiveSpeed] = useState<PlaybackSpeed>("normal");
   const stopRef = useRef(false);
   const modeRef = useRef<DemoMode>("api");
   const apiQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -79,20 +86,21 @@ export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
     const run = apiQueueRef.current.then(async () => {
       try {
         await postDemoSegment(lineIndex);
-      } catch (err) {
+      } catch {
         modeRef.current = "client";
         setMode("client");
         setConnected(true);
-        setError(err instanceof Error ? err.message : "Demo API playback failed");
+        setError(null);
       }
     });
     apiQueueRef.current = run.catch(() => undefined);
   }
 
-  async function playDemo() {
+  async function playDemo(speed: PlaybackSpeed) {
     if (playing || lines.length === 0) return;
     stopRef.current = false;
     setPlaying(true);
+    setActiveSpeed(speed);
     setLineIndex(0);
     setError(null);
     apiQueueRef.current = Promise.resolve();
@@ -127,7 +135,7 @@ export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
         }
       }
 
-      await new Promise((r) => setTimeout(r, line.pauseAfterMs ?? 2000));
+      await new Promise((r) => setTimeout(r, playbackDelayMs(line.pauseAfterMs, speed)));
     }
 
     setPlaying(false);
@@ -142,6 +150,10 @@ export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
     setLineIndex(0);
   }
 
+  if (lines.length === 0) {
+    return null;
+  }
+
   return (
     <div className="flex items-center gap-2">
       {error && (
@@ -150,20 +162,33 @@ export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
         </span>
       )}
       {mode === "client" && playing && (
-        <span className="type-caption text-muted-foreground hidden sm:inline">Offline demo</span>
+        <span className="type-caption text-muted-foreground hidden sm:inline">Local backup</span>
       )}
       {!playing ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-7 type-label"
-          title="Replay scripted discovery call — uses API when available, otherwise local simulation"
-          onClick={() => void playDemo()}
-        >
-          <Play className="h-3 w-3 mr-1" />
-          Demo
-        </Button>
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 type-label"
+            title="Replay scripted discovery call quickly. Uses API when available, otherwise local backup."
+            onClick={() => void playDemo("fast")}
+          >
+            <FastForward className="h-3 w-3 mr-1" />
+            Fast demo
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 type-label"
+            title="Replay scripted discovery call at normal conversation speed. Uses API when available, otherwise local backup."
+            onClick={() => void playDemo("normal")}
+          >
+            <Play className="h-3 w-3 mr-1" />
+            Normal demo
+          </Button>
+        </>
       ) : (
         <Button
           type="button"
@@ -173,7 +198,7 @@ export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
           onClick={stopDemo}
         >
           <Square className="h-3 w-3 mr-1" />
-          Stop ({lineIndex}/{lines.length})
+          Stop {activeSpeed === "fast" ? "fast" : "normal"} ({lineIndex}/{lines.length})
         </Button>
       )}
     </div>

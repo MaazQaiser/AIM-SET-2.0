@@ -59,7 +59,7 @@ export function ContentHub() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const persona = usePersona();
-  const { data: assets = [] } = useKbAssets();
+  const { data: assets = [], isLoading: assetsLoading } = useKbAssets();
   const { data: templates = [] } = useContentTemplates();
   const { toGenerateCount } = useContentManagerSidebarStats();
 
@@ -97,7 +97,9 @@ export function ContentHub() {
           <div>
             <h1 className="type-page-title text-foreground">Knowledge Base</h1>
             <p className="mt-1 type-body-sm text-muted-foreground">
-              {assets.length} approved assets
+              {assetsLoading && assets.length === 0
+                ? "Loading assets..."
+                : `${assets.length} approved assets`}
               {templates.length > 0 && (
                 <span> · {templates.length} template{templates.length === 1 ? "" : "s"}</span>
               )}

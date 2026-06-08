@@ -356,17 +356,21 @@ export function BriefDeckCard({
   const deck = localDeck ?? fetchedDeck;
 
   useEffect(() => {
-    if (localDeck || !callId) return;
+    if (!callId) return;
     let cancelled = false;
-    setLoadingDeck(true);
+    setLoadingDeck(!localDeck);
     void (async () => {
       try {
         const res = await fetch(
-          `/api/calls/${encodeURIComponent(callId)}/relevant-content?refresh=false`
+          `/api/calls/${encodeURIComponent(callId)}/relevant-content?refresh=true`
         );
         if (!res.ok || cancelled) return;
-        const data = (await res.json()) as { relevantDocuments?: RelevantDocument[] };
-        const match = (data.relevantDocuments ?? []).find(isPresentationDocument);
+        const data = (await res.json()) as {
+          recommendedDeck?: RelevantDocument | null;
+          relevantDocuments?: RelevantDocument[];
+        };
+        const match =
+          data.recommendedDeck ?? (data.relevantDocuments ?? []).find(isPresentationDocument);
         if (!cancelled) setFetchedDeck(match ?? null);
       } catch {
         if (!cancelled) setFetchedDeck(null);
@@ -383,15 +387,15 @@ export function BriefDeckCard({
     return (
       <BriefDetailCard
         tone="main"
-        title="Recommended deck"
+        title="Best existing deck"
         icon={Presentation}
         sourceInfo={{
           source: "Knowledge base",
           detail:
-            "This section searches the KB for one presentation file only: a PPT or PPTX that best matches the account and call context.",
+            "This searches the KB for one existing presentation file only: the PPT or PPTX that best matches the account and call context.",
         }}
       >
-        <p className={briefMainMuted}>Checking the knowledge base for one PPT/PPTX deck…</p>
+        <p className={briefMainMuted}>Checking the knowledge base for the best existing PPT/PPTX deck…</p>
       </BriefDetailCard>
     );
   }
@@ -400,12 +404,12 @@ export function BriefDeckCard({
     return (
       <BriefDetailCard
         tone="main"
-        title="Recommended deck"
+        title="Best existing deck"
         icon={Presentation}
         sourceInfo={{
           source: "Knowledge base",
           detail:
-            "The system looked for a PPT/PPTX deck in the KB for this call. If none appears, upload or tag a relevant deck and rerun the workflow.",
+            "The system looked for an existing PPT/PPTX deck in the KB for this call. If none appears, upload or tag a relevant deck and rerun the workflow.",
         }}
       >
         <p className={briefMainMuted}>No PPT/PPTX deck found in the knowledge base for this call.</p>
@@ -424,12 +428,12 @@ export function BriefDeckCard({
   return (
     <BriefDetailCard
       tone="main"
-      title="Recommended deck"
+      title="Best existing deck"
       icon={Presentation}
       sourceInfo={{
         source: "Knowledge base",
         detail:
-          "This deck is selected from KB presentation files. The system chooses one PPT/PPTX with the strongest relevance to the account, needs, and service area.",
+          "This is an existing KB presentation selected for reuse. The system chooses one PPT/PPTX with the strongest relevance to the account, needs, and service area.",
       }}
     >
       <div className="flex items-start gap-3 min-w-0">

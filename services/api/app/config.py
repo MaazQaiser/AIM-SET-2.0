@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     jira_api_token: str = ""
     jira_email: str = ""
     jira_project_key: str = "SALES"
+    jira_issue_type: str = "Task"
     demo_transcript_replay: bool = False
     workflow_agent_on_ingest: bool = Field(
         default=True,

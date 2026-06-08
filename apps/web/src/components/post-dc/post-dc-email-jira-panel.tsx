@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, ExternalLink } from "lucide-react";
 import { GmailIcon, JiraIcon } from "@/components/icons/brand-icons";
 import { EmailEditor } from "@/components/post-dc/email-editor";
 import { EmailDraftPreview } from "@/components/post-dc/email-draft-preview";
 import { JiraTicketCard } from "@/components/post-dc/jira-ticket-card";
 import { PostDcExpandableCard } from "@/components/post-dc/post-dc-expandable-card";
+import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { copyTextToClipboard } from "@/lib/clipboard";
@@ -86,8 +87,21 @@ function JiraPlaceholder() {
   );
 }
 
+function JiraStatusBadge({ ticket }: { ticket: PostCallJiraTicket }) {
+  const variant =
+    ticket.status === "created" ? "success" : ticket.status === "failed" ? "destructive" : "secondary";
+  const label = ticket.status === "created" ? "Created" : ticket.status === "failed" ? "Failed" : "Draft";
+
+  return (
+    <Badge variant={variant} className="shrink-0 type-caption">
+      {label}
+    </Badge>
+  );
+}
+
 function JiraPreview({ ticket }: { ticket: PostCallJiraTicket }) {
   const [copied, setCopied] = useState(false);
+  const isCreated = ticket.status === "created" && Boolean(ticket.externalUrl);
 
   async function handleCopy() {
     const ok = await copyTextToClipboard(formatJiraTicketForCopy(ticket));
@@ -98,28 +112,67 @@ function JiraPreview({ ticket }: { ticket: PostCallJiraTicket }) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 type-body">
-      <div className="flex justify-end -mt-1">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1.5 px-2 type-caption text-muted-foreground"
-              onClick={() => void handleCopy()}
-            >
-              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? "Copied" : "Copy ticket"}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Copy ticket text</TooltipContent>
-        </Tooltip>
+    <div
+      className={cn(
+        "flex min-h-0 flex-1 flex-col gap-3 rounded-md border p-3 type-body",
+        ticket.status === "created"
+          ? "border-success/25 bg-success/5"
+          : ticket.status === "failed"
+            ? "border-destructive/25 bg-destructive/5"
+            : "border-border/60 bg-background"
+      )}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <JiraStatusBadge ticket={ticket} />
+          {ticket.externalKey ? (
+            <span className="type-caption font-medium text-muted-foreground">{ticket.externalKey}</span>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {isCreated ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  asChild
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 px-2 type-caption"
+                >
+                  <a href={ticket.externalUrl} target="_blank" rel="noreferrer">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    View Jira
+                  </a>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Open ticket in Jira</TooltipContent>
+            </Tooltip>
+          ) : null}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 px-2 type-caption text-muted-foreground"
+                onClick={() => void handleCopy()}
+              >
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? "Copied" : "Copy ticket"}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Copy ticket text</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
       <p className="type-label text-foreground break-words">{ticket.summary}</p>
       <p className="type-kicker text-muted-foreground">
         {ticket.issueType} · {ticket.priority}
       </p>
+      {ticket.error ? (
+        <p className="type-caption text-destructive">{ticket.error}</p>
+      ) : null}
       <p className="type-caption text-muted-foreground whitespace-pre-wrap break-words line-clamp-[12]">
         {ticket.description}
       </p>
@@ -192,8 +245,13 @@ export function PostDcEmailJiraPanel({
     <PostDcExpandableCard
       title="Jira ticket"
       headerIcon={<JiraIcon className="h-4 w-4 shrink-0" />}
-      className="h-full min-h-[14rem]"
+      className={cn(
+        "h-full min-h-[14rem]",
+        jiraTicket?.status === "created" && "border-success/30",
+        jiraTicket?.status === "failed" && "border-destructive/30"
+      )}
       expandLabel="Expand Jira ticket"
+      headerExtra={jiraTicket ? <JiraStatusBadge ticket={jiraTicket} /> : undefined}
       modalContent={
         jiraTicket ? (
           <JiraTicketCard ticket={jiraTicket} onCreate={onCreateJiraTicket} />

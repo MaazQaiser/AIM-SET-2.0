@@ -23,6 +23,8 @@ import { normalizeSummarySections } from "@dc-copilot/types/brief";
 import type {
   CallBrief,
   ContentToGenerate,
+  RelevantDocument,
+  RelevantProject,
   PostCallEmailAttachmentMissing,
   PostCallEmailDraft,
   PostCallJiraTicket,
@@ -52,6 +54,36 @@ import type { PlannedArtifactType } from "@dc-copilot/types/brief";
 import { mapPostDcGapType } from "@/lib/content/group-post-dc-gaps";
 
 const BRIEF_POLL_MS = 8_000;
+const KB_ASSETS_SNAPSHOT_KEY = "dc-copilot:kb-assets:v1";
+const KB_ASSETS_SNAPSHOT_MAX_AGE_MS = 5 * 60 * 1000;
+
+function readKbAssetsSnapshot(): KBAsset[] | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const raw = window.localStorage.getItem(KB_ASSETS_SNAPSHOT_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as { savedAt?: number; assets?: unknown };
+    if (!parsed.savedAt || Date.now() - parsed.savedAt > KB_ASSETS_SNAPSHOT_MAX_AGE_MS) {
+      window.localStorage.removeItem(KB_ASSETS_SNAPSHOT_KEY);
+      return undefined;
+    }
+    return Array.isArray(parsed.assets) ? (parsed.assets as KBAsset[]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeKbAssetsSnapshot(assets: KBAsset[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      KB_ASSETS_SNAPSHOT_KEY,
+      JSON.stringify({ savedAt: Date.now(), assets })
+    );
+  } catch {
+    // Ignore storage quota/private-mode failures; React Query still owns live data.
+  }
+}
 
 export interface PreDcContentGenerationGap extends ContentToGenerate {
   callId: string;
@@ -274,6 +306,34 @@ export function useCallBrief(callId: string) {
   });
 }
 
+export interface CallRelevantContent {
+  relevantDocuments: RelevantDocument[];
+  relevantProjects: RelevantProject[];
+  recommendedDeck?: RelevantDocument | null;
+  cached?: boolean;
+}
+
+export function useCallRelevantContent(callId: string) {
+  return useQuery({
+    queryKey: ["call-relevant-content", callId],
+    queryFn: async () => {
+      const api = await bffFetch<CallRelevantContent>(
+        `/api/calls/${callId}/relevant-content`
+      );
+      return (
+        api ?? {
+          relevantDocuments: [],
+          relevantProjects: [],
+          recommendedDeck: null,
+          cached: false,
+        }
+      );
+    },
+    enabled: Boolean(callId),
+    staleTime: QUERY_STALE_TIME_MS,
+  });
+}
+
 export function usePostCallReview(callId: string) {
   const localReview = resolvePostCallReview(callId);
   return useQuery<PostCallReview | null>({
@@ -478,12 +538,15 @@ export function useKbAssets() {
   return useQuery({
     queryKey: ["kb-assets"],
     queryFn: async () => {
-      const res = await fetch("/api/kb/assets", { cache: "no-store" });
+      const res = await fetch("/api/kb/assets");
       if (!res.ok) {
         throw new Error(`KB assets request failed (${res.status})`);
       }
-      return res.json() as Promise<KBAsset[]>;
+      const assets = (await res.json()) as KBAsset[];
+      writeKbAssetsSnapshot(assets);
+      return assets;
     },
+    placeholderData: readKbAssetsSnapshot,
     staleTime: QUERY_STALE_TIME_MS,
   });
 }
@@ -500,13 +563,14 @@ export function useKbAsset(assetId: string) {
   });
 }
 
-export function useKbWatchlist() {
+export function useKbWatchlist({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ["kb-watchlist"],
     queryFn: async () => {
       const api = await bffFetch<KbWatchlistItem[]>("/api/kb/watchlist");
       return api ?? [];
     },
+    enabled,
     staleTime: QUERY_STALE_TIME_MS,
   });
 }

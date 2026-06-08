@@ -19,14 +19,16 @@ import { useKbAssets, useKbWatchlist } from "@/lib/data/hooks";
 import { usePersona } from "@/hooks/use-persona";
 import type { KBAsset } from "@/types";
 
-const filterTypes = ["All", "Deck", "Case Study", "Image", "Architecture Diagram", "Battle Card", "OnePager"];
+const filterTypes = ["All", "Deck", "Image", "Architecture Diagram", "Battle Card", "OnePager"];
 
 const normalizeType = (value: string) => value.toLowerCase().replace(/[\s-]/g, "");
 
 export function KnowledgePageClient() {
   const persona = usePersona();
-  const { data: assets = [] } = useKbAssets();
-  const { data: watchlist = [] } = useKbWatchlist();
+  const defaultTab = persona === "content-owner" ? "watchlist" : "library";
+  const [activeTab, setActiveTab] = useState(defaultTab);
+  const { data: assets = [], isLoading: assetsLoading } = useKbAssets();
+  const { data: watchlist = [] } = useKbWatchlist({ enabled: activeTab === "watchlist" });
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [previewAsset, setPreviewAsset] = useState<KBAsset | null>(null);
@@ -43,7 +45,7 @@ export function KnowledgePageClient() {
         <div>
           <h1 className="type-page-title text-foreground">Knowledge base</h1>
           <p className="mt-1 type-body-sm text-muted-foreground">
-            {assets.length} assets
+            {assetsLoading && assets.length === 0 ? "Loading assets..." : `${assets.length} assets`}
             {process.env.NEXT_PUBLIC_KB_SHARED === "true" && (
               <span className="ml-1">· Shared team library</span>
             )}
@@ -60,7 +62,7 @@ export function KnowledgePageClient() {
         </div>
       </PageHeader>
 
-      <Tabs defaultValue={persona === "content-owner" ? "watchlist" : "library"} variant="underline">
+      <Tabs value={activeTab} onValueChange={setActiveTab} variant="underline">
         <TabsList>
           <TabsTrigger value="library">Library</TabsTrigger>
           <TabsTrigger value="projects">Project repo</TabsTrigger>
@@ -87,7 +89,13 @@ export function KnowledgePageClient() {
             </div>
           </div>
 
-          {filtered.length > 0 ? (
+          {assetsLoading && assets.length === 0 ? (
+            <Card>
+              <CardContent className="p-6 type-body text-muted-foreground">
+                Loading knowledge assets...
+              </CardContent>
+            </Card>
+          ) : filtered.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filtered.map((asset) => (
                 <KBAssetCard key={asset.id} asset={asset} onPreview={setPreviewAsset} />

@@ -1040,13 +1040,15 @@ class SalesCopilotAgent:
         brief: Optional[Dict[str, Any]] = None
         post_review: Optional[Dict[str, Any]] = None
         events: List[Dict[str, Any]] = []
+        use_ui_live_transcript = clean_surface == "live_dc" and "transcriptLineCount" in ctx
 
         if call_id:
             call = self.calls.get_call(self.ctx, call_id)
             brief = self.calls.get_brief(self.ctx, call_id)
             if clean_surface == "post_dc":
                 post_review = self.calls.get_post_review(self.ctx, call_id)
-            events = get_live_call_repository().list_transcript_events(self.ctx, call_id, limit=80)
+            if not use_ui_live_transcript:
+                events = get_live_call_repository().list_transcript_events(self.ctx, call_id, limit=80)
 
             lines.append(f"Active call: {call_id} / {_call_label(call, call_id)}")
             if call:
@@ -1137,7 +1139,21 @@ class SalesCopilotAgent:
                 else:
                     missing.append("pre-DC brief")
 
-            if events:
+            if use_ui_live_transcript:
+                transcript_tail = ctx.get("transcriptTail")
+                if transcript_tail:
+                    lines.append(f"Recent transcript from UI context: {_compact_json(transcript_tail, 1600)}")
+                    self._citations.append(
+                        Citation(
+                            source_type="transcript",
+                            source_id=call_id,
+                            snippet=_field_excerpt(transcript_tail),
+                            confidence=0.68,
+                        )
+                    )
+                else:
+                    missing.append("live transcript")
+            elif events:
                 transcript = _transcript_excerpt(events)
                 lines.append(f"Recent transcript:\n{transcript}")
                 self._citations.append(

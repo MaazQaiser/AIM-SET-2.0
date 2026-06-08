@@ -11,6 +11,7 @@ from dc_core.tenancy import TenantContext
 from dc_llm.client import LlmClient
 from dc_tools.retrieve_kb import default_embed_fn, retrieve_kb
 
+from app.agents.relevant_content import filter_library_kb_hits
 from app.agents.live_call_session import (
     bant_from_signal,
     cheap_pass,
@@ -90,17 +91,24 @@ def _retrieve_kb_for_call(ctx: TenantContext, query: str, limit: int = 5) -> Lis
     repo = get_kb_repository()
 
     def vector_search(tid: str, embedding: List[float], lim: int) -> List[Dict[str, Any]]:
-        return repo.match_chunks(tenant_uuid, embedding, limit=lim, clerk_key=clerk_key)
+        raw = repo.match_chunks(
+            tenant_uuid,
+            embedding,
+            limit=max(lim * 6, lim + 30),
+            clerk_key=clerk_key,
+        )
+        return filter_library_kb_hits(raw)[:lim]
 
     embed_fn = default_embed_fn if settings.openai_configured or settings.openai_api_key else None
-    return retrieve_kb(
+    hits = retrieve_kb(
         tenant_uuid,
         query,
         limit=limit,
-        chunks=get_memory_store().kb_chunks.get(clerk_key, []),
+        chunks=filter_library_kb_hits(get_memory_store().kb_chunks.get(clerk_key, [])),
         embed_fn=embed_fn,
         vector_search_fn=vector_search if embed_fn else None,
     )
+    return filter_library_kb_hits(hits)
 
 
 def _parse_json_block(text: str) -> Dict[str, Any]:

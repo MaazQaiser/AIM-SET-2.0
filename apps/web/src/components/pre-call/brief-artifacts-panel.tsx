@@ -12,7 +12,7 @@ import {
 } from "@/components/pre-call/brief-detail-card";
 import { KbFileTypeIcon } from "@/components/knowledge/kb-file-type-icon";
 import { buildArtifactStudioHref } from "@/lib/content-studio/artifact-studio-href";
-import type { CallBrief, PlannedArtifactType } from "@/lib/brief-types";
+import type { ArtifactFulfillment, CallBrief, PlannedArtifactType } from "@/lib/brief-types";
 import type { KbFileFormat } from "@/lib/kb/file-format";
 import { cn } from "@/lib/cn";
 import type { Call } from "@/types";
@@ -47,7 +47,7 @@ interface BriefArtifactsPanelProps {
   brief: CallBrief;
   /** Optional call context for Content Studio deep links (lead name) */
   call?: Call;
-  /** Body only — used inside tabbed Discovery Call Artifacts card */
+  /** Body only — used inside tabbed Call assets card */
   embedded?: boolean;
   /** When embedded in tabbed panel — show one artifact section per tab */
   section?: BriefArtifactsSection;
@@ -86,18 +86,34 @@ export type BriefArtifactsSection = "all" | "plan" | "suggest";
 
 function artifactsEmptyMessage(section: BriefArtifactsSection): string {
   if (section === "plan") {
-    return "No artifacts planned for this call yet.";
+    return "No assets planned for this call yet.";
   }
   if (section === "suggest") {
-    return "No missing artifacts for this call yet.";
+    return "No content gaps for this call yet.";
   }
-  return "No artifacts planned for this call yet.";
+  return "No assets planned for this call yet.";
 }
 
 function StatusIcon({ status }: { status: string }) {
   if (status === "found") return <FileCheck className="h-3.5 w-3.5 text-emerald-700" />;
   if (status === "partial") return <FileSearch className="h-3.5 w-3.5 text-amber-700" />;
   return <FileQuestion className="h-3.5 w-3.5 text-rose-700" />;
+}
+
+function isSyntheticDcAssetId(assetId?: string | null): boolean {
+  return (assetId ?? "").trim().toLowerCase().startsWith("dc:");
+}
+
+function normalizeFulfillmentRow(row: ArtifactFulfillment): ArtifactFulfillment {
+  if (!isSyntheticDcAssetId(row.assetId)) return row;
+  return {
+    ...row,
+    status: "missing",
+    snippet: undefined,
+    assetId: undefined,
+    requiredData:
+      row.requiredData || `Upload or tag a KB asset for ${row.name || row.artifactId}.`,
+  };
 }
 
 export function BriefArtifactsPanel({
@@ -128,7 +144,7 @@ export function BriefArtifactsPanel({
       {visiblePlan.length > 0 && (
         <div className="space-y-2">
           {section === "all" ? (
-            <p className="type-label text-muted-foreground">Planned for this call</p>
+            <p className="type-label text-muted-foreground">Asset plan</p>
           ) : null}
           <ol className="list-none space-y-3">
             {visiblePlan
@@ -152,13 +168,14 @@ export function BriefArtifactsPanel({
       {visibleFulfillment.length > 0 && (
         <div className="space-y-2">
           {section === "all" ? (
-            <p className="type-label text-muted-foreground">Missing Artifacts</p>
+            <p className="type-label text-muted-foreground">Content gaps</p>
           ) : null}
           <p className={cn(briefMainMuted, "type-body")}>
-            Suggested content by Sales Co-pilot for this call.
+            Planned assets that are missing from the knowledge base or only partially covered.
           </p>
           <ul className="space-y-3">
-            {visibleFulfillment.map((row) => {
+            {visibleFulfillment.map((rawRow) => {
+              const row = normalizeFulfillmentRow(rawRow);
               const planned = plan.find((p) => p.id === row.artifactId);
               const label = row.name || planned?.name || row.artifactId;
               const whyNeeded =
@@ -189,17 +206,21 @@ export function BriefArtifactsPanel({
                       className={cn(
                         briefMainBody,
                         briefMainMuted,
-                        "border-l-2 border-primary/30 pl-2"
+                        "break-words border-l-2 border-primary/30 pl-2 [overflow-wrap:anywhere]"
                       )}
                     >
                       {row.snippet}
                     </p>
                   ) : null}
                   {whyNeeded ? (
-                    <p className="type-caption text-muted-foreground line-clamp-1">{whyNeeded}</p>
+                    <p className="type-caption text-muted-foreground line-clamp-1 [overflow-wrap:anywhere]">
+                      {whyNeeded}
+                    </p>
                   ) : null}
                   {row.assetId ? (
-                    <p className="type-caption font-mono text-muted-foreground">KB: {row.assetId}</p>
+                    <p className="type-caption break-all font-mono text-muted-foreground">
+                      KB: {row.assetId}
+                    </p>
                   ) : null}
                 </li>
               );
@@ -225,7 +246,7 @@ export function BriefArtifactsPanel({
   return (
     <BriefDetailCard
       tone="main"
-      title="Discovery Call Artifacts"
+      title="Call assets"
       icon={Package}
       sourceInfo={{
         source: "AI plan + KB check",

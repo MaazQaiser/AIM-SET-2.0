@@ -84,12 +84,12 @@ export function BriefPreDeckPanel({ deck, callId, accountName, industry }: Brief
     <>
       <BriefDetailCard
         tone="main"
-        title="Pre-call deck"
+        title="AI draft deck"
         icon={Presentation}
         sourceInfo={{
           source: "AI assembly + KB snippets",
           detail:
-            "This preview deck is assembled from the lead research, planned talking points, and any KB proof points found for the account. It is a prep preview, not a final customer deck.",
+            "This is a new call-specific deck draft assembled from lead research, planned talking points, and KB proof points. Use it as a starting point, then refine it in Studio before sharing.",
         }}
         headerExtra={
           <Badge
@@ -110,7 +110,7 @@ export function BriefPreDeckPanel({ deck, callId, accountName, industry }: Brief
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5 type-caption text-muted-foreground">
               <Layers3 className="h-3.5 w-3.5" />
-              {slideCount} preview slide{slideCount === 1 ? "" : "s"}
+              {slideCount} draft slide{slideCount === 1 ? "" : "s"}
             </span>
             <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
               <Eye className="h-3.5 w-3.5" />
@@ -157,7 +157,7 @@ export function BriefPreDeckPanel({ deck, callId, accountName, industry }: Brief
           <DialogHeader className="shrink-0">
             <DialogTitle className="pr-8 truncate">{deck.title}</DialogTitle>
             <DialogDescription>
-              {slideCount} slide preview assembled for the pre-discovery call.
+              {slideCount} draft slide{slideCount === 1 ? "" : "s"} assembled for the pre-discovery call.
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-auto space-y-4 pr-1">

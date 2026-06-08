@@ -316,6 +316,7 @@ def test_live_call_repository_falls_back_to_memory_when_tenant_resolution_fails(
 
     repo = LiveCallRepository()
     session = repo.get_or_create_session(ctx, call_id)
+    assert session["status"] is None
     event = repo.append_transcript_event(
         ctx,
         call_id,
@@ -334,3 +335,36 @@ def test_live_call_repository_falls_back_to_memory_when_tenant_resolution_fails(
     assert store.live_sessions[fallback_key][call_id]["status"] == "live"
     assert store.transcript_events[fallback_key][call_id][0]["text"].startswith("The CFO")
     assert fake_supabase.calls == []
+
+
+def test_live_call_session_defaults_to_null_until_provider_or_transcript(monkeypatch):
+    from app.domain import live_call_repository as repo_module
+
+    fake_supabase = _FakeSupabase()
+    tenant_uuid = "00000000-0000-0000-0000-000000000654"
+    clerk_key = "clerk-live-null-default-test"
+    call_id = "call-live-null-default"
+    ctx = TenantContext(tenant_id="org-live", user_id="u1", clerk_org_id="org-live")
+
+    store = get_memory_store()
+    store.live_sessions.pop(clerk_key, None)
+    store.transcript_events.pop(clerk_key, None)
+
+    monkeypatch.setattr(repo_module, "get_settings", lambda: _SupabaseEnabledSettings())
+    monkeypatch.setattr(repo_module, "get_supabase", lambda: fake_supabase)
+    monkeypatch.setattr(repo_module, "resolve_kb_tenant", lambda _ctx: (tenant_uuid, clerk_key))
+
+    repo = LiveCallRepository()
+    session = repo.get_or_create_session(ctx, call_id)
+
+    assert session["status"] is None
+    assert store.live_sessions[clerk_key][call_id]["status"] is None
+    session_write = next(
+        call for call in fake_supabase.calls if call["table"] == "call_live_sessions" and call["operation"] == "upsert"
+    )
+    assert session_write["payload"]["status"] is None
+
+    linked = repo.link_provider_meeting(ctx, call_id, "bot-linked")
+
+    assert linked["status"] == "live"
+    assert store.live_sessions[clerk_key][call_id]["status"] == "live"

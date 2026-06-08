@@ -1,7 +1,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, Layers, Presentation } from "lucide-react";
+import { Layers, Presentation } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { ContentLibraryAssetRow } from "@/components/content/content-library-asset-row";
 import type { LibraryColumnId } from "@/lib/kb/library-categories";
@@ -16,11 +16,6 @@ export const LIBRARY_COLUMN_META: Record<
     title: "Slide Decks",
     icon: Presentation,
     emptyMessage: "No slide decks in the library yet.",
-  },
-  "case-studies": {
-    title: "Case Studies",
-    icon: BookOpen,
-    emptyMessage: "No case studies in the library yet.",
   },
   others: {
     title: "Others",
@@ -89,7 +84,7 @@ interface ContentLibraryColumnsProps {
 
 export function ContentLibraryColumns({ grouped, onSelectAsset }: ContentLibraryColumnsProps) {
   return (
-    <div className="grid h-[min(680px,calc(100vh-15rem))] min-h-[420px] grid-cols-1 gap-4 lg:grid-cols-3">
+    <div className="grid h-[min(680px,calc(100vh-15rem))] min-h-[420px] grid-cols-1 gap-4 lg:grid-cols-2">
       {(Object.keys(LIBRARY_COLUMN_META) as LibraryColumnId[]).map((columnId) => (
         <ContentLibraryColumn
           key={columnId}

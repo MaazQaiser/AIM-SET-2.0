@@ -160,9 +160,9 @@ function lineToTranscriptEvent(
     keywords: [],
     sentiment:
       line.speakerRole === "customer"
-        ? line.text.match(/nightmare|broken|zero|bottleneck/i)
+        ? line.text.match(/not sure how you|not convinced|skeptical|worried|concerned|frustrated/i)
           ? "negative"
-          : line.text.match(/exactly|appreciate|great|first answer/i)
+          : line.text.match(/exactly what|appreciate|great|first answer|move forward/i)
             ? "positive"
             : "neutral"
         : "neutral",
@@ -176,10 +176,11 @@ function sentimentScore(sentiment: TranscriptEvent["sentiment"]): number {
 }
 
 function sentimentShift(
-  fromScore: number,
+  fromScore: number | null,
   toScore: number,
   timestamp: number
 ): LiveSentimentPayload["shift"] | undefined {
+  if (fromScore == null) return undefined;
   if (Math.abs(toScore - fromScore) < 0.25) return undefined;
   if (toScore < fromScore) {
     return {
@@ -257,42 +258,97 @@ export function applyClientDemoSegment(
 
   switch (lineIndex) {
     case 0:
-      store.updateSentiment(0.25, 0.15, null);
+      store.updateSentiment(0.15, 0, null);
       break;
     case 1:
+      store.updateSentiment(0.1, -0.55, {
+        direction: "negative",
+        from_score: 0,
+        to_score: -0.55,
+        timestamp: line.offsetSeconds,
+        message: "Customer opens skeptical after generic vendor calls.",
+      });
       store.applyIntentUpdate({
         intent: {
-          label: "commercial_discovery",
-          display: "Commercial discovery · proposal requested",
+          label: "trust_reset",
+          display: "Trust reset · skeptical buyer",
           confidence: 0.82,
           evidence: line.text.slice(0, 120),
         },
-        focus_areas: ["AI-native platform", "franchise operations", "formal proposal"],
+        focus_areas: ["Healthcare context", "Company deck", "Specific proof"],
         pains: [],
         top_keywords: stats.global_top.slice(0, 5),
-        next_actions: ["Confirm proposal scope and board timeline before end of call."],
+        next_actions: ["Use the company deck briefly, then move into concrete healthcare workflows."],
       } satisfies IntentSnapshot);
+      store.setSurfacedKbAssets([
+        {
+          id: "demo-tkxel-company-deck",
+          title: "Tkxel healthcare delivery overview",
+          type: "deck",
+          excerpt: "Company overview, healthcare delivery model, integrations, and dedicated pod structure.",
+        },
+      ]);
       addNudge(store, {
-        message:
-          "Customer expects a formal proposal after this call — confirm deliverables and date.",
-        citation: { id: "demo-1", title: "Transcript", type: "transcript", excerpt: line.text },
+        message: "Buyer is skeptical. Present the company deck briefly, then anchor on healthcare workflow proof.",
+        citation: { id: "demo-company-deck", title: "Transcript", type: "transcript", excerpt: line.text },
         role: "ae",
         timestamp: line.offsetSeconds,
         source: "live-call",
       });
       break;
-    case 3:
+    case 6:
       store.applyIntentUpdate({
         intent: {
           label: "pain_discovery",
-          display: "Pain discovery · operational fragmentation",
-          confidence: 0.78,
+          display: "Pain discovery · existing clinic software",
+          confidence: 0.84,
         },
-        focus_areas: ["spreadsheet chaos", "POS integrations", "unit performance visibility"],
+        focus_areas: ["Existing clinics", "Patient intake", "Referral updates"],
         pains: [
           {
-            id: "pain-ops-fragmentation",
-            text: "Operators live in spreadsheets with no real-time unit performance view",
+            id: "pain-existing-clinic-workflows",
+            text: "Existing clinic workflows are scattered across spreadsheets, calls, and old portals",
+            source: "emergent",
+            confidence: 0.9,
+            timestamp: line.offsetSeconds,
+            evidence: line.text,
+          },
+        ],
+        top_keywords: stats.global_top.slice(0, 5),
+        next_actions: ["Confirm which existing workflows must be in the first release."],
+      });
+      checklist = patchItem(checklist, "need", "confirmed", line.text);
+      addBant(store, {
+        dimension: "need",
+        label: "Existing clinic software need confirmed",
+        timestamp: line.offsetSeconds,
+      });
+      addNudge(store, {
+        message: 'Customer raised: "existing clinic workflows are scattered" so validate first release scope.',
+        citation: {
+          id: "demo-pain-existing-clinics",
+          title: "Pain point detected",
+          type: "transcript",
+          excerpt: line.text,
+        },
+        role: "ae",
+        timestamp: line.offsetSeconds,
+        source: "live-call",
+      });
+      break;
+    case 7:
+      store.applyIntentUpdate({
+        intent: {
+          label: "pain_discovery",
+          display: "Pain discovery · intake and referral delays",
+          confidence: 0.86,
+        },
+        focus_areas: ["Duplicate entry", "Patient intake", "Referral status"],
+        pains: [
+          ...(store.intentSnapshot?.pains ?? []),
+          {
+            id: "pain-intake-referral-delays",
+            text: "Front desk teams retype patient data and patients keep calling for referral status",
             source: "emergent",
             confidence: 0.88,
             timestamp: line.offsetSeconds,
@@ -300,19 +356,12 @@ export function applyClientDemoSegment(
           },
         ],
         top_keywords: stats.global_top.slice(0, 5),
-        next_actions: ["Quantify cost of manual ops and compliance delays."],
-      });
-      checklist = patchItem(checklist, "need", "confirmed", line.text);
-      addBant(store, {
-        dimension: "need",
-        label: "Cloud migration / ops modernization need confirmed",
-        timestamp: line.offsetSeconds,
+        next_actions: ["Ask how intake delays affect patient wait time and revenue leakage."],
       });
       addNudge(store, {
-        message:
-          'Customer raised: "operators live in spreadsheets with no real-time unit performance view" - align next questions to this pain.',
+        message: 'Customer raised: "front desk teams retype the same patient data" so quantify operational impact.',
         citation: {
-          id: "demo-pain-ops",
+          id: "demo-pain-intake",
           title: "Pain point detected",
           type: "transcript",
           excerpt: line.text,
@@ -322,19 +371,19 @@ export function applyClientDemoSegment(
         source: "live-call",
       });
       break;
-    case 4:
+    case 9:
       store.applyIntentUpdate({
         intent: {
-          label: "pain_discovery",
-          display: "Pain discovery · compliance bottleneck",
-          confidence: 0.8,
+          label: "expansion_planning",
+          display: "Expansion planning · clinic launch readiness",
+          confidence: 0.84,
         },
-        focus_areas: ["brand-standard audits", "regional expansion", "compliance"],
+        focus_areas: ["Clinic expansion", "Launch checklists", "Repeatable modules"],
         pains: [
           ...(store.intentSnapshot?.pains ?? []),
           {
-            id: "pain-compliance-audits",
-            text: "Manual brand-standard audits block next regional expansion wave",
+            id: "pain-expansion-readiness",
+            text: "New clinic launches feel like custom projects because workflows and reporting are inconsistent",
             source: "emergent",
             confidence: 0.86,
             timestamp: line.offsetSeconds,
@@ -342,102 +391,101 @@ export function applyClientDemoSegment(
           },
         ],
         top_keywords: stats.global_top.slice(0, 5),
-        next_actions: ["Ask how many locations fail audit per quarter."],
+        next_actions: ["Tie the solution to repeatable clinic launch workflows."],
       });
-      addNudge(store, {
-        message:
-          'Customer raised: "Manual brand-standard audits are the bottleneck" - align next questions to this pain.',
-        citation: {
-          id: "demo-pain-audits",
-          title: "Pain point detected",
-          type: "transcript",
-          excerpt: line.text,
-        },
-        role: "ae",
-        timestamp: line.offsetSeconds,
-        source: "live-call",
-      });
+      checklist = patchItem(checklist, "need", "confirmed", line.text);
       break;
-    case 5:
-      checklist = patchItem(checklist, "budget", "confirmed", line.text, "$450K-$600K year one");
+    case 11:
+      checklist = patchItem(checklist, "need", "confirmed", line.text);
       addBant(store, {
-        dimension: "budget",
-        label: "$450K–$600K year-one envelope · board approval in May",
-        value: "$450K-$600K year one",
+        dimension: "need",
+        label: "Dedicated team of three to four people requested",
+        value: "Dedicated delivery pod",
         timestamp: line.offsetSeconds,
       });
       addNudge(store, {
-        message: "Budget band stated on-record — ask who controls final sign-off beyond the board.",
-        citation: { id: "demo-budget", title: "BANT gap", type: "transcript", excerpt: line.text },
+        message: "Dedicated team requested. Confirm roles, coverage, and continuity expectations.",
+        citation: { id: "demo-dedicated-team", title: "Need signal", type: "transcript", excerpt: line.text },
         role: "ae",
         timestamp: line.offsetSeconds,
         source: "discovery-checklist",
-        checklistItemId: "authority",
+        checklistItemId: "need",
       });
       break;
-    case 6:
+    case 13:
+      checklist = patchItem(checklist, "need", "confirmed", line.text);
+      store.setSurfacedKbAssets([
+        {
+          id: "demo-tkxel-company-deck",
+          title: "Tkxel healthcare delivery overview",
+          type: "deck",
+          excerpt: "Company overview, healthcare delivery model, integrations, and dedicated pod structure.",
+        },
+        {
+          id: "demo-healthcare-integration-map",
+          title: "Healthcare integration map",
+          type: "architecture",
+          excerpt: "Intake, scheduling, billing, messaging, reporting, and operational workspace integration lanes.",
+        },
+      ]);
+      break;
+    case 15:
+      store.updateSentiment(0.25, 0.45, {
+        direction: "positive",
+        from_score: -0.55,
+        to_score: 0.45,
+        timestamp: line.offsetSeconds,
+        message: "Customer moves from skeptical to constructive after specific healthcare framing.",
+      });
+      break;
+    case 16:
+      checklist = patchItem(checklist, "budget", "confirmed", line.text, "$650K to $800K year one");
+      addBant(store, {
+        dimension: "budget",
+        label: "$650K to $800K year one budget confirmed",
+        value: "$650K to $800K year one",
+        timestamp: line.offsetSeconds,
+      });
+      addNudge(store, {
+        message: "Budget is confirmed. Separate platform build, integrations, and dedicated pod cost in the proposal.",
+        citation: { id: "demo-budget", title: "BANT signal", type: "transcript", excerpt: line.text },
+        role: "ae",
+        timestamp: line.offsetSeconds,
+        source: "discovery-checklist",
+        checklistItemId: "budget",
+      });
+      break;
+    case 18:
       checklist = patchItem(
         checklist,
         "timeline",
         "confirmed",
         line.text,
-        "Q3 pilot · Q1 production go-live"
+        "July 20 decision, August build, October pilot"
       );
       addBant(store, {
         dimension: "timeline",
-        label: "Q3 pilot · Q1 production go-live",
-        value: "Q3 pilot · Q1 production go-live",
+        label: "July decision, August build, October pilot",
+        value: "July 20 decision, August build, October pilot",
         timestamp: line.offsetSeconds,
       });
       break;
-    case 7: {
-      const objection: ObjectionPayload = {
-        id: `demo-objection-${lineIndex}`,
-        objection_text: "Evaluating build-vs-buy with internal orchestration prototype",
-        counter_points: [
-          "Production agent fabric vs internal prototype scope",
-          "Franchisee permission boundaries and POS integrations",
-        ],
-        suggested_action: "Differentiate time-to-value and operational risk",
-        timestamp: line.offsetSeconds,
-      };
-      store.addObjection(objection);
-      checklist = patchItem(checklist, "competition", "partial", line.text);
-      addNudge(store, {
-        message:
-          "Build-vs-buy objection — differentiate time-to-value and franchisee permission model.",
-        citation: { id: "demo-comp", title: "Objection", type: "transcript", excerpt: line.text },
-        role: "ae",
-        timestamp: line.offsetSeconds,
-        source: "live-call",
-      });
+    case 19:
+      checklist = patchItem(checklist, "timeline", "confirmed", line.text, "January rollout into next clinic wave");
       break;
-    }
-    case 9:
-      store.updateSentiment(0.35, 0.55, {
-        direction: "positive",
-        from_score: 0.2,
-        to_score: 0.55,
-        timestamp: line.offsetSeconds,
-        message: "Customer warming after technical differentiation on multi-tenant agent mesh.",
-      });
-      break;
-    case 10:
-      checklist = patchItem(checklist, "next_step", "partial", line.text);
-      break;
-    case 11: {
-      checklist = patchItem(checklist, "authority", "partial", line.text, "CFO readout");
+    case 21: {
+      checklist = patchItem(checklist, "authority", "partial", line.text, "COO, Finance Lead, CIO");
       checklist = patchItem(checklist, "decision_process", "partial", line.text);
       const question: UnansweredQuestionPayload = {
-        id: `demo-q-cfo-${lineIndex}`,
-        text: "Who besides the CFO needs to approve budget before the Q3 pilot kickoff?",
+        id: `demo-q-cio-${lineIndex}`,
+        text: "What security and integration assumptions does Daniel need before approval?",
         timestamp: line.offsetSeconds,
         asked_at_offset: line.offsetSeconds,
       };
       store.addUnansweredQuestion(question);
       addNudge(store, {
-        message: "CFO readout mentioned — map full decision committee and procurement steps.",
-        citation: { id: "demo-auth", title: "BANT gap", type: "transcript", excerpt: line.text },
+        message: "CIO approval required. Schedule a focused security and integration review.",
+        citation: { id: "demo-auth", title: "Authority signal", type: "transcript", excerpt: line.text },
         role: "ae",
         timestamp: line.offsetSeconds,
         source: "discovery-checklist",
@@ -445,6 +493,18 @@ export function applyClientDemoSegment(
       });
       break;
     }
+    case 22:
+      checklist = patchItem(checklist, "next_step", "partial", line.text);
+      break;
+    case 23:
+      store.updateSentiment(0.35, 0.6, {
+        direction: "positive",
+        from_score: 0.1,
+        to_score: 0.6,
+        timestamp: line.offsetSeconds,
+        message: "Customer is now positive and ready to review a structured proposal.",
+      });
+      break;
     default:
       break;
   }

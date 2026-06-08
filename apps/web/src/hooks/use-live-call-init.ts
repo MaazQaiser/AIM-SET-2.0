@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useBotChatStore } from "@/stores/use-bot-chat";
 import { useLiveCall } from "@/stores/use-live-call";
+import { useSalesCopilotStore } from "@/stores/use-sales-copilot";
 import type { SuggestionLogEntry, TranscriptEvent } from "@/types";
 
 function sentimentLabel(value: unknown): TranscriptEvent["sentiment"] | undefined {
@@ -76,6 +78,8 @@ export function useLiveCallInit(callId: string) {
     // Always start with a clean null state — no data from a previous call
     reset();
     setCallId(callId);
+    useBotChatStore.getState().resetCall(callId);
+    useSalesCopilotStore.getState().clearHistory(`live_dc:${callId}`);
 
     const tick = setInterval(() => {
       useLiveCall.getState().tickElapsed();

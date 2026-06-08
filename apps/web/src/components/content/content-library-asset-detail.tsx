@@ -15,6 +15,8 @@ export function ContentLibraryAssetDetail({
   asset: KBAsset;
   fillHeight?: boolean;
 }) {
+  const assetTypeLabel = asset.type === "case-study" ? "knowledge asset" : asset.type.replace(/-/g, " ");
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <header className="shrink-0 border-b border-border px-5 py-4">
@@ -24,7 +26,7 @@ export function ContentLibraryAssetDetail({
             <div className="flex flex-wrap items-center gap-2">
               <KbFileFormatBadge fileName={asset.fileName} mimeType={asset.mimeType} />
               <span className="type-caption capitalize text-muted-foreground">
-                {asset.type.replace(/-/g, " ")}
+                {assetTypeLabel}
               </span>
             </div>
           </div>

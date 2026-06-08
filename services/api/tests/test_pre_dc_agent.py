@@ -71,6 +71,9 @@ def test_pre_dc_ingest_runs_agent_and_saves_brief(monkeypatch):
                     "Company Description": "Agent Test Co is a B2B SaaS company with an older customer portal. Outreach landed the lead from a cold email campaign.",
                     "Have they described their needs": "Modernize legacy portal. The call was scheduled through a calendar invite.",
                     "Intersection areas b/w tkxel & company": "Legacy portal friction slows customer onboarding.",
+                    "Campaign Service - PreDC": "tk",
+                    "Discovery Call Date (PKT)": "06/07/2026",
+                    "Discovery Call Time (PKT)": "7:00 pm",
                     "Other Information": "Brian responded positively and expressed openness to a call, but later clarified that his initial reply went out before he had bandwidth. After multiple follow-up attempts via email and phone, Brian re-engaged and mentioned that he would need investor funding to move forward, though he expressed strong confidence in revenue potential. Scheduling was discussed, Brian requested an NDA and company details, and the meeting has been confirmed.",
                     "Company Type ICP - PreDC": "B2B SaaS",
                     "ICP Bucket": "Sweet spot",
@@ -123,6 +126,9 @@ def test_pre_dc_ingest_runs_agent_and_saves_brief(monkeypatch):
     assert "Modernize legacy portal" not in pain_points
     assert "investor funding to move forward" not in pain_points
     assert "Brian responded" not in pain_points
+    suggested_action = next(s for s in brief["summarySections"] if s["id"] == "suggested_action")["content"]
+    assert "Legacy portal friction slows customer onboarding" in suggested_action
+    assert "tk 06/07/2026 7:00 pm" not in suggested_action
     relevance = next(s for s in brief["summarySections"] if s["id"] == "relevance")["content"]
     assert (
         relevance

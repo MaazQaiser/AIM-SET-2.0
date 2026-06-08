@@ -95,13 +95,13 @@ def daily_briefing(
 ) -> DailyBriefingOut:
     day = briefing_date or date.today().isoformat()
     repo = get_daily_briefings_repository()
+    context = _briefing_context(body)
 
     if not refresh:
         cached = repo.get(ctx, day)
-        if cached:
+        if cached and cached.get("context") == context:
             return _to_out(cached)
 
-    context = _briefing_context(body)
     result = run_daily_briefing(ctx, context=context)
     stored = repo.save(
         ctx,

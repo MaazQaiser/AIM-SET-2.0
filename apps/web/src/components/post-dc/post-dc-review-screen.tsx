@@ -296,13 +296,12 @@ export function PostDcReviewScreen({
   });
   const workflowTasksDone = countWorkflowTasksDone(workflowTasks);
   const workflowTasksTotal = countWorkflowTasksTotal(workflowTasks);
-  const crmTasksDone = taskList.filter((t) => t.status === "created").length;
   const postDcWorkflow = {
     hasNextSteps: workflowTasksTotal > 0,
     workflowTasksTotal,
     workflowTasksDone,
-    crmTasksTotal: taskList.length,
-    crmTasksDone,
+    crmTasksTotal: 0,
+    crmTasksDone: 0,
     clientEmailReady: Boolean(displayedEmailDraft),
     internalEmailReady: Boolean(displayedInternalEmailDraft),
   };
@@ -520,7 +519,7 @@ function buildJiraTicketDraft({
       "Action items:",
       ...(actionItems.length ? actionItems.map((line) => `- ${line}`) : ["- Assign owner for the next client follow-up."]),
     ].join("\n"),
-    issueType: "Review",
+    issueType: "Task",
     priority: allBantConfirmed || coverage >= 0.75 ? "High" : "Medium",
     labels: ["discovery-call", allBantConfirmed ? "bant-qualified" : "bant-review-needed"],
     projectKey: "SALES",

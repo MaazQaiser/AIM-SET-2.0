@@ -10,6 +10,7 @@ import { SuggestionLog } from "@/components/live/suggestion-log";
 import { UnansweredQuestionsList } from "@/components/live/unanswered-questions-list";
 import { filterKeywordStats } from "@/lib/live/keyword-filter";
 import {
+  hasSentimentScore,
   resolveCustomerSentimentCue,
   resolveSalesRepToneCue,
   scoreEmoji,
@@ -33,9 +34,9 @@ interface LiveInsightsDockProps {
   suggestionLog: SuggestionLogEntry[];
   bantSignals: BantSignal[];
   keywordStats: KeywordStats | null;
-  sentimentAE: number;
+  sentimentAE: number | null;
   salesRepTone?: SalesRepToneCue | null;
-  sentimentCustomer: number;
+  sentimentCustomer: number | null;
   customerSentiment?: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
 }
@@ -83,6 +84,10 @@ function keywordSummary(stats: KeywordStats | null): string | undefined {
   return top.join(", ");
 }
 
+function withOptionalEmoji(emoji: string, label: string): string {
+  return [emoji, label].filter(Boolean).join(" ");
+}
+
 export function LiveInsightsDock({
   unansweredQuestions,
   objections,
@@ -106,7 +111,7 @@ export function LiveInsightsDock({
       Object.keys(filteredKeywordStats.by_speaker).length > 0);
 
   const hasSentiment =
-    sentimentAE !== 0 || sentimentCustomer !== 0 || sentimentShift != null;
+    hasSentimentScore(sentimentAE) || hasSentimentScore(sentimentCustomer) || sentimentShift != null;
   const repToneCue = resolveSalesRepToneCue(sentimentAE, salesRepTone);
   const customerCue = resolveCustomerSentimentCue(sentimentCustomer, customerSentiment);
 
@@ -141,7 +146,7 @@ export function LiveInsightsDock({
       {hasSentiment && (
         <LiveCollapsibleSection
           title="Sentiment"
-          summary={`${scoreEmoji(sentimentAE)} ${repToneCue.label} · ${scoreEmoji(sentimentCustomer)} ${customerCue.label}${
+          summary={`${withOptionalEmoji(scoreEmoji(sentimentAE), repToneCue.label)} · ${withOptionalEmoji(scoreEmoji(sentimentCustomer), customerCue.label)}${
             sentimentShift ? ` · ${shiftEmoji(sentimentShift.direction)} shift` : ""
           }`}
           defaultOpen

@@ -40,12 +40,9 @@ export function PostDcTasksColumn({
     emailDraft,
     jiraTicket,
     landingPage,
-    crmTasks,
     workflowTaskStatus,
     onWorkflowTaskStatusChange,
     onScrollToWidget,
-    onApproveCrmTasks,
-    onRejectCrmTask,
   } = widgetProps;
 
   const leadStage = widgetProps.leadStage ?? resolveLeadStage(review);
@@ -70,9 +67,6 @@ export function PostDcTasksColumn({
     onTaskStatusChange: (taskId: string, status: PostDcWorkflowTaskStatus) =>
       onWorkflowTaskStatusChange?.(taskId, status),
     onScrollToWidget,
-    crmTasks: crmTasks ?? [],
-    onApproveCrmTasks,
-    onRejectCrmTask,
   };
 
   return (

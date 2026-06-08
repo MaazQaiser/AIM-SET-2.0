@@ -21,11 +21,7 @@ import { toast } from "sonner";
 export type BriefRelevantContentSection = "all" | "documents" | "projects";
 
 function hasRelevantContent(brief: CallBrief): boolean {
-  return Boolean(
-    brief.relevantDocuments?.length ||
-      brief.relevantProjects?.length ||
-      brief.recommendedDeck
-  );
+  return Boolean(brief.relevantDocuments?.length || brief.recommendedDeck);
 }
 
 async function fetchRelevantContent(callId: string, refresh: boolean) {
@@ -44,7 +40,7 @@ async function fetchRelevantContent(callId: string, refresh: boolean) {
 interface BriefRelevantContentProps {
   brief: CallBrief;
   className?: string;
-  /** Body only — used inside tabbed Discovery Call Artifacts card */
+  /** Body only — used inside tabbed Call assets card */
   embedded?: boolean;
   /** When embedded in tabbed panel — show one KB section per tab */
   section?: BriefRelevantContentSection;
@@ -83,7 +79,14 @@ export function BriefRelevantContent({
   embedded = false,
   section = "all",
 }: BriefRelevantContentProps) {
-  const documents = brief.relevantDocuments ?? [];
+  const documents = brief.recommendedDeck
+    ? [
+        brief.recommendedDeck,
+        ...(brief.relevantDocuments ?? []).filter(
+          (doc) => doc.assetId !== brief.recommendedDeck?.assetId
+        ),
+      ]
+    : brief.relevantDocuments ?? [];
   const projects = brief.relevantProjects ?? [];
   const showDocuments = section === "all" || section === "documents";
   const showProjects = section === "all" || section === "projects";
@@ -160,7 +163,7 @@ export function BriefRelevantContent({
         {visibleProjects.length > 0 && (
           <div className="space-y-2">
             {section === "all" ? (
-              <p className="type-label text-muted-foreground">Relevant projects</p>
+              <p className="type-label text-muted-foreground">Project matches</p>
             ) : null}
             <ul className={cn("divide-y divide-border/40 rounded-lg border border-border/40 overflow-hidden", briefMainNestedSurfaceClass)}>
               {visibleProjects.map((project) => (
@@ -220,7 +223,7 @@ export function BriefRelevantContent({
     <>
       <BriefDetailCard
         tone="main"
-        title="Relevant content"
+        title="KB matches"
         icon={FolderKanban}
         className={className}
         scrollMaxHeight={BRIEF_RELEVANT_CONTENT_SCROLL_MAX}
@@ -299,7 +302,7 @@ export function useRelevantContentBrief(callId: string, brief: CallBrief) {
         relevantProjects: data.relevantProjects ?? prev.relevantProjects,
         recommendedDeck: data.recommendedDeck ?? prev.recommendedDeck,
       }));
-      toast.success("Relevant content refreshed from knowledge base");
+      toast.success("KB matches refreshed from knowledge base");
     } catch {
       toast.error("Could not refresh relevant content");
     } finally {
@@ -327,7 +330,7 @@ export function BriefRelevantContentLoader({
     return (
       <div className="flex items-center gap-2 type-body text-muted-foreground py-4">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Loading relevant content from knowledge base…
+        Loading KB matches from knowledge base…
       </div>
     );
   }

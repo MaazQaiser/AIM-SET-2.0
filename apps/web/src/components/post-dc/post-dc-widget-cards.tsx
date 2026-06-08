@@ -98,7 +98,10 @@ export function PostSummaryCard({
       {summary.map((p) => (
         <li
           key={p}
-          className={cn(briefBodyClass, "py-2.5 text-muted-foreground whitespace-pre-wrap break-words first:pt-0 last:pb-0 w-full")}
+          className={cn(
+            briefBodyForegroundClass,
+            "py-2.5 whitespace-pre-wrap break-words first:pt-0 last:pb-0 w-full"
+          )}
         >
           {p}
         </li>
@@ -126,7 +129,10 @@ export function PostSummaryCard({
               {summary.map((p) => (
                 <li
                   key={p}
-                  className={cn(briefBodyClass, "py-3 text-foreground/90 whitespace-pre-wrap break-words first:pt-0 last:pb-0")}
+                  className={cn(
+                    briefBodyForegroundClass,
+                    "py-3 whitespace-pre-wrap break-words first:pt-0 last:pb-0"
+                  )}
                 >
                   {p}
                 </li>

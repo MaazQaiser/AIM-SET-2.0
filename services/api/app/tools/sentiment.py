@@ -14,8 +14,6 @@ _POSITIVE = frozenset(
         "happy",
         "excited",
         "interested",
-        "agree",
-        "yes",
         "perfect",
         "helpful",
         "impressed",
@@ -23,31 +21,17 @@ _POSITIVE = frozenset(
         "progress",
         "success",
         "appreciate",
-        "exactly",
     }
 )
-_NEGATIVE = frozenset(
+_NEGATIVE_AFFECT = frozenset(
     {
         "bad",
         "worried",
-        "concern",
         "concerned",
         "frustrated",
         "angry",
         "unhappy",
         "disappointed",
-        "expensive",
-        "difficult",
-        "broken",
-        "nightmare",
-        "pain",
-        "bottleneck",
-        "problem",
-        "issue",
-        "risk",
-        "delay",
-        "no",
-        "never",
         "hesitant",
         "uncertain",
         "unsure",
@@ -55,18 +39,14 @@ _NEGATIVE = frozenset(
         "doubt",
         "confused",
         "confusing",
-        "blocked",
-        "stuck",
-        "can't",
-        "cannot",
     }
 )
 
 _NEGATIVE_PHRASES = tuple(
     re.compile(pattern)
     for pattern in (
-        r"\bnot\s+sure\b",
-        r"\bnot\s+clear\b",
+        r"\bnot\s+sure\s+(?:how\s+)?(?:you|your|this|that|it|the\s+(?:solution|platform|product|approach)|we\s+(?:can|should|would)\s+(?:move|proceed|buy|justify))\b",
+        r"\bnot\s+clear\s+(?:on|how\s+)?(?:you|your|this|that|it|the\s+(?:value|solution|platform|product|approach))\b",
         r"\bnot\s+convinced\b",
         r"\bdoesn'?t\s+make\s+sense\b",
         r"\bdoes\s+not\s+make\s+sense\b",
@@ -91,12 +71,17 @@ class SentimentResult(TypedDict):
 
 
 def analyze_sentiment(text: str, speaker_role: str | None = None) -> SentimentResult:
-    """Lexicon-based sentiment; fast and deterministic for live segments."""
+    """Lexicon-based human sentiment; fast and deterministic for live segments.
+
+    Keep business pain terms out of this score. Words like "nightmare",
+    "bottleneck", and "manual" are discovery evidence, not proof that the
+    speaker's tone or buying sentiment is negative.
+    """
     del speaker_role  # reserved for future role-weighting
     lowered = text.lower()
     tokens = set(re.findall(r"[a-z']+", lowered))
     pos = len(tokens & _POSITIVE)
-    neg = len(tokens & _NEGATIVE)
+    neg = len(tokens & _NEGATIVE_AFFECT)
     pos += sum(1 for pattern in _POSITIVE_PHRASES if pattern.search(lowered))
     neg += sum(1 for pattern in _NEGATIVE_PHRASES if pattern.search(lowered))
     if pos > neg and pos >= 1:

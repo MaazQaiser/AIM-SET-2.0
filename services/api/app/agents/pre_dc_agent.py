@@ -15,13 +15,25 @@ from app.domain.agent_config_repository import get_agent_config_repository
 from app.domain.kb_repository import get_kb_repository
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.memory_store import get_memory_store
-from app.agents.relevant_content import build_relevant_content
+from app.agents.relevant_content import build_relevant_content, filter_library_kb_hits
 from dc_tools.retrieve_kb import default_embed_fn, retrieve_kb
 
 PROMPTS_ROOT = Path(__file__).resolve().parents[4] / "prompts"
 
 COMPANY_NAME_KEY = "Company Name-PreDC"
 NEEDS_CONTENT_FALLBACK = "Needs/content is not identified yet."
+_NON_CONTENT_TOPICS = {
+    "",
+    "-",
+    "n/a",
+    "na",
+    "none",
+    "not known",
+    "unknown",
+    "tk",
+    "tkxel",
+    "high level overview",
+}
 
 
 def load_prompt(rel_path: str) -> str:
@@ -242,6 +254,35 @@ def _pain_point_text(value: str, *, allow_plain: bool = False) -> str:
     return ""
 
 
+def _is_content_topic(value: str) -> bool:
+    clean = re.sub(r"\s+", " ", str(value or "")).strip().strip(".")
+    if clean.lower() in _NON_CONTENT_TOPICS:
+        return False
+    if re.fullmatch(r"\d{1,2}/\d{1,2}/\d{2,4}", clean):
+        return False
+    if re.fullmatch(r"\d{1,2}:\d{2}\s*(?:am|pm)?", clean, flags=re.IGNORECASE):
+        return False
+    return bool(clean)
+
+
+def _action_content_topic(fields: Dict[str, str]) -> str:
+    candidates = (
+        _business_need_text(fields.get("Intersection areas b/w tkxel & company", ""), allow_plain=True),
+        _business_need_text(fields.get("Have they described their needs", ""), allow_plain=True),
+        _business_need_text(fields.get("Other Information", ""), allow_plain=False),
+        _business_need_text(fields.get("Need-PreDC", ""), allow_plain=True),
+    )
+    for candidate in candidates:
+        topic = _compact_text(candidate, 120).strip()
+        if _is_content_topic(topic):
+            return topic
+
+    industry = _compact_text(fields.get("Industry - PreDC", ""), 80).strip()
+    if _is_content_topic(industry):
+        return f"{industry} examples and relevant proof points"
+    return ""
+
+
 def _customer_profile_summary(fields: Dict[str, str], account_name: str) -> str:
     about_bits = [
         fields.get("Company Description", ""),
@@ -289,18 +330,13 @@ def _customer_pain_points_summary(fields: Dict[str, str]) -> str:
 
 
 def _heuristic_summary_sections(fields: Dict[str, str], account_name: str) -> List[Dict[str, str]]:
-    action_bits = [
-        fields.get("Campaign Service - PreDC", ""),
-        fields.get("Discovery Call Date (PKT)", ""),
-        fields.get("Discovery Call Time (PKT)", ""),
-    ]
     relevance_bits = [
         fields.get("What is their relevance to Tkxel?", ""),
         fields.get("Intersection areas b/w tkxel & company", ""),
         fields.get("ICP Bucket", ""),
     ]
 
-    action_context = " ".join(bit for bit in action_bits if bit).strip()
+    action_context = _action_content_topic(fields)
     if action_context:
         action_text = (
             f"Use the discovery call to validate the main need, confirm timeline and decision process, "
@@ -635,18 +671,24 @@ def _kb_search(
     memory_key = clerk_key
 
     def vector_search(tid: str, embedding: List[float], lim: int) -> List[Dict[str, Any]]:
-        return repo.match_chunks(tenant_uuid, embedding, limit=lim, clerk_key=memory_key)
+        raw = repo.match_chunks(
+            tenant_uuid,
+            embedding,
+            limit=max(lim * 6, lim + 30),
+            clerk_key=memory_key,
+        )
+        return filter_library_kb_hits(raw)[:lim]
 
     embed_fn = default_embed_fn if settings.openai_configured or settings.openai_api_key else None
     hits = retrieve_kb(
         tenant_uuid,
         query,
         limit=limit,
-        chunks=get_memory_store().kb_chunks.get(memory_key, []),
+        chunks=filter_library_kb_hits(get_memory_store().kb_chunks.get(memory_key, [])),
         embed_fn=embed_fn,
         vector_search_fn=vector_search if embed_fn else None,
     )
-    return hits, memory_key
+    return filter_library_kb_hits(hits), memory_key
 
 
 def _fulfill_artifacts_heuristic(

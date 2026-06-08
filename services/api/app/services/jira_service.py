@@ -24,8 +24,19 @@ class JiraService:
             raise JiraConfigurationError("Jira integration is not configured.")
 
         base_url = settings.jira_base_url.rstrip("/")
-        project_key = str(payload.get("projectKey") or settings.jira_project_key or "SALES")
-        issue_type = str(payload.get("issueType") or "Review")
+        requested_project_key = str(payload.get("projectKey") or "").strip()
+        configured_project_key = str(settings.jira_project_key or "").strip()
+        project_key = (
+            configured_project_key
+            if configured_project_key and requested_project_key in ("", "SALES")
+            else requested_project_key or configured_project_key or "SALES"
+        )
+        requested_issue_type = str(payload.get("issueType") or "").strip()
+        issue_type = (
+            settings.jira_issue_type
+            if requested_issue_type == "Review" and settings.jira_issue_type
+            else requested_issue_type or settings.jira_issue_type or "Task"
+        )
         fields: Dict[str, Any] = {
             "project": {"key": project_key},
             "summary": str(payload.get("summary") or "Discovery call follow-up"),

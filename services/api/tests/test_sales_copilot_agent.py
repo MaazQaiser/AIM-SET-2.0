@@ -3,6 +3,7 @@ from __future__ import annotations
 from dc_core.tenancy import TenantContext
 
 from app.agents.sales_copilot_agent import (
+    SalesCopilotAgent,
     copilot_chat_response,
     list_dispatchable_agents,
     _polish_copilot_answer,
@@ -102,6 +103,80 @@ def test_copilot_answer_polish_mutes_evidence_sections():
     assert "**Evidence:**\n\n> - Pain: spreadsheets and manual audits." in answer
     assert "> - Quote: *“Manual audits are a nightmare.”*" in answer
     assert "**Best next move**\n\n- Ask for decision criteria." in answer
+
+
+def test_live_surface_context_uses_empty_ui_transcript_over_stored_events(monkeypatch):
+    ctx = TenantContext(tenant_id="tenant-a", user_id="u1", clerk_org_id="tenant-a")
+
+    monkeypatch.setattr(
+        "app.agents.sales_copilot_agent.CallsService.get_call",
+        lambda self, _ctx, _call_id: None,
+    )
+    monkeypatch.setattr(
+        "app.agents.sales_copilot_agent.CallsService.get_brief",
+        lambda self, _ctx, _call_id: None,
+    )
+
+    class StaleTranscriptRepo:
+        def list_transcript_events(self, *_args, **_kwargs):
+            raise AssertionError("stored transcript should not be read for fresh live UI state")
+
+    monkeypatch.setattr(
+        "app.agents.sales_copilot_agent.get_live_call_repository",
+        lambda: StaleTranscriptRepo(),
+    )
+
+    note, missing = SalesCopilotAgent(ctx)._build_surface_context(
+        "what should I ask?",
+        call_id="call-live",
+        surface="live_dc",
+        context={"accountName": "Acme Corp", "transcriptLineCount": 0, "transcriptTail": []},
+    )
+
+    assert "stored transcript" not in note
+    assert "live transcript" in missing
+
+
+def test_live_surface_context_uses_current_ui_transcript_tail(monkeypatch):
+    ctx = TenantContext(tenant_id="tenant-a", user_id="u1", clerk_org_id="tenant-a")
+
+    monkeypatch.setattr(
+        "app.agents.sales_copilot_agent.CallsService.get_call",
+        lambda self, _ctx, _call_id: None,
+    )
+    monkeypatch.setattr(
+        "app.agents.sales_copilot_agent.CallsService.get_brief",
+        lambda self, _ctx, _call_id: None,
+    )
+
+    class StaleTranscriptRepo:
+        def list_transcript_events(self, *_args, **_kwargs):
+            raise AssertionError("stored transcript should not override live UI transcript")
+
+    monkeypatch.setattr(
+        "app.agents.sales_copilot_agent.get_live_call_repository",
+        lambda: StaleTranscriptRepo(),
+    )
+
+    note, missing = SalesCopilotAgent(ctx)._build_surface_context(
+        "summarize the latest point",
+        call_id="call-live",
+        surface="live_dc",
+        context={
+            "accountName": "Acme Corp",
+            "transcriptLineCount": 1,
+            "transcriptTail": [
+                {
+                    "speaker": "Buyer",
+                    "role": "customer",
+                    "text": "Fresh current-call question about budget ownership.",
+                }
+            ],
+        },
+    )
+
+    assert "Fresh current-call question" in note
+    assert "live transcript" not in missing
 
 
 def test_repo_company_playbook_searches_engagement_model_content():

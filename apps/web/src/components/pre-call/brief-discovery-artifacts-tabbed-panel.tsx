@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Package } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import { BriefArtifactsPanel } from "@/components/pre-call/brief-artifacts-panel";
@@ -23,83 +23,97 @@ interface BriefDiscoveryArtifactsTabbedPanelProps {
   call: Call;
 }
 
-const STICKY_TABS_LIST_CLASS = cn(
-  "sticky top-0 z-10 h-10 w-full shrink-0 justify-start gap-6 overflow-x-auto rounded-none",
-  "border-b border-border/60 bg-transparent px-0"
+const TABS_LIST_CLASS = cn(
+  "relative z-10 mb-4 h-auto min-h-10 w-full shrink-0 justify-start gap-6 overflow-x-auto rounded-none",
+  "border-b border-border/60 bg-card px-0"
 );
 
 function resolveDefaultTab(brief: CallBrief): ArtifactsTab {
+  if (brief.recommendedDeck || (brief.relevantDocuments?.length ?? 0) > 0) return "documents";
+  if ((brief.relevantProjects?.length ?? 0) > 0) return "projects";
   if ((brief.artifactPlan?.length ?? 0) > 0) return "plan";
   if ((brief.artifactFulfillment?.length ?? 0) > 0) return "suggest";
-  if ((brief.relevantDocuments?.length ?? 0) > 0) return "documents";
-  if ((brief.relevantProjects?.length ?? 0) > 0) return "projects";
-  return "plan";
+  return "documents";
 }
 
 export function BriefDiscoveryArtifactsTabbedPanel({
   brief,
   call,
 }: BriefDiscoveryArtifactsTabbedPanelProps) {
-  const defaultTab = useMemo(() => resolveDefaultTab(brief), [brief]);
-  const [activeTab, setActiveTab] = useState<ArtifactsTab>(defaultTab);
+  const userSelectedTabRef = useRef(false);
+  const [activeTab, setActiveTab] = useState<ArtifactsTab>(() => resolveDefaultTab(brief));
   const { merged, loading } = useRelevantContentBrief(call.id, brief);
+  const resolvedTab = useMemo(() => resolveDefaultTab(merged), [merged]);
+
+  useEffect(() => {
+    userSelectedTabRef.current = false;
+    setActiveTab(resolveDefaultTab(brief));
+  }, [brief]);
+
+  useEffect(() => {
+    if (userSelectedTabRef.current) return;
+    setActiveTab(resolvedTab);
+  }, [resolvedTab]);
 
   return (
     <BriefDetailCard
       tone="main"
-      title="Discovery Call Artifacts"
+      title="Call assets"
       icon={Package}
       scrollMaxHeight={BRIEF_RELEVANT_CONTENT_SCROLL_MAX}
       sourceInfo={{
         source: "AI plan + knowledge base",
         detail:
-          "Planned for this call lists AI-selected assets for the discovery call. Missing Artifacts shows KB gaps (not found or partial). Relevant content and Relevant projects show ranked matches from your knowledge base.",
+          "Asset plan lists what the call needs. Content gaps shows planned assets that are missing or only partially found. KB matches and Project matches show ranked supporting material from your knowledge base.",
       }}
     >
       <Tabs
         value={activeTab}
-        onValueChange={(value) => setActiveTab(value as ArtifactsTab)}
+        onValueChange={(value) => {
+          userSelectedTabRef.current = true;
+          setActiveTab(value as ArtifactsTab);
+        }}
         className="min-w-0"
       >
-        <TabsList className={STICKY_TABS_LIST_CLASS}>
+        <TabsList className={TABS_LIST_CLASS}>
           <TabsTrigger value="plan" className="type-label">
-            Planned for this call
+            Asset plan
           </TabsTrigger>
           <TabsTrigger value="suggest" className="type-label">
-            Missing Artifacts
+            Content gaps
           </TabsTrigger>
           <TabsTrigger value="documents" className="type-label">
-            Relevant content
+            KB matches
           </TabsTrigger>
           <TabsTrigger value="projects" className="type-label">
-            Relevant projects
+            Project matches
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="plan" className="m-0 pt-4 focus-visible:outline-none">
+        <TabsContent value="plan" className="m-0 focus-visible:outline-none">
           <BriefArtifactsPanel brief={brief} call={call} embedded section="plan" />
         </TabsContent>
 
-        <TabsContent value="suggest" className="m-0 pt-4 focus-visible:outline-none">
+        <TabsContent value="suggest" className="m-0 focus-visible:outline-none">
           <BriefArtifactsPanel brief={brief} call={call} embedded section="suggest" />
         </TabsContent>
 
-        <TabsContent value="documents" className="m-0 pt-4 focus-visible:outline-none">
+        <TabsContent value="documents" className="m-0 focus-visible:outline-none">
           {loading ? (
             <div className="flex items-center gap-2 type-body text-muted-foreground py-4">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading relevant content from knowledge base…
+              Loading KB matches from knowledge base…
             </div>
           ) : (
             <BriefRelevantContent brief={merged} embedded section="documents" />
           )}
         </TabsContent>
 
-        <TabsContent value="projects" className="m-0 pt-4 focus-visible:outline-none">
+        <TabsContent value="projects" className="m-0 focus-visible:outline-none">
           {loading ? (
             <div className="flex items-center gap-2 type-body text-muted-foreground py-4">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading relevant projects from knowledge base…
+              Loading project matches from knowledge base…
             </div>
           ) : (
             <BriefRelevantContent brief={merged} embedded section="projects" />

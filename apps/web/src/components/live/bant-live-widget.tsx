@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Target, X } from "lucide-react";
-import { Card } from "@dc-copilot/ui/components/card";
 import { BantLiveStatusBars } from "@/components/live/bant-live-status-bars";
+import { LiveWidgetAccordionCard } from "@/components/live/live-widget-accordion-card";
 import {
   liveColumnHorizontalPadding,
   liveColumnScrollPadding,
@@ -212,25 +212,13 @@ export function BantLiveWidget({
   );
 
   return (
-    <Card
-      className={cn("flex shrink-0 flex-col overflow-hidden", className)}
-      data-testid="bant-live-section"
+    <LiveWidgetAccordionCard
+      icon={Target}
+      title="BANT live"
+      extra={<BantLiveStatusBars checklist={checklist} />}
+      className={className}
+      testId="bant-live-section"
     >
-      <div
-        className={cn(
-          "flex h-11 w-full shrink-0 items-center justify-between gap-3 border-b border-border/60",
-          liveColumnHorizontalPadding
-        )}
-      >
-        <div className="flex min-w-0 items-center gap-2">
-          <Target className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="truncate type-caption font-medium text-muted-foreground">
-            BANT live
-          </span>
-        </div>
-        <BantLiveStatusBars checklist={checklist} />
-      </div>
-
       <div
         className={cn(
           "flex flex-col overflow-hidden",
@@ -296,6 +284,6 @@ export function BantLiveWidget({
             )}
           </div>
       </div>
-    </Card>
+    </LiveWidgetAccordionCard>
   );
 }

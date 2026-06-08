@@ -37,9 +37,9 @@ interface LiveInsightsPanelProps {
   keywordStats: KeywordStats | null;
   keywords: string[];
   transcript: TranscriptEvent[];
-  sentimentAE: number;
+  sentimentAE: number | null;
   salesRepTone: SalesRepToneCue | null;
-  sentimentCustomer: number;
+  sentimentCustomer: number | null;
   customerSentiment: CustomerSentimentCue | null;
   sentimentShift: SentimentShift | null;
   sentimentSignals: SentimentSignal[];

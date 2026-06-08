@@ -12,6 +12,7 @@ from dc_core.evidence import AgentEnvelope, Citation, validate_envelope
 from dc_core.tenancy import TenantContext
 from dc_llm.client import LlmClient
 
+from app.agents.relevant_content import filter_library_kb_hits
 from app.config import get_settings
 from app.domain.agent_config_repository import get_agent_config_repository
 from app.domain.kb_repository import get_kb_repository
@@ -732,18 +733,24 @@ def _kb_search(ctx: TenantContext, query: str, limit: int = 4) -> Tuple[List[Dic
     memory_key = clerk_key
 
     def vector_search(tid: str, embedding: List[float], lim: int) -> List[Dict[str, Any]]:
-        return repo.match_chunks(tenant_uuid, embedding, limit=lim, clerk_key=memory_key)
+        raw = repo.match_chunks(
+            tenant_uuid,
+            embedding,
+            limit=max(lim * 6, lim + 30),
+            clerk_key=memory_key,
+        )
+        return filter_library_kb_hits(raw)[:lim]
 
     embed_fn = default_embed_fn if settings.openai_configured or settings.openai_api_key else None
     hits = retrieve_kb(
         tenant_uuid,
         query,
         limit=limit,
-        chunks=get_memory_store().kb_chunks.get(memory_key, []),
+        chunks=filter_library_kb_hits(get_memory_store().kb_chunks.get(memory_key, [])),
         embed_fn=embed_fn,
         vector_search_fn=vector_search if embed_fn else None,
     )
-    return hits, memory_key
+    return filter_library_kb_hits(hits), memory_key
 
 
 def _summary_fallback(
@@ -1976,7 +1983,7 @@ def _jira_ticket(
         "status": "draft_pending_approval",
         "summary": f"[{'DC Qualified' if is_qualified else 'DC Follow-up'}] {account_name} — {service_line} opportunity",
         "description": description,
-        "issueType": str(jira_cfg.get("issue_type") or "Review"),
+        "issueType": str(jira_cfg.get("issue_type") or "Task"),
         "priority": priority,
         "labels": labels,
         "projectKey": project_key,

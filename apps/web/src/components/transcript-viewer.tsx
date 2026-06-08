@@ -16,10 +16,9 @@ const sentimentToneClass: Record<string, string> = {
   neutral: "hover:bg-muted/50",
 };
 
-const sentimentEmoji: Record<string, string> = {
+const sentimentEmoji: Partial<Record<NonNullable<TranscriptEvent["sentiment"]>, string>> = {
   positive: "😊",
   negative: "😟",
-  neutral: "😐",
 };
 
 const roleColor: Record<string, string> = {
@@ -95,6 +94,7 @@ export const TranscriptViewer = memo(function TranscriptViewer({
           const event = events[virtualRow.index];
           const isLastLive =
             isLive && showLiveCursor && virtualRow.index === events.length - 1;
+          const sentimentIcon = event.sentiment ? sentimentEmoji[event.sentiment] : null;
 
           return (
             <div
@@ -137,13 +137,13 @@ export const TranscriptViewer = memo(function TranscriptViewer({
                   <span className="type-caption text-muted-foreground">
                     {Math.floor(event.timestamp / 60)}:{String(event.timestamp % 60).padStart(2, "0")}
                   </span>
-                  {event.sentiment && (
+                  {sentimentIcon && (
                     <span
                       className="type-label leading-none"
                       title={event.sentiment}
                       aria-label={`Sentiment: ${event.sentiment}`}
                     >
-                      {sentimentEmoji[event.sentiment] ?? "😐"}
+                      {sentimentIcon}
                     </span>
                   )}
                   {event.signalType === "discovery_anchor" && (
