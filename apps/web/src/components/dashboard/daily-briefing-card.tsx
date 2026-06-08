@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
-import { Sparkles } from "lucide-react";
 import { Card, CardContent } from "@dc-copilot/ui/components/card";
+import { briefMainBody } from "@/components/pre-call/brief-detail-card";
+import { cn } from "@/lib/cn";
 import {
   callOpportunityValue,
   callScheduleDate,
@@ -136,11 +137,26 @@ function leadFocusLabel(call?: Call): string {
   return call.leadName ? `${call.leadName} at ${call.accountName}` : call.accountName;
 }
 
-function Highlight({ children }: { children: ReactNode }) {
+type HighlightTone = "calls" | "opportunity" | "lead" | "prep" | "ai";
+
+const HIGHLIGHT_TONE_CLASS: Record<HighlightTone, string> = {
+  calls: "bg-primary/15 text-primary dark:bg-primary/25",
+  opportunity: "bg-amber-100/90 text-amber-950 dark:bg-amber-500/20 dark:text-amber-100",
+  lead: "bg-violet-100/90 text-violet-950 dark:bg-violet-500/20 dark:text-violet-100",
+  prep: "bg-emerald-100/90 text-emerald-950 dark:bg-emerald-500/20 dark:text-emerald-100",
+  ai: "bg-blue-100/90 text-blue-950 dark:bg-blue-500/20 dark:text-blue-100",
+};
+
+function Highlight({ tone, children }: { tone: HighlightTone; children: ReactNode }) {
   return (
-    <span className="font-semibold text-foreground underline decoration-warning/45 decoration-2 underline-offset-4">
+    <mark
+      className={cn(
+        "rounded px-1 py-0.5 font-bold underline decoration-foreground/35 underline-offset-2",
+        HIGHLIGHT_TONE_CLASS[tone]
+      )}
+    >
       {children}
-    </span>
+    </mark>
   );
 }
 
@@ -183,22 +199,22 @@ export function DailyBriefingCard({ enabled = true }: { enabled?: boolean }) {
   return (
     <Card>
       <CardContent className="space-y-3 p-5 pt-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Sparkles className="h-4 w-4 shrink-0 text-warning" />
-            <span className="type-title text-foreground">Daily brief</span>
-          </div>
-        </div>
+        <p className="type-kicker text-muted-foreground">Daily brief</p>
 
-        <p className="max-w-5xl type-section-title leading-relaxed text-foreground">
+        <p
+          className={cn(
+            briefMainBody,
+            "max-w-6xl break-words text-[1.35rem] leading-[1.55] text-foreground/90"
+          )}
+        >
           {summary ?? (
             <>
-              <Highlight>{callsText}</Highlight> today with{" "}
-              <Highlight>{opportunityText}</Highlight>{" "}
+              <Highlight tone="calls">{callsText}</Highlight> today with{" "}
+              <Highlight tone="opportunity">{opportunityText}</Highlight>{" "}
               {totalOpportunity > 0 ? "in visible opportunity" : "still needing sizing"}.{" "}
               {leadFocus ? (
                 <>
-                  <Highlight>{leadText}</Highlight> needs the first prep pass.
+                  <Highlight tone="lead">{leadText}</Highlight> needs the first prep pass.
                 </>
               ) : (
                 "No lead needs urgent attention yet."
@@ -207,11 +223,11 @@ export function DailyBriefingCard({ enabled = true }: { enabled?: boolean }) {
                 "AI is checking the content gaps now."
               ) : contentPrepItems.length > 0 ? (
                 <>
-                  <Highlight>{prepText}</Highlight> should be prepared
+                  <Highlight tone="prep">{prepText}</Highlight> should be prepared
                   {aiPrepCount > 0 ? (
                     <>
                       {" "}
-                      with <Highlight>AI suggestions</Highlight> ready
+                      with <Highlight tone="ai">AI suggestions</Highlight> ready
                     </>
                   ) : null}
                   .

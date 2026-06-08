@@ -5,6 +5,7 @@ import { SidebarProvider } from "@/components/layout/sidebar-context";
 import { DashboardThemePreview } from "@/components/providers/theme-preview-provider";
 import { PersonaProvider } from "@/components/providers/persona-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { DashboardDataWarmup } from "@/components/providers/dashboard-data-warmup";
 import { DcImportsHydrator } from "@/components/settings/dc-imports-hydrator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { GlobalCopilotDock } from "@/components/copilot/global-copilot-dock";
@@ -19,6 +20,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <SidebarProvider>
           <TooltipProvider delayDuration={200}>
             <DcImportsHydrator />
+            <DashboardDataWarmup />
             <Suspense fallback={null}>
               <DashboardThemePreview>
                 <div className="relative flex h-svh overflow-hidden">

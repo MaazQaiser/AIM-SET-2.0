@@ -13,8 +13,12 @@ import { ContentDraftsTab } from "@/components/content/content-drafts-tab";
 import {
   useContentManagerSidebarStats,
   useKbAssets,
+  useKbProjects,
 } from "@/lib/data/hooks";
-import { useContentTemplates } from "@/lib/data/content-studio-hooks";
+import {
+  useContentTemplates,
+  useStudioProjects,
+} from "@/lib/data/content-studio-hooks";
 import { usePersona } from "@/hooks/use-persona";
 
 export type KnowledgeBaseTab = "projects" | "library" | "suggestions" | "templates" | "studio";
@@ -26,6 +30,17 @@ const TAB_LABELS: Record<KnowledgeBaseTab, string> = {
   templates: "Templates",
   studio: "Content Studio",
 };
+
+function TabLabel({ label, count }: { label: string; count: number | null }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span>{label}</span>
+      <span className="rounded-full bg-muted px-1.5 py-0.5 type-caption font-medium tabular-nums text-muted-foreground">
+        {count ?? "..."}
+      </span>
+    </span>
+  );
+}
 
 function normalizeTabParam(tabParam: string | null): KnowledgeBaseTab | null {
   if (
@@ -60,8 +75,10 @@ export function ContentHub() {
   const searchParams = useSearchParams();
   const persona = usePersona();
   const { data: assets = [], isLoading: assetsLoading } = useKbAssets();
-  const { data: templates = [] } = useContentTemplates();
-  const { toGenerateCount } = useContentManagerSidebarStats();
+  const { data: projects = [], isLoading: projectsLoading } = useKbProjects();
+  const { data: templates = [], isLoading: templatesLoading } = useContentTemplates();
+  const { data: studioProjects = [], isLoading: studioProjectsLoading } = useStudioProjects();
+  const { toGenerateCount, isLoading: suggestionsLoading } = useContentManagerSidebarStats();
 
   const tabParam = searchParams.get("tab");
   const libraryTabParam = searchParams.get("libraryTab");
@@ -120,18 +137,40 @@ export function ContentHub() {
       <Tabs value={activeTab} onValueChange={onTabChange} variant="underline">
         {!hideHubChrome ? (
           <TabsList>
-            <TabsTrigger value="projects">{TAB_LABELS.projects}</TabsTrigger>
-            <TabsTrigger value="library">{TAB_LABELS.library}</TabsTrigger>
-            <TabsTrigger value="suggestions">
-              {TAB_LABELS.suggestions}
-              {toGenerateCount > 0 && (
-                <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 type-caption font-medium tabular-nums text-primary">
-                  {toGenerateCount}
-                </span>
-              )}
+            <TabsTrigger value="projects">
+              <TabLabel
+                label={TAB_LABELS.projects}
+                count={projectsLoading && projects.length === 0 ? null : projects.length}
+              />
             </TabsTrigger>
-            <TabsTrigger value="templates">{TAB_LABELS.templates}</TabsTrigger>
-            <TabsTrigger value="studio">{TAB_LABELS.studio}</TabsTrigger>
+            <TabsTrigger value="library">
+              <TabLabel
+                label={TAB_LABELS.library}
+                count={assetsLoading && assets.length === 0 ? null : assets.length}
+              />
+            </TabsTrigger>
+            <TabsTrigger value="suggestions">
+              <TabLabel
+                label={TAB_LABELS.suggestions}
+                count={suggestionsLoading && toGenerateCount === 0 ? null : toGenerateCount}
+              />
+            </TabsTrigger>
+            <TabsTrigger value="templates">
+              <TabLabel
+                label={TAB_LABELS.templates}
+                count={templatesLoading && templates.length === 0 ? null : templates.length}
+              />
+            </TabsTrigger>
+            <TabsTrigger value="studio">
+              <TabLabel
+                label={TAB_LABELS.studio}
+                count={
+                  studioProjectsLoading && studioProjects.length === 0
+                    ? null
+                    : studioProjects.length
+                }
+              />
+            </TabsTrigger>
           </TabsList>
         ) : null}
 
