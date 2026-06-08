@@ -283,8 +283,7 @@ class CallsService:
 
     def _memory_keys(self, ctx: TenantContext, clerk_key: str) -> List[str]:
         fallback = self._fallback_clerk_key(ctx)
-        raw = ctx.clerk_org_id or ctx.tenant_id or ctx.user_id or "local-dev"
-        return list(dict.fromkeys([clerk_key, fallback, raw]))
+        return list(dict.fromkeys([clerk_key, fallback]))
 
     def _save_post_review_memory(
         self, ctx: TenantContext, clerk_key: str, call_id: str, payload: Dict[str, Any]
