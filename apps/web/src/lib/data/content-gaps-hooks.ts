@@ -35,7 +35,7 @@ function normalizeDismissInput(input: DismissContentGapInput): Array<{ gapKey: s
   if (typeof input === "string") {
     return [{ gapKey: input, payload: {} }];
   }
-  if ("gapKeys" in input && input.gapKeys.length > 0) {
+  if ("gapKeys" in input) {
     const { gapKeys, ...payload } = input;
     return gapKeys.map((gapKey) => ({ gapKey, payload }));
   }

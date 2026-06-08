@@ -476,7 +476,8 @@ function ContentGenerationCard({
     isError: planError,
   } = useContentPlan(planInput);
   const fallbackPlan = useMemo(() => buildFallbackSuggestionPlan(group, source), [group, source]);
-  const resolvedPlan = planPreview?.suggestion_plan ?? fallbackPlan;
+  const apiPlan = planPreview?.suggestion_plan;
+  const resolvedPlan = apiPlan ?? fallbackPlan;
 
   async function handleDismiss() {
     if (gapKeys.length === 0) return;
@@ -686,7 +687,7 @@ function ContentGenerationCard({
           </p>
         )}
         {expanded && resolvedPlan && (
-          <SuggestionPlanPreview plan={resolvedPlan} loading={planLoading && !planPreview?.suggestion_plan} />
+          <SuggestionPlanPreview plan={resolvedPlan} loading={planLoading && !apiPlan} />
         )}
         {expanded && !planLoading && !planError && !resolvedPlan && (
           <p className="rounded-md border border-dashed border-border px-3 py-2 type-caption text-muted-foreground">

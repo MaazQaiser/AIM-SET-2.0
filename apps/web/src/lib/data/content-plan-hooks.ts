@@ -16,8 +16,8 @@ export function useContentPlan(input: ContentPlanInput | null) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(input),
-        },
-        45_000
+          signal: AbortSignal.timeout(45_000),
+        }
       );
       return envelope?.result ?? null;
     },
