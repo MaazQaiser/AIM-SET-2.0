@@ -471,13 +471,10 @@ export function BotChatPanel({
           .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
         setCopilotLoading(true, copilotThreadId);
-        const ctrl = new AbortController();
-        const timeout = window.setTimeout(() => ctrl.abort(), 45000);
         try {
           const res = await fetch("/api/copilot/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            signal: ctrl.signal,
             body: JSON.stringify({
               message: userContent,
               history,
@@ -533,13 +530,8 @@ export function BotChatPanel({
             copilotThreadId
           );
         } catch (err) {
-          if (err instanceof DOMException && err.name === "AbortError") {
-            setError("Sales Co-pilot timed out after 45s. Please try a shorter prompt.");
-          } else {
-            setError(err instanceof Error ? err.message : "Failed to send message");
-          }
+          setError(err instanceof Error ? err.message : "Failed to send message");
         } finally {
-          window.clearTimeout(timeout);
           setCopilotLoading(false, copilotThreadId);
         }
         return;

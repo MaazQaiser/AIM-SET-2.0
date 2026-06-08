@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import {
   AlertCircle,
   ArrowUpRight,
-  Building2,
   CalendarClock,
   ChevronDown,
   ChevronUp,
@@ -28,6 +27,7 @@ import { AIGeneratedBadge } from "@/components/ai-generated-badge";
 import { AiGradientText } from "@/components/ai-gradient-text";
 import { KbUploadButton } from "@/components/knowledge/kb-upload-button";
 import {
+  contentGapKeyForLead,
   useContentGaps,
   useKbAssets,
   usePostDcContentGenerationGaps,
@@ -45,6 +45,7 @@ import { attachKbMatchesToGroups } from "@/lib/content/suggestion-context";
 import { createProjectFromSuggestion } from "@/lib/content/create-project-from-suggestion";
 import { useContentPlan } from "@/lib/data/content-plan-hooks";
 import { useDismissContentGap, useResolveContentGap, useTrackContentGap } from "@/lib/data/content-gaps-hooks";
+import type { SuggestionPlan } from "@/types/content_studio";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -140,22 +141,6 @@ function getPriorityConfig(priority: number) {
     badgeVariant: "secondary" as const,
     Icon: Zap,
   };
-}
-
-function buildGapKey(
-  group: { id: string; name: string },
-  lead: { callId: string; sourceArtifactId?: string; sourceItemId?: string } | undefined,
-  source: "pre-dc" | "post-dc"
-) {
-  if (!lead) return group.id;
-  if (source === "post-dc") {
-    return `post_dc:${lead.callId}:${group.name.trim().toLowerCase()}`;
-  }
-  const artifactPart =
-    lead.sourceArtifactId?.trim() ||
-    lead.sourceItemId?.trim() ||
-    (group.id.startsWith("artifact:") ? group.id.slice("artifact:".length) : group.name);
-  return `pre_dc:${lead.callId}:${artifactPart}`;
 }
 
 export function ContentSuggestionsTab() {
@@ -392,6 +377,33 @@ function formatLeadTooltip(leads: ContentGenerationLead[]) {
     .join("\n");
 }
 
+function buildFallbackSuggestionPlan(
+  group: PreDcGenerationGroup,
+  source: "pre-dc" | "post-dc"
+): SuggestionPlan | undefined {
+  const embeddedSlides = group.leads.find((lead) => lead.slidePlan?.length)?.slidePlan;
+  if (!embeddedSlides?.length) return undefined;
+
+  return {
+    suggestion_id: group.id,
+    source,
+    generation_reason: group.reason,
+    needed_for: group.neededFor,
+    title: group.name,
+    artifact_type: group.type,
+    lead_count: group.leads.length,
+    plan_summary: `Draft plan from ${embeddedSlides.length} pre-call slide suggestions.`,
+    slide_plan: embeddedSlides.map((slide, index) => ({
+      slide: index + 1,
+      heading: slide.heading,
+      body: slide.body,
+      visual: slide.visual,
+      mode: slide.reuseHint ? ("reuse" as const) : ("generate" as const),
+      evidence_refs: slide.sourceAssetId ? [`kb:${slide.sourceAssetId}`] : undefined,
+    })),
+  };
+}
+
 function ContentGenerationCard({
   group,
   source,
@@ -401,12 +413,13 @@ function ContentGenerationCard({
 }) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const dismissGap = useDismissContentGap();
   const resolveGap = useResolveContentGap();
   const trackGap = useTrackContentGap();
   const primaryLead = group.leads[0];
-  const gapKey = buildGapKey(group, primaryLead, source);
+  const gapKeys = group.leads.map((lead) => contentGapKeyForLead(lead, source));
+  const gapKey = primaryLead ? contentGapKeyForLead(primaryLead, source) : group.id;
   const sourceCount = group.leads.length;
   const sourceArtifactId =
     primaryLead?.sourceArtifactId || (group.id.startsWith("artifact:") ? group.id.slice("artifact:".length) : undefined);
@@ -420,8 +433,6 @@ function ContentGenerationCard({
   const contentRequirements = buildContentRequirements(group, primaryLead);
   const impactStatement = buildImpactStatement(group, source);
   const priorityCfg = getPriorityConfig(group.priority);
-  const uniqueAccounts = [...new Set(group.leads.map((l) => l.accountName).filter(Boolean))];
-
   const suggestionContext = {
     ...(primaryLead?.context ?? {}),
     source: source === "post-dc" ? "post_dc" : "pre_dc",
@@ -463,12 +474,15 @@ function ContentGenerationCard({
     data: planPreview,
     isLoading: planLoading,
     isError: planError,
-  } = useContentPlan(expanded ? planInput : null);
+  } = useContentPlan(planInput);
+  const fallbackPlan = useMemo(() => buildFallbackSuggestionPlan(group, source), [group, source]);
+  const resolvedPlan = planPreview?.suggestion_plan ?? fallbackPlan;
 
   async function handleDismiss() {
+    if (gapKeys.length === 0) return;
     try {
       await dismissGap.mutateAsync({
-        gapKey,
+        gapKeys,
         source,
         name: group.name,
         artifactType: group.type,
@@ -527,7 +541,7 @@ function ContentGenerationCard({
         leads: group.leads,
         kbMatches: group.kbMatches,
         sourceArtifactId,
-        cachedPlan: planPreview?.suggestion_plan ?? undefined,
+        cachedPlan: resolvedPlan,
       });
       trackGap.mutate({
         gapKey,
@@ -581,7 +595,7 @@ function ContentGenerationCard({
             </div>
 
             {/* Title */}
-            <CardTitle className="break-words text-base font-semibold leading-snug">
+            <CardTitle className="break-words !text-[20px] !font-bold leading-snug">
               {group.name}
             </CardTitle>
           </div>
@@ -636,36 +650,10 @@ function ContentGenerationCard({
         <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-2.5">
           <div className="flex items-center gap-1.5">
             <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden />
-            <AiGradientText className="type-label font-semibold">Why this matters now</AiGradientText>
+            <AiGradientText className="!text-[12px] font-semibold">Why this matters now</AiGradientText>
           </div>
           <p className="type-body text-foreground leading-relaxed">{impactStatement}</p>
-
-          {/* Affected accounts */}
-          {uniqueAccounts.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-              <span className="type-caption text-muted-foreground shrink-0">Accounts at risk:</span>
-              {uniqueAccounts.slice(0, 4).map((account) => (
-                <Badge key={account} variant="secondary" className="gap-1 type-caption font-normal">
-                  <Building2 className="h-2.5 w-2.5" />
-                  {account}
-                </Badge>
-              ))}
-              {uniqueAccounts.length > 4 && (
-                <Badge variant="outline" className="type-caption font-normal">
-                  +{uniqueAccounts.length - 4} more
-                </Badge>
-              )}
-            </div>
-          )}
         </div>
-
-        {/* What to create */}
-        {contentRequirements && contentRequirements !== group.reason && (
-          <div className="space-y-1">
-            <p className="type-caption font-medium text-muted-foreground">What to create</p>
-            <p className="type-label text-foreground leading-relaxed">{contentRequirements}</p>
-          </div>
-        )}
 
         {/* KB matches */}
         {group.kbMatches && group.kbMatches.length > 0 && (
@@ -687,20 +675,20 @@ function ContentGenerationCard({
         </div>
 
         {/* Plan preview */}
-        {expanded && planLoading && (
+        {expanded && planLoading && !resolvedPlan && (
           <p className="rounded-md border border-dashed border-border px-3 py-2 type-caption text-muted-foreground">
             Building AI slide plan…
           </p>
         )}
-        {expanded && planError && (
+        {expanded && planError && !resolvedPlan && (
           <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 type-label text-destructive">
             Could not load the slide plan preview.
           </p>
         )}
-        {expanded && !planLoading && !planError && planPreview?.suggestion_plan && (
-          <SuggestionPlanPreview plan={planPreview.suggestion_plan} />
+        {expanded && resolvedPlan && (
+          <SuggestionPlanPreview plan={resolvedPlan} loading={planLoading && !planPreview?.suggestion_plan} />
         )}
-        {expanded && !planLoading && !planError && !planPreview?.suggestion_plan && (
+        {expanded && !planLoading && !planError && !resolvedPlan && (
           <p className="rounded-md border border-dashed border-border px-3 py-2 type-caption text-muted-foreground">
             No slide plan came back for this suggestion yet.
           </p>
@@ -734,15 +722,22 @@ function SuggestionKbMatches({
 
 function SuggestionPlanPreview({
   plan,
+  loading = false,
 }: {
-  plan: import("@/types/content_studio").SuggestionPlan;
+  plan: SuggestionPlan;
+  loading?: boolean;
 }) {
   const projects = plan.evidence?.projects ?? [];
-  const kbAssets = plan.evidence?.kb_assets ?? [];
   const slides = plan.slide_plan ?? [];
 
   return (
     <div className="space-y-3 rounded-md border border-border bg-muted/30 p-3">
+      {loading && (
+        <p className="flex items-center gap-1.5 type-caption text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+          Refining slide plan…
+        </p>
+      )}
       {plan.plan_summary && (
         <p className="type-label leading-relaxed text-muted-foreground">{plan.plan_summary}</p>
       )}
@@ -758,25 +753,6 @@ function SuggestionPlanPreview({
           </div>
         </div>
       )}
-      {kbAssets.length > 0 && (
-        <div className="space-y-1">
-          <p className="type-label text-foreground">Reusable KB assets</p>
-          <div className="flex flex-wrap gap-1.5">
-            {kbAssets.map((asset) => (
-              <Badge key={asset.asset_id} variant="outline" className="type-caption font-normal">
-                {asset.title}
-                {asset.slide_count ? ` · ${asset.slide_count} slides` : ""}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      )}
-      {plan.template?.name && (
-        <p className="type-caption text-muted-foreground">
-          <span className="font-medium text-foreground">Default template: </span>
-          {plan.template.name}
-        </p>
-      )}
       {slides.length === 0 && (
         <p className="rounded-md border border-dashed border-border px-3 py-2 type-caption text-muted-foreground">
           No slide rows were returned for this plan.
@@ -785,20 +761,27 @@ function SuggestionPlanPreview({
       {slides.length > 0 && (
         <div className="space-y-1.5">
           <p className="type-label text-foreground">Proposed slides</p>
-          <ol className="space-y-1 type-caption text-muted-foreground">
+          <ol className="space-y-3 type-caption text-muted-foreground">
             {slides.map((slide) => (
-              <li key={slide.slide} className="flex flex-wrap items-center gap-1.5">
-                <span className="font-medium text-foreground">{slide.slide}. {slide.heading}</span>
-                {slide.mode === "reuse" && (
-                  <Badge variant="outline" className="h-5 type-caption">Reuse</Badge>
-                )}
-                {slide.mode === "hybrid" && (
-                  <Badge variant="outline" className="h-5 type-caption">Hybrid</Badge>
-                )}
-                {slide.reuse && (
-                  <span className="type-caption text-muted-foreground">
-                    from {slide.reuse.source_vertical || "KB"} slide {slide.reuse.source_slide_index}
-                  </span>
+              <li key={slide.slide} className="space-y-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-medium text-foreground">{slide.slide}. {slide.heading}</span>
+                  {slide.mode === "reuse" && (
+                    <Badge variant="outline" className="h-5 type-caption">Reuse</Badge>
+                  )}
+                  {slide.mode === "hybrid" && (
+                    <Badge variant="outline" className="h-5 type-caption">Hybrid</Badge>
+                  )}
+                  {slide.reuse && (
+                    <span className="type-caption text-muted-foreground">
+                      from {slide.reuse.source_vertical || "KB"} slide {slide.reuse.source_slide_index}
+                    </span>
+                  )}
+                </div>
+                {slide.body && (
+                  <p className="type-body-sm leading-relaxed text-muted-foreground whitespace-pre-line">
+                    {slide.body}
+                  </p>
                 )}
               </li>
             ))}

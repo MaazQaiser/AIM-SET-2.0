@@ -17,29 +17,6 @@ import type {
   TemplateAssistResult,
 } from "@/types/content_studio";
 
-const TEMPLATE_SAVE_TIMEOUT_MS = 20_000;
-
-async function fetchTemplateWithTimeout(
-  input: RequestInfo | URL,
-  init?: RequestInit
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), TEMPLATE_SAVE_TIMEOUT_MS);
-  try {
-    return await fetch(input, {
-      ...init,
-      signal: init?.signal ?? controller.signal,
-    });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error("Save timed out after 20s. Please try again.");
-    }
-    throw error;
-  } finally {
-    window.clearTimeout(timeout);
-  }
-}
-
 export interface StudioProjectDetail {
   project: StudioProject;
   messages: Array<{
@@ -296,7 +273,7 @@ export function useCreateTemplate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: ContentTemplateDraft) => {
-      const res = await fetchTemplateWithTimeout("/api/content/templates", {
+      const res = await fetch("/api/content/templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -313,7 +290,7 @@ export function useUpdateTemplate(templateId?: string) {
   return useMutation({
     mutationFn: async (body: ContentTemplateDraft) => {
       if (!templateId) throw new Error("Template id is required");
-      const res = await fetchTemplateWithTimeout(`/api/content/templates/${templateId}`, {
+      const res = await fetch(`/api/content/templates/${templateId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -323,7 +300,7 @@ export function useUpdateTemplate(templateId?: string) {
       // Final safety net: if update target is stale/missing, create a fresh
       // template from the current editor draft instead of failing the save.
       if (res.status === 404) {
-        const createRes = await fetchTemplateWithTimeout("/api/content/templates", {
+        const createRes = await fetch("/api/content/templates", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -360,24 +337,11 @@ export function useTemplateAssist() {
 }
 
 const PARENT_TEMPLATE_TAG = "__parent_template__";
-const PARENT_TEMPLATE_FETCH_TIMEOUT_MS = 120_000;
-const PARENT_TEMPLATE_SAVE_TIMEOUT_MS = 120_000;
 
 async function fetchParentTemplate(): Promise<ContentTemplate | null> {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), PARENT_TEMPLATE_FETCH_TIMEOUT_MS);
-  try {
-    const res = await fetch("/api/content/templates/parent", {
-      cache: "no-store",
-      signal: controller.signal,
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as ContentTemplate | null;
-  } catch {
-    return null;
-  } finally {
-    window.clearTimeout(timeout);
-  }
+  const res = await fetch("/api/content/templates/parent", { cache: "no-store" });
+  if (!res.ok) return null;
+  return (await res.json()) as ContentTemplate | null;
 }
 
 /** Loads the singleton parent template (includes metadata for scratch builder). */
@@ -393,25 +357,13 @@ export function useSaveParentTemplate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: ContentTemplateDraft) => {
-      const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), PARENT_TEMPLATE_SAVE_TIMEOUT_MS);
-      try {
-        const res = await fetch("/api/content/templates/parent", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error(await res.text());
-        return res.json() as Promise<ContentTemplate>;
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          throw new Error("Save timed out. Your images may be very large — try again or use smaller images.");
-        }
-        throw error;
-      } finally {
-        window.clearTimeout(timeout);
-      }
+      const res = await fetch("/api/content/templates/parent", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json() as Promise<ContentTemplate>;
     },
     onSuccess: (savedTemplate) => {
       qc.setQueryData<ContentTemplate | null>(["content-parent-template"], savedTemplate);

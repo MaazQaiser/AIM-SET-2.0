@@ -72,14 +72,11 @@ export function AddPreDcLeadDialog({ onCreated }: AddPreDcLeadDialogProps) {
       return;
     }
     setSaving(true);
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 90_000);
     try {
       const res = await fetch("/api/dc-notes/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kind: "pre-dc", records: [record] }),
-        signal: controller.signal,
       });
       if (!res.ok) {
         const err = (await res.json().catch(() => null)) as {
@@ -110,15 +107,8 @@ export function AddPreDcLeadDialog({ onCreated }: AddPreDcLeadDialogProps) {
           : undefined,
       });
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") {
-        toast.error(
-          "Save timed out. Check that the API is running on port 8000, then try again."
-        );
-      } else {
-        toast.error(e instanceof Error ? e.message : "Could not create lead");
-      }
+      toast.error(e instanceof Error ? e.message : "Could not create lead");
     } finally {
-      window.clearTimeout(timeoutId);
       setSaving(false);
     }
   };

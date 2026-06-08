@@ -36,7 +36,7 @@ _plan_cache_lock = threading.Lock()
 
 
 def _plan_cache_key(tenant_id: str, suggestion_id: str, title: str) -> str:
-    return f"{tenant_id}:{suggestion_id}:{title.strip().lower()}"
+    return f"{tenant_id}:{suggestion_id}:{title.strip().lower()}:v2"
 
 
 def _get_cached_plan(key: str) -> Optional[Any]:
@@ -181,6 +181,127 @@ def _dedupe_evidence_kb_assets(items: List[Dict[str, Any]]) -> List[Dict[str, An
     return out[:8]
 
 
+MIN_SLIDE_COUNT = 6
+
+
+def _two_line_body(line1: str, line2: str) -> str:
+    first = str(line1 or "").strip()
+    second = str(line2 or "").strip()
+    if not first:
+        first = "Frame the buyer problem in concrete terms."
+    if not second:
+        second = "Connect the message to the account's priorities and timeline."
+    if not first.endswith((".", "!", "?")):
+        first = f"{first}."
+    if not second.endswith((".", "!", "?")):
+        second = f"{second}."
+    return f"{first}\n{second}"
+
+
+def _normalize_slide_body(body: str, *, heading: str = "", intent: str = "") -> str:
+    text = str(body or "").strip()
+    if not text:
+        return _two_line_body(
+            intent or heading or "Explain why this slide matters for the buyer.",
+            "Tie the takeaway to evidence from projects or the knowledge base.",
+        )
+    if "\n" in text:
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if len(lines) >= 2:
+            return _two_line_body(lines[0], lines[1])
+        return _two_line_body(lines[0], intent or "Make the outcome tangible for the buying team.")
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", text) if part.strip()]
+    if len(sentences) >= 2:
+        return _two_line_body(sentences[0], sentences[1])
+    return _two_line_body(text, intent or "Translate this proof point into buyer-ready language.")
+
+
+def _ensure_slide_plan_quality(
+    slide_plan: List[Dict[str, Any]],
+    *,
+    title: str,
+    artifact_type: str,
+    generation_reason: str,
+    needed_for: str,
+    content_requirements: str,
+    leads: List[Dict[str, Any]],
+    evidence_projects: List[Dict[str, Any]],
+    evidence_kb: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    plan = [dict(slide) for slide in slide_plan if isinstance(slide, dict)]
+    for slide in plan:
+        slide["body"] = _normalize_slide_body(
+            str(slide.get("body") or ""),
+            heading=str(slide.get("heading") or ""),
+            intent=str(slide.get("intent") or ""),
+        )
+
+    lead_count = len(leads) or 1
+    industries = sorted({l.get("industry") for l in leads if l.get("industry")})
+    industry_label = industries[0] if industries else "this vertical"
+    filler_specs = [
+        (
+            f"{industry_label} market context",
+            f"Buyers in {industry_label} are under pressure to move faster with less risk.",
+            f"This deck should show how {title} answers that pressure with proof, not promises.",
+        ),
+        (
+            "Why this matters now",
+            generation_reason or f"Multiple leads need a credible {artifact_type.replace('_', ' ')} before their next call.",
+            needed_for or f"Equip reps to run a sharper conversation across {lead_count} upcoming meeting{'s' if lead_count != 1 else ''}.",
+        ),
+        (
+            "Solution storyline",
+            f"Position {title} as the anchor asset for the account conversation.",
+            content_requirements or "Translate internal evidence into buyer-ready language the team can reuse immediately.",
+        ),
+        (
+            "Proof from delivery",
+            "Show measurable outcomes from a comparable customer engagement.",
+            "Highlight the metric, the motion, and why it maps to this account's goals.",
+        ),
+        (
+            "Knowledge base support",
+            "Pull approved language and visuals from existing internal assets.",
+            "Reuse strong slides where possible and customize only what the buyer context requires.",
+        ),
+        (
+            "Recommended next steps",
+            f"Close with the decision the buyer should make after reviewing {title}.",
+            "Spell out the follow-up meeting, owners, and the proof still needed to advance the deal.",
+        ),
+    ]
+
+    evidence_refs: List[str] = []
+    for proj in evidence_projects[:2]:
+        evidence_refs.append(f"project:{proj['asset_id']}")
+    for kb in evidence_kb[:2]:
+        evidence_refs.append(f"kb:{kb['asset_id']}")
+
+    slot = len(plan) + 1
+    filler_index = 0
+    while len(plan) < MIN_SLIDE_COUNT:
+        heading, line1, line2 = filler_specs[filler_index % len(filler_specs)]
+        filler_index += 1
+        plan.append(
+            {
+                "slide": slot,
+                "heading": heading[:72],
+                "body": _two_line_body(line1, line2),
+                "intent": needed_for or generation_reason or "Advance the buyer conversation",
+                "visual": "Supporting chart, quote, or account visual",
+                "mode": "generate",
+                "evidence_refs": evidence_refs[:2],
+                "data_points": [line1[:120], line2[:120]],
+            }
+        )
+        slot += 1
+
+    for index, slide in enumerate(plan, start=1):
+        slide["slide"] = index
+    return plan[:8]
+
+
 def _heuristic_slide_plan(
     *,
     title: str,
@@ -217,44 +338,81 @@ def _heuristic_slide_plan(
     plan: List[Dict[str, Any]] = [
         {
             "slide": 1,
-            "heading": title,
-            "body": f"Frame why this {artifact_type.replace('_', ' ')} matters for {lead_count} lead{'s' if lead_count != 1 else ''}.",
+            "heading": title[:72],
+            "body": _two_line_body(
+                f"Open with why this {artifact_type.replace('_', ' ')} matters for {lead_count} upcoming lead conversation{'s' if lead_count != 1 else ''}.",
+                generation_reason or needed_for or "Set the buyer context before diving into proof.",
+            ),
             "intent": needed_for or generation_reason or "Set context for the buyer conversation",
             "visual": "Account or industry hero visual",
             "mode": "generate",
             "evidence_refs": evidence_refs[:2],
             "data_points": data_points[:3],
-        }
+        },
+        {
+            "slide": 2,
+            "heading": f"{industry_label or 'Market'} urgency"[:72],
+            "body": _two_line_body(
+                generation_reason or f"Buyers in {industry_label or 'this segment'} need sharper enablement before the next call.",
+                needed_for or content_requirements or "Show the gap this asset closes across the affected accounts.",
+            ),
+            "intent": "Explain why the team needs this asset now",
+            "visual": "Problem framing or urgency chart",
+            "mode": "generate",
+            "evidence_refs": evidence_refs[:1],
+            "data_points": data_points[:2],
+        },
+        {
+            "slide": 3,
+            "heading": "What to create",
+            "body": _two_line_body(
+                content_requirements or f"Define the storyline for {title} in buyer-ready language.",
+                f"Make the asset reusable across {lead_count} lead{'s' if lead_count != 1 else ''} without rewriting from scratch each time.",
+            ),
+            "intent": "Clarify the asset scope and message",
+            "visual": "Outline or story arc",
+            "mode": "generate",
+            "evidence_refs": evidence_refs[:1],
+            "data_points": data_points[:2],
+        },
     ]
 
-    slot = 2
-    for idx, proj in enumerate(evidence_projects[:2]):
+    slot = 4
+    for proj in evidence_projects[:2]:
+        snippet = str(proj.get("snippet") or "Show measurable outcomes from a similar engagement.")
         plan.append(
             {
                 "slide": slot,
                 "heading": str(proj.get("title") or "Relevant project proof")[:72],
-                "body": str(proj.get("snippet") or "Show measurable outcomes from a similar engagement."),
+                "body": _two_line_body(
+                    snippet,
+                    "Connect this delivery proof to the buyer outcome your team is trying to create.",
+                ),
                 "intent": "Ground the story in project database evidence",
                 "visual": "Case metrics or customer logo",
                 "mode": "generate",
                 "evidence_refs": [f"project:{proj['asset_id']}"],
-                "data_points": [str(proj.get("snippet") or "")[:120]],
+                "data_points": [snippet[:120]],
             }
         )
         slot += 1
 
     reuse_candidate = next((kb for kb in evidence_kb if int(kb.get("slide_count") or 0) >= 3), None)
     if reuse_candidate and artifact_type == "deck":
+        snippet = str(reuse_candidate.get("snippet") or "Reuse an approved slide from the knowledge base.")
         plan.append(
             {
                 "slide": slot,
                 "heading": str(reuse_candidate.get("title") or "Proven vertical slide")[:72],
-                "body": "Reuse an approved slide from the knowledge base.",
+                "body": _two_line_body(
+                    snippet,
+                    "Reuse this approved slide and customize only the buyer-specific details.",
+                ),
                 "intent": "Leverage existing vertical content",
                 "visual": "Existing deck slide",
                 "mode": "reuse",
                 "evidence_refs": [f"kb:{reuse_candidate['asset_id']}"],
-                "data_points": [str(reuse_candidate.get("snippet") or "")[:120]],
+                "data_points": [snippet[:120]],
                 "reuse": {
                     "source_asset_id": reuse_candidate["asset_id"],
                     "source_slide_index": 3,
@@ -264,18 +422,26 @@ def _heuristic_slide_plan(
             }
         )
         slot += 1
-    elif evidence_kb:
-        kb = evidence_kb[0]
+
+    for kb in evidence_kb[:2]:
+        if slot > MIN_SLIDE_COUNT:
+            break
+        if reuse_candidate and kb.get("asset_id") == reuse_candidate.get("asset_id"):
+            continue
+        snippet = str(kb.get("snippet") or "Supporting evidence from the content library.")
         plan.append(
             {
                 "slide": slot,
-                "heading": "Knowledge base proof point",
-                "body": str(kb.get("snippet") or "Supporting evidence from the content library."),
+                "heading": str(kb.get("title") or "Knowledge base proof point")[:72],
+                "body": _two_line_body(
+                    snippet,
+                    "Use this internal proof to reinforce credibility without inventing new claims.",
+                ),
                 "intent": "Cite approved internal content",
                 "visual": "Proof chart or quote",
                 "mode": "generate",
                 "evidence_refs": [f"kb:{kb['asset_id']}"],
-                "data_points": [str(kb.get("snippet") or "")[:120]],
+                "data_points": [snippet[:120]],
             }
         )
         slot += 1
@@ -284,7 +450,10 @@ def _heuristic_slide_plan(
         {
             "slide": slot,
             "heading": "Recommended next steps",
-            "body": "Summarize the path forward and the decision the buyer should make.",
+            "body": _two_line_body(
+                "Summarize the path forward and the decision the buyer should make.",
+                f"Prepare the team for {lead_count} upcoming conversation{'s' if lead_count != 1 else ''} with a clear follow-up ask.",
+            ),
             "intent": "Close with clear next actions",
             "visual": "Timeline or checklist",
             "mode": "generate",
@@ -292,7 +461,17 @@ def _heuristic_slide_plan(
             "data_points": [f"Prepared for {lead_count} upcoming conversation{'s' if lead_count != 1 else ''}"],
         }
     )
-    return plan
+    return _ensure_slide_plan_quality(
+        plan,
+        title=title,
+        artifact_type=artifact_type,
+        generation_reason=generation_reason,
+        needed_for=needed_for,
+        content_requirements=content_requirements,
+        leads=leads,
+        evidence_projects=evidence_projects,
+        evidence_kb=evidence_kb,
+    )
 
 
 def _parse_llm_plan(raw: str) -> Optional[Dict[str, Any]]:
@@ -487,13 +666,23 @@ def run_content_plan(
             completion = LlmClient(openai_api_key=settings.openai_api_key or None).complete(
                 system=system,
                 user=user_payload,
-                max_tokens=800,
+                max_tokens=1400,
                 model="gpt-5.4-mini",
                 fallback_model="gpt-5.4-mini",
             )
             parsed = _parse_llm_plan(completion.text)
             if parsed and isinstance(parsed.get("slide_plan"), list):
-                slide_plan = parsed["slide_plan"]
+                slide_plan = _ensure_slide_plan_quality(
+                    parsed["slide_plan"],
+                    title=title,
+                    artifact_type=artifact_type,
+                    generation_reason=generation_reason,
+                    needed_for=needed_for,
+                    content_requirements=content_requirements,
+                    leads=normalized_leads,
+                    evidence_projects=evidence_projects,
+                    evidence_kb=evidence_kb,
+                )
                 plan_summary = str(parsed.get("plan_summary") or plan_summary)
             model_name = completion.model
             cost_usd = completion.cost_usd

@@ -10,11 +10,15 @@ export function useContentPlan(input: ContentPlanInput | null) {
     queryKey: ["content-plan", input?.suggestionId, input?.title],
     queryFn: async () => {
       if (!input) return null;
-      const envelope = await bffFetch<{ result: ContentPlanResult }>("/api/content/plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
+      const envelope = await bffFetch<{ result: ContentPlanResult }>(
+        "/api/content/plan",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        },
+        45_000
+      );
       return envelope?.result ?? null;
     },
     enabled: Boolean(input?.suggestionId && input?.title),
