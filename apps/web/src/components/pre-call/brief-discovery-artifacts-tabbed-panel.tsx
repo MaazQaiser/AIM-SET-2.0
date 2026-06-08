@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Package } from "lucide-react";
+import { FolderKanban, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
-import { BriefArtifactsPanel } from "@/components/pre-call/brief-artifacts-panel";
 import {
   BriefDetailCard,
   BRIEF_RELEVANT_CONTENT_SCROLL_MAX,
@@ -16,7 +15,7 @@ import type { CallBrief } from "@/lib/brief-types";
 import type { Call } from "@/types";
 import { cn } from "@/lib/cn";
 
-type ArtifactsTab = "plan" | "suggest" | "documents" | "projects";
+type RelevantContentTab = "documents" | "projects";
 
 interface BriefDiscoveryArtifactsTabbedPanelProps {
   brief: CallBrief;
@@ -28,11 +27,19 @@ const TABS_LIST_CLASS = cn(
   "border-b border-border/60 bg-card px-0"
 );
 
-function resolveDefaultTab(brief: CallBrief): ArtifactsTab {
-  if (brief.recommendedDeck || (brief.relevantDocuments?.length ?? 0) > 0) return "documents";
-  if ((brief.relevantProjects?.length ?? 0) > 0) return "projects";
-  if ((brief.artifactPlan?.length ?? 0) > 0) return "plan";
-  if ((brief.artifactFulfillment?.length ?? 0) > 0) return "suggest";
+function relevantDocumentCount(brief: CallBrief): number {
+  const documents = brief.relevantDocuments ?? [];
+  if (!brief.recommendedDeck) return documents.length;
+  const duplicateDeckCount = documents.some((doc) => doc.assetId === brief.recommendedDeck?.assetId)
+    ? 0
+    : 1;
+  return documents.length + duplicateDeckCount;
+}
+
+function resolveDefaultTab(brief: CallBrief): RelevantContentTab {
+  const documentCount = relevantDocumentCount(brief);
+  const projectCount = brief.relevantProjects?.length ?? 0;
+  if (projectCount > 0 && documentCount === 0) return "projects";
   return "documents";
 }
 
@@ -41,9 +48,11 @@ export function BriefDiscoveryArtifactsTabbedPanel({
   call,
 }: BriefDiscoveryArtifactsTabbedPanelProps) {
   const userSelectedTabRef = useRef(false);
-  const [activeTab, setActiveTab] = useState<ArtifactsTab>(() => resolveDefaultTab(brief));
+  const [activeTab, setActiveTab] = useState<RelevantContentTab>(() => resolveDefaultTab(brief));
   const { merged, loading } = useRelevantContentBrief(call.id, brief);
   const resolvedTab = useMemo(() => resolveDefaultTab(merged), [merged]);
+  const documentCount = relevantDocumentCount(merged);
+  const projectCount = merged.relevantProjects?.length ?? 0;
 
   useEffect(() => {
     userSelectedTabRef.current = false;
@@ -58,51 +67,47 @@ export function BriefDiscoveryArtifactsTabbedPanel({
   return (
     <BriefDetailCard
       tone="main"
-      title="Call assets"
-      icon={Package}
+      title="Relevant content"
+      icon={FolderKanban}
       scrollMaxHeight={BRIEF_RELEVANT_CONTENT_SCROLL_MAX}
       sourceInfo={{
-        source: "AI plan + knowledge base",
+        source: "Knowledge base search",
         detail:
-          "Asset plan lists what the call needs. Content gaps shows planned assets that are missing or only partially found. KB matches and Project matches show ranked supporting material from your knowledge base.",
+          "This shows ranked, previewable content pulled from the knowledge base: presentations and documents, plus project details when they match the account and call context.",
       }}
     >
       <Tabs
         value={activeTab}
         onValueChange={(value) => {
           userSelectedTabRef.current = true;
-          setActiveTab(value as ArtifactsTab);
+          setActiveTab(value as RelevantContentTab);
         }}
         className="min-w-0"
       >
         <TabsList className={TABS_LIST_CLASS}>
-          <TabsTrigger value="plan" className="type-label">
-            Asset plan
-          </TabsTrigger>
-          <TabsTrigger value="suggest" className="type-label">
-            Content gaps
-          </TabsTrigger>
           <TabsTrigger value="documents" className="type-label">
-            KB matches
+            Presentations & docs
+            {documentCount > 0 ? (
+              <span className="ml-1 type-caption tabular-nums text-muted-foreground">
+                {documentCount}
+              </span>
+            ) : null}
           </TabsTrigger>
           <TabsTrigger value="projects" className="type-label">
-            Project matches
+            Project details
+            {projectCount > 0 ? (
+              <span className="ml-1 type-caption tabular-nums text-muted-foreground">
+                {projectCount}
+              </span>
+            ) : null}
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="plan" className="m-0 focus-visible:outline-none">
-          <BriefArtifactsPanel brief={brief} call={call} embedded section="plan" />
-        </TabsContent>
-
-        <TabsContent value="suggest" className="m-0 focus-visible:outline-none">
-          <BriefArtifactsPanel brief={brief} call={call} embedded section="suggest" />
-        </TabsContent>
 
         <TabsContent value="documents" className="m-0 focus-visible:outline-none">
           {loading ? (
             <div className="flex items-center gap-2 type-body text-muted-foreground py-4">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading KB matches from knowledge base…
+              <Loader2 className="h-4 w-4 animate-spin text-foreground" />
+              Loading presentations and documents from knowledge base…
             </div>
           ) : (
             <BriefRelevantContent brief={merged} embedded section="documents" />
@@ -112,8 +117,8 @@ export function BriefDiscoveryArtifactsTabbedPanel({
         <TabsContent value="projects" className="m-0 focus-visible:outline-none">
           {loading ? (
             <div className="flex items-center gap-2 type-body text-muted-foreground py-4">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading project matches from knowledge base…
+              <Loader2 className="h-4 w-4 animate-spin text-foreground" />
+              Loading project details from knowledge base…
             </div>
           ) : (
             <BriefRelevantContent brief={merged} embedded section="projects" />

@@ -41,9 +41,11 @@ import { mergeCallsWithImport } from "@/lib/dc-data/merge-calls-with-import";
 import { getPostDcTranscriptForCall } from "@/lib/demo/build-post-dc-transcript";
 import {
   getImportVersion,
+  resolveCallStatusOverrides,
   resolveCall,
   resolveCallBrief,
   resolveCalls,
+  resolveFranchiseDemoCallForList,
   resolvePostCallReview,
   resolvePostDcRecordForCall,
 } from "@/lib/dc-data/resolvers";
@@ -190,15 +192,17 @@ function buildInternalEmailFallback(
 
 async function fetchCallsFromApi(): Promise<Call[]> {
   const imported = resolveCalls();
+  const statusOverrides = resolveCallStatusOverrides();
+  const demoCall = resolveFranchiseDemoCallForList();
   const api = await bffFetch<Call[]>("/api/calls");
   if (api && api.length > 0) {
-    return mergeFranchiseDemoCalls(mergeCallsWithImport(api, imported));
+    return mergeFranchiseDemoCalls(mergeCallsWithImport(api, imported, statusOverrides), demoCall);
   }
-  return mergeFranchiseDemoCalls(imported);
+  return mergeFranchiseDemoCalls(imported, demoCall);
 }
 
 export function useCalls() {
-  const localCalls = mergeFranchiseDemoCalls(resolveCalls());
+  const localCalls = mergeFranchiseDemoCalls(resolveCalls(), resolveFranchiseDemoCallForList());
   return useQuery({
     queryKey: ["calls", getImportVersion()],
     queryFn: fetchCallsFromApi,
@@ -215,7 +219,7 @@ export function useCall(callId: string) {
       const local = resolveCall(callId);
       const api = await bffFetch<Call>(`/api/calls/${callId}`);
       if (api && local) {
-        return mergeCallsWithImport([api], [local])[0] ?? api;
+        return mergeCallsWithImport([api], [local], resolveCallStatusOverrides())[0] ?? api;
       }
       if (api) return api;
       if (local) return local;
@@ -340,8 +344,9 @@ export function usePostCallReview(callId: string) {
     queryKey: ["post-call", callId, getImportVersion()],
     placeholderData: localReview,
     queryFn: async () => {
+      const state = useDcImportsStore.getState();
+      if (state.statusOverridesByCallId[callId] === "upcoming") return null;
       if (callId === FRANCHISE_DEMO_CALL_ID) {
-        const state = useDcImportsStore.getState();
         if (
           !state.emailDraftsByCallId[callId] ||
           hasClientUnsafeEmailText(state.emailDraftsByCallId[callId]) ||
@@ -568,6 +573,27 @@ export function useKbAsset(assetId: string) {
       if (api) return api;
       throw new Error(`Asset not found: ${assetId}`);
     },
+    staleTime: QUERY_STALE_TIME_MS,
+  });
+}
+
+export interface KbAssetSuggestionStats {
+  assetId: string;
+  suggestedLeadCount: number;
+}
+
+export function useKbAssetSuggestionStats(assetId: string | null | undefined) {
+  const normalizedAssetId = assetId ?? "";
+
+  return useQuery({
+    queryKey: ["kb-asset-suggestion-stats", normalizedAssetId],
+    queryFn: async () => {
+      const api = await bffFetch<KbAssetSuggestionStats>(
+        `/api/kb/assets/${encodeURIComponent(normalizedAssetId)}/suggestion-stats`
+      );
+      return api ?? { assetId: normalizedAssetId, suggestedLeadCount: 0 };
+    },
+    enabled: normalizedAssetId.length > 0,
     staleTime: QUERY_STALE_TIME_MS,
   });
 }

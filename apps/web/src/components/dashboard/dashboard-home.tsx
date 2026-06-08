@@ -34,7 +34,7 @@ export function DashboardHome() {
       <AssistantGreeting />
       {showImportPrompt && <DashboardImportPrompt />}
       <DailyBriefingCard enabled={importsHydrated} />
-      <div className="grid gap-3 lg:grid-cols-[1fr_1.2fr] lg:items-stretch">
+      <div className="grid gap-3 lg:grid-cols-2 lg:items-stretch">
         <AiTodoList />
         <UnifiedAgenda />
       </div>

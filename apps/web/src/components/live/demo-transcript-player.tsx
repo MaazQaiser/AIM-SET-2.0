@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@dc-copilot/ui/components/button";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   applyApiDemoResult,
   applyClientDemoSegment,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/demo/client-live-call-demo";
 import { getDemoTranscriptForCall } from "@/lib/demo-live-transcript";
 import { useLiveCall } from "@/stores/use-live-call";
+import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { FastForward, Play, Square } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -34,8 +36,22 @@ export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
   const modeRef = useRef<DemoMode>("api");
   const apiQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lines = getDemoTranscriptForCall(callId);
+  const queryClient = useQueryClient();
   const appendTranscriptEvent = useLiveCall((s) => s.appendTranscriptEvent);
   const setConnected = useLiveCall((s) => s.setConnected);
+  const setCallStatus = useDcImportsStore((s) => s.setCallStatus);
+
+  function markCallCompleted() {
+    setCallStatus(callId, "completed");
+    void fetch(`/api/calls/${callId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "completed" }),
+    }).finally(() => {
+      void queryClient.invalidateQueries({ queryKey: ["calls"] });
+      void queryClient.invalidateQueries({ queryKey: ["call", callId] });
+    });
+  }
 
   async function postDemoSegment(lineIndex: number) {
     const line = lines[lineIndex];
@@ -109,6 +125,7 @@ export function DemoTranscriptPlayer({ callId }: DemoTranscriptPlayerProps) {
       process.env.NEXT_PUBLIC_DEMO_CLIENT_ONLY === "true" ? "client" : "api";
     modeRef.current = resolved;
     setMode(resolved);
+    markCallCompleted();
 
     setConnected(true);
     useLiveCall.getState().reset();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Sparkles } from "lucide-react";
@@ -15,6 +15,7 @@ import { useCallBrief, usePostCallReview } from "@/lib/data/hooks";
 import { resolvePostCallReview } from "@/lib/dc-data/resolvers";
 import { seedChecklistFromCall } from "@/lib/discovery-checklist-seed";
 import { usePersona } from "@/hooks/use-persona";
+import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { Button } from "@dc-copilot/ui/components/button";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { CallDetailPageLoader } from "@/components/layout/page-loaders";
@@ -44,12 +45,24 @@ export function CallDetailTabs({
   const { data: review } = usePostCallReview(callId);
   const [runningWorkflow, setRunningWorkflow] = useState(false);
   const persona = usePersona();
+  const setCallStatus = useDcImportsStore((s) => s.setCallStatus);
 
   const leadershipPreview = persona === "leadership";
   const importedReview = resolvePostCallReview(callId);
-  const postDcReady =
-    (call.status === "completed" || Boolean(importedReview)) &&
-    Boolean(review ?? importedReview);
+  const postDcReady = Boolean(review ?? importedReview);
+
+  useEffect(() => {
+    if (!postDcReady || call.status === "completed") return;
+    setCallStatus(callId, "completed");
+    void fetch(`/api/calls/${callId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "completed" }),
+    }).finally(() => {
+      void queryClient.invalidateQueries({ queryKey: ["calls"] });
+      void queryClient.invalidateQueries({ queryKey: ["call", callId] });
+    });
+  }, [call.status, callId, postDcReady, queryClient, setCallStatus]);
 
   const runPreDcWorkflow = async () => {
     setRunningWorkflow(true);

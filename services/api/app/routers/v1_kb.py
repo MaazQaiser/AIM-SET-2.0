@@ -12,6 +12,7 @@ from dc_core.tenancy import TenantContext
 
 from app.config import get_settings
 from app.deps import get_tenant_context
+from app.domain.calls_service import CallsService
 from app.domain.kb_constants import ALLOWED_ASSET_TYPES, ALLOWED_EXTENSIONS, EXTENSION_MIME
 from app.domain.kb_project_repository import get_kb_project, list_kb_projects
 from app.domain.kb_tenancy import resolve_kb_tenant
@@ -20,6 +21,7 @@ from app.orchestrator.dispatcher import Orchestrator
 from app.services.kb_ingest_service import process_ingest_job
 
 router = APIRouter(prefix="/api/v1/kb", tags=["kb"])
+_calls = CallsService()
 _orch = Orchestrator()
 
 
@@ -46,6 +48,14 @@ def get_asset(asset_id: str, ctx: TenantContext = Depends(get_tenant_context)) -
     if not asset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
     return asset
+
+
+@router.get("/assets/{asset_id}/suggestion-stats")
+def get_asset_suggestion_stats(
+    asset_id: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    return _calls.asset_suggestion_stats(ctx, asset_id)
 
 
 @router.get("/projects")

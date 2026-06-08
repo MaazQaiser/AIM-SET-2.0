@@ -37,6 +37,12 @@ function contentTypeLabel(type: string): string {
   return type.replace(/_/g, " ");
 }
 
+function compactText(value: string, limit = 56): string {
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (clean.length <= limit) return clean;
+  return `${clean.slice(0, limit - 1).trimEnd()}…`;
+}
+
 export function useAiTodos() {
   const { data: calls = [] } = useCalls();
   const { data: coachingInsights = [] } = useCoachingInsights();
@@ -73,7 +79,7 @@ export function useAiTodos() {
         title: hasFollowUp
           ? "Approve follow-up email & tasks"
           : `Approve ${pendingTasks.length} task${pendingTasks.length > 1 ? "s" : ""}`,
-        subtitle: `${pendingTasks.length} item${pendingTasks.length > 1 ? "s" : ""} · Post-call · awaiting sign-off`,
+        subtitle: `${pendingTasks.length} awaiting sign-off`,
         agent: "post_dc",
         priority: "high",
         href: latestPostDcHref(calls),
@@ -95,7 +101,7 @@ export function useAiTodos() {
           call.status === "live"
             ? `Run live cockpit for ${call.accountName}`
             : `Prep for ${call.accountName}`,
-        subtitle: `${Number.isFinite(at.getTime()) ? format(at, "h:mm a") : "Today"} · ${lead} · review brief, pains, and discovery questions`,
+        subtitle: `${Number.isFinite(at.getTime()) ? format(at, "h:mm a") : "Today"} · ${lead}`,
         agent: "live-call",
         priority: urgent ? "high" : "medium",
         href: call.status === "live" ? `/calls/${call.id}/live` : `/calls/${call.id}`,
@@ -107,7 +113,7 @@ export function useAiTodos() {
       items.push({
         id: `todo-content-${gap.id}`,
         title: `Generate ${type} for ${gap.accountName}`,
-        subtitle: gap.name,
+        subtitle: compactText(gap.name, 48),
         agent: "content_generation",
         priority: gap.priority <= 1 ? "high" : "medium",
         href: gap.studioHref,
@@ -119,7 +125,7 @@ export function useAiTodos() {
       items.push({
         id: `todo-deck-${call.id}`,
         title: `Prepare deck for ${call.accountName}`,
-        subtitle: "Tailor proof points and story before the call",
+        subtitle: "Tailor proof points",
         agent: "content_generation",
         priority: "medium",
         href: buildArtifactStudioHref({
@@ -148,7 +154,7 @@ export function useAiTodos() {
       items.push({
         id: `todo-clp-activity-${topClpCallId}`,
         title: `Review lead hub activity${topClpAccountName ? ` for ${topClpAccountName}` : ""}`,
-        subtitle: activityParts.join(" · "),
+        subtitle: activityParts.slice(0, 2).join(" · "),
         agent: "post_dc",
         priority:
           (topClpStats?.unreadNotifications ?? 0) > 0 || (topClpStats?.proposalOpens ?? 0) > 0
@@ -160,7 +166,7 @@ export function useAiTodos() {
       items.push({
         id: `todo-clp-draft-${topClpCallId}`,
         title: `Finish lead hub${topClpAccountName ? ` for ${topClpAccountName}` : ""}`,
-        subtitle: "Draft customer landing page · polish and publish",
+        subtitle: "Draft lead hub",
         agent: "post_dc",
         priority: "medium",
         href: `/calls/${topClpCallId}/landing-page`,

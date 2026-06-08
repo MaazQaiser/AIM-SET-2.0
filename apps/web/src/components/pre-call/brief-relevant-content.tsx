@@ -21,7 +21,11 @@ import { toast } from "sonner";
 export type BriefRelevantContentSection = "all" | "documents" | "projects";
 
 function hasRelevantContent(brief: CallBrief): boolean {
-  return Boolean(brief.relevantDocuments?.length || brief.recommendedDeck);
+  return Boolean(
+    brief.relevantDocuments?.length ||
+      brief.relevantProjects?.length ||
+      brief.recommendedDeck
+  );
 }
 
 async function fetchRelevantContent(callId: string, refresh: boolean) {
@@ -47,7 +51,7 @@ interface BriefRelevantContentProps {
 }
 
 function RelevanceBar({ score, className }: { score: number; className?: string }) {
-  const pct = Math.round(score * 100);
+  const pct = Math.round(Math.min(1, Math.max(0, score)) * 100);
   return (
     <div className={cn("flex w-full max-w-[220px] items-center gap-2", className)}>
       <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
@@ -132,16 +136,24 @@ export function BriefRelevantContent({
                         className="h-9 w-9"
                       />
                       <div className="min-w-0 flex-1">
-                        <p
-                          className={cn(
-                            briefMainLead,
-                            doc.relevanceScore >= 0.7 && briefMainUnderline,
-                            "break-words"
-                          )}
-                        >
-                          {doc.title}
-                        </p>
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                          <p
+                            className={cn(
+                              briefMainLead,
+                              doc.relevanceScore >= 0.7 && briefMainUnderline,
+                              "min-w-0 flex-1 break-words"
+                            )}
+                          >
+                            {doc.title}
+                          </p>
+                          <span className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 type-caption font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+                            {Math.round(Math.min(1, Math.max(0, doc.relevanceScore)) * 100)}% relevance
+                          </span>
+                        </div>
                         <RelevanceBar score={doc.relevanceScore} className="mt-2" />
+                        {doc.snippet ? (
+                          <p className={cn(briefMainMuted, "mt-1 line-clamp-2")}>{doc.snippet}</p>
+                        ) : null}
                       </div>
                     </div>
                     <Button
@@ -183,11 +195,11 @@ export function BriefRelevantContent({
                       >
                         {project.title}
                       </span>
-                      <RelevanceBar
-                        score={project.relevanceScore}
-                        className="max-w-[88px] shrink-0"
-                      />
+                      <span className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 type-caption font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+                        {Math.round(Math.min(1, Math.max(0, project.relevanceScore)) * 100)}% relevance
+                      </span>
                     </div>
+                    <RelevanceBar score={project.relevanceScore} className="mt-2 max-w-[160px]" />
                     {project.summary ? (
                       <p className={cn(briefMainMuted, "mt-1 line-clamp-1")}>{project.summary}</p>
                     ) : null}
@@ -329,7 +341,7 @@ export function BriefRelevantContentLoader({
   if (loading) {
     return (
       <div className="flex items-center gap-2 type-body text-muted-foreground py-4">
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <Loader2 className="h-4 w-4 animate-spin text-foreground" />
         Loading KB matches from knowledge base…
       </div>
     );
@@ -347,7 +359,7 @@ export function BriefRelevantContentLoader({
           onClick={() => void refresh()}
         >
           {refreshing ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-foreground" />
           ) : (
             <RefreshCw className="h-3.5 w-3.5" />
           )}

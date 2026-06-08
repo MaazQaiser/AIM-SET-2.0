@@ -599,13 +599,13 @@ export const FRANCHISE_DEMO_TRANSCRIPT: DemoTranscriptLine[] = [
   },
 ];
 
-export function mergeFranchiseDemoCalls(calls: Call[]): Call[] {
+export function mergeFranchiseDemoCalls(calls: Call[], demoCall: Call = franchiseDemoCall): Call[] {
   if (calls.some((c) => c.id === FRANCHISE_DEMO_CALL_ID)) return calls;
   const hasSameAccount = calls.some(
-    (c) => c.accountName?.trim().toLowerCase() === franchiseDemoCall.accountName.trim().toLowerCase()
+    (c) => c.accountName?.trim().toLowerCase() === demoCall.accountName.trim().toLowerCase()
   );
   if (hasSameAccount) return calls;
-  return [franchiseDemoCall, ...calls];
+  return [demoCall, ...calls];
 }
 
 export function isFranchiseDemoCall(callId: string): boolean {

@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, HelpCircle, Presentation, Users } from "lucide-react";
+import { AlertCircle, HelpCircle, Loader2, Presentation, Users } from "lucide-react";
 import { ConfidenceTag } from "@/components/confidence-tag";
 import { BANTScorecard } from "@/components/bant-scorecard";
 import { KbAssetPreview } from "@/components/knowledge/kb-asset-preview";
-import { KbFileFormatIcon } from "@/components/knowledge/kb-file-format-badge";
 import {
   BriefDetailAccordion,
   BriefDetailCard,
@@ -395,7 +394,10 @@ export function BriefDeckCard({
             "This searches the KB for one existing presentation file only: the PPT or PPTX that best matches the account and call context.",
         }}
       >
-        <p className={briefMainMuted}>Checking the knowledge base for the best existing PPT/PPTX deck…</p>
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin text-foreground" />
+          <p className={briefMainMuted}>Checking the knowledge base for the best existing PPT/PPTX deck…</p>
+        </div>
       </BriefDetailCard>
     );
   }
@@ -436,19 +438,11 @@ export function BriefDeckCard({
           "This is an existing KB presentation selected for reuse. The system chooses one PPT/PPTX with the strongest relevance to the account, needs, and service area.",
       }}
     >
-      <div className="flex items-start gap-3 min-w-0">
-        <KbFileFormatIcon fileName={deck.fileName} mimeType={deck.mimeType} />
-        <div className="min-w-0 flex-1">
-          <p className={cn(briefMainLead, "font-semibold break-words leading-snug")}>
-            {deck.title}
-          </p>
-        </div>
-      </div>
       <KbAssetPreview
         asset={previewAsset}
         indexedText={deck.previewText ?? deck.snippet}
         compact
-        className="w-full mt-4"
+        className="w-full"
       />
     </BriefDetailCard>
   );

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { PlainMarkdownBold } from "@/components/post-dc/plain-markdown-bold";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import type { PostCallEmailDraft } from "@/lib/brief-types";
 
@@ -71,7 +72,7 @@ export function EmailDraftPreview({ draft, showCopy = true }: EmailDraftPreviewP
       <div className="min-h-0 flex-1 space-y-1.5">
         <p className="type-kicker text-muted-foreground">Body</p>
         <div className="type-caption text-muted-foreground leading-relaxed whitespace-pre-wrap break-words line-clamp-[10]">
-          {bodyLines.join("\n")}
+          <PlainMarkdownBold text={bodyLines.join("\n")} />
           {draft.body_markdown.split("\n").filter((l) => l.trim()).length > bodyLines.length ? "\n…" : ""}
         </div>
       </div>

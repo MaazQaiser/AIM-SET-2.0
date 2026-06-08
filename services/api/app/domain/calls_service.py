@@ -38,6 +38,56 @@ def call_id_aliases(call_id: str) -> List[str]:
     return list(dict.fromkeys(aliases))
 
 
+def _asset_ref_matches(item: Any, asset_id: str) -> bool:
+    if not isinstance(item, dict):
+        return False
+    for key in (
+        "assetId",
+        "asset_id",
+        "kbAssetId",
+        "kb_asset_id",
+        "sourceAssetId",
+        "source_asset_id",
+    ):
+        if str(item.get(key) or "").strip() == asset_id:
+            return True
+    return False
+
+
+def _asset_match_item_matches(item: Any, asset_id: str) -> bool:
+    if _asset_ref_matches(item, asset_id):
+        return True
+    return isinstance(item, dict) and str(item.get("id") or "").strip() == asset_id
+
+
+def _brief_suggests_asset(payload: Any, asset_id: str) -> bool:
+    if not isinstance(payload, dict):
+        return False
+
+    if _asset_ref_matches(payload.get("recommendedDeck"), asset_id):
+        return True
+    if any(_asset_ref_matches(doc, asset_id) for doc in payload.get("relevantDocuments") or []):
+        return True
+    if any(_asset_ref_matches(item, asset_id) for item in payload.get("artifactFulfillment") or []):
+        return True
+    if any(_asset_ref_matches(item, asset_id) for item in payload.get("kbSuggestions") or []):
+        return True
+
+    for item in payload.get("contentToGenerate") or []:
+        if not isinstance(item, dict):
+            continue
+        if _asset_ref_matches(item.get("recommendedDeck"), asset_id):
+            return True
+        if any(_asset_ref_matches(doc, asset_id) for doc in item.get("relevantDocuments") or []):
+            return True
+        if any(_asset_match_item_matches(match, asset_id) for match in item.get("kbMatches") or []):
+            return True
+        if any(_asset_ref_matches(source, asset_id) for source in item.get("evidence") or []):
+            return True
+
+    return False
+
+
 def _memory_fallback_clerk_key(ctx: TenantContext) -> str:
     settings = get_settings()
     if settings.kb_shared_mode:
@@ -65,6 +115,7 @@ def _field_text(fields: Dict[str, Any], *keys: str) -> str:
 
 
 _COMPANY_STAGES = ("SMB", "Ideation", "Startup", "Funded Startup", "Enterprise")
+_CALL_STATUSES = {"upcoming", "live", "completed", "no-show"}
 
 
 def _hash_seed(value: str) -> int:
@@ -139,6 +190,22 @@ def _icp_score_from_bucket(bucket: str) -> float:
 
 def _deal_stage_from_fields(fields: Dict[str, Any], *, call_id: str) -> str:
     return _normalize_company_stage(fields, call_id=call_id)
+
+
+def _resolve_call_status(
+    persisted_status: Optional[str],
+    imported_status: Optional[str],
+) -> str:
+    """Resolve competing status sources without letting Pre-DC import rewind a call."""
+    persisted = persisted_status if persisted_status in _CALL_STATUSES else None
+    imported = imported_status if imported_status in _CALL_STATUSES else None
+    if persisted == "completed" or imported == "completed":
+        return "completed"
+    if persisted == "no-show" or imported == "no-show":
+        return "no-show"
+    if persisted == "live" or imported == "live":
+        return "live"
+    return persisted or imported or "upcoming"
 
 
 def build_calls_from_pre_dc(
@@ -316,6 +383,43 @@ class CallsService:
         if rows:
             supabase.table("calls").upsert(rows).execute()
 
+    def mark_call_status(
+        self,
+        ctx: TenantContext,
+        call_id: str,
+        status: str,
+    ) -> Dict[str, Any]:
+        if status not in _CALL_STATUSES:
+            raise ValueError(f"Unsupported call status: {status}")
+
+        try:
+            clerk_key = self._clerk_key(ctx)
+        except Exception:
+            clerk_key = self._fallback_clerk_key(ctx)
+
+        call = self.get_call(ctx, call_id) or {
+            "id": call_id,
+            "accountName": call_id,
+            "scheduledAt": datetime.now(timezone.utc).isoformat(),
+            "briefReady": False,
+            "pod": [],
+        }
+        call["status"] = status
+
+        for tenant_key in _memory_clerk_aliases(ctx, clerk_key):
+            get_memory_store().upsert_calls(tenant_key, [call])
+
+        if get_settings().supabase_configured:
+            try:
+                self._persist_calls(ctx, [call])
+            except Exception:
+                pass
+
+        return call
+
+    def mark_call_completed(self, ctx: TenantContext, call_id: str) -> Dict[str, Any]:
+        return self.mark_call_status(ctx, call_id, "completed")
+
     def list_calls(self, ctx: TenantContext) -> List[Dict[str, Any]]:
         tenant_uuid, clerk_key = self._read_tenant_keys(ctx)
         if not get_settings().supabase_configured:
@@ -378,7 +482,7 @@ class CallsService:
                     **enriched,
                     **call,
                     "scheduledAt": call.get("scheduledAt") or enriched.get("scheduledAt"),
-                    "status": enriched.get("status") or call.get("status"),
+                    "status": _resolve_call_status(call.get("status"), enriched.get("status")),
                     "bant": enriched.get("bant") or call.get("bant"),
                     "dealStage": call.get("dealStage") or enriched.get("dealStage"),
                     "industry": call.get("industry") or enriched.get("industry"),
@@ -430,6 +534,49 @@ class CallsService:
                         get_memory_store().save_call_brief(clerk_key, call_id, payload)
                     return apply_summary_titles_to_brief(payload)
         return None
+
+    def asset_suggestion_stats(self, ctx: TenantContext, asset_id: str) -> Dict[str, Any]:
+        asset_id = str(asset_id or "").strip()
+        matched_call_ids: set[str] = set()
+        if not asset_id:
+            return {"assetId": asset_id, "suggestedLeadCount": 0}
+
+        tenant_uuid, clerk_key = self._read_tenant_keys(ctx)
+        rows: List[Dict[str, Any]] = []
+
+        if get_settings().supabase_configured:
+            try:
+                result = execute_with_retry(
+                    lambda: (
+                        get_supabase()
+                        .table("call_briefs")
+                        .select("call_id,payload")
+                        .eq("tenant_id", tenant_uuid)
+                        .execute()
+                    )
+                )
+                rows = result.data or []
+            except Exception:
+                rows = []
+
+        if not rows:
+            seen: set[str] = set()
+            for tenant_key in _memory_clerk_aliases(ctx, clerk_key):
+                for call_id, payload in get_memory_store().call_briefs.get(tenant_key, {}).items():
+                    key = f"{tenant_key}:{call_id}"
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    rows.append({"call_id": call_id, "payload": payload})
+
+        for row in rows:
+            payload = row.get("payload") or {}
+            if _brief_suggests_asset(payload, asset_id):
+                call_id = str(row.get("call_id") or payload.get("callId") or "").strip()
+                if call_id:
+                    matched_call_ids.add(call_id)
+
+        return {"assetId": asset_id, "suggestedLeadCount": len(matched_call_ids)}
 
     def save_brief(self, ctx: TenantContext, call_id: str, payload: Dict[str, Any]) -> None:
         clerk_key = self._clerk_key(ctx)

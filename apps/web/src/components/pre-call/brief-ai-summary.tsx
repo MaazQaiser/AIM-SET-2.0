@@ -582,11 +582,11 @@ export function BriefAISummary({ brief, call }: BriefAISummaryProps) {
           "The workflow summarizes imported lead research into one readout. The relevance section shows relevant project count, project names, and the overall KB match percentage.",
       }}
     >
-      <div className="space-y-2.5 min-w-0">
+      <div className="space-y-3.5 min-w-0">
         {summarySections.map((section) => (
           <section
             key={section.id}
-            className="space-y-1.5 border-t border-border/60 pt-2.5 first:border-t-0 first:pt-0"
+            className="space-y-2 border-t border-border/60 pt-3.5 first:border-t-0 first:pt-0"
           >
             <SummarySectionTitle section={section} intercom={isIntercom} />
             <HighlightedSummary

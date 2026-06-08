@@ -12,18 +12,38 @@ import type { ContentTemplate } from "@/types/content_studio";
 
 type UploadPhase = "idle" | "uploading" | "processing" | "done";
 
+const MAX_TEMPLATE_UPLOAD_BYTES = 52_428_800;
+
 interface TemplateUploadResponse {
   template: ContentTemplate;
   storagePath: string;
 }
 
-function uploadTemplateWithProgress(
+interface TemplateUploadTarget {
+  uploadUrl: string;
+  token: string;
+}
+
+async function prepareTemplateUpload(): Promise<TemplateUploadTarget | null> {
+  const res = await fetch("/api/content/templates/upload/prepare", {
+    method: "POST",
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return res.json() as Promise<TemplateUploadTarget>;
+}
+
+function sendTemplateUpload(
   form: FormData,
+  target: TemplateUploadTarget | null,
   onUploadPct: (pct: number) => void
 ): Promise<TemplateUploadResponse> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/content/templates/upload");
+    xhr.open("POST", target?.uploadUrl ?? "/api/content/templates/upload");
+    if (target?.token) {
+      xhr.setRequestHeader("Authorization", `Bearer ${target.token}`);
+    }
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
         onUploadPct(Math.round((event.loaded / event.total) * 100));
@@ -47,6 +67,14 @@ function uploadTemplateWithProgress(
     xhr.onerror = () => reject(new Error("Network error during template upload."));
     xhr.send(form);
   });
+}
+
+async function uploadTemplateWithProgress(
+  form: FormData,
+  onUploadPct: (pct: number) => void
+): Promise<TemplateUploadResponse> {
+  const target = await prepareTemplateUpload();
+  return sendTemplateUpload(form, target, onUploadPct);
 }
 
 async function pollTemplate(
@@ -88,6 +116,10 @@ export default function TemplateUploadPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file) return;
+    if (file.size > MAX_TEMPLATE_UPLOAD_BYTES) {
+      setError("Template file is too large. Please upload a PPT/PPTX under 50 MB.");
+      return;
+    }
     setError("");
     setPhase("uploading");
     setUploadPct(0);

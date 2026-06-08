@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { format } from "date-fns";
-import { Calendar, Database, Layers, Tag, TrendingUp } from "lucide-react";
+import { Calendar, Database, Layers, Tag, TrendingUp, Users } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { KbFileFormatBadge } from "@/components/knowledge/kb-file-format-badge";
 import type { KBAsset } from "@/types";
@@ -34,17 +34,25 @@ function formatAssetType(type: string) {
 
 interface KbAssetStatisticsProps {
   asset: KBAsset;
+  suggestedLeadCount?: number;
+  suggestedLeadCountLoading?: boolean;
   className?: string;
 }
 
-export function KbAssetStatistics({ asset, className }: KbAssetStatisticsProps) {
+export function KbAssetStatistics({
+  asset,
+  suggestedLeadCount,
+  suggestedLeadCountLoading = false,
+  className,
+}: KbAssetStatisticsProps) {
   const status = asset.status ?? "ready";
+  const leadCount = suggestedLeadCount ?? 0;
 
   return (
     <div className={cn("space-y-4", className)}>
       <div>
         <p className="type-kicker text-muted-foreground">Statistics</p>
-        <div className="mt-3 space-y-2.5 rounded-lg border border-border bg-muted/20 p-3">
+        <div className="mt-4 space-y-3">
           <StatRow
             label="Format"
             value={<KbFileFormatBadge fileName={asset.fileName} mimeType={asset.mimeType} />}
@@ -72,6 +80,15 @@ export function KbAssetStatistics({ asset, className }: KbAssetStatisticsProps) 
               icon={TrendingUp}
             />
           ) : null}
+          <StatRow
+            label="Suggested in"
+            value={
+              suggestedLeadCountLoading
+                ? "..."
+                : `${leadCount} ${leadCount === 1 ? "lead" : "leads"}`
+            }
+            icon={Users}
+          />
           {asset.uploadedAt ? (
             <StatRow
               label="Uploaded"

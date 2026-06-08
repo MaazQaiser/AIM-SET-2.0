@@ -26,6 +26,12 @@ export interface ClpAssetRef {
   kind?: string;
   displayMode?: "embed" | "card" | "download";
   caption?: string;
+  fileName?: string;
+  mimeType?: string;
+  hasPreview?: boolean;
+  previewSlideCount?: number;
+  previewUrl?: string;
+  downloadUrl?: string;
 }
 
 export interface ClpSuggestion {

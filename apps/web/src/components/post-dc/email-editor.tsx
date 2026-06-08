@@ -20,6 +20,7 @@ import { Input } from "@dc-copilot/ui/components/input";
 import { Label } from "@dc-copilot/ui/components/label";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { AIGeneratedBadge } from "@/components/ai-generated-badge";
+import { PlainMarkdownBold } from "@/components/post-dc/plain-markdown-bold";
 import { Separator } from "@dc-copilot/ui/components/separator";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@dc-copilot/ui/components/tooltip";
@@ -302,7 +303,7 @@ export function EmailEditor({
           />
         ) : (
           <div className="whitespace-pre-wrap type-body text-foreground leading-relaxed">
-            {local.body_markdown}
+            <PlainMarkdownBold text={local.body_markdown} />
           </div>
         )}
       </div>

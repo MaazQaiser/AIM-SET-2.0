@@ -72,14 +72,26 @@ def _apply_kb_entries(
             }
         )
         if len(selected_assets) < 4 and not any(a["assetId"] == asset_id for a in selected_assets):
-            selected_assets.append(
-                {
-                    "assetId": asset_id,
-                    "title": title,
-                    "kind": entry.get("format") or entry.get("type") or entry.get("kind") or "document",
-                    "displayMode": "embed",
-                }
-            )
+            asset_ref = {
+                "assetId": asset_id,
+                "title": title,
+                "kind": entry.get("format") or entry.get("type") or entry.get("kind") or "document",
+                "displayMode": "embed",
+            }
+            for source_key, target_key in (
+                ("fileName", "fileName"),
+                ("file_name", "fileName"),
+                ("mimeType", "mimeType"),
+                ("mime_type", "mimeType"),
+                ("hasPreview", "hasPreview"),
+                ("previewSlideCount", "previewSlideCount"),
+                ("preview_slide_count", "previewSlideCount"),
+                ("previewUrl", "previewUrl"),
+                ("downloadUrl", "downloadUrl"),
+            ):
+                if entry.get(source_key) is not None and asset_ref.get(target_key) is None:
+                    asset_ref[target_key] = entry[source_key]
+            selected_assets.append(asset_ref)
         added += 1
 
 
@@ -223,6 +235,10 @@ def run_clp_generate(
                         "assetId": str(aid),
                         "title": found.get("name") or "Attachment",
                         "displayMode": "embed",
+                        "fileName": found.get("fileName"),
+                        "mimeType": found.get("mimeType"),
+                        "previewUrl": found.get("previewUrl"),
+                        "downloadUrl": found.get("downloadUrl"),
                     }
                 )
 

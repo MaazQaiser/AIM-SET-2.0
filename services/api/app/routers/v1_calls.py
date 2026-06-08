@@ -65,6 +65,19 @@ def post_call_pipeline(call_id: str, ctx: TenantContext = Depends(get_tenant_con
     return _orch.dispatch_post_call(ctx, call_id)
 
 
+@router.patch("/{call_id}/status")
+def update_call_status(
+    call_id: str,
+    body: Dict[str, Any],
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    status = str(body.get("status") or "").strip()
+    try:
+        return _calls.mark_call_status(ctx, call_id, status)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.get("/{call_id}/post-call")
 def get_post_call_review(call_id: str, ctx: TenantContext = Depends(get_tenant_context)) -> Dict[str, Any]:
     payload = _calls.get_post_review(ctx, call_id)
@@ -96,7 +109,12 @@ def start_recall_bot(
         raise HTTPException(status_code=400, detail="meeting_url must be an http(s) URL")
 
     try:
-        return create_recall_live_bot(ctx, call_id, meeting_url)
+        result = create_recall_live_bot(ctx, call_id, meeting_url)
+        try:
+            _calls.mark_call_completed(ctx, call_id)
+        except Exception:
+            pass
+        return result
     except RecallConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except RecallAPIError as exc:

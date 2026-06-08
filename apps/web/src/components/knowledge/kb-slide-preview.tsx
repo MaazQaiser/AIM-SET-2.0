@@ -1,8 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Loader2, Maximize2 } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@dc-copilot/ui/components/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@dc-copilot/ui/components/tooltip";
+import { KbFileFormatIcon } from "@/components/knowledge/kb-file-format-badge";
 import {
   KB_SLIDE_PREVIEW_CACHE_VERSION,
   kbFileUrl,
@@ -11,11 +20,17 @@ import {
   kbSlideUrl,
 } from "@/lib/kb/file-format";
 import { cn } from "@/lib/cn";
-import { briefMainNestedSurfaceClass } from "@/components/pre-call/brief-detail-card";
+import {
+  briefDetailDialogClass,
+  briefMainNestedSurfaceClass,
+} from "@/components/pre-call/brief-detail-card";
 import type { KBAsset } from "@/types";
 
 interface KbSlidePreviewProps {
-  asset: Pick<KBAsset, "id" | "title" | "fileName" | "status" | "previewSlideCount">;
+  asset: Pick<
+    KBAsset,
+    "id" | "title" | "fileName" | "mimeType" | "status" | "previewSlideCount"
+  >;
   compact?: boolean;
   className?: string;
 }
@@ -29,6 +44,7 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
   const [slideCacheVersion, setSlideCacheVersion] = useState(KB_SLIDE_PREVIEW_CACHE_VERSION);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fullScreenOpen, setFullScreenOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,11 +123,6 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
     };
   }, [previewPdfUrl]);
 
-  const slideSrc = useMemo(
-    () => kbSlideUrl(asset.id, currentSlide, slideCacheVersion),
-    [asset.id, currentSlide, slideCacheVersion]
-  );
-
   if (loading) {
     return (
       <div
@@ -122,7 +133,7 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
           className
         )}
       >
-        <Loader2 className="h-5 w-5 animate-spin" />
+        <Loader2 className="h-5 w-5 animate-spin text-foreground" />
         Loading slides…
       </div>
     );
@@ -143,56 +154,204 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
   }
 
   return (
+    <>
+      <KbSlidePreviewFrame
+        asset={asset}
+        currentSlide={currentSlide}
+        downloadUrl={downloadUrl}
+        mode={compact ? "compact" : "default"}
+        onExpand={() => setFullScreenOpen(true)}
+        previewPdfUrl={previewPdfUrl}
+        setError={setError}
+        setCurrentSlide={setCurrentSlide}
+        setUsePdfFallback={setUsePdfFallback}
+        slideCacheVersion={slideCacheVersion}
+        slideCount={slideCount}
+        usePdfFallback={usePdfFallback}
+        className={className}
+      />
+
+      <Dialog open={fullScreenOpen} onOpenChange={setFullScreenOpen}>
+        <DialogContent
+          className={cn(
+            briefDetailDialogClass,
+            "left-0 top-0 flex h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-background p-0"
+          )}
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>{asset.title}</DialogTitle>
+            <DialogDescription>Full screen slide preview</DialogDescription>
+          </DialogHeader>
+          <KbSlidePreviewFrame
+            asset={asset}
+            currentSlide={currentSlide}
+            downloadUrl={downloadUrl}
+            mode="fullscreen"
+            previewPdfUrl={previewPdfUrl}
+            setError={setError}
+            setCurrentSlide={setCurrentSlide}
+            setUsePdfFallback={setUsePdfFallback}
+            slideCacheVersion={slideCacheVersion}
+            slideCount={slideCount}
+            usePdfFallback={usePdfFallback}
+            className="h-full"
+          />
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+type SlidePreviewMode = "compact" | "default" | "fullscreen";
+
+interface KbSlidePreviewFrameProps {
+  asset: Pick<
+    KBAsset,
+    "id" | "title" | "fileName" | "mimeType" | "status" | "previewSlideCount"
+  >;
+  currentSlide: number;
+  downloadUrl: string | null;
+  mode: SlidePreviewMode;
+  onExpand?: () => void;
+  previewPdfUrl: string | null;
+  setError: (error: string) => void;
+  setCurrentSlide: (updater: (slide: number) => number) => void;
+  setUsePdfFallback: (useFallback: boolean) => void;
+  slideCacheVersion: string;
+  slideCount: number;
+  usePdfFallback: boolean;
+  className?: string;
+}
+
+function KbSlidePreviewFrame({
+  asset,
+  currentSlide,
+  downloadUrl,
+  mode,
+  onExpand,
+  previewPdfUrl,
+  setError,
+  setCurrentSlide,
+  setUsePdfFallback,
+  slideCacheVersion,
+  slideCount,
+  usePdfFallback,
+  className,
+}: KbSlidePreviewFrameProps) {
+  const compact = mode === "compact";
+  const fullScreen = mode === "fullscreen";
+  const slideSrc = useMemo(
+    () => kbSlideUrl(asset.id, currentSlide, slideCacheVersion),
+    [asset.id, currentSlide, slideCacheVersion]
+  );
+
+  return (
     <div
       className={cn(
-        "flex flex-col rounded-lg border overflow-hidden bg-muted/10",
-        briefMainNestedSurfaceClass,
-        compact ? "min-h-0 max-h-80" : "min-h-[70vh]",
+        "flex min-h-0 flex-col overflow-hidden rounded-lg border bg-muted/10",
+        !fullScreen && briefMainNestedSurfaceClass,
+        compact && "min-h-[28rem]",
+        !compact && !fullScreen && "min-h-[70vh]",
+        fullScreen && "h-full rounded-none border-0",
         className
       )}
     >
-      <div className="flex items-center justify-between gap-2 border-b bg-card px-4 py-2">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            disabled={currentSlide <= 1}
-            onClick={() => setCurrentSlide((s) => Math.max(1, s - 1))}
-            aria-label="Previous slide"
+      <div
+        className={cn(
+          "flex shrink-0 flex-wrap items-center justify-between gap-2 border-b bg-card px-4 py-2",
+          fullScreen && "pr-16"
+        )}
+      >
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2 sm:flex-nowrap">
+          <div
+            className={cn(
+              "flex min-w-0 items-center gap-2",
+              fullScreen ? "w-full sm:w-auto sm:max-w-[50vw]" : "w-full sm:w-auto sm:max-w-72 lg:max-w-96"
+            )}
           >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="type-body tabular-nums min-w-[5rem] text-center">
-            Slide {currentSlide} / {slideCount}
-          </span>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            disabled={currentSlide >= slideCount}
-            onClick={() => setCurrentSlide((s) => Math.min(slideCount, s + 1))}
-            aria-label="Next slide"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+            <KbFileFormatIcon
+              fileName={asset.fileName}
+              mimeType={asset.mimeType}
+              size="sm"
+              className="shrink-0"
+            />
+            <span className="truncate type-body font-semibold text-foreground" title={asset.title}>
+              {asset.title}
+            </span>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={currentSlide <= 1}
+              onClick={() => setCurrentSlide((s) => Math.max(1, s - 1))}
+              aria-label="Previous slide"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="min-w-[5.5rem] text-center type-body tabular-nums">
+              Slide {currentSlide} / {slideCount}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={currentSlide >= slideCount}
+              onClick={() => setCurrentSlide((s) => Math.min(slideCount, s + 1))}
+              aria-label="Next slide"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-        {downloadUrl ? (
-          <Button variant="outline" size="sm" className="shrink-0" asChild>
-            <a href={downloadUrl} download={asset.fileName ?? asset.title}>
-              <Download className="h-4 w-4 mr-1" />
-              Download original
-            </a>
-          </Button>
-        ) : null}
+
+        <div className="flex shrink-0 items-center gap-2">
+          {onExpand ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={onExpand}
+                  aria-label="Open full screen preview"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left">Full screen</TooltipContent>
+            </Tooltip>
+          ) : null}
+          {downloadUrl ? (
+            <Button variant="outline" size="sm" className="shrink-0" asChild>
+              <a href={downloadUrl} download={asset.fileName ?? asset.title}>
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Download original</span>
+              </a>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
-      <div className="flex flex-1 min-h-0 items-center justify-center bg-neutral-950/5 p-4">
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 items-center justify-center bg-neutral-950/5",
+          fullScreen ? "p-4 sm:p-6" : "p-4"
+        )}
+      >
         {usePdfFallback && previewPdfUrl ? (
           <iframe
             title={`${asset.title} preview`}
             src={previewPdfUrl}
-            className={cn("w-full rounded-md bg-white", compact ? "h-56" : "h-[65vh]")}
+            className={cn(
+              "w-full rounded-md bg-white",
+              compact && "h-56",
+              !compact && !fullScreen && "h-[65vh]",
+              fullScreen && "h-[calc(100dvh-11rem)]"
+            )}
           />
         ) : (
           <>
@@ -202,8 +361,10 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
               src={slideSrc}
               alt={`${asset.title} — slide ${currentSlide}`}
               className={cn(
-                "max-w-full rounded-md shadow-md object-contain bg-white",
-                compact ? "max-h-48" : "max-h-[65vh]"
+                "max-w-full rounded-md bg-white object-contain shadow-md",
+                compact && "max-h-[22rem]",
+                !compact && !fullScreen && "max-h-[65vh]",
+                fullScreen && "max-h-[calc(100dvh-11rem)]"
               )}
               onError={() => {
                 if (previewPdfUrl) {
@@ -218,15 +379,17 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
       </div>
 
       {slideCount > 1 && !usePdfFallback ? (
-        <div className="flex gap-2 overflow-x-auto border-t bg-card px-4 py-3">
+        <div className="flex shrink-0 gap-2 overflow-x-auto border-t bg-card px-4 py-3">
           {Array.from({ length: slideCount }, (_, i) => i + 1).map((index) => (
             <button
               key={index}
               type="button"
-              onClick={() => setCurrentSlide(index)}
+              onClick={() => setCurrentSlide(() => index)}
               className={cn(
-                "shrink-0 rounded border overflow-hidden transition ring-offset-2",
-                currentSlide === index ? "ring-2 ring-primary border-primary" : "border-transparent opacity-80 hover:opacity-100"
+                "shrink-0 overflow-hidden rounded border ring-offset-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                currentSlide === index
+                  ? "border-primary ring-2 ring-primary"
+                  : "border-transparent opacity-80 hover:opacity-100"
               )}
               aria-label={`Go to slide ${index}`}
             >
@@ -234,7 +397,10 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
               <img
                 src={kbSlideUrl(asset.id, index, slideCacheVersion)}
                 alt=""
-                className="h-14 w-24 object-cover bg-white"
+                className={cn(
+                  "object-cover bg-white",
+                  fullScreen ? "h-16 w-28" : "h-14 w-24"
+                )}
                 loading="lazy"
               />
             </button>

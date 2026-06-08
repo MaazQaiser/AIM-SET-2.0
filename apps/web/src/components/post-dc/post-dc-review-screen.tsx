@@ -36,6 +36,7 @@ import { preDcField } from "@/types/dc-notes";
 import { useDashboardLayoutStore } from "@/stores/use-dashboard-layout";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { PostDcCloseDealAction } from "@/components/post-dc/post-dc-close-deal-action";
+import { ResetToPreDcAction } from "@/components/post-dc/reset-to-pre-dc-action";
 import { BotChatPanel } from "@/components/bot-chat-panel";
 import { briefBodyClass } from "@/components/pre-call/brief-detail-card";
 import { sanitizeClientEmailDraft } from "@/lib/post-dc-client-email-safety";
@@ -399,6 +400,7 @@ export function PostDcReviewScreen({
               showEndReview={false}
             />
             <PostDcCloseDealAction callId={callId} />
+            <ResetToPreDcAction callId={callId} />
           </div>
           <PostDcActionStrip {...postDcWorkflow} />
         </div>
@@ -423,15 +425,18 @@ export function PostDcReviewScreen({
         leadStage={leadStage}
         postDcWorkflow={postDcWorkflow}
         trailingActions={
-          <CallWrapUpActions
-            callId={callId}
-            hasReview={showReview}
-            variant="compact"
-            showLiveLink={false}
-            showPostDcLink={false}
-            showCreateDeck={false}
-            showEndReview={false}
-          />
+          <>
+            <CallWrapUpActions
+              callId={callId}
+              hasReview={showReview}
+              variant="compact"
+              showLiveLink={false}
+              showPostDcLink={false}
+              showCreateDeck={false}
+              showEndReview={false}
+            />
+            <ResetToPreDcAction callId={callId} />
+          </>
         }
       />
       {layoutBody}

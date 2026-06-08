@@ -156,7 +156,7 @@ export function UnifiedAgenda() {
 
   return (
     <Card className="flex h-[380px] flex-col">
-      <CardHeader className="shrink-0 pb-3 pt-5 px-5">
+      <CardHeader className="shrink-0 px-6 pb-4 pt-6">
         <CardTitle className="flex items-center gap-2">
           <Clock className="h-[18px] w-[18px] shrink-0 text-muted-foreground" />
           Upcoming calls
@@ -165,8 +165,8 @@ export function UnifiedAgenda() {
           Next discovery calls
         </p>
       </CardHeader>
-      <CardContent className="flex min-h-0 flex-1 flex-col px-5 pb-5 pt-0">
-        <div className="min-h-0 flex-1 overflow-y-auto pr-0.5 space-y-4">
+      <CardContent className="flex min-h-0 flex-1 flex-col px-6 pb-6 pt-0">
+        <div className="brief-card-scroll brief-card-scroll--sidebar dashboard-card-scroll -mr-[22px] min-h-0 flex-1 space-y-4 overflow-y-auto pr-[22px]">
           {grouped.length === 0 ? (
             <div className="space-y-2 rounded-lg border border-dashed px-4 py-10 text-center type-body-sm text-muted-foreground">
               <p>No upcoming calls scheduled.</p>

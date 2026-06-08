@@ -219,7 +219,7 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
   },
   {
     id: "brief.workflow-artifacts",
-    title: "Call assets",
+    title: "Relevant content",
     category: "content",
     column: "center",
     sortOrder: 0.5,

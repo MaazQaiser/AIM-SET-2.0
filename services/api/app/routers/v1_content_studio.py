@@ -1,14 +1,31 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from dc_core.tenancy import TenantContext
 
+from app.config import get_settings
 from app.deps import get_tenant_context
 from app.domain.content_studio_repository import ARTIFACT_TYPES, TEMPLATE_EXTENSIONS, get_content_studio_repository
 from app.orchestrator.dispatcher import Orchestrator
@@ -27,9 +44,79 @@ from app.services.template_editor_service import (
 from app.services.template_ingest_service import ensure_template_metadata, ensure_template_preview_slides
 
 TEMPLATE_UPLOAD_EXTENSIONS = {".ppt", ".pptx"}
+TEMPLATE_UPLOAD_TOKEN_SCOPE = "content-template-upload"
 
 router = APIRouter(prefix="/api/v1/content", tags=["content-studio"])
 _orch = Orchestrator()
+
+
+def _base64url_decode(segment: str) -> bytes:
+    padding = "=" * (-len(segment) % 4)
+    return base64.urlsafe_b64decode(f"{segment}{padding}".encode("ascii"))
+
+
+def _base64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
+
+
+def _tenant_context_from_upload_token(token: str) -> TenantContext:
+    settings = get_settings()
+    if not settings.internal_secret:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="INTERNAL_SECRET is not configured on the API service",
+        )
+
+    raw = token.removeprefix("Bearer ").strip()
+    try:
+        payload_segment, signature = raw.split(".", 1)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid upload token",
+        ) from exc
+
+    expected = _base64url_encode(
+        hmac.new(
+            settings.internal_secret.encode("utf-8"),
+            payload_segment.encode("ascii"),
+            hashlib.sha256,
+        ).digest()
+    )
+    if not hmac.compare_digest(signature, expected):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid upload token",
+        )
+
+    try:
+        payload = json.loads(_base64url_decode(payload_segment).decode("utf-8"))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid upload token",
+        ) from exc
+
+    if payload.get("scope") != TEMPLATE_UPLOAD_TOKEN_SCOPE:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid upload token scope",
+        )
+    if int(payload.get("exp") or 0) < int(time.time()):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Upload token expired",
+        )
+
+    user_id = str(payload.get("userId") or "").strip()
+    tenant_id = str(payload.get("tenantId") or user_id).strip()
+    clerk_org_id = str(payload.get("clerkOrgId") or "").strip() or None
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid upload token",
+        )
+    return TenantContext.from_headers(user_id, tenant_id, clerk_org_id)
 
 
 class CreateProjectBody(BaseModel):
@@ -374,14 +461,14 @@ def delete_template(
     return {"status": "deleted", "templateId": template_id}
 
 
-@router.post("/templates/upload")
-async def upload_template(
+async def _upload_template_file(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
-    name: Optional[str] = Form(None),
-    artifact_type: Optional[str] = Form(None),
-    tags: Optional[str] = Form(None),
-    ctx: TenantContext = Depends(get_tenant_context),
+    *,
+    file: UploadFile,
+    name: Optional[str],
+    artifact_type: Optional[str],
+    tags: Optional[str],
+    ctx: TenantContext,
 ) -> Dict[str, Any]:
     file_name = file.filename or "upload.bin"
     ext = Path(file_name).suffix.lower()
@@ -391,6 +478,9 @@ async def upload_template(
             detail=f"Unsupported file type. Allowed: {', '.join(sorted(TEMPLATE_UPLOAD_EXTENSIONS))}",
         )
     content = await file.read()
+    if len(content) > get_settings().kb_max_upload_bytes:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File too large")
+
     tag_list = [t.strip() for t in (tags or "").split(",") if t.strip()]
     result = _orch.dispatch_template_ingest(
         ctx,
@@ -409,6 +499,47 @@ async def upload_template(
         result["storagePath"],
     )
     return result
+
+
+@router.post("/templates/upload")
+async def upload_template(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    name: Optional[str] = Form(None),
+    artifact_type: Optional[str] = Form(None),
+    tags: Optional[str] = Form(None),
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, Any]:
+    return await _upload_template_file(
+        background_tasks,
+        file=file,
+        name=name,
+        artifact_type=artifact_type,
+        tags=tags,
+        ctx=ctx,
+    )
+
+
+@router.post("/templates/upload/direct")
+async def upload_template_direct(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    name: Optional[str] = Form(None),
+    artifact_type: Optional[str] = Form(None),
+    tags: Optional[str] = Form(None),
+    authorization: Optional[str] = Header(default=None),
+    x_upload_token: Optional[str] = Header(default=None, alias="x-upload-token"),
+) -> Dict[str, Any]:
+    token = authorization or x_upload_token or ""
+    ctx = _tenant_context_from_upload_token(token)
+    return await _upload_template_file(
+        background_tasks,
+        file=file,
+        name=name,
+        artifact_type=artifact_type,
+        tags=tags,
+        ctx=ctx,
+    )
 
 
 @router.get("/studio/projects")

@@ -75,7 +75,7 @@ function TodoRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-none border-0 bg-transparent px-0 py-2.5 transition-colors",
+        "flex items-center gap-3 rounded-none border-0 bg-transparent px-0 py-2 transition-colors",
         !isLast && "border-b border-border",
         done ? "opacity-50" : "hover:opacity-80"
       )}
@@ -90,7 +90,7 @@ function TodoRow({
           <CheckCircle2 className="h-4 w-4 text-success" />
         ) : (
           <span
-            className={cn("block h-2.5 w-2.5 rounded-full", PRIORITY_DOT[todo.priority])}
+            className={cn("block h-2 w-2 rounded-full", PRIORITY_DOT[todo.priority])}
           />
         )}
       </button>
@@ -117,11 +117,11 @@ function TodoRowIcon({
   return (
     <div
       className={cn(
-        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+        "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
         cfg.className
       )}
     >
-      <Icon className="h-4 w-4" />
+      <Icon className="h-3.5 w-3.5" />
     </div>
   );
 }
@@ -139,16 +139,16 @@ function TodoRowContent({
     <div className="flex-1 min-w-0">
       <p
         className={cn(
-          "type-panel-title text-foreground",
+          "truncate type-body-sm font-semibold text-foreground",
           done && "line-through text-muted-foreground"
         )}
       >
         {todo.title}
       </p>
-      {todo.subtitle && (
-        <p className="mt-0.5 truncate type-caption text-muted-foreground">{todo.subtitle}</p>
-      )}
-      <p className="mt-0.5 type-caption text-muted-foreground">{cfg.label} Agent</p>
+      <p className="mt-0.5 truncate type-caption text-muted-foreground">
+        {cfg.label}
+        {todo.subtitle ? ` · ${todo.subtitle}` : ""}
+      </p>
     </div>
   );
 }
@@ -181,7 +181,7 @@ export function AiTodoList() {
 
   return (
     <Card className="flex h-[380px] flex-col">
-      <CardHeader className="shrink-0 pb-3 pt-5 px-5">
+      <CardHeader className="shrink-0 px-6 pb-4 pt-6">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
@@ -195,28 +195,30 @@ export function AiTodoList() {
         </div>
         {counts.high > 0 && (
           <p className="mt-1 type-caption text-muted-foreground">
-            {counts.high} high priority · AI-derived from agent activity
+            {counts.high} high priority
           </p>
         )}
       </CardHeader>
-      <CardContent className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-0">
-        {todos.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center rounded-lg border border-dashed bg-muted/20">
-            <CheckCircle2 className="h-8 w-8 text-success mb-2" />
-            <p className="type-panel-title">You&apos;re all caught up</p>
-            <p className="mt-1 type-caption text-muted-foreground">The agents are quiet.</p>
-          </div>
-        ) : (
-          todos.map((todo, index) => (
-            <TodoRow
-              key={todo.id}
-              todo={todo}
-              done={doneIds.has(todo.id)}
-              onToggle={() => toggle(todo.id)}
-              isLast={index === todos.length - 1}
-            />
-          ))
-        )}
+      <CardContent className="min-h-0 flex-1 px-6 pb-6 pt-0">
+        <div className="brief-card-scroll brief-card-scroll--sidebar dashboard-card-scroll -mr-[22px] h-full min-h-0 overflow-y-auto pr-[22px]">
+          {todos.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-muted/20 py-12 text-center">
+              <CheckCircle2 className="mb-2 h-8 w-8 text-success" />
+              <p className="type-panel-title">You&apos;re all caught up</p>
+              <p className="mt-1 type-caption text-muted-foreground">The agents are quiet.</p>
+            </div>
+          ) : (
+            todos.map((todo, index) => (
+              <TodoRow
+                key={todo.id}
+                todo={todo}
+                done={doneIds.has(todo.id)}
+                onToggle={() => toggle(todo.id)}
+                isLast={index === todos.length - 1}
+              />
+            ))
+          )}
+        </div>
       </CardContent>
     </Card>
   );

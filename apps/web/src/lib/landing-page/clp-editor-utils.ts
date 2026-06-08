@@ -109,16 +109,13 @@ export function syncAssetSections(page: CustomerLandingPage): CustomerLandingPag
 
 export function toggleSelectedAsset(
   page: CustomerLandingPage,
-  asset: { assetId: string; title: string }
+  asset: Pick<ClpAssetRef, "assetId" | "title"> & Partial<ClpAssetRef>
 ): CustomerLandingPage {
   if (isCompanyPlaybookLandingAsset(asset)) return syncAssetSections(page);
   const exists = page.selectedAssets.some((s) => s.assetId === asset.assetId);
   const selectedAssets: ClpAssetRef[] = exists
     ? page.selectedAssets.filter((s) => s.assetId !== asset.assetId)
-    : [
-        ...page.selectedAssets,
-        { assetId: asset.assetId, title: asset.title, displayMode: "embed" },
-      ];
+    : [...page.selectedAssets, { ...asset, displayMode: asset.displayMode ?? "embed" }];
   return syncAssetSections({ ...page, selectedAssets });
 }
 

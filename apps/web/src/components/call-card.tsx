@@ -18,7 +18,7 @@ interface CallCardProps {
 const STATUS_CONFIG = {
   upcoming:  { label: "Upcoming",  variant: "secondary"   as const, dot: "bg-muted-foreground" },
   live:      { label: "Live",      variant: "live"        as const, dot: "bg-success animate-live-pulse", pulse: true },
-  completed: { label: "Completed", variant: "outline"     as const, dot: "bg-success" },
+  completed: { label: "Post-DC",   variant: "outline"     as const, dot: "bg-success" },
   "no-show": { label: "No show",   variant: "destructive" as const, dot: "bg-destructive" },
 };
 

@@ -138,6 +138,10 @@ def handle_transcript_segment(
         "provider_event_id": segment.get("provider_event_id"),
     }
     stored = repo.append_transcript_event(ctx, call_id, normalized)
+    try:
+        CallsService().mark_call_completed(ctx, call_id)
+    except Exception:
+        _logger.exception("failed to mark call completed after transcript event call_id=%s", call_id)
     stored["speaker_name"] = (
         segment.get("speakerName")
         or segment.get("speaker_name")

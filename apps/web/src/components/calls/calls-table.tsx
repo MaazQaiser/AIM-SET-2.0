@@ -23,7 +23,7 @@ const STATUS_CONFIG: Record<
 > = {
   upcoming: { label: "Upcoming", variant: "secondary" },
   live: { label: "Live", variant: "live", pulse: true },
-  completed: { label: "Completed", variant: "outline" },
+  completed: { label: "Post-DC", variant: "outline" },
   "no-show": { label: "No show", variant: "destructive" },
 };
 
