@@ -11,8 +11,6 @@ from app.domain.agent_config_defaults import AGENT_IDS, EDITABLE_CONFIG_KEYS, me
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.memory_store import get_memory_store
 from app.deps import get_supabase
-from app.domain.supabase_helpers import run_with_timeout
-
 _logger = logging.getLogger(__name__)
 
 
@@ -67,9 +65,15 @@ class AgentConfigRepository:
                         return data["config"]
                     return None
 
-                saved = run_with_timeout(lambda: _fetch(agent_id), default=None)
+                try:
+                    saved = _fetch(agent_id)
+                except Exception:
+                    saved = None
                 if saved is None and agent_id == "workflow":
-                    saved = run_with_timeout(lambda: _fetch("pre-dc"), default=None)
+                    try:
+                        saved = _fetch("pre-dc")
+                    except Exception:
+                        saved = None
 
         return merge_agent_config(agent_id, saved)
 
@@ -93,7 +97,10 @@ class AgentConfigRepository:
             def _upsert() -> None:
                 get_supabase().table("agent_configs").upsert(row, on_conflict="tenant_id,agent_id").execute()
 
-            run_with_timeout(_upsert, default=None)
+            try:
+                _upsert()
+            except Exception:
+                _logger.exception("failed to upsert agent config agent_id=%s", agent_id)
 
         store = get_memory_store()
         store.agent_configs.setdefault(clerk_key, {})[agent_id] = payload

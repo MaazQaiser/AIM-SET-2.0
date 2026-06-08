@@ -1,45 +1,53 @@
 "use client";
 
-import { AIGeneratedBadge } from "@/components/ai-generated-badge";
-import { KbUploadButton } from "@/components/knowledge/kb-upload-button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/cn";
-import { createProjectFromSuggestion } from "@/lib/content/create-project-from-suggestion";
-import { groupPostDcGaps } from "@/lib/content/group-post-dc-gaps";
+import { useMemo, useState } from "react";
 import {
-  type ContentGenerationLead,
-  type PreDcGenerationGroup,
-  groupPreDcGaps,
-} from "@/lib/content/group-pre-dc-gaps";
-import { attachKbMatchesToGroups } from "@/lib/content/suggestion-context";
-import { useDismissContentGap, useResolveContentGap } from "@/lib/data/content-gaps-hooks";
-import { useContentPlan } from "@/lib/data/content-plan-hooks";
-import {
-  postDcContentGapKey,
-  preDcContentGapKey,
-  useContentGaps,
-  useKbAssets,
-  usePostDcContentGenerationGaps,
-  usePreDcContentGenerationGaps,
-} from "@/lib/data/hooks";
+  AlertCircle,
+  ArrowUpRight,
+  CalendarClock,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  Lightbulb,
+  Loader2,
+  Sparkles,
+  TrendingUp,
+  Upload,
+  Users,
+  X,
+  Zap,
+} from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AIGeneratedBadge } from "@/components/ai-generated-badge";
+import { AiGradientText } from "@/components/ai-gradient-text";
+import { KbUploadButton } from "@/components/knowledge/kb-upload-button";
 import {
-  ArrowUpRight,
-  CalendarClock,
-  ChevronDown,
-  FilePlus2,
-  FileText,
-  Lightbulb,
-  Loader2,
-  Upload,
-  X,
-} from "lucide-react";
-import Link from "next/link";
+  contentGapKeyForLead,
+  useContentGaps,
+  useKbAssets,
+  usePostDcContentGenerationGaps,
+  usePreDcContentGenerationGaps,
+  postDcContentGapKey,
+  preDcContentGapKey,
+} from "@/lib/data/hooks";
+import {
+  groupPreDcGaps,
+  type ContentGenerationLead,
+  type PreDcGenerationGroup,
+} from "@/lib/content/group-pre-dc-gaps";
+import { groupPostDcGaps } from "@/lib/content/group-post-dc-gaps";
+import { attachKbMatchesToGroups } from "@/lib/content/suggestion-context";
+import { createProjectFromSuggestion } from "@/lib/content/create-project-from-suggestion";
+import { useContentPlan } from "@/lib/data/content-plan-hooks";
+import { useDismissContentGap, useResolveContentGap, useTrackContentGap } from "@/lib/data/content-gaps-hooks";
+import type { SuggestionPlan } from "@/types/content_studio";
 import { useRouter } from "next/navigation";
-import { useId, useMemo, useState } from "react";
+import Link from "next/link";
 
 const statusConfig = {
   draft: { variant: "warning" as const, label: "Draft ready" },
@@ -47,7 +55,7 @@ const statusConfig = {
   approved: { variant: "success" as const, label: "Approved" },
 };
 
-type ContentSuggestionSource = "pre-dc" | "post-dc";
+type ContentInputTab = "pre-dc" | "post-dc";
 
 function formatArtifactType(value: string) {
   return value.replace(/_/g, " ");
@@ -72,29 +80,67 @@ function buildContentRequirements(
   const explicit = primaryLead?.contentRequirements?.trim();
   if (explicit && !isGenericUploadInstruction(explicit)) return explicit;
 
-  const audience =
-    group.industryLabel || primaryLead?.industry || primaryLead?.accountName || "this call";
-  const purpose = (group.neededFor || group.reason || "support the upcoming conversation")
-    .replace(/\s+/g, " ")
-    .trim();
+  const audience = group.industryLabel || primaryLead?.industry || primaryLead?.accountName || "this call";
+  const purpose = (group.neededFor || group.reason || "support the upcoming conversation").replace(/\s+/g, " ").trim();
   const artifactType = titleCaseArtifactType(group.type).toLowerCase();
   return `Create a ${artifactType} titled "${group.name}" for ${audience}. It should cover: ${purpose} Include reusable proof points, relevant KB/project evidence, and a clear call next step.`;
 }
 
-function buildGapKey(
-  group: { id: string; name: string },
-  lead: { callId: string; sourceArtifactId?: string; sourceItemId?: string } | undefined,
+function buildImpactStatement(
+  group: PreDcGenerationGroup,
   source: "pre-dc" | "post-dc"
-) {
-  if (!lead) return group.id;
-  if (source === "post-dc") {
-    return `post_dc:${lead.callId}:${group.name.trim().toLowerCase()}`;
+): string {
+  const count = group.leads.length;
+  const accounts = [...new Set(group.leads.map((l) => l.accountName).filter(Boolean))];
+  const phase = source === "post-dc" ? "post-call follow-up" : "upcoming call";
+  const coreReason = group.reason?.trim() || group.neededFor?.trim() || "";
+
+  if (count === 1) {
+    const account = accounts[0];
+    const prefix = account
+      ? `This asset is missing ahead of ${account}'s ${phase}.`
+      : `This asset is missing for an ${phase}.`;
+    return coreReason ? `${prefix} ${coreReason}` : prefix;
   }
-  const artifactPart =
-    lead.sourceArtifactId?.trim() ||
-    lead.sourceItemId?.trim() ||
-    (group.id.startsWith("artifact:") ? group.id.slice("artifact:".length) : group.name);
-  return `pre_dc:${lead.callId}:${artifactPart}`;
+
+  const accountText =
+    accounts.length === 0
+      ? `${count} active deals`
+      : accounts.length === 1
+        ? `${accounts[0]}`
+        : accounts.length === 2
+          ? `${accounts[0]} and ${accounts[1]}`
+          : `${accounts[0]}, ${accounts[1]}, and ${accounts.length - 2} more`;
+
+  const verb = source === "post-dc" ? "heading into follow-ups" : "going into their calls";
+  const riskText = `${count} deal${count > 1 ? "s are" : " is"} ${verb} without this asset — putting engagement with ${accountText} at risk.`;
+
+  return coreReason ? `${riskText} ${coreReason}` : riskText;
+}
+
+function getPriorityConfig(priority: number) {
+  if (priority <= 1) {
+    return {
+      label: "Urgent",
+      accentClass: "border-l-4 border-l-destructive",
+      badgeVariant: "destructive" as const,
+      Icon: AlertCircle,
+    };
+  }
+  if (priority <= 2) {
+    return {
+      label: "High priority",
+      accentClass: "border-l-4 border-l-warning",
+      badgeVariant: "warning" as const,
+      Icon: TrendingUp,
+    };
+  }
+  return {
+    label: "Suggested",
+    accentClass: "border-l-4 border-l-primary/50",
+    badgeVariant: "secondary" as const,
+    Icon: Zap,
+  };
 }
 
 export function ContentSuggestionsTab() {
@@ -147,7 +193,10 @@ export function ContentSuggestionsTab() {
 
   return (
     <div className="space-y-6">
-      <ContentAgentInputsSection preDcGroups={preDcGroups} postDcGroups={postDcGroups} />
+      <ContentAgentInputsSection
+        preDcGroups={preDcGroups}
+        postDcGroups={postDcGroups}
+      />
 
       {trackedGaps.length > 0 && (
         <div className="space-y-4">
@@ -158,9 +207,7 @@ export function ContentSuggestionsTab() {
                 Gaps persisted in the content workflow with linked drafts.
               </p>
             </div>
-            <Badge variant="outline">
-              {trackedGaps.length} item{trackedGaps.length === 1 ? "" : "s"}
-            </Badge>
+            <Badge variant="outline">{trackedGaps.length} item{trackedGaps.length === 1 ? "" : "s"}</Badge>
           </div>
           {trackedGaps.map((gap) => {
             const config = statusConfig[gap.status];
@@ -204,13 +251,7 @@ export function ContentSuggestionsTab() {
                     </p>
                   </div>
                   <Button asChild size="sm">
-                    <Link
-                      href={
-                        gap.studioProjectId
-                          ? `/content/studio/${gap.studioProjectId}`
-                          : `/content/${gap.id}`
-                      }
-                    >
+                    <Link href={gap.studioProjectId ? `/content/studio/${gap.studioProjectId}` : `/content/${gap.id}`}>
                       Open in studio
                     </Link>
                   </Button>
@@ -233,40 +274,84 @@ function ContentAgentInputsSection({
 }) {
   const preDcAssetCount = preDcGroups.length;
   const postDcAssetCount = postDcGroups.length;
-  const assetCount = preDcAssetCount + postDcAssetCount;
-  const suggestionItems = [
-    ...preDcGroups.map((group) => ({ group, source: "pre-dc" as const })),
-    ...postDcGroups.map((group) => ({ group, source: "post-dc" as const })),
-  ];
+  const defaultTab: ContentInputTab = preDcAssetCount > 0 ? "pre-dc" : "post-dc";
+  const [activeTab, setActiveTab] = useState<ContentInputTab>(defaultTab);
+
+  const activeGroups = activeTab === "pre-dc" ? preDcGroups : postDcGroups;
+  const activeAssetCount = activeTab === "pre-dc" ? preDcAssetCount : postDcAssetCount;
+  const description =
+    activeTab === "pre-dc"
+      ? "Missing assets detected during call prep, grouped by required document."
+      : "Missing assets flagged after call wrap-up, grouped by required document.";
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="type-section-title text-foreground">AI suggestions</h2>
-          <p className="type-caption text-muted-foreground">
-            Missing assets detected across call prep and post-call workflows, grouped by required document.
-          </p>
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as ContentInputTab)}
+        className="space-y-4"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="type-section-title text-foreground">AI suggestions</h2>
+            <p className="type-caption text-muted-foreground">{description}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <TabsList className="h-9 rounded-lg bg-muted/50 p-1">
+              <TabsTrigger value="pre-dc" className="px-3">
+                Pre-DC
+                {preDcAssetCount > 0 && (
+                  <span className="ml-1.5 rounded-full bg-background px-1.5 py-0.5 type-caption font-medium tabular-nums">
+                    {preDcAssetCount}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="post-dc" className="type-label px-3">
+                Post-DC
+                {postDcAssetCount > 0 && (
+                  <span className="ml-1.5 rounded-full bg-background px-1.5 py-0.5 type-caption font-medium tabular-nums">
+                    {postDcAssetCount}
+                  </span>
+                )}
+              </TabsTrigger>
+            </TabsList>
+            {activeAssetCount > 0 && (
+              <Badge variant="warning">
+                {activeAssetCount} to generate
+              </Badge>
+            )}
+          </div>
         </div>
-        {assetCount > 0 ? <Badge variant="warning">{assetCount} to generate</Badge> : null}
-      </div>
 
-      <ContentGenerationGrid
-        items={suggestionItems}
-        emptyMessage="No content gaps detected yet."
-      />
+        <TabsContent value="pre-dc" className="m-0 focus-visible:outline-none">
+          <ContentGenerationGrid
+            groups={preDcGroups}
+            source="pre-dc"
+            emptyMessage="No Pre-DC content gaps detected yet."
+          />
+        </TabsContent>
+        <TabsContent value="post-dc" className="m-0 focus-visible:outline-none">
+          <ContentGenerationGrid
+            groups={postDcGroups}
+            source="post-dc"
+            emptyMessage="No Post-DC content gaps detected yet. Run call wrap-up to flag missing assets."
+          />
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }
 
 function ContentGenerationGrid({
-  items,
+  groups,
+  source,
   emptyMessage,
 }: {
-  items: { group: PreDcGenerationGroup; source: ContentSuggestionSource }[];
+  groups: PreDcGenerationGroup[];
+  source: "pre-dc" | "post-dc";
   emptyMessage: string;
 }) {
-  if (items.length === 0) {
+  if (groups.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center type-body text-muted-foreground">
         {emptyMessage}
@@ -276,8 +361,8 @@ function ContentGenerationGrid({
 
   return (
     <div className="flex flex-col gap-3">
-      {items.map(({ group, source }) => (
-        <ContentGenerationCard key={`${source}:${group.id}`} group={group} source={source} />
+      {groups.map((group) => (
+        <ContentGenerationCard key={group.id} group={group} source={source} />
       ))}
     </div>
   );
@@ -292,10 +377,31 @@ function formatLeadTooltip(leads: ContentGenerationLead[]) {
     .join("\n");
 }
 
-function compactSentence(value: string | undefined, limit = 180) {
-  const text = (value ?? "").replace(/\s+/g, " ").trim();
-  if (text.length <= limit) return text;
-  return `${text.slice(0, limit - 1).trim()}…`;
+function buildFallbackSuggestionPlan(
+  group: PreDcGenerationGroup,
+  source: "pre-dc" | "post-dc"
+): SuggestionPlan | undefined {
+  const embeddedSlides = group.leads.find((lead) => lead.slidePlan?.length)?.slidePlan;
+  if (!embeddedSlides?.length) return undefined;
+
+  return {
+    suggestion_id: group.id,
+    source,
+    generation_reason: group.reason,
+    needed_for: group.neededFor,
+    title: group.name,
+    artifact_type: group.type,
+    lead_count: group.leads.length,
+    plan_summary: `Draft plan from ${embeddedSlides.length} pre-call slide suggestions.`,
+    slide_plan: embeddedSlides.map((slide, index) => ({
+      slide: index + 1,
+      heading: slide.heading,
+      body: slide.body,
+      visual: slide.visual,
+      mode: slide.reuseHint ? ("reuse" as const) : ("generate" as const),
+      evidence_refs: slide.sourceAssetId ? [`kb:${slide.sourceAssetId}`] : undefined,
+    })),
+  };
 }
 
 function ContentGenerationCard({
@@ -303,23 +409,20 @@ function ContentGenerationCard({
   source,
 }: {
   group: PreDcGenerationGroup;
-  source: ContentSuggestionSource;
+  source: "pre-dc" | "post-dc";
 }) {
   const router = useRouter();
-  const detailsId = useId();
-  const planId = useId();
   const [generating, setGenerating] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [planRequested, setPlanRequested] = useState(false);
-  const [planOpen, setPlanOpen] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const dismissGap = useDismissContentGap();
   const resolveGap = useResolveContentGap();
+  const trackGap = useTrackContentGap();
   const primaryLead = group.leads[0];
-  const gapKey = buildGapKey(group, primaryLead, source);
+  const gapKeys = group.leads.map((lead) => contentGapKeyForLead(lead, source));
+  const gapKey = primaryLead ? contentGapKeyForLead(primaryLead, source) : group.id;
   const sourceCount = group.leads.length;
   const sourceArtifactId =
-    primaryLead?.sourceArtifactId ||
-    (group.id.startsWith("artifact:") ? group.id.slice("artifact:".length) : undefined);
+    primaryLead?.sourceArtifactId || (group.id.startsWith("artifact:") ? group.id.slice("artifact:".length) : undefined);
   const sourcePath =
     primaryLead?.sourcePath ||
     (primaryLead?.callId
@@ -328,6 +431,8 @@ function ContentGenerationCard({
         : `/calls/${primaryLead.callId}`
       : "/content?tab=suggestions");
   const contentRequirements = buildContentRequirements(group, primaryLead);
+  const impactStatement = buildImpactStatement(group, source);
+  const priorityCfg = getPriorityConfig(group.priority);
   const suggestionContext = {
     ...(primaryLead?.context ?? {}),
     source: source === "post-dc" ? "post_dc" : "pre_dc",
@@ -369,26 +474,16 @@ function ContentGenerationCard({
     data: planPreview,
     isLoading: planLoading,
     isError: planError,
-  } = useContentPlan(planRequested ? planInput : null);
-  const sourceLabel = source === "post-dc" ? "Post-DC" : "Pre-DC";
-  const sourceDetailLabel = source === "post-dc" ? "Post-DC follow-up" : "Pre-DC call brief";
-  const compactNeed = compactSentence(group.neededFor || group.reason || contentRequirements, 145);
-  const kbMatchCount = group.kbMatches?.length ?? 0;
-  const visibleKbMatches = (group.kbMatches ?? []).slice(0, 3);
-  const hiddenKbMatchCount = Math.max(0, kbMatchCount - visibleKbMatches.length);
-  const hasDetails = Boolean(
-    group.reason || contentRequirements || group.industryLabel || kbMatchCount > 0 || sourcePath
-  );
-
-  function handlePlanToggle() {
-    setPlanRequested(true);
-    setPlanOpen((value) => !value);
-  }
+  } = useContentPlan(planInput);
+  const fallbackPlan = useMemo(() => buildFallbackSuggestionPlan(group, source), [group, source]);
+  const apiPlan = planPreview?.suggestion_plan;
+  const resolvedPlan = apiPlan ?? fallbackPlan;
 
   async function handleDismiss() {
+    if (gapKeys.length === 0) return;
     try {
       await dismissGap.mutateAsync({
-        gapKey,
+        gapKeys,
         source,
         name: group.name,
         artifactType: group.type,
@@ -447,6 +542,20 @@ function ContentGenerationCard({
         leads: group.leads,
         kbMatches: group.kbMatches,
         sourceArtifactId,
+        cachedPlan: resolvedPlan,
+      });
+      trackGap.mutate({
+        gapKey,
+        studioProjectId: projectId,
+        source,
+        name: group.name,
+        artifactType: group.type,
+        callId: primaryLead?.callId,
+        reason: group.reason,
+        neededFor: group.neededFor,
+        sourcePath,
+        contentRequirements,
+        priority: group.priority,
       });
       router.push(`/content/studio/${projectId}?suggestionId=${encodeURIComponent(group.id)}`);
     } catch (err) {
@@ -457,252 +566,194 @@ function ContentGenerationCard({
   }
 
   return (
-    <article className="rounded-lg border border-border/70 bg-card text-card-foreground shadow-none">
-      <div className="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-warning/25 bg-warning/10 text-warning">
-            <FilePlus2 className="h-4 w-4" />
-          </span>
+    <Card className={`w-full overflow-hidden ${priorityCfg.accentClass}`}>
+      <CardHeader className="pb-3">
+        <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0 flex-1 space-y-2">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h3 className="min-w-0 break-words type-panel-title font-semibold text-foreground">
-                {group.name}
-              </h3>
-              <Badge variant="outline" className="h-6 capitalize">
+            {/* Priority + type badges */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={priorityCfg.badgeVariant} className="gap-1 text-xs">
+                <priorityCfg.Icon className="h-3 w-3" />
+                {priorityCfg.label}
+              </Badge>
+              <Badge variant="outline" className="capitalize text-xs">
                 {formatArtifactType(group.type)}
               </Badge>
               <TooltipProvider delayDuration={200}>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Badge variant="outline" className="h-6 cursor-default font-normal">
-                      <span className="font-medium tabular-nums text-destructive">
-                        {sourceCount}
-                      </span>
-                      <span className="text-muted-foreground">
-                        brief{sourceCount === 1 ? "" : "s"}
-                      </span>
+                    <Badge variant="outline" className="cursor-default gap-1.5 text-xs font-normal">
+                      <Users className="h-3 w-3 text-muted-foreground" />
+                      <span className="tabular-nums font-semibold text-foreground">{sourceCount}</span>
+                      <span className="text-muted-foreground">{sourceCount === 1 ? "call needs this" : "calls need this"}</span>
                     </Badge>
                   </TooltipTrigger>
-                  <TooltipContent
-                    side="bottom"
-                    align="start"
-                    className="max-w-xs whitespace-pre-line type-label"
-                  >
+                  <TooltipContent side="bottom" align="start" className="max-w-xs whitespace-pre-line type-label">
                     {formatLeadTooltip(group.leads)}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              {kbMatchCount > 0 ? (
-                <Badge variant="secondary" className="h-6 font-normal">
-                  {kbMatchCount} KB match{kbMatchCount === 1 ? "" : "es"}
-                </Badge>
-              ) : null}
-              <Link
-                href={sourcePath}
-                className="inline-flex h-6 items-center gap-1 rounded-md px-1.5 type-label font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                {sourceLabel}
-                <ArrowUpRight className="h-3 w-3" />
-              </Link>
             </div>
-            {compactNeed ? (
-              <p className="type-body-sm leading-relaxed text-foreground">
-                <span className="font-medium text-foreground">Use for: </span>
-                {compactNeed}
-              </p>
-            ) : null}
+
+            {/* Title */}
+            <CardTitle className="break-words !text-[20px] !font-bold leading-snug">
+              {group.name}
+            </CardTitle>
+          </div>
+
+          {/* Top-right actions */}
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Button size="sm" disabled={generating} onClick={() => void handleGenerate()} className="gap-1.5">
+              {generating ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Generate
+                </>
+              )}
+            </Button>
+            <KbUploadButton
+              defaultTitle={group.name}
+              onAssetReady={(asset) => void handleUploadResolved(asset)}
+              trigger={
+                <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" aria-label="Upload instead">
+                  <Upload className="h-3.5 w-3.5" />
+                </Button>
+              }
+            />
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 shrink-0 text-muted-foreground"
+                    disabled={dismissGap.isPending}
+                    aria-label="Dismiss suggestion"
+                    onClick={() => void handleDismiss()}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Dismiss</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
+      </CardHeader>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
-          {hasDetails ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-8 text-muted-foreground hover:text-foreground"
-              aria-expanded={detailsOpen}
-              aria-controls={detailsId}
-              onClick={() => setDetailsOpen((value) => !value)}
-            >
-              <ChevronDown
-                className={cn("h-3.5 w-3.5 transition-transform", detailsOpen && "rotate-180")}
-                aria-hidden
-              />
-              Details
-            </Button>
-          ) : null}
+      <CardContent className="space-y-4 pt-0">
+        {/* Impact block */}
+        <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-2.5">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden />
+            <AiGradientText className="!text-[12px] font-semibold">Why this matters now</AiGradientText>
+          </div>
+          <p className="type-body text-foreground leading-relaxed">{impactStatement}</p>
+        </div>
+
+        {/* KB matches */}
+        {group.kbMatches && group.kbMatches.length > 0 && (
+          <SuggestionKbMatches matches={group.kbMatches} />
+        )}
+
+        {/* Preview AI plan toggle */}
+        <div className="flex border-t border-border/60 pt-3">
           <Button
             type="button"
+            variant="ghost"
             size="sm"
-            variant="secondary"
-            className="h-8"
-            aria-expanded={planOpen}
-            aria-controls={planId}
-            onClick={handlePlanToggle}
+            className="gap-1.5 text-muted-foreground"
+            onClick={() => setExpanded((v) => !v)}
           >
-            {planLoading && planOpen ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-            {planOpen ? "Hide plan" : "Preview plan"}
+            {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            {expanded ? "Hide plan" : "Preview AI plan"}
           </Button>
-          <Button size="sm" disabled={generating} onClick={() => void handleGenerate()}>
-            {generating ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <>
-                Generate
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </>
-            )}
-          </Button>
-          <KbUploadButton
-            defaultTitle={group.name}
-            onAssetReady={(asset) => void handleUploadResolved(asset)}
-            trigger={
-              <Button size="icon" variant="outline" className="h-8 w-8" aria-label="Upload instead">
-                <Upload className="h-3.5 w-3.5" />
-              </Button>
-            }
-          />
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-muted-foreground"
-                  disabled={dismissGap.isPending}
-                  aria-label="Dismiss suggestion"
-                  onClick={() => void handleDismiss()}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">Dismiss</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
         </div>
-      </div>
 
-      {detailsOpen && (
-        <div id={detailsId} className="border-t border-border/60 px-5 py-4">
-          <div className="grid gap-3 type-body-sm text-foreground md:grid-cols-[minmax(0,1fr)_minmax(220px,auto)]">
-            <div className="space-y-2">
-              {contentRequirements ? (
-                <p className="leading-relaxed">
-                  <span className="font-medium text-foreground">Create: </span>
-                  {compactSentence(contentRequirements, 260)}
-                </p>
-              ) : null}
-              {group.reason && group.reason !== contentRequirements ? (
-                <p className="leading-relaxed">
-                  <span className="font-medium text-foreground">Reason: </span>
-                  {compactSentence(group.reason, 220)}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-2 md:text-right">
-              {group.industryLabel ? (
-                <p>
-                  <span className="font-medium text-foreground">Vertical: </span>
-                  {group.industryLabel}
-                </p>
-              ) : null}
-              <p>
-                <span className="font-medium text-foreground">Needed at: </span>
-                <Link
-                  href={sourcePath}
-                  className="inline-flex items-center gap-1 underline-offset-2 hover:underline"
-                >
-                  {sourceDetailLabel}
-                  <ArrowUpRight className="h-3 w-3" />
-                </Link>
-              </p>
-            </div>
-          </div>
-
-          {visibleKbMatches.length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {visibleKbMatches.map((match) => (
-                <Button
-                  key={match.id}
-                  asChild
-                  size="sm"
-                  variant="outline"
-                  className="h-7 max-w-full px-2 type-label"
-                >
-                  <Link href={`/content?tab=library&asset=${encodeURIComponent(match.id)}`}>
-                    <FileText className="h-3 w-3 shrink-0" />
-                    <span className="truncate">{match.title}</span>
-                  </Link>
-                </Button>
-              ))}
-              {hiddenKbMatchCount > 0 ? (
-                <Badge variant="secondary" className="h-7 font-normal">
-                  +{hiddenKbMatchCount} more
-                </Badge>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      )}
-
-      <div id={planId}>
-        {planOpen && planLoading && (
-          <p className="mx-4 mb-3 rounded-md border border-dashed border-border px-3 py-2 type-caption text-muted-foreground">
+        {/* Plan preview */}
+        {expanded && planLoading && !resolvedPlan && (
+          <p className="rounded-md border border-dashed border-border px-3 py-2 type-caption text-muted-foreground">
             Building AI slide plan…
           </p>
         )}
-        {planOpen && planError && (
-          <p className="mx-4 mb-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 type-label text-destructive">
+        {expanded && planError && !resolvedPlan && (
+          <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 type-label text-destructive">
             Could not load the slide plan preview.
           </p>
         )}
-        {planOpen && !planLoading && !planError && planPreview?.suggestion_plan && (
-          <div className="px-4 pb-3">
-            <SuggestionPlanPreview plan={planPreview.suggestion_plan} />
-          </div>
+        {expanded && resolvedPlan && (
+          <SuggestionPlanPreview plan={resolvedPlan} loading={planLoading && !apiPlan} />
         )}
-        {planOpen && !planLoading && !planError && !planPreview?.suggestion_plan && (
-          <p className="mx-4 mb-3 rounded-md border border-dashed border-border px-3 py-2 type-caption text-muted-foreground">
+        {expanded && !planLoading && !planError && !resolvedPlan && (
+          <p className="rounded-md border border-dashed border-border px-3 py-2 type-caption text-muted-foreground">
             No slide plan came back for this suggestion yet.
           </p>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SuggestionKbMatches({
+  matches,
+}: {
+  matches: NonNullable<PreDcGenerationGroup["kbMatches"]>;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <p className="type-caption font-medium text-muted-foreground">Related in KB</p>
+      <div className="flex flex-wrap gap-1.5">
+        {matches.map((match) => (
+          <Button key={match.id} asChild size="sm" variant="outline" className="h-7 max-w-full px-2 type-label">
+            <Link href={`/content?tab=library&asset=${encodeURIComponent(match.id)}`}>
+              <FileText className="h-3 w-3 shrink-0" />
+              <span className="truncate">{match.title}</span>
+            </Link>
+          </Button>
+        ))}
       </div>
-    </article>
+    </div>
   );
 }
 
 function SuggestionPlanPreview({
   plan,
+  loading = false,
 }: {
-  plan: import("@/types/content_studio").SuggestionPlan;
+  plan: SuggestionPlan;
+  loading?: boolean;
 }) {
   const projects = plan.evidence?.projects ?? [];
-  const kbAssets = plan.evidence?.kb_assets ?? [];
   const slides = plan.slide_plan ?? [];
-  const visibleSlides = slides.slice(0, 6);
-  const hiddenSlideCount = Math.max(0, slides.length - visibleSlides.length);
-  const reuseCount = slides.filter((slide) => slide.mode === "reuse").length;
-  const sourceCount = projects.length + kbAssets.length;
 
   return (
-    <div className="rounded-md border border-border bg-muted/20 p-3">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <p className="type-label text-foreground">AI slide plan</p>
-        <Badge variant="secondary" className="h-5 type-caption font-normal">
-          {slides.length || "No"} slide{slides.length === 1 ? "" : "s"}
-        </Badge>
-        {reuseCount > 0 ? (
-          <Badge variant="outline" className="h-5 type-caption font-normal">
-            {reuseCount} reuse
-          </Badge>
-        ) : null}
-        {sourceCount > 0 ? (
-          <span className="type-caption text-muted-foreground">
-            {sourceCount} source{sourceCount === 1 ? "" : "s"}
-          </span>
-        ) : null}
-      </div>
+    <div className="space-y-3 rounded-md border border-border bg-muted/30 p-3">
+      {loading && (
+        <p className="flex items-center gap-1.5 type-caption text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+          Refining slide plan…
+        </p>
+      )}
+      {plan.plan_summary && (
+        <p className="type-label leading-relaxed text-muted-foreground">{plan.plan_summary}</p>
+      )}
+      {projects.length > 0 && (
+        <div className="space-y-1">
+          <p className="type-label text-foreground">Matching projects</p>
+          <div className="flex flex-wrap gap-1.5">
+            {projects.map((proj) => (
+              <Badge key={proj.asset_id} variant="secondary" className="type-caption font-normal">
+                {proj.title}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
       {slides.length === 0 && (
         <p className="rounded-md border border-dashed border-border px-3 py-2 type-caption text-muted-foreground">
           No slide rows were returned for this plan.
@@ -710,41 +761,32 @@ function SuggestionPlanPreview({
       )}
       {slides.length > 0 && (
         <div className="space-y-1.5">
-          <ol className="space-y-1 type-caption text-muted-foreground">
-            {visibleSlides.map((slide) => (
-              <li
-                key={slide.slide}
-                className="grid gap-2 sm:grid-cols-[1.5rem_minmax(0,1fr)_auto] sm:items-center"
-              >
-                <span className="font-medium tabular-nums text-muted-foreground">
-                  {slide.slide}.
-                </span>
-                <span className="font-medium text-foreground">{slide.heading}</span>
-                <span className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+          <p className="type-label text-foreground">Proposed slides</p>
+          <ol className="space-y-3 type-caption text-muted-foreground">
+            {slides.map((slide) => (
+              <li key={slide.slide} className="space-y-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-medium text-foreground">{slide.slide}. {slide.heading}</span>
                   {slide.mode === "reuse" && (
-                    <Badge variant="outline" className="h-5 type-caption">
-                      Reuse
-                    </Badge>
+                    <Badge variant="outline" className="h-5 type-caption">Reuse</Badge>
                   )}
                   {slide.mode === "hybrid" && (
-                    <Badge variant="outline" className="h-5 type-caption">
-                      Hybrid
-                    </Badge>
+                    <Badge variant="outline" className="h-5 type-caption">Hybrid</Badge>
                   )}
                   {slide.reuse && (
                     <span className="type-caption text-muted-foreground">
-                      {slide.reuse.source_vertical || "KB"} slide {slide.reuse.source_slide_index}
+                      from {slide.reuse.source_vertical || "KB"} slide {slide.reuse.source_slide_index}
                     </span>
                   )}
-                </span>
+                </div>
+                {slide.body && (
+                  <p className="type-body-sm leading-relaxed text-muted-foreground whitespace-pre-line">
+                    {slide.body}
+                  </p>
+                )}
               </li>
             ))}
           </ol>
-          {hiddenSlideCount > 0 ? (
-            <p className="type-caption text-muted-foreground">
-              +{hiddenSlideCount} more slide{hiddenSlideCount === 1 ? "" : "s"}.
-            </p>
-          ) : null}
         </div>
       )}
     </div>

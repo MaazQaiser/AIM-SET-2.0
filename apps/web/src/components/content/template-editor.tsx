@@ -1,18 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  Bot,
-  ChevronLeft,
-  Code2,
-  Eye,
-  Loader2,
-  MessageSquareText,
-  Save,
-  Send,
-  Sparkles,
-} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronLeft, Code2, Eye, Loader2, Save } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
@@ -23,7 +14,6 @@ import { Textarea } from "@dc-copilot/ui/components/textarea";
 import {
   useContentTemplate,
   useCreateTemplate,
-  useTemplateAssist,
   useUpdateTemplate,
 } from "@/lib/data/content-studio-hooks";
 import {
@@ -37,48 +27,28 @@ import {
 } from "@/lib/content-studio/template-editor";
 import type { ContentTemplateDraft } from "@/types/content_studio";
 
-type ChatMessage = {
-  role: "assistant" | "user";
-  content: string;
-};
-
-const TEMPLATE_AGENT_PROMPTS = [
-  "Generate a polished executive deck template with a clean blue accent",
-  "Create a dark one-pager template with strong section hierarchy",
-  "Redesign this template with a white background, tighter spacing, and premium typography",
-] as const;
-
 interface TemplateEditorProps {
   templateId?: string;
 }
 
 export function TemplateEditor({ templateId }: TemplateEditorProps) {
+  const router = useRouter();
   const isEdit = Boolean(templateId);
   const detail = useContentTemplate(templateId);
   const create = useCreateTemplate();
   const update = useUpdateTemplate(templateId);
-  const assist = useTemplateAssist();
-  const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const [name, setName] = useState("New template");
   const [artifactType, setArtifactType] = useState<TemplateArtifactType>("deck");
   const [tagsText, setTagsText] = useState("");
   const [html, setHtml] = useState(STARTER_TEMPLATE_HTML);
   const [css, setCss] = useState(STARTER_TEMPLATE_CSS);
-  const [instruction, setInstruction] = useState("");
   const [saveError, setSaveError] = useState("");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [previewParts, setPreviewParts] = useState({
     html: STARTER_TEMPLATE_HTML,
     css: STARTER_TEMPLATE_CSS,
   });
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: "assistant",
-      content:
-        "Tell me to generate a full template or change the current style. I will update the HTML and CSS draft here.",
-    },
-  ]);
 
   useEffect(() => {
     if (!detail.data || !isEdit) return;
@@ -96,12 +66,6 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
     }, 350);
     return () => window.clearTimeout(timer);
   }, [css, html]);
-
-  useEffect(() => {
-    if (messages.length > 0 || assist.isPending) {
-      bottomRef.current?.scrollIntoView({ block: "end" });
-    }
-  }, [assist.isPending, messages]);
 
   const previewHtml = useMemo(
     () => compileTemplateDocument(previewParts.html, previewParts.css),
@@ -128,38 +92,11 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
     try {
       const saved = isEdit ? await update.mutateAsync(draft) : await create.mutateAsync(draft);
       setLastSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-      if (!isEdit) {
-        window.location.href = `/content/templates/${saved.id}/edit`;
+      if (!isEdit || (isEdit && templateId && saved.id !== templateId)) {
+        router.replace(`/content/templates/${saved.id}/edit`);
       }
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to save template");
-    }
-  }
-
-  async function handleAssist() {
-    const nextInstruction = instruction.trim();
-    if (!nextInstruction) return;
-    setInstruction("");
-    setMessages((current) => [...current, { role: "user", content: nextInstruction }]);
-    try {
-      const result = await assist.mutateAsync({ ...draft, instruction: nextInstruction });
-      setHtml(result.html);
-      setCss(result.css);
-      setMessages((current) => [
-        ...current,
-        {
-          role: "assistant",
-          content: result.message || "Updated the template draft. Review the preview, then save.",
-        },
-      ]);
-    } catch (err) {
-      setMessages((current) => [
-        ...current,
-        {
-          role: "assistant",
-          content: err instanceof Error ? err.message : "I could not update the template.",
-        },
-      ]);
     }
   }
 
@@ -167,6 +104,19 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
     return (
       <div className="p-6">
         <p className="type-body-sm text-muted-foreground">Loading template editor...</p>
+      </div>
+    );
+  }
+
+  if (isEdit && !detail.isLoading && !detail.data) {
+    return (
+      <div className="p-6 space-y-3">
+        <p className="type-body-sm text-destructive">
+          Template not found or request timed out. Please go back to Templates and reopen it.
+        </p>
+        <Link href="/content?tab=templates" className="type-body-sm text-primary underline">
+          Back to templates
+        </Link>
       </div>
     );
   }
@@ -207,7 +157,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
       {saveError ? <p className="shrink-0 type-body-sm text-destructive">{saveError}</p> : null}
 
       <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-12">
-        <Card className="min-h-0 xl:col-span-4">
+        <Card className="min-h-0 xl:col-span-5">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2">
               <Code2 className="h-4 w-4" />
@@ -275,7 +225,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
           </CardContent>
         </Card>
 
-        <Card className="min-h-0 xl:col-span-5">
+        <Card className="min-h-0 xl:col-span-7">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 type-body">
               <Eye className="h-4 w-4" />
@@ -291,89 +241,6 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
                 sandbox="allow-same-origin"
               />
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="min-h-0 xl:col-span-3">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 type-body">
-              <Bot className="h-4 w-4" />
-              Template agent
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex h-[calc(100%-4rem)] min-h-0 flex-col gap-3">
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-md border bg-muted/20 p-3">
-              {messages.map((message, index) => (
-                <div
-                  key={`${message.role}-${index}`}
-                  className={
-                    message.role === "user"
-                      ? "ml-5 rounded-md bg-primary p-2 text-primary-foreground"
-                      : "mr-5 rounded-md border bg-background p-2"
-                  }
-                >
-                  <div className="mb-1 flex items-center gap-1 type-caption font-medium opacity-80">
-                    {message.role === "user" ? (
-                      <MessageSquareText className="h-3 w-3" />
-                    ) : (
-                      <Sparkles className="h-3 w-3" />
-                    )}
-                    {message.role === "user" ? "You" : "Agent"}
-                  </div>
-                  <p className="whitespace-pre-wrap type-label leading-relaxed">{message.content}</p>
-                </div>
-              ))}
-              {assist.isPending ? (
-                <div className="mr-5 flex items-center gap-2 rounded-md border bg-background p-2 type-caption text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Updating draft...
-                </div>
-              ) : null}
-              <div ref={bottomRef} />
-            </div>
-
-            <form
-              className="shrink-0 space-y-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void handleAssist();
-              }}
-            >
-              <div className="flex flex-wrap gap-1">
-                {TEMPLATE_AGENT_PROMPTS.map((prompt) => (
-                  <Button
-                    key={prompt}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-auto whitespace-normal px-2 py-1 text-left type-caption"
-                    onClick={() => setInstruction(prompt)}
-                    disabled={assist.isPending}
-                  >
-                    {prompt}
-                  </Button>
-                ))}
-              </div>
-              <Textarea
-                value={instruction}
-                onChange={(event) => setInstruction(event.target.value)}
-                placeholder="Generate a polished dark executive deck template"
-                className="min-h-[92px] resize-none"
-                disabled={assist.isPending}
-              />
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={assist.isPending || !instruction.trim()}
-              >
-                {assist.isPending ? (
-                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="mr-1 h-4 w-4" />
-                )}
-                Generate / update draft
-              </Button>
-            </form>
           </CardContent>
         </Card>
       </div>

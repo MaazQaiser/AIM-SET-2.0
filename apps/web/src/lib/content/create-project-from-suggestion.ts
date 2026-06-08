@@ -20,6 +20,8 @@ export interface SuggestionProjectInput {
   leads?: ContentGenerationLead[];
   kbMatches?: SuggestionKbMatch[];
   sourceArtifactId?: string;
+  /** Pre-fetched plan from the expanded card — skips the redundant fetchContentPlan call. */
+  cachedPlan?: SuggestionPlan;
 }
 
 function mapArtifactType(type: string): "deck" | "one_pager" | "image" {
@@ -47,67 +49,15 @@ export async function fetchContentPlan(input: ContentPlanInput): Promise<Suggest
   return plan;
 }
 
-/** Creates a Studio project pre-seeded from a content suggestion and returns its id. */
-export async function createProjectFromSuggestion(input: SuggestionProjectInput): Promise<string> {
-  const artifactType = mapArtifactType(String(input.artifactType));
-  const leads = (input.leads ?? []).map((lead) => ({
-    callId: lead.callId,
-    accountName: lead.accountName,
-    leadName: lead.leadName,
-    industry: lead.industry ?? input.industry,
-    sourcePath: lead.sourcePath,
-    contentRequirements: lead.contentRequirements,
-    context: lead.context,
-    relevantProjects: lead.relevantProjects,
-    relevantDocuments: lead.relevantDocuments,
-    recommendedDeck: lead.recommendedDeck,
-  }));
-  const sourcePath =
-    input.sourcePath || input.leads?.find((lead) => lead.sourcePath)?.sourcePath || "/content?tab=suggestions";
-  const contentRequirements =
-    input.contentRequirements ||
-    input.leads?.find((lead) => lead.contentRequirements)?.contentRequirements ||
-    input.reason ||
-    input.neededFor ||
-    "";
-  const suggestionContext = {
-    ...(input.context ?? {}),
-    source: input.source,
-    sourcePath,
-    suggestionId: input.suggestionId,
-    gapId: input.gapId,
-    title: input.title,
-    artifactType,
-    accountName: input.accountName,
-    leadName: input.leadName,
-    industry: input.industry,
-    reason: input.reason,
-    neededFor: input.neededFor,
-    contentRequirements,
-    kbMatches: input.kbMatches ?? [],
-    leads,
-  };
-
-  let suggestionPlan: SuggestionPlan | undefined;
-  try {
-    suggestionPlan = await fetchContentPlan({
-      suggestionId: input.suggestionId,
-      title: input.title,
-      artifactType,
-      source: input.source,
-      generationReason: input.reason,
-      neededFor: input.neededFor,
-      sourcePath,
-      contentRequirements,
-      context: suggestionContext,
-      industry: input.industry,
-      leads,
-      kbAssetIds: (input.kbMatches ?? []).map((m) => m.id),
-    });
-  } catch {
-    suggestionPlan = undefined;
-  }
-
+function buildSuggestionBrief(
+  input: SuggestionProjectInput,
+  artifactType: "deck" | "one_pager" | "image",
+  leads: ReturnType<typeof mapLeads>,
+  sourcePath: string,
+  contentRequirements: string,
+  suggestionContext: Record<string, unknown>,
+  suggestionPlan?: SuggestionPlan,
+): Record<string, unknown> {
   const brief: Record<string, unknown> = {
     artifact_type: artifactType,
     account_name: input.accountName,
@@ -120,11 +70,7 @@ export async function createProjectFromSuggestion(input: SuggestionProjectInput)
     source_path: sourcePath,
     content_requirements: contentRequirements,
     what_to_create: contentRequirements,
-    needed_at: {
-      source: input.source,
-      path: sourcePath,
-      call_id: input.callId,
-    },
+    needed_at: { source: input.source, path: sourcePath, call_id: input.callId },
     suggestion_context: suggestionContext,
     asset_name: input.title,
     industry: input.industry,
@@ -154,13 +100,70 @@ export async function createProjectFromSuggestion(input: SuggestionProjectInput)
       })),
     ]),
   };
-
   if (suggestionPlan) {
     brief.suggestion_plan = suggestionPlan;
-    if (suggestionPlan.slide_plan?.length) {
-      brief.slide_count = suggestionPlan.slide_plan.length;
-    }
+    if (suggestionPlan.slide_plan?.length) brief.slide_count = suggestionPlan.slide_plan.length;
   }
+  return brief;
+}
+
+function mapLeads(input: SuggestionProjectInput, artifactType: string) {
+  return (input.leads ?? []).map((lead) => ({
+    callId: lead.callId,
+    accountName: lead.accountName,
+    leadName: lead.leadName,
+    industry: lead.industry ?? input.industry,
+    sourcePath: lead.sourcePath,
+    contentRequirements: lead.contentRequirements,
+    context: lead.context,
+    relevantProjects: lead.relevantProjects,
+    relevantDocuments: lead.relevantDocuments,
+    recommendedDeck: lead.recommendedDeck,
+  }));
+}
+
+/** Creates a Studio project pre-seeded from a content suggestion and returns its id.
+ *
+ * Navigation strategy: create the project immediately with the basic brief so the
+ * user reaches the studio in ~1-2 seconds. If a cached plan is available it is
+ * included; otherwise the plan is fetched in the background — the studio bootstrap
+ * produces a full rule-based outline in the meantime.
+ */
+export async function createProjectFromSuggestion(input: SuggestionProjectInput): Promise<string> {
+  const artifactType = mapArtifactType(String(input.artifactType));
+  const leads = mapLeads(input, artifactType);
+  const sourcePath =
+    input.sourcePath || input.leads?.find((lead) => lead.sourcePath)?.sourcePath || "/content?tab=suggestions";
+  const contentRequirements =
+    input.contentRequirements ||
+    input.leads?.find((lead) => lead.contentRequirements)?.contentRequirements ||
+    input.reason ||
+    input.neededFor ||
+    "";
+  const suggestionContext = {
+    ...(input.context ?? {}),
+    source: input.source,
+    sourcePath,
+    suggestionId: input.suggestionId,
+    gapId: input.gapId,
+    title: input.title,
+    artifactType,
+    accountName: input.accountName,
+    leadName: input.leadName,
+    industry: input.industry,
+    reason: input.reason,
+    neededFor: input.neededFor,
+    contentRequirements,
+    kbMatches: input.kbMatches ?? [],
+    leads,
+  };
+
+  // Use the pre-fetched plan if available (card was expanded) — skip the LLM call.
+  const suggestionPlan: SuggestionPlan | undefined = input.cachedPlan;
+
+  const brief = buildSuggestionBrief(
+    input, artifactType, leads, sourcePath, contentRequirements, suggestionContext, suggestionPlan
+  );
 
   const createRes = await fetch("/api/content/studio/projects", {
     method: "POST",
@@ -179,6 +182,27 @@ export async function createProjectFromSuggestion(input: SuggestionProjectInput)
     throw new Error(await createRes.text());
   }
   const project = (await createRes.json()) as { id: string };
+
+  // If no plan was cached, warm the server-side plan cache in the background.
+  // The studio bootstrap runs rule-based and gives immediate results; the plan
+  // will be ready from cache on the next request.
+  if (!suggestionPlan) {
+    void fetchContentPlan({
+      suggestionId: input.suggestionId,
+      title: input.title,
+      artifactType,
+      source: input.source,
+      generationReason: input.reason,
+      neededFor: input.neededFor,
+      sourcePath,
+      contentRequirements,
+      context: suggestionContext,
+      industry: input.industry,
+      leads,
+      kbAssetIds: (input.kbMatches ?? []).map((m) => m.id),
+    }).catch(() => {/* warm cache best-effort */});
+  }
+
   return project.id;
 }
 

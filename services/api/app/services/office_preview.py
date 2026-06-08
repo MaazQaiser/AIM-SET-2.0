@@ -36,7 +36,11 @@ def rasterize_presentation_slides(
     *,
     dpi: int = DEFAULT_SLIDE_DPI,
 ) -> List[bytes]:
-    """Render presentation slides to PNG bytes (LibreOffice → PDF → rasterize)."""
+    """Render presentation slides to PNG bytes via LibreOffice -> PDF -> PNG.
+
+    Visual slide previews require LibreOffice so uploaded decks keep their original
+    layout, fonts, and branding. Text-only fallback PDFs are never used here.
+    """
     normalized = ext.lower() if ext.startswith(".") else f".{ext.lower()}"
     if normalized not in PRESENTATION_EXTENSIONS:
         raise ValueError(f"Not a presentation: {ext}")

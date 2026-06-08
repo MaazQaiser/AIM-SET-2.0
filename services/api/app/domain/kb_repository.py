@@ -310,13 +310,18 @@ class KbRepository:
 
         patch = {
             "preview_slide_count": len(slide_pngs),
-            "preview_storage_path": None,
         }
         settings = get_settings()
         if settings.supabase_configured:
             try:
                 supabase = get_supabase()
                 supabase.table("kb_assets").update(patch).eq("tenant_id", tenant_id).eq("id", asset_id).execute()
+                try:
+                    supabase.table("kb_assets").update({"preview_updated_at": _now_iso()}).eq(
+                        "tenant_id", tenant_id
+                    ).eq("id", asset_id).execute()
+                except Exception:
+                    pass
                 self._clear_asset_list_cache()
             except Exception:
                 pass

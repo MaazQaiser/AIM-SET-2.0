@@ -58,8 +58,7 @@ function AppDocument({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const clerkEnabled =
-    !isLocalAuthBypassEnabled() && isClerkConfigured();
+  const clerkEnabled = !isLocalAuthBypassEnabled() && isClerkConfigured();
   const publishableKey = getClerkPublishableKey();
 
   const document = (

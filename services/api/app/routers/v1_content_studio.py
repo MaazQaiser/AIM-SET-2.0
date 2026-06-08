@@ -102,6 +102,7 @@ class TemplateBody(BaseModel):
     html: str
     css: str = ""
     tags: List[str] = Field(default_factory=list)
+    metadata: Optional[Dict[str, Any]] = None
 
 
 class TemplatePatchBody(BaseModel):
@@ -110,6 +111,7 @@ class TemplatePatchBody(BaseModel):
     html: Optional[str] = None
     css: Optional[str] = None
     tags: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 
 class TemplateAssistBody(BaseModel):
@@ -151,6 +153,7 @@ def create_template(
             css_variables=extract_css_variables(resolved_css),
             tags=body.tags,
             page_count=count_template_pages(document, body.artifactType),
+            metadata=body.metadata,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -174,6 +177,48 @@ def assist_template(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/templates/parent")
+def get_parent_template(
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Optional[Dict[str, Any]]:
+    """Return the singleton parent template, or null when not yet configured."""
+    return get_content_studio_repository().get_parent_template(ctx)
+
+
+@router.post("/templates/parent/assets")
+async def upload_parent_template_asset(
+    file: UploadFile = File(...),
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Dict[str, str]:
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing file")
+    try:
+        return get_content_studio_repository().upload_parent_asset(
+            ctx,
+            file_bytes=data,
+            file_name=file.filename or "asset.png",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/templates/parent/assets/{asset_name}")
+def get_parent_template_asset(
+    asset_name: str,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> Response:
+    try:
+        data, mime_type = get_content_studio_repository().download_parent_asset(ctx, asset_name)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found") from exc
+    return Response(
+        content=data,
+        media_type=mime_type,
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 
 @router.get("/templates/{template_id}")
@@ -297,6 +342,8 @@ def update_template(
         patch["artifactType"] = body.artifactType
     if body.tags is not None:
         patch["tags"] = body.tags
+    if body.metadata is not None:
+        patch["metadata"] = body.metadata
     if body.html is not None or body.css is not None:
         html = body.html if body.html is not None else existing.get("html") or ""
         _, existing_css = split_template_parts(existing.get("html") or "")
@@ -452,12 +499,20 @@ def get_project(
     include_latest: bool = Query(True, alias="includeLatest"),
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> Dict[str, Any]:
-    project = get_content_studio_repository().get_project(ctx, project_id)
+    repo = get_content_studio_repository()
+    project = repo.get_project(ctx, project_id)
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-    messages = get_content_studio_repository().list_messages(ctx, project_id)
-    revisions = get_content_studio_repository().list_revisions(ctx, project_id)
-    latest = get_content_studio_repository().latest_revision(ctx, project_id) if include_latest else None
+
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        f_messages = pool.submit(repo.list_messages, ctx, project_id)
+        f_revisions = pool.submit(repo.list_revisions, ctx, project_id)
+        f_latest = pool.submit(repo.latest_revision, ctx, project_id) if include_latest else None
+        messages = f_messages.result()
+        revisions = f_revisions.result()
+        latest = f_latest.result() if f_latest is not None else None
+
     return {"project": project, "messages": messages, "revisions": revisions, "latestRevision": latest}
 
 
@@ -586,10 +641,18 @@ def save_revision_to_kb(
             detail="Invalid format. Allowed: pdf, pptx, csv",
         )
 
-    file_bytes = render_html_export(str(revision.get("html") or ""), fmt)
+    revision_html = str(revision.get("html") or "")
+    file_bytes = render_html_export(revision_html, fmt)
     ext = f".{fmt}"
     file_name = f"{_safe_file_stem(title)}{ext}"
     asset_type = "image" if artifact_type == "image" else "one-pager" if artifact_type == "one_pager" else "deck"
+
+    # Extract plain text from the HTML so the ingest pipeline can index it even
+    # when the exported file format (e.g. image-based PPTX) has no extractable text.
+    from app.services.content_export_service import _html_fragment_to_text, _split_sections
+
+    slide_texts = [_html_fragment_to_text(s) for s in _split_sections(revision_html)]
+    source_text = "\n\n".join(t for t in slide_texts if t).strip()
 
     kb_repo = get_kb_repository()
     result = kb_repo.create_upload(
@@ -610,6 +673,7 @@ def save_revision_to_kb(
             "asset_id": result["asset"]["id"],
             "_clerk_key": clerk_key,
             "_uploaded_by": ctx.user_id,
+            "_source_text": source_text,
         },
         kb_repo,
     )
@@ -622,7 +686,22 @@ def save_revision_to_kb(
         from app.domain.content_gaps_repository import get_content_gaps_repository
 
         gap_repo = get_content_gaps_repository()
+        brief = project.get("brief") or {}
         gap = gap_repo.get_gap(ctx, str(gap_id))
+        if not gap:
+            # Gap was never persisted (e.g. user clicked "Generate in Studio" without
+            # dismissing first). Create it now so we can mark it resolved.
+            gap = gap_repo.upsert_gap(
+                ctx,
+                gap_key=str(gap_id),
+                source=str(brief.get("source") or "pre_dc"),
+                name=title,
+                artifact_type=artifact_type,
+                call_id=str(brief.get("call_id") or brief.get("callId") or "") or None,
+                reason=str(brief.get("reason") or "") or None,
+                needed_for=str(brief.get("neededFor") or brief.get("needed_for") or "") or None,
+                source_path=str(brief.get("sourcePath") or brief.get("source_path") or "") or None,
+            )
         if gap:
             gap_repo.patch_gap(
                 ctx,

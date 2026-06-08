@@ -70,8 +70,16 @@ export function kbSlideMetaUrl(assetId: string): string {
   return `/api/kb/assets/${encodeURIComponent(assetId)}/preview/slides`;
 }
 
-export function kbSlideUrl(assetId: string, slideIndex: number): string {
-  return `/api/kb/assets/${encodeURIComponent(assetId)}/preview/slides/${slideIndex}`;
+/** Bump when slide preview rendering changes so browsers drop stale PNG cache. */
+export const KB_SLIDE_PREVIEW_CACHE_VERSION = "visual3";
+
+export function kbSlideUrl(
+  assetId: string,
+  slideIndex: number,
+  cacheVersion: string = KB_SLIDE_PREVIEW_CACHE_VERSION
+): string {
+  const base = `/api/kb/assets/${encodeURIComponent(assetId)}/preview/slides/${slideIndex}`;
+  return `${base}?v=${encodeURIComponent(cacheVersion)}`;
 }
 
 export function isPresentationFormat(format: KbFileFormat): boolean {

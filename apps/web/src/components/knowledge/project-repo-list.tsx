@@ -16,7 +16,6 @@ import {
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent } from "@dc-copilot/ui/components/card";
-import { FilterChip } from "@dc-copilot/ui/components/chip";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { SearchInput } from "@dc-copilot/ui/components/search-input";
 import { PageHeader, PageShell } from "@/components/layout/page-shell";
@@ -72,6 +71,26 @@ function ProjectRepoViewToggle({
         <span className="hidden sm:inline">Cards</span>
       </Button>
     </fieldset>
+  );
+}
+
+function ProjectRepoStats({ projects }: { projects: KBProject[] }) {
+  const industryCount = new Set(projects.map((project) => project.industry).filter(Boolean)).size;
+  const sourceCount = new Set(projects.flatMap((project) => project.sourceAssetIds ?? [project.sourceAssetId])).size;
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      {[
+        { label: "Projects", value: projects.length.toLocaleString() },
+        { label: "Industries", value: industryCount.toLocaleString() },
+        { label: "KB sources", value: sourceCount.toLocaleString() },
+      ].map((stat) => (
+        <div key={stat.label} className="rounded-lg border border-border bg-card px-4 py-3">
+          <p className="type-label text-muted-foreground">{stat.label}</p>
+          <p className="mt-1 type-screen-title text-foreground">{stat.value}</p>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -233,7 +252,7 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
   const [industryFilter, setIndustryFilter] = useState("All");
   const [view, setView] = useState<ProjectRepoView>("table");
 
-  const industryFilters = useMemo(() => ["All", ...uniqueProjectValues(projects, "industry", 7)], [projects]);
+  const industryOptions = useMemo(() => uniqueProjectValues(projects, "industry", 50), [projects]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -263,6 +282,8 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
         </PageHeader>
       )}
 
+      <ProjectRepoStats projects={projects} />
+
       <div className="space-y-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <SearchInput
@@ -273,21 +294,30 @@ export function ProjectRepoList({ embedded = false }: { embedded?: boolean }) {
             aria-label="Search KB projects"
           />
           <div className="flex flex-wrap items-center gap-2">
-            <ProjectRepoViewToggle view={view} onChange={setView} />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-          {industryFilters.map((filter) => (
-            <FilterChip
-              key={`industry-${filter}`}
-              active={filter === industryFilter}
-              onClick={() => setIndustryFilter(filter)}
-              className="h-7 px-2.5 type-caption"
+            <select
+              id="project-repo-industry-filter"
+              value={industryFilter}
+              onChange={(event) => setIndustryFilter(event.target.value)}
+              className="flex h-8 min-w-[10rem] rounded-md border border-input bg-background px-3 py-1 type-body ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label="Filter projects by industry"
             >
-              {filter === "All" ? "All" : filter}
-            </FilterChip>
-          ))}
+              <option value="All">All industries</option>
+              {industryOptions.map((industry) => (
+                <option key={industry} value={industry}>
+                  {industry}
+                </option>
+              ))}
+            </select>
+            <ProjectRepoViewToggle view={view} onChange={setView} />
+            {embedded && (
+              <Button asChild variant="outline" size="sm">
+                <Link href="/knowledge/projects">
+                  <ArrowUpRight className="h-4 w-4" />
+                  Open repo
+                </Link>
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

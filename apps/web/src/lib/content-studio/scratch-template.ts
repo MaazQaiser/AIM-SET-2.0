@@ -17,13 +17,17 @@ export interface ScratchSlideDraft {
   backgroundColor: string;
   textColor?: string;
   backgroundImageDataUrl?: string;
+  backgroundImageUrl?: string;
   backgroundImageName?: string;
+  /** When true the slide occupies a locked position (start or end group) and cannot be deleted or reordered. */
+  isFixed?: boolean;
 }
 
 export interface ScratchLogoAsset {
   id: string;
   label: string;
   dataUrl: string;
+  url?: string;
   fileName?: string;
   isPrimary?: boolean;
 }
@@ -39,7 +43,12 @@ export interface ScratchTemplateDraft {
   logos?: ScratchLogoAsset[];
   logoDataUrl?: string;
   logoName?: string;
+  /** Fixed slides prepended before the user's editable slides. */
+  fixedStartSlides?: ScratchSlideDraft[];
+  /** User-editable slides in the middle of the template. */
   slides: ScratchSlideDraft[];
+  /** Fixed slides appended after the user's editable slides. */
+  fixedEndSlides?: ScratchSlideDraft[];
 }
 
 export const SCRATCH_LAYOUT_OPTIONS: Array<{ value: ScratchSlideLayout; label: string }> = [
@@ -96,7 +105,13 @@ export function buildScratchTemplateDocument(draft: ScratchTemplateDraft): { htm
   const logos = normalizeLogos(draft);
   const logoCluster = logos.length > 0 ? buildLogoCluster(logos) : "";
 
-  const slides = draft.slides.map((slide, index) =>
+  const allSlides = [
+    ...(draft.fixedStartSlides ?? []),
+    ...draft.slides,
+    ...(draft.fixedEndSlides ?? []),
+  ];
+
+  const slides = allSlides.map((slide, index) =>
     buildSlideMarkup(slide, index + 1, logoCluster, defaultTextColor)
   );
 
@@ -104,6 +119,98 @@ export function buildScratchTemplateDocument(draft: ScratchTemplateDraft): { htm
     html: slides.join("\n"),
     css: buildScratchCss(accent, defaultTextColor, fontFamily),
   };
+}
+
+function makeFixedSlide(
+  layout: ScratchSlideLayout,
+  title: string,
+  kicker: string,
+  body: string,
+  backgroundColor: string,
+  textColor?: string
+): ScratchSlideDraft {
+  return {
+    id:
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `fixed-${Date.now()}-${Math.random()}`,
+    layout,
+    title,
+    kicker,
+    body,
+    backgroundColor,
+    textColor,
+    isFixed: true,
+  };
+}
+
+/**
+ * Returns the single fixed cover slide that always opens every template.
+ * The template creator can edit its content; it cannot be deleted or reordered.
+ */
+export function createDefaultFixedStartSlides(): ScratchSlideDraft[] {
+  return [
+    makeFixedSlide(
+      "cover",
+      "Slide Title",
+      "EXECUTIVE BRIEFING",
+      "A strategic overview prepared for [Prospect Name] — [Date]",
+      "#0f172a",
+      "#ffffff"
+    ),
+  ];
+}
+
+/**
+ * Returns the 6 fixed closing slides that always end every template.
+ * The template creator can edit their content; they cannot be deleted or reordered.
+ */
+export function createDefaultFixedEndSlides(): ScratchSlideDraft[] {
+  return [
+    makeFixedSlide(
+      "section",
+      "About [Company]",
+      "OUR COMPANY",
+      "Brief overview of who we are and why we're here.",
+      "#f8fafc"
+    ),
+    makeFixedSlide(
+      "three_cards",
+      "Why [Company]?",
+      "OUR DIFFERENTIATORS",
+      "Three things that set us apart from the competition.",
+      "#ffffff"
+    ),
+    makeFixedSlide(
+      "visual_left",
+      "Proven Results",
+      "CUSTOMER SUCCESS",
+      "Real outcomes from customers just like you.",
+      "#eff6ff"
+    ),
+    makeFixedSlide(
+      "two_column",
+      "Investment Overview",
+      "YOUR INVESTMENT",
+      "Clear value and the return you can expect.",
+      "#ffffff"
+    ),
+    makeFixedSlide(
+      "closing",
+      "Next Steps",
+      "LET'S MOVE FORWARD",
+      "Align on actions and timeline to get started today.",
+      "#f0fdf4"
+    ),
+    makeFixedSlide(
+      "cover",
+      "Thank You",
+      "WE'RE EXCITED TO PARTNER",
+      "Questions? Let's keep the conversation going.",
+      "#0f172a",
+      "#ffffff"
+    ),
+  ];
 }
 
 export function parseScratchTags(value: string): string[] {
@@ -121,9 +228,10 @@ function buildSlideMarkup(
 ): string {
   const bg = safeColor(slide.backgroundColor, "#ffffff");
   const textColor = safeColor(slide.textColor ?? defaultTextColor, defaultTextColor);
-  const hasBackgroundImage = Boolean(slide.backgroundImageDataUrl);
+  const hasBackgroundImage = Boolean(slide.backgroundImageUrl || slide.backgroundImageDataUrl);
+  const backgroundSrc = slide.backgroundImageUrl || slide.backgroundImageDataUrl || "";
   const backgroundImage = hasBackgroundImage
-    ? `<img class="scratch-bg-image" src="${escapeAttr(slide.backgroundImageDataUrl ?? "")}" alt="" />`
+    ? `<img class="scratch-bg-image" src="${escapeAttr(backgroundSrc)}" alt="" />`
     : "";
   const classes = [
     "slide",
@@ -142,7 +250,7 @@ function buildSlideMarkup(
 }
 
 function normalizeLogos(draft: ScratchTemplateDraft): ScratchLogoAsset[] {
-  const logo = (draft.logos ?? []).find((entry) => Boolean(entry.dataUrl));
+  const logo = (draft.logos ?? []).find((entry) => Boolean(entry.url || entry.dataUrl));
   if (logo) return [logo];
   if (!draft.logoDataUrl) return [];
   return [
@@ -156,19 +264,25 @@ function normalizeLogos(draft: ScratchTemplateDraft): ScratchLogoAsset[] {
   ];
 }
 
+function logoSrc(logo: ScratchLogoAsset): string {
+  return logo.url || logo.dataUrl;
+}
+
 function buildLogoCluster(logos: ScratchLogoAsset[]): string {
   const logo = logos[0];
   if (!logo) return "";
+  const src = logoSrc(logo);
+  if (!src) return "";
 
   return `<div class="scratch-logo-cluster">
-  <img class="scratch-logo-primary" src="${escapeAttr(logo.dataUrl)}" alt="${escapeAttr(
+  <img class="scratch-logo-primary" src="${escapeAttr(src)}" alt="${escapeAttr(
     logo.fileName || logo.label || "Logo"
   )}" />
 </div>`;
 }
 
 function buildLayoutBody(slide: ScratchSlideDraft, slideNumber: number): string {
-  const kicker = escapeHtml(slide.kicker || `Slide ${slideNumber}`);
+  const kicker = escapeHtml(`Slide ${slideNumber}`);
   const title = escapeHtml(slide.title || `Slide ${slideNumber} title`);
   const body = escapeHtml(slide.body || "Add content here.");
 
@@ -189,7 +303,7 @@ function buildLayoutBody(slide: ScratchSlideDraft, slideNumber: number): string 
   </div>
 </div>`;
     case "blank":
-      return `<div class="blank-layout" aria-label="Blank slide"></div>`;
+      return `<div class="blank-layout"></div>`;
     case "two_column":
       return `<header class="slide-header">
     <div class="eyebrow">${kicker}</div>

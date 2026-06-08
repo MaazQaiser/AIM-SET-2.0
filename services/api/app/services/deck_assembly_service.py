@@ -11,6 +11,8 @@ from app.domain.content_studio_repository import ContentStudioRepository, get_co
 from app.domain.kb_repository import get_kb_repository
 from app.domain.kb_tenancy import resolve_kb_tenant
 
+PARENT_TEMPLATE_TAG = "__parent_template__"
+
 
 def extract_slide_section(html: str, slide_index: int) -> Optional[str]:
     """Return inner HTML for a deck section by data-slide index."""
@@ -145,6 +147,68 @@ def _latest_revision_html_for_asset(
     return None
 
 
+def _extract_slide_sections(html: str) -> List[str]:
+    """Return all <section class="slide"> elements from HTML in document order."""
+    pattern = re.compile(
+        r'<section\b[^>]*\bclass="[^"]*\bslide\b[^"]*"[^>]*>.*?</section>',
+        re.DOTALL | re.IGNORECASE,
+    )
+    return [m.group(0) for m in pattern.finditer(html)]
+
+
+def _renumber_slide_section(section_html: str, new_num: int) -> str:
+    """Replace the data-slide attribute value so all slides are numbered sequentially."""
+    return re.sub(
+        r'(data-slide=)["\']?\d+["\']?',
+        f'\\1"{new_num}"',
+        section_html,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+
+
+def _get_parent_fixed_sections(
+    ctx: TenantContext,
+    repo: ContentStudioRepository,
+) -> Tuple[List[str], List[str]]:
+    """Return (fixed_start_sections, fixed_end_sections) from the configured parent template.
+
+    Returns two empty lists when no parent template is set up, so callers can
+    safely call this unconditionally — it degrades gracefully.
+    """
+    try:
+        stubs = repo.list_templates(ctx, artifact_type="deck")
+        stub = next(
+            (t for t in stubs if PARENT_TEMPLATE_TAG in (t.get("tags") or [])),
+            None,
+        )
+        if not stub:
+            return [], []
+
+        parent = repo.get_template(ctx, str(stub["id"]))
+        if not parent:
+            return [], []
+
+        parent_html = str(parent.get("html") or "")
+        if not parent_html:
+            return [], []
+
+        all_sections = _extract_slide_sections(parent_html)
+        if not all_sections:
+            return [], []
+
+        # Determine the start/end split from the saved draft metadata when
+        # available; otherwise default to 1 fixed-start slide.
+        meta = parent.get("metadata") or {}
+        draft = meta.get("fixedSlidesDraft") or {}
+        fixed_start_slides = draft.get("fixedStartSlides") or []
+        n_start = max(1, len(fixed_start_slides)) if fixed_start_slides else 1
+
+        return all_sections[:n_start], all_sections[n_start:]
+    except Exception:
+        return [], []
+
+
 def _extract_template_style(template: Optional[Dict[str, Any]]) -> str:
     if not template:
         return ""
@@ -166,6 +230,7 @@ def merge_slide_plan_to_html(
     template: Optional[Dict[str, Any]] = None,
     generated_sections: Optional[Dict[int, str]] = None,
     repo: Optional[ContentStudioRepository] = None,
+    artifact_type: str = "deck",
 ) -> str:
     """Assemble a full deck HTML from slide plan items (reuse + generated sections)."""
     repo = repo or get_content_studio_repository()
@@ -221,8 +286,28 @@ def merge_slide_plan_to_html(
 
         sections.append(section_html)
 
+    # Inject parent-template fixed slides only for deck artifacts.
+    # The helper returns empty lists when no parent template is configured, so
+    # this is a no-op for tenants that haven't set one up.
+    parent_start, parent_end = (
+        _get_parent_fixed_sections(ctx, repo) if artifact_type == "deck" else ([], [])
+    )
+
+    # Renumber all sections sequentially: parent-start → user → parent-end.
+    merged: List[str] = []
+    counter = 1
+    for s in parent_start:
+        merged.append(_renumber_slide_section(s, counter))
+        counter += 1
+    for s in sections:
+        merged.append(_renumber_slide_section(s, counter))
+        counter += 1
+    for s in parent_end:
+        merged.append(_renumber_slide_section(s, counter))
+        counter += 1
+
     style = _extract_template_style(template)
-    body = "\n".join(sections)
+    body = "\n".join(merged)
     return (
         f"<!DOCTYPE html><html><head><meta charset='utf-8'>"
         f"<style>body{{margin:0;background:#fff;font-family:Urbanist,sans-serif}}"

@@ -9,9 +9,6 @@ from dc_core.tenancy import TenantContext
 from app.config import get_settings
 from app.deps import get_supabase
 from app.domain.memory_store import get_memory_store
-from app.domain.supabase_helpers import run_with_timeout
-
-
 def _deterministic_tenant_uuid(clerk_key: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"dc-copilot-tenant:{clerk_key}"))
 
@@ -52,7 +49,10 @@ class TenantService:
 
             # Upload/ingest need a real tenants row (kb_assets.tenant_id FK). Do not fall back
             # to an in-memory UUID that was never inserted.
-            tenant_uuid = run_with_timeout(_resolve_from_db, default=None, timeout_sec=12.0)
+            try:
+                tenant_uuid = _resolve_from_db()
+            except Exception:
+                tenant_uuid = None
             if tenant_uuid:
                 return tenant_uuid, clerk_key
             if allow_memory_fallback:

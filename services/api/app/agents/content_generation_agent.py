@@ -362,6 +362,7 @@ def _generate_deck_from_plan(
         template=chosen_template,
         generated_sections=generated_sections,
         repo=repo,
+        artifact_type="deck",
     )
 
     _, violations = sanitize_html(full_html)
@@ -455,12 +456,23 @@ def run_studio_bootstrap(
     else:
         template_id_from_plan = ""
 
-    kb_hits = _retrieve_studio_kb_hits(ctx, f"{title} {brief.get('needed_for', '')} {brief.get('generation_reason', '')}")
+    from concurrent.futures import ThreadPoolExecutor
+    bootstrap_query = f"{title} {brief.get('needed_for', '')} {brief.get('generation_reason', '')}"
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        kb_future = pool.submit(_retrieve_studio_kb_hits, ctx, bootstrap_query)
+        tpl_future = pool.submit(_pick_default_templates, ctx, repo, project, brief, title)
+        kb_hits = kb_future.result()
+        best_template, recommendations = tpl_future.result()
+
     if kb_hits and not brief.get("kb_asset_ids"):
         brief["kb_asset_ids"] = [str(hit.get("asset_id", "")) for hit in kb_hits[:5] if hit.get("asset_id")]
 
     if artifact_type == "deck" and _needs_slide_outline(brief, artifact_type) and not brief.get("slide_outline"):
-        brief["slide_outline"] = _build_slide_outline(title=title, brief=brief)
+        _existing_tpl_id = str(project.get("templateId") or template_id_from_plan or "").strip()
+        _existing_tpl = repo.get_template(ctx, _existing_tpl_id) if _existing_tpl_id else None
+        brief["slide_outline"] = _build_slide_outline(
+            title=title, brief=brief, two_sections=_template_has_two_sections(_existing_tpl)
+        )
         brief["slide_outline"] = _attach_outline_sources(
             brief["slide_outline"],
             project_id=project_id,
@@ -472,8 +484,6 @@ def run_studio_bootstrap(
             project_id=project_id,
             kb_hits=kb_hits,
         )
-
-    best_template, recommendations = _pick_default_templates(ctx, repo, project, brief, title)
     if template_id_from_plan:
         planned = repo.get_template(ctx, template_id_from_plan)
         if planned:
@@ -617,9 +627,14 @@ def run_studio_turn(
             return envelope
 
         if _needs_slide_outline(brief, str(project.get("artifactType") or "deck")):
+            _tpl_for_outline = repo.get_template(ctx, template_id) if template_id else None
+            if not _tpl_for_outline:
+                _existing_tpl_id = str(project.get("templateId") or "").strip()
+                _tpl_for_outline = repo.get_template(ctx, _existing_tpl_id) if _existing_tpl_id else None
             brief["slide_outline"] = _build_slide_outline(
                 title=str(project.get("title") or "Generated Deck"),
                 brief=brief,
+                two_sections=_template_has_two_sections(_tpl_for_outline),
             )
             best_template, recommendations = _pick_default_templates(
                 ctx, repo, project, brief, title
@@ -1091,6 +1106,26 @@ def _extract_template_slots(html: str) -> List[str]:
                 if token not in slots:
                     slots.append(token)
     return slots[:20]
+
+
+def _template_has_two_sections(template: Optional[Dict[str, Any]]) -> bool:
+    """Return True when the template exposes two distinct body/content slots per slide."""
+    if not template:
+        return False
+    metadata = template.get("metadata") or {}
+    conversion = metadata.get("conversion") or {}
+    try:
+        section_count = int(conversion.get("sectionCount") or 1)
+    except (TypeError, ValueError):
+        section_count = 1
+    if section_count >= 2:
+        return True
+    slots = _extract_template_slots(str(template.get("html") or ""))
+    body_like = [
+        s for s in slots
+        if any(kw in s.lower() for kw in ("body", "section", "content", "column", "left", "right"))
+    ]
+    return len(body_like) >= 2
 
 
 def _apply_patch(html: str, patch: Dict[str, Any]) -> str:
@@ -1742,7 +1777,12 @@ def _needs_slide_outline(brief: Dict[str, Any], artifact_type: str) -> bool:
     return not isinstance(outline, list) or len(outline) == 0
 
 
-def _build_slide_outline(title: str, brief: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _build_slide_outline(
+    title: str,
+    brief: Dict[str, Any],
+    *,
+    two_sections: bool = False,
+) -> List[Dict[str, Any]]:
     count = _slide_count(brief) or 5
     audience = str(brief.get("audience") or "Executive stakeholders")
     context = str(brief.get("content_context") or "Discovery context")
@@ -1754,36 +1794,48 @@ def _build_slide_outline(title: str, brief: Dict[str, Any]) -> List[Dict[str, An
         clean_points = ["Current pain point", "Recommended approach", "Expected outcome"]
 
     outline: List[Dict[str, Any]] = []
-    outline.append(
-        {
-            "slide": 1,
-            "heading": title,
-            "body": f"Set the context for {audience} and frame why this conversation matters now.",
-            "visual": "Account logo or relevant hero image",
-        }
-    )
+
+    # Slide 1: Title / opener
+    title_slide: Dict[str, Any] = {
+        "slide": 1,
+        "heading": title,
+        "body": f"Set the context for {audience} and frame why this conversation matters now.",
+        "visual": "Account logo or relevant hero image",
+    }
+    if two_sections:
+        title_slide["section_a"] = f"Set the context for {audience} and explain the current situation."
+        title_slide["section_b"] = "Frame why this conversation is urgent and what the audience will gain."
+    outline.append(title_slide)
 
     middle_slots = max(0, count - 2)
     for index in range(middle_slots):
         point = clean_points[index % len(clean_points)]
-        outline.append(
-            {
-                "slide": index + 2,
-                "heading": point[:72],
-                "body": f"Explain the pain point, business impact, and what the audience needs to believe. Context: {context}.",
-                "visual": "Pain-impact chart or workflow diagram",
-            }
-        )
+        slide: Dict[str, Any] = {
+            "slide": index + 2,
+            "heading": point[:72],
+            "body": f"Explain the pain point, business impact, and what the audience needs to believe. Context: {context}.",
+            "visual": "Pain-impact chart or workflow diagram",
+        }
+        if two_sections:
+            slide["section_a"] = (
+                f"Pain point: {point[:100]}. Describe the business impact and why it matters now."
+            )
+            slide["section_b"] = (
+                f"Recommended approach: Address this with a targeted solution. Context: {context}."
+            )
+        outline.append(slide)
 
     if count > 1:
-        outline.append(
-            {
-                "slide": count,
-                "heading": "Recommended next steps",
-                "body": "Summarize the proposed path, ownership, and the next decision the buyer should make.",
-                "visual": "Timeline or next-step checklist",
-            }
-        )
+        closing: Dict[str, Any] = {
+            "slide": count,
+            "heading": "Recommended next steps",
+            "body": "Summarize the proposed path, ownership, and the next decision the buyer should make.",
+            "visual": "Timeline or next-step checklist",
+        }
+        if two_sections:
+            closing["section_a"] = "Immediate actions: Define ownership and set a timeline for the first milestone."
+            closing["section_b"] = "Decision point: Identify the key question the buyer must answer to move forward."
+        outline.append(closing)
 
     return outline[:count]
 
@@ -1816,6 +1868,8 @@ def _build_slide_preview_html(
         slide_num = int(item.get("slide") or index)
         heading = html_lib.escape(str(item.get("heading") or f"Slide {slide_num}").strip())
         body = html_lib.escape(str(item.get("body") or "").strip())
+        section_a = html_lib.escape(str(item.get("section_a") or "").strip())
+        section_b = html_lib.escape(str(item.get("section_b") or "").strip())
         visual = html_lib.escape(str(item.get("visual") or "").strip())
         evidence = html_lib.escape(str(item.get("evidence") or "").strip())
         citation_source = html_lib.escape(str(item.get("citation_source") or "").strip())
@@ -1827,12 +1881,29 @@ def _build_slide_preview_html(
             else ""
         )
         evidence_block = f'<p class="evidence-note">Evidence: {evidence} {cite}</p>' if evidence else ""
+
+        if section_a or section_b:
+            content_block = f"""
+              <div class="two-col" data-role="two-section">
+                <div class="col col-a" data-role="section-a">
+                  <p class="col-label">Section A</p>
+                  <p data-role="body">{section_a or body} {cite}</p>
+                </div>
+                <div class="col col-b" data-role="section-b">
+                  <p class="col-label">Section B</p>
+                  <p data-role="body-b">{section_b} {cite}</p>
+                </div>
+              </div>
+            """
+        else:
+            content_block = f'<p data-role="body">{body} {cite}</p>'
+
         slides.append(
             f"""
             <section class="slide dc-slide template-root" data-slide="{slide_num}" data-role="studio-slide">
               <div class="slide-kicker">Slide {slide_num:02d}</div>
               <{title_tag} data-role="heading">{heading} {cite}</{title_tag}>
-              <p data-role="body">{body} {cite}</p>
+              {content_block}
               {visual_block}
               {evidence_block}
             </section>
@@ -1933,6 +2004,30 @@ def _build_slide_preview_html(
             font-size: 15px;
             line-height: 1.4;
             color: var(--muted, #64748b);
+          }}
+          .two-col {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-top: 20px;
+          }}
+          .col {{
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }}
+          .col-b {{
+            border-left: 2px solid var(--border, #e2e8f0);
+            padding-left: 32px;
+          }}
+          .col-label {{
+            margin: 0;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--accent, #2563eb);
+            opacity: 0.7;
           }}
           .cite {{
             display: inline-block;

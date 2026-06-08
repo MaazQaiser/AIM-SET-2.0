@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useDeferredValue } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -9,6 +9,7 @@ import {
   ImagePlus,
   LayoutTemplate,
   Loader2,
+  Lock,
   Palette,
   Plus,
   Save,
@@ -27,6 +28,8 @@ import { cn } from "@dc-copilot/ui/lib/cn";
 import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import {
   buildScratchTemplateDocument,
+  createDefaultFixedEndSlides,
+  createDefaultFixedStartSlides,
   createScratchSlide,
   SCRATCH_FONT_OPTIONS,
   SCRATCH_LAYOUT_OPTIONS,
@@ -36,7 +39,47 @@ import {
   type ScratchTemplateFont,
 } from "@/lib/content-studio/scratch-template";
 import { compileTemplateDocument } from "@/lib/content-studio/template-editor";
-import { useCreateTemplate } from "@/lib/data/content-studio-hooks";
+import { useCreateTemplate, useParentTemplate } from "@/lib/data/content-studio-hooks";
+
+function SlideListButton({
+  slide,
+  globalIndex,
+  isActive,
+  isFixed = false,
+  onClick,
+}: {
+  slide: ScratchSlideDraft;
+  globalIndex: number;
+  isActive: boolean;
+  isFixed?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+        isActive
+          ? "border-primary bg-primary/10 text-foreground"
+          : "border-border bg-card hover:bg-muted/40"
+      )}
+      onClick={onClick}
+    >
+      <span className="min-w-0">
+        <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+          {isFixed ? <Lock className="h-2.5 w-2.5 text-amber-500" /> : null}
+          Slide {globalIndex + 1}
+        </span>
+        <span className="block truncate font-medium">
+          {slide.layout === "blank" ? "Blank slide" : slide.title || "Untitled"}
+        </span>
+      </span>
+      <Badge variant="outline" className="shrink-0 capitalize">
+        {slide.layout.replace(/_/g, " ")}
+      </Badge>
+    </button>
+  );
+}
 
 const QUICK_ADD_LAYOUTS: Array<{ layout: ScratchSlideLayout; label: string }> = [
   { layout: "cover", label: "Cover" },
@@ -57,24 +100,62 @@ function readImageDataUrl(file: File): Promise<string> {
 
 export function TemplateScratchBuilder() {
   const create = useCreateTemplate();
+  const { data: parentTemplate } = useParentTemplate();
   const [name, setName] = useState("Scratch deck template");
   const [accentColor, setAccentColor] = useState("#2563eb");
   const [textColor, setTextColor] = useState("#0f172a");
   const [fontFamily, setFontFamily] = useState<ScratchTemplateFont>("urbanist");
   const [logoDataUrl, setLogoDataUrl] = useState("");
   const [logoFileName, setLogoFileName] = useState("");
+
+  // Fixed slides at the start (1 slide) and end (6 slides) of every template.
+  const [fixedStartSlides, setFixedStartSlides] = useState<ScratchSlideDraft[]>(
+    () => createDefaultFixedStartSlides()
+  );
+  const [fixedEndSlides, setFixedEndSlides] = useState<ScratchSlideDraft[]>(
+    () => createDefaultFixedEndSlides()
+  );
+
+  // User-editable slides between the two fixed groups.
   const [slides, setSlides] = useState<ScratchSlideDraft[]>([createScratchSlide(1)]);
-  const [activeSlideId, setActiveSlideId] = useState(slides[0]?.id ?? "");
+
+  // When a parent template is configured, use its fixed slides instead of the local defaults.
+  useEffect(() => {
+    if (!parentTemplate?.metadata) return;
+    const draft = parentTemplate.metadata.fixedSlidesDraft as
+      | { startSlides?: ScratchSlideDraft[]; endSlides?: ScratchSlideDraft[] }
+      | undefined;
+    if (!draft) return;
+    if (draft.startSlides?.length) {
+      setFixedStartSlides(draft.startSlides);
+      setActiveSlideId(draft.startSlides[0].id);
+    }
+    if (draft.endSlides?.length) setFixedEndSlides(draft.endSlides);
+  }, [parentTemplate]);
+
+  const allSlides = useMemo(
+    () => [...fixedStartSlides, ...slides, ...fixedEndSlides],
+    [fixedStartSlides, slides, fixedEndSlides]
+  );
+
+  const [activeSlideId, setActiveSlideId] = useState(() => fixedStartSlides[0]?.id ?? "");
   const [error, setError] = useState("");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
   const activeIndex = Math.max(
     0,
-    slides.findIndex((slide) => slide.id === activeSlideId)
+    allSlides.findIndex((slide) => slide.id === activeSlideId)
   );
-  const activeSlide = slides[activeIndex] ?? slides[0];
+  const activeSlide = allSlides[activeIndex] ?? allSlides[0];
   const activeSlideTextColor = activeSlide.textColor ?? textColor;
   const isBlankSlide = activeSlide.layout === "blank";
+  const isActiveFixed = activeSlide?.isFixed ?? false;
+
+  function getActiveGroup(): "fixedStart" | "middle" | "fixedEnd" {
+    if (fixedStartSlides.some((s) => s.id === activeSlide.id)) return "fixedStart";
+    if (fixedEndSlides.some((s) => s.id === activeSlide.id)) return "fixedEnd";
+    return "middle";
+  }
   const logos = useMemo<ScratchLogoAsset[]>(
     () =>
       logoDataUrl
@@ -91,26 +172,39 @@ export function TemplateScratchBuilder() {
     [logoDataUrl, logoFileName]
   );
 
+  // Defer the preview inputs so the editor stays responsive during fast edits.
+  // The iframe recompile is expensive; it runs during React's idle time.
+  const previewInputs = useMemo(
+    () => ({ name, accentColor, textColor, fontFamily, logos, fixedStartSlides, slides, fixedEndSlides }),
+    [accentColor, fixedEndSlides, fixedStartSlides, fontFamily, logos, name, slides, textColor]
+  );
+  const deferredPreviewInputs = useDeferredValue(previewInputs);
+
   const compiled = useMemo(
     () =>
       buildScratchTemplateDocument({
-        name,
-        accentColor,
-        textColor,
-        fontFamily,
+        name: deferredPreviewInputs.name,
+        accentColor: deferredPreviewInputs.accentColor,
+        textColor: deferredPreviewInputs.textColor,
+        fontFamily: deferredPreviewInputs.fontFamily,
         tags: [],
-        logos,
-        slides,
+        logos: deferredPreviewInputs.logos,
+        fixedStartSlides: deferredPreviewInputs.fixedStartSlides,
+        slides: deferredPreviewInputs.slides,
+        fixedEndSlides: deferredPreviewInputs.fixedEndSlides,
       }),
-    [accentColor, fontFamily, logos, name, slides, textColor]
+    [deferredPreviewInputs]
   );
   const previewHtml = useMemo(() => compileTemplateDocument(compiled.html, compiled.css), [compiled]);
-  const previewFrameHeight = Math.max(1, slides.length) * 740;
+  const previewFrameHeight = Math.max(1, allSlides.length) * 740;
 
   function updateActiveSlide(patch: Partial<ScratchSlideDraft>) {
-    setSlides((current) =>
-      current.map((slide) => (slide.id === activeSlide.id ? { ...slide, ...patch } : slide))
-    );
+    const updater = (current: ScratchSlideDraft[]) =>
+      current.map((s) => (s.id === activeSlide.id ? { ...s, ...patch } : s));
+    const group = getActiveGroup();
+    if (group === "fixedStart") setFixedStartSlides(updater);
+    else if (group === "fixedEnd") setFixedEndSlides(updater);
+    else setSlides(updater);
   }
 
   function addSlide(layout: ScratchSlideLayout = "section") {
@@ -134,10 +228,14 @@ export function TemplateScratchBuilder() {
   }
 
   function removeSlide() {
-    if (slides.length <= 1) return;
+    if (isActiveFixed || slides.length <= 1) return;
     setSlides((current) => {
       const nextSlides = current.filter((slide) => slide.id !== activeSlide.id);
-      setActiveSlideId(nextSlides[Math.max(0, activeIndex - 1)]?.id ?? nextSlides[0]?.id ?? "");
+      // activeIndex here is relative to allSlides; find the new neighbour in middle slides.
+      const middleActiveIdx = current.findIndex((s) => s.id === activeSlide.id);
+      setActiveSlideId(
+        nextSlides[Math.max(0, middleActiveIdx - 1)]?.id ?? nextSlides[0]?.id ?? allSlides[0]?.id ?? ""
+      );
       return nextSlides;
     });
   }
@@ -363,33 +461,60 @@ export function TemplateScratchBuilder() {
                 ))}
               </div>
             </div>
-            <div className="space-y-2">
+
+            {/* ── Slide list — 3 groups ── */}
+            <div className="space-y-3">
               <Label>Slide list</Label>
-              <div className="space-y-2">
-                {slides.map((slide, index) => (
-                  <button
+
+              {/* Fixed — Start */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-1 px-1 text-[10px] font-semibold uppercase tracking-widest text-amber-600">
+                  <Lock className="h-3 w-3" />
+                  Fixed — Start
+                </div>
+                {fixedStartSlides.map((slide, idx) => (
+                  <SlideListButton
                     key={slide.id}
-                    type="button"
-                    className={cn(
-                      "flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors",
-                      slide.id === activeSlide.id
-                        ? "border-primary bg-primary/10 text-foreground"
-                        : "border-border bg-card hover:bg-muted/40"
-                    )}
+                    slide={slide}
+                    globalIndex={idx}
+                    isActive={slide.id === activeSlide.id}
+                    isFixed
                     onClick={() => setActiveSlideId(slide.id)}
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-[11px] font-medium text-muted-foreground">
-                        Slide {index + 1}
-                      </span>
-                      <span className="block truncate font-medium">
-                        {slide.layout === "blank" ? "Blank slide" : slide.title || "Untitled"}
-                      </span>
-                    </span>
-                    <Badge variant="outline" className="shrink-0 capitalize">
-                      {slide.layout.replace(/_/g, " ")}
-                    </Badge>
-                  </button>
+                  />
+                ))}
+              </div>
+
+              {/* Your slides */}
+              <div className="space-y-1">
+                <div className="px-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Your slides
+                </div>
+                {slides.map((slide, idx) => (
+                  <SlideListButton
+                    key={slide.id}
+                    slide={slide}
+                    globalIndex={fixedStartSlides.length + idx}
+                    isActive={slide.id === activeSlide.id}
+                    onClick={() => setActiveSlideId(slide.id)}
+                  />
+                ))}
+              </div>
+
+              {/* Fixed — End */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-1 px-1 text-[10px] font-semibold uppercase tracking-widest text-amber-600">
+                  <Lock className="h-3 w-3" />
+                  Fixed — End
+                </div>
+                {fixedEndSlides.map((slide, idx) => (
+                  <SlideListButton
+                    key={slide.id}
+                    slide={slide}
+                    globalIndex={fixedStartSlides.length + slides.length + idx}
+                    isActive={slide.id === activeSlide.id}
+                    isFixed
+                    onClick={() => setActiveSlideId(slide.id)}
+                  />
                 ))}
               </div>
             </div>
@@ -404,6 +529,13 @@ export function TemplateScratchBuilder() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {isActiveFixed ? (
+              <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                <Lock className="h-3 w-3 shrink-0" />
+                Fixed slide — locked in position. Set its content here; it will appear in every template.
+              </div>
+            ) : null}
+
             <div className="flex flex-wrap gap-2">
               {SCRATCH_LAYOUT_OPTIONS.map((option) => (
                 <Button
@@ -528,7 +660,14 @@ export function TemplateScratchBuilder() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={duplicateSlide}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={duplicateSlide}
+                disabled={isActiveFixed}
+                title={isActiveFixed ? "Fixed slides cannot be duplicated" : undefined}
+              >
                 <Copy className="h-4 w-4" />
                 Duplicate
               </Button>
@@ -537,7 +676,8 @@ export function TemplateScratchBuilder() {
                 variant="outline"
                 size="sm"
                 onClick={removeSlide}
-                disabled={slides.length <= 1}
+                disabled={isActiveFixed || slides.length <= 1}
+                title={isActiveFixed ? "Fixed slides cannot be removed" : undefined}
               >
                 <Trash2 className="h-4 w-4" />
                 Remove

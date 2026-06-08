@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { bffFetch } from "@/lib/api/bff-fetch";
@@ -535,6 +535,16 @@ export function useCoachingInsights() {
 }
 
 export function useKbAssets() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const snapshot = readKbAssetsSnapshot();
+    if (!snapshot?.length) return;
+    queryClient.setQueryData<KBAsset[]>(["kb-assets"], (existing) =>
+      existing?.length ? existing : snapshot
+    );
+  }, [queryClient]);
+
   return useQuery({
     queryKey: ["kb-assets"],
     queryFn: async () => {
@@ -546,7 +556,6 @@ export function useKbAssets() {
       writeKbAssetsSnapshot(assets);
       return assets;
     },
-    placeholderData: readKbAssetsSnapshot,
     staleTime: QUERY_STALE_TIME_MS,
   });
 }
@@ -637,6 +646,15 @@ export function preDcContentGapKey(item: Pick<PreDcContentGenerationGap, "callId
 
 export function postDcContentGapKey(item: Pick<PostDcContentGenerationGap, "callId" | "name">) {
   return `post_dc:${item.callId}:${item.name.trim().toLowerCase()}`;
+}
+
+export function contentGapKeyForLead(
+  lead: Pick<PreDcContentGenerationGap, "callId" | "sourceArtifactId" | "sourceItemId" | "name">,
+  source: "pre-dc" | "post-dc"
+) {
+  return source === "post-dc"
+    ? postDcContentGapKey({ callId: lead.callId, name: lead.name })
+    : preDcContentGapKey(lead);
 }
 
 function nonOpenGapKeys(gaps: ContentGap[]) {

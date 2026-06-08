@@ -114,6 +114,8 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
             const raw = JSON.parse(event.data as string) as { type: string; payload?: unknown };
             const msg = raw as StreamMessage;
             const store = useLiveCall.getState();
+            // Discard messages that arrived for a different callId (stale socket)
+            if (store.callId && store.callId !== callIdRef.current) return;
             switch (msg.type) {
               case "transcript":
                 store.appendTranscriptEvent(msg.payload);

@@ -45,4 +45,9 @@ def retrieve_kb(
 def default_embed_fn(query: str) -> List[float]:
     from dc_embeddings.client import EmbeddingClient
 
-    return EmbeddingClient(api_key=os.environ.get("OPENAI_API_KEY")).embed([query]).embeddings[0]
+    _dim = os.environ.get("KB_EMBEDDING_DIMENSIONS")
+    dimensions = int(_dim) if _dim else None
+    return EmbeddingClient(
+        api_key=os.environ.get("OPENAI_API_KEY"),
+        dimensions=dimensions,
+    ).embed([query]).embeddings[0]

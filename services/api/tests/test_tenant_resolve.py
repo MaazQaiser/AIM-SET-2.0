@@ -14,10 +14,10 @@ def test_resolve_raises_when_supabase_fails_instead_of_orphan_uuid(monkeypatch):
 
     svc = TenantService()
 
-    def _timeout(*_args, **_kwargs):
-        return None
+    def _fail(*_args, **_kwargs):
+        raise RuntimeError("supabase unavailable")
 
-    monkeypatch.setattr("app.domain.tenant_service.run_with_timeout", _timeout)
+    monkeypatch.setattr("app.domain.tenant_service.get_supabase", _fail)
 
     ctx = TenantContext(tenant_id="org-missing", user_id="u1", clerk_org_id="org-missing")
     try:
@@ -35,10 +35,10 @@ def test_resolve_can_use_memory_fallback_for_reads(monkeypatch):
 
     svc = TenantService()
 
-    def _timeout(*_args, **_kwargs):
-        return None
+    def _fail(*_args, **_kwargs):
+        raise RuntimeError("supabase unavailable")
 
-    monkeypatch.setattr("app.domain.tenant_service.run_with_timeout", _timeout)
+    monkeypatch.setattr("app.domain.tenant_service.get_supabase", _fail)
 
     ctx = TenantContext(tenant_id="org-missing", user_id="u1", clerk_org_id="org-missing")
     tenant_uuid, clerk_key = svc.resolve(ctx, allow_memory_fallback=True)

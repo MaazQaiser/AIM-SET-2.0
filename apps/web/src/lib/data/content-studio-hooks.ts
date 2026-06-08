@@ -88,6 +88,7 @@ export function useContentTemplates(artifactType?: string) {
 }
 
 export function useContentTemplate(templateId?: string) {
+  const qc = useQueryClient();
   return useQuery({
     queryKey: ["content-template", templateId],
     queryFn: async () => {
@@ -97,6 +98,12 @@ export function useContentTemplate(templateId?: string) {
     },
     enabled: Boolean(templateId),
     staleTime: QUERY_STALE_TIME_MS,
+    // Show template instantly from list cache while fetching fresh detail.
+    placeholderData: () => {
+      if (!templateId) return undefined;
+      const list = qc.getQueryData<ContentTemplate[]>(["content-templates"]);
+      return list?.find((template) => template.id === templateId);
+    },
   });
 }
 
@@ -288,8 +295,21 @@ export function useUpdateTemplate(templateId?: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json() as Promise<ContentTemplate>;
+      if (res.ok) return res.json() as Promise<ContentTemplate>;
+
+      // Final safety net: if update target is stale/missing, create a fresh
+      // template from the current editor draft instead of failing the save.
+      if (res.status === 404) {
+        const createRes = await fetch("/api/content/templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!createRes.ok) throw new Error(await createRes.text());
+        return createRes.json() as Promise<ContentTemplate>;
+      }
+
+      throw new Error(await res.text());
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["content-templates"] });
@@ -312,6 +332,47 @@ export function useTemplateAssist() {
       });
       if (!res.ok) throw new Error(await res.text());
       return res.json() as Promise<TemplateAssistResult>;
+    },
+  });
+}
+
+const PARENT_TEMPLATE_TAG = "__parent_template__";
+
+async function fetchParentTemplate(): Promise<ContentTemplate | null> {
+  const res = await fetch("/api/content/templates/parent", { cache: "no-store" });
+  if (!res.ok) return null;
+  return (await res.json()) as ContentTemplate | null;
+}
+
+/** Loads the singleton parent template (includes metadata for scratch builder). */
+export function useParentTemplate() {
+  return useQuery({
+    queryKey: ["content-parent-template"],
+    queryFn: fetchParentTemplate,
+    staleTime: QUERY_STALE_TIME_MS,
+  });
+}
+
+export function useSaveParentTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: ContentTemplateDraft) => {
+      const res = await fetch("/api/content/templates/parent", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json() as Promise<ContentTemplate>;
+    },
+    onSuccess: (savedTemplate) => {
+      qc.setQueryData<ContentTemplate | null>(["content-parent-template"], savedTemplate);
+      qc.setQueryData<ContentTemplate[]>(["content-templates"], (old) => {
+        const withoutParent = (old ?? []).filter(
+          (t) => !t.tags?.includes(PARENT_TEMPLATE_TAG)
+        );
+        return [savedTemplate, ...withoutParent];
+      });
     },
   });
 }

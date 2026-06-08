@@ -84,7 +84,17 @@ def get_asset_preview_slides_meta(
     slide_count = int(row.get("preview_slide_count") or 0)
     if slide_count <= 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Slide preview not found for asset")
-    return {"assetId": asset_id, "slideCount": slide_count}
+    cache_version = (
+        row.get("preview_updated_at")
+        or row.get("embedded_at")
+        or row.get("uploaded_at")
+        or "1"
+    )
+    return {
+        "assetId": asset_id,
+        "slideCount": slide_count,
+        "cacheVersion": str(cache_version),
+    }
 
 
 @router.get("/assets/{asset_id}/preview/slides/{slide_index}")
@@ -114,7 +124,7 @@ def get_asset_preview_slide(
     return Response(
         content=data,
         media_type="image/png",
-        headers={"Cache-Control": "private, max-age=3600"},
+        headers={"Cache-Control": "private, no-store, must-revalidate"},
     )
 
 

@@ -10,14 +10,21 @@ export function useContentPlan(input: ContentPlanInput | null) {
     queryKey: ["content-plan", input?.suggestionId, input?.title],
     queryFn: async () => {
       if (!input) return null;
-      const envelope = await bffFetch<{ result: ContentPlanResult }>("/api/content/plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
+      const envelope = await bffFetch<{ result: ContentPlanResult }>(
+        "/api/content/plan",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+          signal: AbortSignal.timeout(45_000),
+        }
+      );
       return envelope?.result ?? null;
     },
     enabled: Boolean(input?.suggestionId && input?.title),
     staleTime: QUERY_STALE_TIME_MS,
+    gcTime: QUERY_STALE_TIME_MS * 2,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 }
