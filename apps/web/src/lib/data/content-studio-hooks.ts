@@ -279,8 +279,11 @@ export function useCreateTemplate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: ContentTemplateDraft) => {
-      const { createTemplateDirect } = await import("@/lib/content-studio/parent-template-assets");
-      const res = await createTemplateDirect(body);
+      const res = await fetch("/api/content/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       if (!res.ok) throw new Error(await res.text());
       return res.json() as Promise<ContentTemplate>;
     },
@@ -293,25 +296,30 @@ export function useUpdateTemplate(templateId?: string) {
   return useMutation({
     mutationFn: async (body: ContentTemplateDraft) => {
       if (!templateId) throw new Error("Template id is required");
-      const { createTemplateDirect, patchTemplateDirect } = await import(
-        "@/lib/content-studio/parent-template-assets"
-      );
-      const res = await patchTemplateDirect(templateId, body);
+      const res = await fetch(`/api/content/templates/${templateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       if (res.ok) return res.json() as Promise<ContentTemplate>;
 
       // Final safety net: if update target is stale/missing, create a fresh
       // template from the current editor draft instead of failing the save.
       if (res.status === 404) {
-        const createRes = await createTemplateDirect(body);
+        const createRes = await fetch("/api/content/templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
         if (!createRes.ok) throw new Error(await createRes.text());
         return createRes.json() as Promise<ContentTemplate>;
       }
 
       throw new Error(await res.text());
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      qc.setQueryData(["content-template", templateId], saved);
       qc.invalidateQueries({ queryKey: ["content-templates"] });
-      qc.invalidateQueries({ queryKey: ["content-template", templateId] });
     },
   });
 }

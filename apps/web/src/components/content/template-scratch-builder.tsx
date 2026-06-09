@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, useDeferredValue } from "react";
+import { useEffect, useMemo, useRef, useState, useDeferredValue } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
   Copy,
@@ -39,12 +40,37 @@ import {
   type ScratchTemplateFont,
 } from "@/lib/content-studio/scratch-template";
 import {
+  compactSlidesForSave,
   dataUrlToFile,
   ensureSlideImageUrls,
   uploadParentTemplateAsset,
 } from "@/lib/content-studio/parent-template-assets";
 import { compileTemplateDocument } from "@/lib/content-studio/template-editor";
-import { useCreateTemplate, useParentTemplate } from "@/lib/data/content-studio-hooks";
+import {
+  useContentTemplate,
+  useCreateTemplate,
+  useParentTemplate,
+  useUpdateTemplate,
+} from "@/lib/data/content-studio-hooks";
+import type { ContentTemplate } from "@/types/content_studio";
+
+interface ScratchTemplateDraftMeta {
+  scratchTemplate?: boolean;
+  scratchDraft?: {
+    accentColor?: string;
+    textColor?: string;
+    fontFamily?: ScratchTemplateFont;
+    logoUrl?: string;
+    logoFileName?: string;
+    fixedStartSlides?: ScratchSlideDraft[];
+    slides?: ScratchSlideDraft[];
+    fixedEndSlides?: ScratchSlideDraft[];
+  };
+}
+
+interface TemplateScratchBuilderProps {
+  templateId?: string;
+}
 
 function SlideListButton({
   slide,
@@ -92,9 +118,20 @@ const QUICK_ADD_LAYOUTS: Array<{ layout: ScratchSlideLayout; label: string }> = 
   { layout: "blank", label: "Blank" },
 ];
 const PREVIEW_SCALE = 0.34;
-export function TemplateScratchBuilder() {
+
+function readScratchDraft(template?: ContentTemplate | null): ScratchTemplateDraftMeta["scratchDraft"] {
+  const meta = template?.metadata as ScratchTemplateDraftMeta | undefined;
+  return meta?.scratchDraft;
+}
+
+export function TemplateScratchBuilder({ templateId }: TemplateScratchBuilderProps = {}) {
+  const router = useRouter();
+  const isEdit = Boolean(templateId);
+  const existing = useContentTemplate(templateId);
   const create = useCreateTemplate();
+  const update = useUpdateTemplate(templateId);
   const { data: parentTemplate } = useParentTemplate();
+  const hydratedFromIdRef = useRef<string | null>(null);
   const [name, setName] = useState("Scratch deck template");
   const [accentColor, setAccentColor] = useState("#2563eb");
   const [textColor, setTextColor] = useState("#0f172a");
@@ -114,8 +151,33 @@ export function TemplateScratchBuilder() {
   // User-editable slides between the two fixed groups.
   const [slides, setSlides] = useState<ScratchSlideDraft[]>([createScratchSlide(1)]);
 
-  // When a parent template is configured, use its fixed slides instead of the local defaults.
+  // Hydrate saved scratch template for editing (name, slides, branding).
   useEffect(() => {
+    if (!isEdit || !existing.data?.id) return;
+    if (hydratedFromIdRef.current === existing.data.id) return;
+
+    const draft = readScratchDraft(existing.data);
+    setName(existing.data.name);
+    if (draft?.accentColor) setAccentColor(draft.accentColor);
+    if (draft?.textColor) setTextColor(draft.textColor);
+    if (draft?.fontFamily) setFontFamily(draft.fontFamily);
+    if (draft?.logoUrl) {
+      setLogoUrl(draft.logoUrl);
+      setLogoDataUrl("");
+      setLogoFileName(draft.logoFileName ?? "");
+    }
+    if (draft?.fixedStartSlides?.length) {
+      setFixedStartSlides(draft.fixedStartSlides);
+      setActiveSlideId(draft.fixedStartSlides[0]?.id ?? "");
+    }
+    if (draft?.slides?.length) setSlides(draft.slides);
+    if (draft?.fixedEndSlides?.length) setFixedEndSlides(draft.fixedEndSlides);
+    hydratedFromIdRef.current = existing.data.id;
+  }, [existing.data, isEdit]);
+
+  // When creating a new template, inherit fixed slides from the parent template.
+  useEffect(() => {
+    if (isEdit) return;
     if (!parentTemplate?.metadata) return;
     const draft = parentTemplate.metadata.fixedSlidesDraft as
       | { startSlides?: ScratchSlideDraft[]; endSlides?: ScratchSlideDraft[] }
@@ -126,7 +188,7 @@ export function TemplateScratchBuilder() {
       setActiveSlideId(draft.startSlides[0].id);
     }
     if (draft.endSlides?.length) setFixedEndSlides(draft.endSlides);
-  }, [parentTemplate]);
+  }, [isEdit, parentTemplate]);
 
   const allSlides = useMemo(
     () => [...fixedStartSlides, ...slides, ...fixedEndSlides],
@@ -135,6 +197,7 @@ export function TemplateScratchBuilder() {
 
   const [activeSlideId, setActiveSlideId] = useState(() => fixedStartSlides[0]?.id ?? "");
   const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
   const activeIndex = Math.max(
@@ -278,6 +341,7 @@ export function TemplateScratchBuilder() {
   }
 
   async function handleSave() {
+    if (isSaving || create.isPending || update.isPending) return;
     setError("");
     if (!name.trim()) {
       setError("Template name is required.");
@@ -287,6 +351,7 @@ export function TemplateScratchBuilder() {
       setError("Add at least one slide.");
       return;
     }
+    setIsSaving(true);
     try {
       let resolvedLogoUrl = logoUrl;
       if (!resolvedLogoUrl && logoDataUrl) {
@@ -325,18 +390,47 @@ export function TemplateScratchBuilder() {
         slides: preparedMiddle,
         fixedEndSlides: preparedEnd,
       });
-      const saved = await create.mutateAsync({
+      const payload = {
         name: name.trim(),
-        artifactType: "deck",
-        tags: [],
+        artifactType: "deck" as const,
+        tags: [] as string[],
         html: compiledForSave.html,
         css: compiledForSave.css,
-      });
+        metadata: {
+          scratchTemplate: true,
+          scratchDraft: {
+            accentColor,
+            textColor,
+            fontFamily,
+            ...(resolvedLogoUrl ? { logoUrl: resolvedLogoUrl, logoFileName } : {}),
+            fixedStartSlides: compactSlidesForSave(preparedStart),
+            slides: compactSlidesForSave(preparedMiddle),
+            fixedEndSlides: compactSlidesForSave(preparedEnd),
+          },
+        },
+      };
+      const saved = isEdit
+        ? await update.mutateAsync(payload)
+        : await create.mutateAsync(payload);
       setLastSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-      window.location.href = `/content/templates/${saved.id}/edit`;
+      if (!isEdit) {
+        router.replace(`/content/templates/${saved.id}/scratch`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save template.");
+    } finally {
+      setIsSaving(false);
     }
+  }
+
+  const saving = isSaving || create.isPending || update.isPending;
+
+  if (isEdit && existing.isLoading && !existing.data) {
+    return (
+      <PageShell size="wide" className="flex items-center justify-center py-24">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </PageShell>
+    );
   }
 
   return (
@@ -353,24 +447,40 @@ export function TemplateScratchBuilder() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold">Create template from scratch</h1>
+              <h1 className="text-2xl font-semibold">
+                {isEdit ? "Edit template" : "Create template from scratch"}
+              </h1>
               <Badge variant="secondary">Slide skeleton</Badge>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Build the base slide structure, then choose fonts, add background images, and place logos before saving.
+              {isEdit
+                ? "Update the template name, slides, and branding, then save."
+                : "Build the base slide structure, then choose fonts, add background images, and place logos before saving."}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[220px] space-y-1">
+              <Label htmlFor="scratch-name-header" className="text-xs text-muted-foreground">
+                Template name
+              </Label>
+              <Input
+                id="scratch-name-header"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="My deck template"
+                disabled={saving}
+              />
+            </div>
             {lastSavedAt ? (
-              <span className="text-xs text-muted-foreground">Saved {lastSavedAt}</span>
+              <span className="pb-2 text-xs text-muted-foreground">Saved {lastSavedAt}</span>
             ) : null}
-            <Button type="button" onClick={() => void handleSave()} disabled={create.isPending}>
-              {create.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+            <Button type="button" onClick={() => void handleSave()} disabled={saving}>
+              {saving ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
               ) : (
-                <Save className="h-4 w-4" />
+                <Save className="mr-1 h-4 w-4" />
               )}
-              Save template
+              {saving ? "Saving..." : "Save template"}
             </Button>
           </div>
         </div>
@@ -387,10 +497,6 @@ export function TemplateScratchBuilder() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="scratch-name">Template name</Label>
-              <Input id="scratch-name" value={name} onChange={(event) => setName(event.target.value)} />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="scratch-accent" className="flex items-center gap-2">
                 <Palette className="h-4 w-4" />

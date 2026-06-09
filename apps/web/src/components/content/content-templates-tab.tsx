@@ -13,6 +13,14 @@ function formatArtifactType(value: string) {
   return value.replace(/_/g, " ");
 }
 
+function isScratchTemplate(template: ContentTemplate) {
+  return Boolean(
+    template.metadata &&
+      typeof template.metadata === "object" &&
+      (template.metadata as { scratchTemplate?: boolean }).scratchTemplate
+  );
+}
+
 export function ContentTemplatesTab() {
   const { data: templates = [], isLoading } = useContentTemplates();
   const { data: parentTemplate, isLoading: parentLoading } = useParentTemplate();
@@ -234,12 +242,21 @@ function TemplateCard({
               Preview
             </Link>
           </Button>
-          <Button size="sm" variant="outline" asChild>
-            <Link href={`/content/templates/${template.id}/edit`}>
-              <Code2 className="h-4 w-4 mr-1" />
-              Edit
-            </Link>
-          </Button>
+          {isScratchTemplate(template) ? (
+            <Button size="sm" variant="outline" asChild>
+              <Link href={`/content/templates/${template.id}/scratch`}>
+                <Pencil className="h-4 w-4 mr-1" />
+                Edit
+              </Link>
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" asChild>
+              <Link href={`/content/templates/${template.id}/edit`}>
+                <Code2 className="h-4 w-4 mr-1" />
+                Edit HTML
+              </Link>
+            </Button>
+          )}
           <Button size="sm" variant="outline" disabled={deleting} onClick={onDelete}>
             <Trash2 className="h-4 w-4 mr-1" />
             Delete

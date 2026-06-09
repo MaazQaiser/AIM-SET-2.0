@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -58,15 +58,18 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
     html: STARTER_TEMPLATE_HTML,
     css: STARTER_TEMPLATE_CSS,
   });
+  const hydratedFromIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!resolvedTemplate || !isEdit) return;
+    if (hydratedFromIdRef.current === resolvedTemplate.id) return;
     const parts = splitTemplateDocument(resolvedTemplate.html ?? "");
     setName(resolvedTemplate.name);
     setArtifactType(resolvedTemplate.artifactType);
     setTagsText(resolvedTemplate.tags.join(", "));
     setHtml(parts.html);
     setCss(parts.css);
+    hydratedFromIdRef.current = resolvedTemplate.id;
   }, [resolvedTemplate, isEdit]);
 
   useEffect(() => {

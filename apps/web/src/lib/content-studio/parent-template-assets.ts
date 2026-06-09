@@ -59,26 +59,60 @@ function uploadAssetWithProgress(
   });
 }
 
-export async function uploadParentTemplateAsset(file: File): Promise<string> {
-  const target = await prepareTemplateWrite();
-  const payload = await uploadAssetWithProgress(file, target);
+async function uploadViaBff(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch("/api/content/templates/parent/assets", {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) throw new Error((await res.text()) || "Failed to upload image.");
+  const payload = (await res.json()) as { url?: string };
   if (!payload.url) throw new Error("Upload did not return an asset URL.");
   return payload.url;
+}
+
+export async function uploadParentTemplateAsset(file: File): Promise<string> {
+  const target = await prepareTemplateWrite();
+  if (target?.parentAssetUploadUrl && target.token) {
+    try {
+      const payload = await uploadAssetWithProgress(file, target);
+      if (payload.url) return payload.url;
+    } catch {
+      // Fall back to the BFF when the browser cannot reach the API directly.
+    }
+  }
+  return uploadViaBff(file);
+}
+
+async function saveViaBff(body: ContentTemplateDraft): Promise<Response> {
+  return fetch("/api/content/templates/parent", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 export async function saveParentTemplateDirect(
   body: ContentTemplateDraft
 ): Promise<Response> {
   const target = await prepareTemplateWrite();
-  const saveUrl = target?.parentSaveUrl ?? "/api/content/templates/parent";
-  return fetch(saveUrl, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(target?.token ?? ""),
-    },
-    body: JSON.stringify(body),
-  });
+  if (target?.parentSaveUrl && target.token) {
+    try {
+      const direct = await fetch(target.parentSaveUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(target.token),
+        },
+        body: JSON.stringify(body),
+      });
+      if (direct.ok) return direct;
+    } catch {
+      // Fall back to the BFF when the browser cannot reach the API directly.
+    }
+  }
+  return saveViaBff(body);
 }
 
 export async function createTemplateDirect(body: ContentTemplateDraft): Promise<Response> {
@@ -133,7 +167,12 @@ export function compactSlidesForSave(slides: ScratchSlideDraft[]): ScratchSlideD
   return slides.map(compactSlideForSave);
 }
 
+function slidesNeedImageUpload(slides: ScratchSlideDraft[]): boolean {
+  return slides.some((slide) => slide.backgroundImageDataUrl && !slide.backgroundImageUrl);
+}
+
 export async function ensureSlideImageUrls(slides: ScratchSlideDraft[]): Promise<ScratchSlideDraft[]> {
+  if (!slidesNeedImageUpload(slides)) return slides;
   const next: ScratchSlideDraft[] = [];
   for (const slide of slides) {
     if (slide.backgroundImageDataUrl && !slide.backgroundImageUrl) {
