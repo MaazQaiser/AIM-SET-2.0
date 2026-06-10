@@ -18,12 +18,12 @@ import { ClientHistoryCard } from "@/components/pre-call/client-history-card";
 import { PostDcBriefPreviewCard } from "@/components/pre-call/post-dc-brief-preview";
 import { PreDcResearchCard } from "@/components/pre-call/pre-dc-research-card";
 import {
-  BriefBANTCard,
   BriefDeckCard,
   BriefDiscoveryQuestionsCard,
   BriefObjectionsCard,
   BriefPainsCard,
   BriefPodNotesCard,
+  BriefSdrHandoffSummaryCard,
 } from "@/components/pre-call/brief-widget-cards";
 import {
   PostBeforeContextCard,
@@ -55,6 +55,7 @@ import type {
   PostCallTask,
 } from "@/lib/brief-types";
 import { arrayLen } from "@/lib/dashboard/normalize-widget-props";
+import type { SdrHandoffSummaryItem } from "@/lib/dc-notes/build-from-import";
 import type { BANTScore, Call } from "@/types";
 
 type DefaultLayout = Pick<LayoutItem, "x" | "y" | "w" | "h" | "minW" | "minH">;
@@ -87,7 +88,7 @@ export const BRIEF_INFO_WIDGET_IDS = [
   "brief.post-preview",
 ] as const;
 
-export const BRIEF_TASK_WIDGET_IDS = ["brief.bant"] as const;
+export const BRIEF_TASK_WIDGET_IDS = [] as const;
 
 export function isBriefInfoWidget(id: string): boolean {
   return (BRIEF_INFO_WIDGET_IDS as readonly string[]).includes(id);
@@ -97,7 +98,7 @@ export function isBriefTaskWidget(id: string): boolean {
   return (BRIEF_TASK_WIDGET_IDS as readonly string[]).includes(id);
 }
 
-/** Main column: center widgets + right column except BANT (moved to prep tasks sidebar). */
+/** Main column: center widgets + right column except left-rail context. */
 export function isBriefFocusWidget<P extends { id: string; column: WidgetColumn }>(
   widget: P
 ): boolean {
@@ -109,6 +110,7 @@ export interface BriefWidgetProps {
   brief: CallBrief;
   bant?: BANTScore;
   discoveryQuestions: string[];
+  sdrHandoffSummary: SdrHandoffSummaryItem[];
   leadershipPreview: boolean;
   call: Call;
   accountSnapshot: AccountSnapshotRow[];
@@ -209,11 +211,15 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     column: "center",
     sortOrder: 0.25,
     isAvailable: ({ brief }) => arrayLen(brief.preDeck?.slides) > 0,
-    render: ({ brief }) => (
+    render: ({ brief, call }) => (
       <BriefPreDeckPanel
         deck={brief.preDeck}
         callId={brief.callId}
         accountName={brief.accountName}
+        industry={call.industry}
+        relevantDocuments={brief.relevantDocuments}
+        relevantProjects={brief.relevantProjects}
+        recommendedDeck={brief.recommendedDeck}
       />
     ),
   },
@@ -233,12 +239,23 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
   },
   {
     id: "brief.content-to-generate",
-    title: "Content to generate",
+    title: "Content to Generate for similar Leads",
     category: "content",
     column: "center",
     sortOrder: 0.75,
     isAvailable: ({ brief }) => arrayLen(brief.contentToGenerate) > 0,
     render: ({ brief }) => <BriefContentToGeneratePanel items={brief.contentToGenerate} />,
+  },
+  {
+    id: "brief.sdr-handoff",
+    title: "SDR handoff summary",
+    category: "client",
+    column: "center",
+    sortOrder: 1.9,
+    isAvailable: ({ sdrHandoffSummary }) => arrayLen(sdrHandoffSummary) > 0,
+    render: ({ sdrHandoffSummary }) => (
+      <BriefSdrHandoffSummaryCard items={sdrHandoffSummary ?? []} />
+    ),
   },
   {
     id: "brief.discovery",
@@ -367,18 +384,6 @@ export const BRIEF_WIDGETS: WidgetSpec<BriefWidgetProps>[] = [
     render: ({ brief }, opts) =>
       brief.postDcPreview ? (
         <PostDcBriefPreviewCard preview={brief.postDcPreview} embedded={opts?.embedded} />
-      ) : null,
-  },
-  {
-    id: "brief.bant",
-    title: "BANT scorecard",
-    category: "qualification",
-    column: "right",
-    sortOrder: 0,
-    isAvailable: ({ bant }) => Boolean(bant),
-    render: ({ bant, brief, call }, opts) =>
-      bant ? (
-        <BriefBANTCard bant={bant} brief={brief} call={call} embedded={opts?.embedded} />
       ) : null,
   },
   {

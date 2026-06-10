@@ -112,7 +112,7 @@ export function DashboardWidget({
 
   if (!isEditing) {
     return (
-      <div ref={bodyRef} className="min-w-0 w-full">
+      <div ref={bodyRef} className="min-w-0 w-full h-full">
         {context}
       </div>
     );

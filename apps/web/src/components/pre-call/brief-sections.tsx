@@ -16,9 +16,11 @@ import {
   BriefObjectionsCard,
   BriefPainsCard,
   BriefPodNotesCard,
+  BriefSdrHandoffSummaryCard,
 } from "@/components/pre-call/brief-widget-cards";
 import { DiscoveryChecklistPanel } from "@/components/live/discovery-checklist-panel";
 import { seedChecklistFromCall } from "@/lib/discovery-checklist-seed";
+import type { SdrHandoffSummaryItem } from "@/lib/dc-notes/build-from-import";
 import type { CallBrief } from "@/lib/brief-types";
 import type { BANTScore, Call } from "@/types";
 
@@ -29,12 +31,14 @@ export {
   BriefObjectionsCard,
   BriefPainsCard,
   BriefPodNotesCard,
+  BriefSdrHandoffSummaryCard,
 } from "@/components/pre-call/brief-widget-cards";
 
 interface BriefSectionsProps {
   brief: CallBrief;
   bant?: BANTScore;
   discoveryQuestions?: string[];
+  sdrHandoffSummary?: SdrHandoffSummaryItem[];
   leadershipPreview?: boolean;
   call?: Call;
 }
@@ -43,6 +47,7 @@ export function BriefSections({
   brief,
   bant,
   discoveryQuestions = [],
+  sdrHandoffSummary = [],
   leadershipPreview,
   call,
 }: BriefSectionsProps) {
@@ -63,6 +68,9 @@ export function BriefSections({
         callId={brief.callId}
         accountName={brief.accountName}
         industry={call?.industry}
+        relevantDocuments={brief.relevantDocuments}
+        relevantProjects={brief.relevantProjects}
+        recommendedDeck={brief.recommendedDeck}
       />
 
       {brief.researchSections && brief.researchSections.length > 0 && (
@@ -90,6 +98,10 @@ export function BriefSections({
       )}
 
       <BriefPainsCard pains={brief.pains} />
+
+      {sdrHandoffSummary.length > 0 && (
+        <BriefSdrHandoffSummaryCard items={sdrHandoffSummary} />
+      )}
 
       {discoveryQuestions.length > 0 && (
         <BriefDiscoveryQuestionsCard questions={discoveryQuestions} />

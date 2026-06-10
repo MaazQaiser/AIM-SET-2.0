@@ -14,6 +14,7 @@ import { useDcImportsStore } from "@/stores/use-dc-imports";
 import {
   discoveryQuestionsFromPreDc,
   findPreDcRecordForCall,
+  sdrHandoffSummaryFromPreDc,
 } from "@/lib/dc-notes/build-from-import";
 import { preDcField } from "@/types/dc-notes";
 import { cn } from "@/lib/cn";
@@ -56,6 +57,7 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
         "What would success look like in the next 90 days?",
         "Who else should be involved in evaluating a solution?",
       ];
+  const sdrHandoffSummary = preRecord ? sdrHandoffSummaryFromPreDc(preRecord) : [];
 
   const accountSnapshot = buildAccountSnapshot({ preRecord, call });
 
@@ -78,6 +80,11 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
     leadTitle: call.leadTitle ?? (preRecord ? preDcField(preRecord, "prospectPersona") : undefined),
     clientAttendees: brief?.clientAttendees,
   });
+  const leadLinkedInUrl =
+    brief?.clientAttendees?.find(
+      (attendee) => attendee.name.trim().toLowerCase() === call.leadName?.trim().toLowerCase()
+    )?.linkedinUrl || (preRecord ? preDcField(preRecord, "personLinkedIn") : undefined);
+  const companyLinkedInUrl = preRecord ? preDcField(preRecord, "companyLinkedIn") : undefined;
 
   return (
     <PageShell
@@ -92,14 +99,16 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
       <CallDetailStickyHeader
         call={call}
         scheduleText={scheduleText}
-        bant={resolvedBant}
         showJoinCall={showJoinCall}
         isEditingLayout={isEditingLayout}
         onToggleLayout={() => setEditingLayout(!isEditingLayout)}
+        personLinkedInUrl={leadLinkedInUrl}
+        companyLinkedInUrl={companyLinkedInUrl}
       />
       <CallDetailTabs
         callId={callId}
         discoveryQuestions={discoveryQuestions}
+        sdrHandoffSummary={sdrHandoffSummary}
         bant={resolvedBant}
         call={call}
         accountSnapshot={accountSnapshot}

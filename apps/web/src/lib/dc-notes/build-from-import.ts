@@ -399,18 +399,85 @@ export function buildPostDcBriefPreview(record: PostDCRecord): PostDcBriefPrevie
   };
 }
 
+function compactText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function cleanQuestionTopic(value: string, company = ""): string {
+  let clean = compactText(value)
+    .replace(/^(?:yes|no)\s*(?:[-:]\s*)?/i, "")
+    .replace(/[.;]\s*$/, "");
+
+  if (company) {
+    clean = clean.replace(
+      new RegExp(`^${escapeRegExp(company)}\\s+(?:needs|requires|wants|is looking for)\\s+`, "i"),
+      ""
+    );
+  }
+
+  return clean;
+}
+
+function isGenericNeed(value: string): boolean {
+  return /^(?:high level overview|not known|unknown|n\/a|-+)$/i.test(compactText(value));
+}
+
+function isGenericCampaignService(value: string): boolean {
+  return /^(?:tk|tkxel|not known|unknown|n\/a|-+)$/i.test(compactText(value));
+}
+
+function looksLikeHandoffNote(value: string): boolean {
+  return (
+    /\b(?:SDR|AE)\s+Note\s*:/i.test(value) ||
+    /\b(?:reached out|sent (?:a |the )?(?:mass )?email|positive reply|agreed to a demo|demo call)\b/i.test(value)
+  );
+}
+
+function shortenQuestionText(value: string, max = 120): string {
+  const clean = compactText(value);
+  if (clean.length <= max) return clean;
+  return `${clean.slice(0, max).trim()}...`;
+}
+
+function conciseQuestionTopic(value: string): string {
+  const clean = compactText(value);
+  if (clean.length <= 90) return clean;
+
+  const beforeWith = clean.replace(/\s+with\s+.+$/i, "");
+  if (beforeWith.length >= 16 && beforeWith.length < clean.length) return beforeWith;
+
+  const beforeList = clean.split(/[,;]/)[0]?.trim();
+  if (beforeList && beforeList.length >= 16 && beforeList.length < clean.length) {
+    return beforeList;
+  }
+
+  return shortenQuestionText(clean, 110);
+}
+
 export function discoveryQuestionsFromPreDc(record: PreDCRecord): string[] {
   const company = preDcField(record, "companyName");
   const lead = preDcField(record, "leadName");
+  const intersection = cleanQuestionTopic(preDcField(record, "intersectionAreas"), company);
+  const describedNeed = cleanQuestionTopic(preDcField(record, "describedNeeds"), company);
+  const statedNeed = cleanQuestionTopic(preDcField(record, "needPreDc"), company);
+  const need = looksLikeHandoffNote(describedNeed) || isGenericNeed(describedNeed)
+    ? statedNeed
+    : describedNeed;
   const questions: string[] = [];
 
-  if (preDcField(record, "intersectionAreas")) {
+  if (intersection) {
     questions.push(
-      `How are you currently approaching ${preDcField(record, "intersectionAreas")} at ${company}?`
+      `Which parts of ${conciseQuestionTopic(intersection)} are most urgent${company ? ` for ${company}` : ""} right now?`
     );
   }
-  if (preDcField(record, "describedNeeds")) {
-    questions.push(`You mentioned "${preDcField(record, "describedNeeds").slice(0, 120)}…" — can you expand on priority and timeline?`);
+  if (need && !isGenericNeed(need)) {
+    questions.push(
+      `For ${shortenQuestionText(need, 110)}, what outcome would make the first 90 days successful?`
+    );
   }
   if (preDcField(record, "techStacks")) {
     questions.push(`Walk me through your stack today (${preDcField(record, "techStacks")}) and where it breaks down.`);
@@ -423,6 +490,78 @@ export function discoveryQuestionsFromPreDc(record: PreDCRecord): string[] {
   }
 
   return questions.slice(0, 5);
+}
+
+export interface SdrHandoffSummaryItem {
+  label: string;
+  value: string;
+}
+
+function stripNoteLabel(value: string): string {
+  return value
+    .replace(/^\s*(?:SDR|AE)\s+Note\s*:\s*/i, "")
+    .trim();
+}
+
+function sentenceCase(value: string): string {
+  const clean = value.trim();
+  if (!clean) return "";
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
+function splitSdrAeNotes(value: string): { sdrNote: string; aeNote: string } {
+  const clean = value.trim();
+  if (!clean) return { sdrNote: "", aeNote: "" };
+
+  const aeMatch = clean.match(/\bAE\s+Note\s*:/i);
+  if (!aeMatch || aeMatch.index === undefined) {
+    return { sdrNote: stripNoteLabel(clean), aeNote: "" };
+  }
+
+  return {
+    sdrNote: stripNoteLabel(clean.slice(0, aeMatch.index)),
+    aeNote: stripNoteLabel(clean.slice(aeMatch.index)),
+  };
+}
+
+export function sdrHandoffSummaryFromPreDc(record: PreDCRecord): SdrHandoffSummaryItem[] {
+  const company = preDcField(record, "companyName");
+  const otherInfo = preDcField(record, "otherInformation");
+  const describedNeeds = preDcField(record, "describedNeeds");
+  const noteSource =
+    [otherInfo, describedNeeds].find((value) => looksLikeHandoffNote(value)) ?? "";
+  const { sdrNote, aeNote } = splitSdrAeNotes(noteSource);
+  const campaignService = preDcField(record, "campaignService");
+  const needs = cleanQuestionTopic(
+    looksLikeHandoffNote(describedNeeds)
+      ? preDcField(record, "intersectionAreas") || preDcField(record, "needPreDc")
+      : describedNeeds || preDcField(record, "needPreDc"),
+    company
+  );
+  const callDate = preDcField(record, "discoveryCallDatePkt");
+  const callTime = preDcField(record, "discoveryCallTimePkt");
+  const rows: SdrHandoffSummaryItem[] = [];
+  const seen = new Set<string>();
+
+  function add(label: string, value: string) {
+    const clean = sentenceCase(value.replace(/\s+/g, " ").trim().replace(/[.;]\s*$/, ""));
+    const key = `${label}:${clean}`.toLowerCase();
+    if (!clean || seen.has(key)) return;
+    rows.push({ label, value: clean });
+    seen.add(key);
+  }
+
+  add("How they were approached", sdrNote || (isGenericCampaignService(campaignService) ? "" : campaignService));
+  add("Client signal", needs);
+  add("Committed for this call", aeNote);
+  if (otherInfo && otherInfo !== noteSource) {
+    add("Internal prep note", otherInfo);
+  }
+  if (rows.length < 4 && (callDate || callTime)) {
+    add("Scheduling context", [callDate, callTime ? `${callTime} PKT` : ""].filter(Boolean).join(" - "));
+  }
+
+  return rows.slice(0, 4);
 }
 
 export function buildBriefFromPreDc(record: PreDCRecord, callId: string): CallBrief {

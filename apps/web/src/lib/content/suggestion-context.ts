@@ -32,6 +32,8 @@ const ARTIFACT_TITLE_BUILDERS: Record<
 > = {
   "art-deck": (industry) =>
     industry ? `${industry} services overview deck` : "Services overview deck",
+  "art-industry-vertical-deck": (industry) =>
+    industry ? `${industry} vertical deck` : "Industry vertical deck",
   "art-case": (industry) => (industry ? `${industry} case study` : "Industry case study"),
   "art-onepager": (industry) =>
     industry ? `${industry} service one-pager` : "Service one-pager",
@@ -115,7 +117,7 @@ function extractIndustryFromAssetName(name: string, type: PreDcContentGeneration
   }
 
   if (type === "deck") {
-    const match = normalized.match(/^(.+?)\s+(?:services\s+)?(?:overview\s+)?deck$/i);
+    const match = normalized.match(/^(.+?)\s+(?:(?:services|vertical)\s+)?(?:overview\s+)?deck$/i);
     if (match?.[1] && !isGenericIndustry(match[1])) {
       return normalizeIndustryLabel(match[1]);
     }

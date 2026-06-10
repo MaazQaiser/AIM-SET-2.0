@@ -9,6 +9,7 @@ import type {
 } from "@/lib/brief-types";
 import type { BriefWidgetProps, PostDcWidgetProps } from "@/lib/dashboard/widget-registry";
 import type { AccountSnapshotRow } from "@/components/calls/account-widget-cards";
+import type { SdrHandoffSummaryItem } from "@/lib/dc-notes/build-from-import";
 export function arrayLen(value: unknown): number {
   return Array.isArray(value) ? value.length : 0;
 }
@@ -50,9 +51,13 @@ export function normalizePostCallReview(review: PostCallReview): PostCallReview 
 }
 
 export function normalizeBriefWidgetProps(
-  props: Omit<BriefWidgetProps, "brief" | "discoveryQuestions" | "accountSnapshot"> & {
+  props: Omit<
+    BriefWidgetProps,
+    "brief" | "discoveryQuestions" | "sdrHandoffSummary" | "accountSnapshot"
+  > & {
     brief: CallBrief;
     discoveryQuestions?: string[] | null;
+    sdrHandoffSummary?: SdrHandoffSummaryItem[] | null;
     accountSnapshot?: AccountSnapshotRow[] | null;
   }
 ): BriefWidgetProps {
@@ -60,6 +65,9 @@ export function normalizeBriefWidgetProps(
     ...props,
     brief: normalizeCallBrief(props.brief),
     discoveryQuestions: Array.isArray(props.discoveryQuestions) ? props.discoveryQuestions : [],
+    sdrHandoffSummary: Array.isArray(props.sdrHandoffSummary)
+      ? props.sdrHandoffSummary
+      : [],
     accountSnapshot: Array.isArray(props.accountSnapshot) ? props.accountSnapshot : [],
   };
 }

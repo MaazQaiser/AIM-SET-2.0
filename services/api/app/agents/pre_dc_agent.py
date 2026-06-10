@@ -633,30 +633,15 @@ def _enrich_relevance_section(
 
 
 def _heuristic_artifact_plan(fields: Dict[str, str]) -> List[Dict[str, Any]]:
-    industry = fields.get("Industry - PreDC", "the prospect")
-    service = fields.get("Campaign Service - PreDC", "discovery")
+    industry = _deck_text(fields.get("Industry - PreDC"), 90) or "industry vertical"
     return [
         {
-            "id": "art-deck",
-            "name": f"{service or 'Services'} overview deck",
+            "id": "art-industry-vertical-deck",
+            "name": f"{industry} vertical deck",
             "type": "deck",
-            "rationale": f"Anchor the conversation for {industry}.",
+            "rationale": f"Create an industry-specific deck for {industry} and add relevant project proof points.",
             "priority": 1,
-        },
-        {
-            "id": "art-case",
-            "name": f"{industry} case study",
-            "type": "case_study",
-            "rationale": "Social proof aligned to their industry.",
-            "priority": 2,
-        },
-        {
-            "id": "art-onepager",
-            "name": "Service one-pager",
-            "type": "one_pager",
-            "rationale": "Leave-behind summarizing fit and next steps.",
-            "priority": 3,
-        },
+        }
     ]
 
 
@@ -721,11 +706,6 @@ def _fulfill_artifacts_heuristic(
     return out
 
 
-def _artifact_type_label(value: Any) -> str:
-    text = str(value or "content").replace("_", " ").strip()
-    return text or "content"
-
-
 def _artifact_priority(item: Dict[str, Any], fallback: int = 99) -> int:
     try:
         return int(item.get("priority") or fallback)
@@ -733,20 +713,158 @@ def _artifact_priority(item: Dict[str, Any], fallback: int = 99) -> int:
         return fallback
 
 
+def _deck_text(value: Any, limit: int = 220) -> str:
+    return _compact_text(re.sub(r"\s+", " ", str(value or "")).strip(), limit)
+
+
+def _first_deck_text(*values: Any, limit: int = 220) -> str:
+    for value in values:
+        text = _deck_text(value, limit)
+        if text:
+            return text
+    return ""
+
+
+def _score_text(value: Any) -> str:
+    pct = _score_pct(value)
+    return f"{pct}% relevance" if pct is not None else "relevance not scored"
+
+
+def _plan_names(plan: List[Dict[str, Any]], limit: int = 3) -> List[str]:
+    names: List[str] = []
+    seen = set()
+    for item in sorted(plan, key=_artifact_priority):
+        name = _deck_text(item.get("name") or "Artifact", 90)
+        key = name.lower()
+        if name and key not in seen:
+            names.append(name)
+            seen.add(key)
+        if len(names) >= limit:
+            break
+    return names
+
+
+_NOISY_KB_MARKERS = (
+    "thank you",
+    "all rights reserved",
+    "drop us a line",
+    "services@",
+    "www.",
+    "freedom drive",
+    "other offices",
+)
+
+
+def _strip_noisy_kb_text(value: Any, limit: int = 900) -> str:
+    lines: List[str] = []
+    for raw_line in str(value or "").splitlines():
+        line = _deck_text(raw_line, 320)
+        if not line:
+            continue
+        lowered = line.lower()
+        if any(marker in lowered for marker in _NOISY_KB_MARKERS):
+            continue
+        lines.append(line)
+    if not lines:
+        text = _deck_text(value, limit)
+        lowered = text.lower()
+        if any(marker in lowered for marker in _NOISY_KB_MARKERS):
+            return ""
+        return text
+    return _deck_text(" ".join(lines), limit)
+
+
+def _project_reference_text(projects: List[Dict[str, Any]]) -> Tuple[str, str, Optional[str], Optional[str]]:
+    if not projects:
+        return "", "", None, None
+
+    lines: List[str] = []
+    preview_parts: List[str] = []
+    first = projects[0]
+    for index, project in enumerate(projects[:3], start=1):
+        title = _deck_text(project.get("title") or "Relevant project", 90)
+        summary = _first_deck_text(project.get("summary"), project.get("details"), limit=170)
+        score = _score_text(project.get("relevanceScore"))
+        line = f"{title} ({score})"
+        if summary:
+            line += f" - {summary}"
+        lines.append(line)
+
+        details = _first_deck_text(project.get("details"), project.get("summary"), limit=700)
+        preview_parts.append(
+            f"{index}. {line}\nIndexed project notes: {details or summary or 'No additional project notes indexed.'}".strip()
+        )
+
+    narrative = (
+        "Mention these projects library matches as the proof set after the AE validates the pain: "
+        + "; ".join(lines)
+        + "."
+    )
+    preview = "\n\n".join(part for part in preview_parts if part)
+    return (
+        _deck_text(narrative, 700),
+        preview or narrative,
+        str(first.get("id") or "") or None,
+        str(first.get("assetId") or "") or None,
+    )
+
+
+def _document_reference_text(document: Dict[str, Any]) -> Tuple[str, str, Optional[str]]:
+    title = _deck_text(document.get("title") or "Relevant KB asset", 110)
+    snippet = _strip_noisy_kb_text(
+        _first_deck_text(document.get("snippet"), document.get("previewText"), limit=260),
+        limit=190,
+    )
+    score = _score_text(document.get("relevanceScore"))
+    narrative = f"Use {title} as a supporting reusable KB source ({score})."
+    if snippet:
+        narrative += f" Pull only the parts that map to: {snippet}"
+    preview = _strip_noisy_kb_text(
+        _first_deck_text(document.get("previewText"), document.get("snippet"), limit=900),
+        limit=900,
+    )
+    return _deck_text(narrative, 700), preview, str(document.get("assetId") or "") or None
+
+
+def _is_useful_kb_snippet(text: str) -> bool:
+    clean = _strip_noisy_kb_text(text, 500).lower()
+    if len(clean) < 35:
+        return False
+    return not any(marker in clean for marker in _NOISY_KB_MARKERS)
+
+
+def _fallback_document_from_hits(hits: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    for hit in hits:
+        snippet = _strip_noisy_kb_text(hit.get("chunk_text"), 500)
+        if not _is_useful_kb_snippet(snippet):
+            continue
+        return {
+            "assetId": str(hit.get("asset_id") or ""),
+            "title": _deck_text((hit.get("metadata") or {}).get("title") or "Relevant KB proof point", 110),
+            "relevanceScore": hit.get("score"),
+            "snippet": snippet,
+            "previewText": snippet,
+        }
+    return None
+
+
 def _build_pre_deck(
     account_name: str,
     research: Dict[str, str],
     plan: List[Dict[str, Any]],
     hits: List[Dict[str, Any]],
+    relevant: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Build a lightweight previewable pre-call deck for the Pre-DC screen."""
+    """Build a call-ready deck outline for the Pre-DC screen."""
     slides: List[Dict[str, Any]] = []
+    relevant = relevant or {}
 
     def add_slide(
         title: str,
         narrative: str,
         *,
         source_type: str = "workflow",
+        source_id: Optional[str] = None,
         asset_id: Optional[str] = None,
         preview_text: Optional[str] = None,
     ) -> None:
@@ -759,145 +877,304 @@ def _build_pre_deck(
                 "title": title,
                 "narrative": clean[:700],
                 "sourceType": source_type,
+                "sourceId": source_id,
                 "assetId": asset_id,
                 "previewText": (preview_text or clean)[:1200],
             }
         )
 
-    context_bits = [
-        research.get("company_description", ""),
-        research.get("industry", ""),
-        research.get("icp_bucket", ""),
-        research.get("deal_stage", ""),
-    ]
-    add_slide(
-        "Account context",
-        " ".join(bit for bit in context_bits if bit).strip()
-        or f"Prepare discovery context for {account_name}.",
+    needs = _first_deck_text(
+        _business_need_text(research.get("needs", ""), allow_plain=True),
+        _pain_point_text(research.get("intersection", ""), allow_plain=True),
+        research.get("relevance"),
+        limit=170,
+    )
+    service = _deck_text(research.get("campaign_service"), 90)
+    industry = _deck_text(research.get("industry"), 90)
+    stage = _deck_text(research.get("deal_stage"), 70)
+    icp = _deck_text(research.get("icp_bucket"), 70)
+    account_profile = _first_deck_text(
+        _without_outreach_details(research.get("company_description", "")),
+        industry,
+        limit=210,
     )
 
     add_slide(
-        "Likely need and discovery angle",
-        " ".join(
-            bit
-            for bit in [
-                research.get("needs", ""),
-                research.get("intersection", ""),
-                research.get("campaign_service", ""),
-            ]
-            if bit
+        "Objective and agenda",
+        (
+            f"Open by confirming priorities for {account_name}"
+            + (f" around {needs}" if needs else "")
+            + ". Agenda: align on context, diagnose workflow/data gaps, map fit, and agree the next step."
         ),
     )
 
-    for hit in hits[:3]:
-        snippet = (hit.get("chunk_text") or "").strip()
-        if not snippet:
-            continue
+    add_slide(
+        "Account hypothesis",
+        (
+            f"{account_name} appears to be "
+            + (account_profile or "early in discovery with limited imported profile detail")
+            + (
+                f". Context to validate: {', '.join(bit for bit in [industry, stage, icp] if bit)}."
+                if any([industry, stage, icp])
+                else "."
+            )
+        ),
+    )
+
+    discovery_focus = needs or "the current process, urgency, and success criteria"
+    add_slide(
+        "Discovery map",
+        (
+            f"Use the call to validate {discovery_focus}. Confirm current workflow, must-have integrations, "
+            "pain impact, decision path, budget owner, timeline, and what would make a pilot worthwhile."
+        ),
+    )
+
+    projects = _relevant_projects(relevant)[:3]
+    project_narrative, project_preview, project_id, project_asset_id = _project_reference_text(projects)
+    if project_narrative:
         add_slide(
-            "Relevant proof point",
-            snippet,
-            source_type="knowledge_base",
-            asset_id=str(hit.get("asset_id", "")) or None,
-            preview_text=snippet,
+            "Relevant projects from library",
+            project_narrative,
+            source_type="project_database",
+            source_id=project_id,
+            asset_id=project_asset_id,
+            preview_text=project_preview,
+        )
+    else:
+        search_context = " / ".join(bit for bit in [industry, service, needs] if bit) or account_name
+        add_slide(
+            "Project proof to confirm",
+            (
+                "No project-library match is strong enough yet. Before presenting proof, search or tag project "
+                f"references for {search_context}; otherwise keep this section discovery-only."
+            ),
         )
 
-    planned_names = [
-        f"{item.get('name', 'Artifact')} ({_artifact_type_label(item.get('type'))})"
-        for item in sorted(plan, key=_artifact_priority)[:4]
+    recommended_deck = _select_recommended_deck(relevant)
+    document = recommended_deck or _top_relevant_document(relevant) or _fallback_document_from_hits(hits)
+    if document:
+        doc_narrative, doc_preview, doc_asset_id = _document_reference_text(document)
+        add_slide(
+            "Reusable KB assets",
+            doc_narrative,
+            source_type="knowledge_base",
+            asset_id=doc_asset_id,
+            preview_text=doc_preview,
+        )
+    else:
+        add_slide(
+            "Presentation asset gap to resolve",
+            "No matching deck or document was found in the KB yet. Upload or tag a relevant deck before the call, or proceed with a discovery-first conversation.",
+        )
+
+    planned_names = _plan_names(plan)
+    close_bits = [
+        "Close by confirming BANT gaps, success criteria, decision process, and the owner for next-step coordination."
     ]
     if planned_names:
-        add_slide(
-            "Recommended talk track",
-            "Prepare these assets for the call: " + "; ".join(planned_names) + ".",
+        close_bits.append(
+            "Prepare follow-up material around: " + "; ".join(planned_names) + "."
         )
+    if service and service.lower() not in _NON_CONTENT_TOPICS:
+        close_bits.append(f"Position {service} only after the customer confirms the problem.")
+    add_slide("Close plan", " ".join(close_bits))
+
+    has_project_evidence = bool(projects)
+    evidence_note = ""
+    if projects:
+        project_names = [
+            _deck_text(project.get("title") or "Relevant project", 70)
+            for project in projects[:3]
+            if _deck_text(project.get("title") or "", 70)
+        ]
+        if project_names:
+            evidence_note = " Project proof: " + "; ".join(project_names) + "."
+        else:
+            evidence_note = f" Includes {len(projects)} projects library match{'es' if len(projects) != 1 else ''}."
+    if document:
+        doc_title = _deck_text(document.get("title") or "matched KB asset", 70)
+        evidence_note += f" Supporting KB asset: {doc_title}."
+    if not has_project_evidence:
+        evidence_note += " Add a project-library proof point before using this as a sales deck."
 
     return {
         "title": f"{account_name} pre-call deck",
-        "status": "ready" if any(s.get("sourceType") == "knowledge_base" for s in slides) else "needs_content",
-        "summary": "Preview deck assembled from Pre-DC research and the strongest KB matches.",
+        "status": "ready" if has_project_evidence else "needs_content",
+        "summary": (
+            f"{min(len(slides), 6)}-slide pre-call plan: agenda, account hypothesis, discovery map, "
+            "project proof, reusable assets, and close plan."
+            + evidence_note
+        ),
         "slides": slides[:6],
     }
+
+
+def _is_generic_company_deck(document: Dict[str, Any]) -> bool:
+    text = " ".join(
+        str(document.get(key) or "")
+        for key in ("title", "fileName", "file_name", "snippet", "previewText")
+    ).lower()
+    generic_markers = (
+        "company overview",
+        "company deck",
+        "tk overview",
+        "tkxel overview",
+        "tkxel company",
+        "about tkxel",
+    )
+    return any(marker in text for marker in generic_markers)
+
+
+def _industry_tokens(industry: str) -> List[str]:
+    return [
+        token
+        for token in re.split(r"[^a-z0-9]+", industry.lower())
+        if len(token) >= 4 and token not in {"industry", "vertical", "services"}
+    ]
+
+
+def _has_industry_vertical_deck(relevant: Dict[str, Any], industry: str) -> bool:
+    tokens = _industry_tokens(industry)
+    if not tokens:
+        return False
+    for document in relevant.get("relevantDocuments") or []:
+        if not isinstance(document, dict) or not _is_presentation_document(document):
+            continue
+        if _is_generic_company_deck(document):
+            continue
+        text = " ".join(
+            str(document.get(key) or "")
+            for key in ("title", "fileName", "file_name", "snippet", "previewText")
+        ).lower()
+        if any(token in text for token in tokens):
+            return True
+    return False
 
 
 def _content_to_generate(
     plan: List[Dict[str, Any]],
     fulfillments: List[Dict[str, Any]],
     relevant: Optional[Dict[str, Any]] = None,
+    research: Optional[Dict[str, str]] = None,
 ) -> List[Dict[str, Any]]:
-    planned_by_id = {str(item.get("id", "")): item for item in plan}
     relevant = relevant or {}
+    research = research or {}
+    industry = _deck_text(research.get("industry"), 90) or "Industry vertical"
+    if _has_industry_vertical_deck(relevant, industry):
+        return []
+
     relevant_projects = _relevant_projects(relevant)[:5]
     relevant_documents = [
         doc for doc in (relevant.get("relevantDocuments") or [])
         if isinstance(doc, dict)
     ][:5]
     recommended_deck = _select_recommended_deck(relevant)
-    output: List[Dict[str, Any]] = []
-    for row in fulfillments:
-        status = str(row.get("status") or "").lower()
-        if status not in ("missing", "partial"):
-            continue
-        artifact_id = str(row.get("artifactId") or "")
-        planned = planned_by_id.get(artifact_id, {})
-        name = row.get("name") or planned.get("name") or "New content"
-        rationale = str(planned.get("rationale") or "").strip()
-        required = str(row.get("requiredData") or "").strip()
-        reason_parts = []
-        if required:
-            reason_parts.append(required)
-        if rationale:
-            reason_parts.append(f"It matters for this call because {rationale}")
-        if not reason_parts:
-            reason_parts.append(
-                "The workflow could not find a strong enough knowledge-base match for this planned call asset."
-            )
-        reason = " ".join(reason_parts)
-        item: Dict[str, Any] = {
-            "id": f"gap-{artifact_id or len(output) + 1}",
-            "sourceArtifactId": artifact_id or None,
-            "name": name,
-            "type": planned.get("type") or "one_pager",
-            "priority": _artifact_priority(planned, len(output) + 1),
-            "status": status,
-            "reason": reason,
-            "neededFor": rationale
-            or "Give the pod stronger call-specific material than the current KB can provide.",
-        }
-        if relevant_projects:
-            item["relevantProjects"] = relevant_projects
-        if relevant_documents:
-            item["relevantDocuments"] = relevant_documents
-        if recommended_deck:
-            item["recommendedDeck"] = recommended_deck
-        evidence: List[Dict[str, Any]] = []
-        for project in relevant_projects[:3]:
-            evidence.append(
-                {
-                    "sourceType": str(project.get("source") or "project_database"),
-                    "sourceId": str(project.get("id") or ""),
-                    "assetId": project.get("assetId"),
-                    "title": str(project.get("title") or "Relevant project"),
-                    "summary": str(project.get("summary") or ""),
-                    "details": str(project.get("details") or ""),
-                    "relevanceScore": project.get("relevanceScore"),
-                }
-            )
-        for doc in relevant_documents[:3]:
-            evidence.append(
-                {
-                    "sourceType": "knowledge_base",
-                    "sourceId": str(doc.get("assetId") or ""),
-                    "assetId": doc.get("assetId"),
-                    "title": str(doc.get("title") or "Relevant KB document"),
-                    "summary": str(doc.get("snippet") or doc.get("previewText") or ""),
-                    "relevanceScore": doc.get("relevanceScore"),
-                }
-            )
-        if evidence:
-            item["evidence"] = evidence
-        output.append(item)
-    output.sort(key=lambda item: _artifact_priority(item))
-    return output
+    project_names = [
+        _deck_text(project.get("title") or "Relevant project", 80)
+        for project in relevant_projects[:3]
+        if _deck_text(project.get("title") or "", 80)
+    ]
+    project_instruction = (
+        "Add project proof from: " + "; ".join(project_names) + "."
+        if project_names
+        else "Add relevant projects from the projects library before sharing."
+    )
+    name = f"{industry} vertical deck"
+    reason = (
+        f"No {industry} vertical deck is available in the KB. Use the existing company deck as the base, "
+        f"then tailor the storyline to this lead's industry. {project_instruction}"
+    )
+    content_requirements = (
+        f"Create a {industry} industry-vertical sales deck. Include a short industry context, likely pains, "
+        "Tkxel positioning, relevant project proof points from the projects library, and a discovery-call close."
+    )
+    item: Dict[str, Any] = {
+        "id": "gap-industry-vertical-deck",
+        "sourceArtifactId": "art-industry-vertical-deck",
+        "name": name,
+        "type": "deck",
+        "priority": 1,
+        "status": "missing",
+        "reason": reason,
+        "neededFor": f"Industry-specific deck for a {industry} lead.",
+        "contentRequirements": content_requirements,
+        "context": {
+            "contentIntent": "industry_vertical_deck",
+            "industryVertical": industry,
+            "avoidSuggestions": ["one_pager", "generic_tk_overview_deck", "company_overview_deck"],
+            "requiredSources": ["company_deck", "projects_library"],
+            "projectCount": len(relevant_projects),
+        },
+        "slidePlan": [
+            {
+                "slide": 1,
+                "heading": f"{industry} context",
+                "body": "Frame the lead's industry-specific pressures and why the conversation matters now.",
+                "evidence": "Pre-DC lead research",
+                "sourceType": "crm_record",
+            },
+            {
+                "slide": 2,
+                "heading": "Likely needs and discovery angle",
+                "body": "Translate the imported needs into the discovery questions and solution hypothesis.",
+                "evidence": research.get("needs") or research.get("intersection") or "Pre-DC notes",
+                "sourceType": "crm_record",
+            },
+            {
+                "slide": 3,
+                "heading": "Relevant project proof",
+                "body": project_instruction,
+                "evidence": "; ".join(project_names) or "Projects library",
+                "sourceType": "project_database",
+                "sourceId": str((relevant_projects[0] or {}).get("id") or "") if relevant_projects else None,
+                "sourceAssetId": (relevant_projects[0] or {}).get("assetId") if relevant_projects else None,
+            },
+            {
+                "slide": 4,
+                "heading": "How Tkxel can help",
+                "body": "Reuse approved company-deck positioning, but make the examples and proof industry-specific.",
+                "evidence": (recommended_deck or {}).get("title") or "Company deck",
+                "sourceType": "knowledge_base",
+                "sourceAssetId": (recommended_deck or {}).get("assetId"),
+                "reuseHint": "Use the company deck for positioning only; do not create another generic overview deck.",
+            },
+        ],
+    }
+    if relevant_projects:
+        item["relevantProjects"] = relevant_projects
+    if relevant_documents:
+        item["relevantDocuments"] = relevant_documents
+    if recommended_deck:
+        item["recommendedDeck"] = recommended_deck
+
+    evidence: List[Dict[str, Any]] = []
+    for project in relevant_projects[:3]:
+        evidence.append(
+            {
+                "sourceType": str(project.get("source") or "project_database"),
+                "sourceId": str(project.get("id") or ""),
+                "assetId": project.get("assetId"),
+                "title": str(project.get("title") or "Relevant project"),
+                "summary": str(project.get("summary") or ""),
+                "details": str(project.get("details") or ""),
+                "relevanceScore": project.get("relevanceScore"),
+            }
+        )
+    if recommended_deck:
+        evidence.append(
+            {
+                "sourceType": "knowledge_base",
+                "sourceId": str(recommended_deck.get("assetId") or ""),
+                "assetId": recommended_deck.get("assetId"),
+                "title": str(recommended_deck.get("title") or "Company deck"),
+                "summary": str(recommended_deck.get("snippet") or recommended_deck.get("previewText") or ""),
+                "relevanceScore": recommended_deck.get("relevanceScore"),
+            }
+        )
+    if evidence:
+        item["evidence"] = evidence
+    return [item]
 
 
 def _is_presentation_document(doc: Dict[str, Any]) -> bool:
@@ -1015,8 +1292,8 @@ def run_pre_dc_pipeline(
         fulfillments = _fulfill_artifacts_heuristic(artifact_plan, hits)
 
     relevant = build_relevant_content(ctx, account_name, research)
-    pre_deck = _build_pre_deck(account_name, research, artifact_plan, hits)
-    content_to_generate = _content_to_generate(artifact_plan, fulfillments, relevant)
+    pre_deck = _build_pre_deck(account_name, research, artifact_plan, hits, relevant)
+    content_to_generate = _content_to_generate(artifact_plan, fulfillments, relevant, research)
 
     citations: List[Citation] = []
     for i, hit in enumerate(hits[:3]):

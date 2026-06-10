@@ -5,7 +5,7 @@ import { FolderKanban, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import {
   BriefDetailCard,
-  BRIEF_RELEVANT_CONTENT_SCROLL_MAX,
+  BRIEF_PARALLEL_CARD_SCROLL_MAX,
 } from "@/components/pre-call/brief-detail-card";
 import {
   BriefRelevantContent,
@@ -69,11 +69,11 @@ export function BriefDiscoveryArtifactsTabbedPanel({
       tone="main"
       title="Relevant content"
       icon={FolderKanban}
-      scrollMaxHeight={BRIEF_RELEVANT_CONTENT_SCROLL_MAX}
+      className="h-[min(20.16rem,calc(72vh-7.2rem))]"
+      scrollMaxHeight={BRIEF_PARALLEL_CARD_SCROLL_MAX}
       sourceInfo={{
         source: "Knowledge base search",
-        detail:
-          "This shows ranked, previewable content pulled from the knowledge base: presentations and documents, plus project details when they match the account and call context.",
+        detail: "Ranked documents and project-library matches for this call.",
       }}
     >
       <Tabs

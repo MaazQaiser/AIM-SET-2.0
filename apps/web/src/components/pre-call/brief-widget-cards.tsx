@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, HelpCircle, Loader2, Presentation, Users } from "lucide-react";
+import { AlertCircle, HelpCircle, Loader2, Mail, Presentation, Users } from "lucide-react";
 import { ConfidenceTag } from "@/components/confidence-tag";
 import { BANTScorecard } from "@/components/bant-scorecard";
 import { KbAssetPreview } from "@/components/knowledge/kb-asset-preview";
@@ -256,13 +256,13 @@ export function BriefDiscoveryQuestionsCard({ questions }: { questions: string[]
       tone="main"
       title="Suggested discovery questions"
       icon={HelpCircle}
+      collapsible
+      defaultOpen={false}
       scrollMaxHeight={scrolls ? QUESTIONS_PEEK_HEIGHT : undefined}
       headerExtra={
-        scrolls ? (
-          <span className="type-caption text-muted-foreground shrink-0 tabular-nums">
-            {questions.length} questions
-          </span>
-        ) : null
+        <span className="type-caption text-muted-foreground shrink-0 tabular-nums">
+          {questions.length} question{questions.length === 1 ? "" : "s"}
+        </span>
       }
       sourceInfo={{
         source: "AI and rules from Pre-DC data",
@@ -276,10 +276,10 @@ export function BriefDiscoveryQuestionsCard({ questions }: { questions: string[]
             key={`${i}-${q.slice(0, 48)}`}
             className="flex gap-3 py-3 min-w-0 first:pt-0 last:pb-0"
           >
-            <span className="shrink-0 font-mono type-body text-primary font-bold w-7 pt-0.5">
+            <span className="shrink-0 w-7 pt-0.5 font-mono type-caption font-bold text-primary">
               Q{i + 1}
             </span>
-            <p className={cn(briefMainBody, "font-normal break-words min-w-0 flex-1")}>
+            <p className="min-w-0 flex-1 break-words text-sm font-semibold leading-relaxed text-foreground">
               {q}
             </p>
           </li>
@@ -291,6 +291,51 @@ export function BriefDiscoveryQuestionsCard({ questions }: { questions: string[]
           read Q{PEEK_DISCOVERY_QUESTIONS + 1}–Q{questions.length}.
         </p>
       ) : null}
+    </BriefDetailCard>
+  );
+}
+
+export interface SdrHandoffSummaryItem {
+  label: string;
+  value: string;
+}
+
+export function BriefSdrHandoffSummaryCard({
+  items,
+}: {
+  items: SdrHandoffSummaryItem[];
+}) {
+  return (
+    <BriefDetailCard
+      tone="main"
+      title="SDR handoff summary"
+      icon={Mail}
+      collapsible
+      defaultOpen={false}
+      headerExtra={
+        <span className="type-caption text-muted-foreground shrink-0 tabular-nums">
+          {items.length} item{items.length === 1 ? "" : "s"}
+        </span>
+      }
+      sourceInfo={{
+        source: "Imported SDR and AE notes",
+        detail:
+          "This summarizes how the prospect was approached, what signal came back before scheduling, and what the AE should treat as committed or expected for the discovery call.",
+      }}
+    >
+      <dl className="divide-y divide-border">
+        {items.map((item) => (
+          <div
+            key={`${item.label}-${item.value.slice(0, 32)}`}
+            className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-4"
+          >
+            <dt className="type-label font-semibold text-foreground">{item.label}</dt>
+            <dd className={cn(briefMainMuted, "break-words font-medium text-foreground/85")}>
+              {item.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </BriefDetailCard>
   );
 }

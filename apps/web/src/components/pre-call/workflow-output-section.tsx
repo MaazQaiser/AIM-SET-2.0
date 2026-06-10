@@ -53,6 +53,9 @@ export function WorkflowOutputSection({ brief }: WorkflowOutputSectionProps) {
         deck={brief.preDeck}
         callId={brief.callId}
         accountName={brief.accountName}
+        relevantDocuments={brief.relevantDocuments}
+        relevantProjects={brief.relevantProjects}
+        recommendedDeck={brief.recommendedDeck}
       />
       <BriefArtifactsPanel brief={brief} />
       <BriefContentToGeneratePanel items={brief.contentToGenerate} />

@@ -2,6 +2,7 @@ from dc_core.tenancy import TenantContext
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.agents.pre_dc_agent import _build_pre_deck
 from app.domain.calls_service import CallsService
 from app.domain.memory_store import get_memory_store
 from app.main import app
@@ -144,8 +145,40 @@ def test_pre_dc_ingest_runs_agent_and_saves_brief(monkeypatch):
     assert brief.get("artifactFulfillment")
     assert brief.get("preDeck")
     assert brief["preDeck"].get("slides")
+    assert brief["preDeck"]["status"] == "ready"
+    assert "Project proof: Legacy Portal Modernization; Customer Onboarding Workflow." in brief["preDeck"]["summary"]
+    deck_slide_titles = [slide["title"] for slide in brief["preDeck"]["slides"]]
+    assert deck_slide_titles[:3] == [
+        "Objective and agenda",
+        "Account hypothesis",
+        "Discovery map",
+    ]
+    project_slide = next(
+        slide for slide in brief["preDeck"]["slides"] if slide["title"] == "Relevant projects from library"
+    )
+    assert project_slide["sourceType"] == "project_database"
+    assert project_slide["sourceId"] == "proj-legacy-portal"
+    assert "Legacy Portal Modernization" in project_slide["narrative"]
+    assert "Customer Onboarding Workflow" in project_slide["previewText"]
     assert brief.get("contentToGenerate")
-    assert "reason" in brief["contentToGenerate"][0]
+    assert len(brief["contentToGenerate"]) == 1
+    content_gap = brief["contentToGenerate"][0]
+    assert content_gap["name"] == "SaaS vertical deck"
+    assert content_gap["type"] == "deck"
+    assert "one" not in content_gap["type"]
+    assert "overview deck" not in content_gap["name"].lower()
+    assert "projects_library" in content_gap["context"]["requiredSources"]
+    assert "Legacy Portal Modernization" in content_gap["reason"]
+    assert content_gap["relevantProjects"][0]["title"] == "Legacy Portal Modernization"
+    all_gap_text = " ".join(
+        str(value)
+        for gap in brief["contentToGenerate"]
+        for value in gap.values()
+        if isinstance(value, str)
+    ).lower()
+    assert "one-pager" not in all_gap_text
+    assert "one pager" not in all_gap_text
+    assert "tk overview deck" not in all_gap_text
     assert "relevantDocuments" in brief
     assert "relevantProjects" in brief
     assert brief.get("agentStatus") == "success"
@@ -181,6 +214,87 @@ def test_generate_brief_delegates_to_pre_dc_pipeline(monkeypatch):
         "content"
     ]
     assert pain_points == "Needs/content is not identified yet."
+
+
+def test_pre_deck_ignores_footer_only_kb_hits():
+    deck = _build_pre_deck(
+        "Prism Data Collective",
+        {
+            "company_description": "US-based data infrastructure organization modernizing legacy workflows.",
+            "needs": "replace spreadsheet-driven processes and clarify the data model",
+            "industry": "Data infrastructure",
+            "campaign_service": "ERP integration",
+        },
+        [],
+        [
+            {
+                "asset_id": "footer-only",
+                "score": 0.96,
+                "chunk_text": "THANK YOU! Engineering the Future, Together (C) 2025 All rights reserved. services@tkxel.com www.tkxel.com",
+            }
+        ],
+        {"relevantProjects": [], "relevantDocuments": [], "recommendedDeck": None},
+    )
+
+    text = " ".join(slide["narrative"] for slide in deck["slides"])
+    assert "THANK YOU" not in text
+    assert "Presentation asset gap to resolve" in [slide["title"] for slide in deck["slides"]]
+
+
+def test_pre_deck_puts_project_library_matches_in_slide_content():
+    deck = _build_pre_deck(
+        "Prism Data Collective",
+        {
+            "company_description": "US-based data infrastructure organization modernizing legacy workflows.",
+            "needs": "replace spreadsheet-driven processes and clarify the data model",
+            "industry": "Data infrastructure",
+            "campaign_service": "ERP integration",
+        },
+        [],
+        [],
+        {
+            "relevantProjects": [
+                {
+                    "id": "proj-data-platform",
+                    "title": "Data Platform Modernization",
+                    "source": "project_database",
+                    "relevanceScore": 0.93,
+                    "summary": "Modernized data workflows and integration patterns for a mid-market platform.",
+                    "details": "Project notes include legacy integration replacement, shared data model, and reporting readiness.",
+                },
+                {
+                    "id": "proj-erp-sync",
+                    "title": "ERP Integration Hub",
+                    "source": "project_database",
+                    "relevanceScore": 0.87,
+                    "summary": "Connected ERP and operational systems for cleaner workflow handoffs.",
+                    "details": "Project notes include integration governance and rollout planning.",
+                },
+            ],
+            "relevantDocuments": [
+                {
+                    "assetId": "kb-footer",
+                    "title": "Company Overview",
+                    "format": "pptx",
+                    "relevanceScore": 0.9,
+                    "snippet": "THANK YOU! Engineering the Future, Together. services@tkxel.com www.tkxel.com",
+                    "previewText": "THANK YOU!\nAll rights reserved.\nservices@tkxel.com",
+                }
+            ],
+            "recommendedDeck": None,
+        },
+    )
+
+    assert deck["status"] == "ready"
+    project_slide = next(
+        slide for slide in deck["slides"] if slide["title"] == "Relevant projects from library"
+    )
+    assert "Data Platform Modernization" in project_slide["narrative"]
+    assert "ERP Integration Hub" in project_slide["narrative"]
+    assert "Indexed project notes" in project_slide["previewText"]
+    kb_slide = next(slide for slide in deck["slides"] if slide["title"] == "Reusable KB assets")
+    assert "THANK YOU" not in kb_slide["previewText"]
+    assert "services@tkxel.com" not in kb_slide["previewText"]
 
 
 def test_workflow_config_includes_default_prompts_and_rules(monkeypatch):

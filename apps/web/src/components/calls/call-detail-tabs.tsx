@@ -20,12 +20,14 @@ import { Button } from "@dc-copilot/ui/components/button";
 import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { CallDetailPageLoader } from "@/components/layout/page-loaders";
 import type { AccountSnapshotRow } from "@/components/calls/account-widget-cards";
+import type { SdrHandoffSummaryItem } from "@/lib/dc-notes/build-from-import";
 import type { BANTScore, Call } from "@/types";
 import { cn } from "@/lib/cn";
 
 interface CallDetailTabsProps {
   callId: string;
   discoveryQuestions: string[];
+  sdrHandoffSummary: SdrHandoffSummaryItem[];
   bant: BANTScore;
   call: Call;
   accountSnapshot: AccountSnapshotRow[];
@@ -35,6 +37,7 @@ interface CallDetailTabsProps {
 export function CallDetailTabs({
   callId,
   discoveryQuestions,
+  sdrHandoffSummary,
   bant,
   call,
   accountSnapshot,
@@ -135,6 +138,7 @@ export function CallDetailTabs({
           brief,
           bant,
           discoveryQuestions,
+          sdrHandoffSummary,
           leadershipPreview,
           call,
           accountSnapshot,
@@ -147,6 +151,7 @@ export function CallDetailTabs({
           brief,
           bant,
           discoveryQuestions,
+          sdrHandoffSummary,
           leadershipPreview,
           call,
           accountSnapshot,

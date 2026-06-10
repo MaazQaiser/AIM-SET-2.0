@@ -5,6 +5,7 @@ import {
   findPreDcRecordForCall,
   matchPostDcToCall,
   slugifyCompany,
+  sdrHandoffSummaryFromPreDc,
 } from "./build-from-import";
 import { PRE_DC_HEADERS } from "@/types/dc-notes";
 import type { PostDCRecord, PreDCRecord } from "@/types/dc-notes";
@@ -77,6 +78,55 @@ describe("discoveryQuestionsFromPreDc", () => {
       preRecord({ [PRE_DC_HEADERS.techStacks]: "AWS, Kubernetes" })
     );
     expect(qs.some((q) => q.includes("stack"))).toBe(true);
+  });
+
+  it("cleans company-prefixed needs and keeps SDR notes out of questions", () => {
+    const qs = discoveryQuestionsFromPreDc(
+      preRecord({
+        [PRE_DC_HEADERS.companyName]: "Prism Data Collective",
+        [PRE_DC_HEADERS.intersectionAreas]:
+          "Prism Data Collective needs a unified ERP/operations platform with reliable integrations",
+        [PRE_DC_HEADERS.describedNeeds]:
+          "SDR Note: Outbound sequence highlighting tkxel ERP case studies. AE Note: Replace spreadsheet-driven processes.",
+        [PRE_DC_HEADERS.needPreDc]: "High Level Overview",
+      })
+    );
+
+    expect(qs[0]).toContain("Which parts of a unified ERP/operations platform");
+    expect(qs.join(" ")).not.toContain("SDR Note");
+    expect(qs.join(" ")).not.toContain("Prism Data Collective needs");
+  });
+});
+
+describe("sdrHandoffSummaryFromPreDc", () => {
+  it("summarizes SDR and AE handoff notes from described needs", () => {
+    const rows = sdrHandoffSummaryFromPreDc(
+      preRecord({
+        [PRE_DC_HEADERS.intersectionAreas]:
+          "Unified ERP platform for data infrastructure workflows",
+        [PRE_DC_HEADERS.describedNeeds]:
+          "SDR Note: Outbound sequence to Nadia highlighting tkxel ERP and integration case studies; positive reply within a week. AE Note: Replace spreadsheet-driven processes and clarify the data model.",
+        [PRE_DC_HEADERS.discoveryCallDatePkt]: "06/10/2026",
+        [PRE_DC_HEADERS.discoveryCallTimePkt]: "7:00 pm",
+      })
+    );
+
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: "How they were approached",
+          value: expect.stringContaining("Outbound sequence to Nadia"),
+        }),
+        expect.objectContaining({
+          label: "Client signal",
+          value: "Unified ERP platform for data infrastructure workflows",
+        }),
+        expect.objectContaining({
+          label: "Committed for this call",
+          value: expect.stringContaining("Replace spreadsheet-driven processes"),
+        }),
+      ])
+    );
   });
 });
 

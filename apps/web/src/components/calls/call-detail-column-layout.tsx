@@ -157,6 +157,7 @@ export function CallDetailColumnLayout<P>({
             widgetProps={widgetProps}
             onHide={(id) => hideWidget(layoutKey, id)}
             isPrimary
+            renderPrimaryPair
           />
         </div>
       </div>
@@ -180,7 +181,6 @@ export function CallDetailColumnLayout<P>({
           return <PostDcTranscriptColumn callId={postDcProps.callId} />;
         case "coach":
           return <PostDcAiCoachColumn review={postDcProps.review} />;
-        case "overview":
         default:
           return (
             <PostDcFocusColumn
@@ -257,6 +257,7 @@ function ColumnRail<P>({
   onHide,
   header,
   isPrimary,
+  renderPrimaryPair = false,
 }: {
   zone: WidgetColumn;
   label: string;
@@ -265,9 +266,39 @@ function ColumnRail<P>({
   onHide: (id: string) => void;
   header?: React.ReactNode;
   isPrimary?: boolean;
+  renderPrimaryPair?: boolean;
 }) {
   const { isIntercom } = useThemePreview();
   if (widgets.length === 0 && !header) return null;
+  const pairedIds = new Set(["brief.pre-deck", "brief.workflow-artifacts"]);
+  const firstPairedIndex = renderPrimaryPair
+    ? widgets.findIndex((widget) => pairedIds.has(widget.id))
+    : -1;
+  const beforePair =
+    firstPairedIndex >= 0
+      ? widgets.slice(0, firstPairedIndex)
+      : widgets;
+  const pairedWidgets =
+    firstPairedIndex >= 0
+      ? widgets.filter((widget) => pairedIds.has(widget.id))
+      : [];
+  const afterPair =
+    firstPairedIndex >= 0
+      ? widgets.filter((widget, index) => index > firstPairedIndex && !pairedIds.has(widget.id))
+      : [];
+
+  const renderWidget = (spec: WidgetSpec<P>) => (
+    <div key={spec.id} id={`post-dc-widget-${spec.id}`} className="scroll-mt-28 min-w-0 h-full">
+      <DashboardWidget
+        title={spec.title}
+        isEditing={false}
+        columnZone={zone}
+        onHide={() => onHide(spec.id)}
+      >
+        {spec.render(widgetProps)}
+      </DashboardWidget>
+    </div>
+  );
 
   return (
     <section
@@ -283,18 +314,15 @@ function ColumnRail<P>({
       <ColumnSectionLabel label={label} />
       {header}
       <div className={cn("flex flex-col min-w-0", isIntercom ? "gap-4" : "gap-3", isPrimary && !isIntercom && "gap-5")}>
-        {widgets.map((spec) => (
-          <div key={spec.id} id={`post-dc-widget-${spec.id}`} className="scroll-mt-28 min-w-0">
-            <DashboardWidget
-              title={spec.title}
-              isEditing={false}
-              columnZone={zone}
-              onHide={() => onHide(spec.id)}
-            >
-              {spec.render(widgetProps)}
-            </DashboardWidget>
+        {beforePair.map(renderWidget)}
+        {pairedWidgets.length > 1 ? (
+          <div className="grid min-w-0 gap-5 xl:grid-cols-2 xl:items-stretch">
+            {pairedWidgets.map(renderWidget)}
           </div>
-        ))}
+        ) : (
+          pairedWidgets.map(renderWidget)
+        )}
+        {afterPair.map(renderWidget)}
       </div>
     </section>
   );

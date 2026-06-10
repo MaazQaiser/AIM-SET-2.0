@@ -1,10 +1,9 @@
 "use client";
 
-import { AlertTriangle, FilePlus2 } from "lucide-react";
+import { FilePlus2, FolderKanban } from "lucide-react";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import {
   BriefDetailCard,
-  BriefDetailRow,
   briefMainBody,
   briefMainLead,
   briefMainMuted,
@@ -17,72 +16,74 @@ interface BriefContentToGeneratePanelProps {
   items?: ContentToGenerate[];
 }
 
-const STATUS_LABEL: Record<ContentToGenerate["status"], string> = {
-  missing: "Missing",
-  partial: "Partial",
-};
+function isSmartDeckSuggestion(item: ContentToGenerate) {
+  const text = `${item.name} ${item.reason} ${item.neededFor}`.toLowerCase();
+  if (item.type !== "deck") return false;
+  if (text.includes("one-pager") || text.includes("one pager") || text.includes("one_pager")) {
+    return false;
+  }
+  if (text.includes("tk overview deck") || text.includes("tkxel overview deck")) return false;
+  if (text.includes("service one-pager") || text.includes("service one pager")) return false;
+  return true;
+}
+
+function projectSummary(item: ContentToGenerate) {
+  const projects = item.relevantProjects ?? [];
+  if (projects.length === 0) return "Add relevant projects from the projects library.";
+  const names = projects.slice(0, 3).map((project) => project.title).filter(Boolean);
+  const suffix = projects.length > names.length ? ` +${projects.length - names.length} more` : "";
+  return `Add project proof: ${names.join("; ")}${suffix}.`;
+}
 
 export function BriefContentToGeneratePanel({ items }: BriefContentToGeneratePanelProps) {
-  const gaps = (items ?? []).slice().sort((a, b) => a.priority - b.priority);
+  const gaps = (items ?? [])
+    .filter(isSmartDeckSuggestion)
+    .slice()
+    .sort((a, b) => a.priority - b.priority);
   if (gaps.length === 0) return null;
 
   return (
     <BriefDetailCard
       tone="main"
-      title="Content to generate"
+      title="Content to Generate for similar Leads"
       icon={FilePlus2}
       variant="warning"
       sourceInfo={{
-        source: "AI gap check against KB",
+        source: "AI gap check against KB and projects library",
         detail:
-          "If the workflow planned an asset but KB has no strong match, it lists that content here and explains why creating it would improve call prep.",
+          "Only industry-vertical deck suggestions appear here. Generic company overview decks and one-pagers are intentionally excluded because the approved company deck already exists.",
       }}
       headerExtra={
         <span className="type-caption text-muted-foreground shrink-0">
-          {gaps.length} gap{gaps.length === 1 ? "" : "s"}
+          {gaps.length} suggestion{gaps.length === 1 ? "" : "s"}
         </span>
       }
     >
-      <div className="space-y-3">
-        <p className={briefMainMuted}>
-          These assets are not strong enough in the knowledge base yet. Creating them would make the
-          call prep sharper.
-        </p>
-        <ul className="space-y-2">
+      <div className="space-y-2">
+        <ul className="divide-y divide-border/40 rounded-lg border border-border/40 overflow-hidden">
           {gaps.map((item) => (
-            <li key={item.id}>
-              <BriefDetailRow className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <AlertTriangle
-                    className={cn(
-                      "h-3.5 w-3.5",
-                      item.status === "missing" ? "text-rose-700" : "text-amber-700"
-                    )}
-                  />
-                  <p className={cn(briefMainLead, briefMainUnderline, "min-w-0 flex-1 break-words")}>
-                    {item.name}
+            <li key={item.id} className="px-4 py-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <FilePlus2 className="mt-1 h-4 w-4 shrink-0 text-warning" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <p className={cn(briefMainLead, briefMainUnderline, "min-w-0 flex-1 break-words")}>
+                      {item.name}
+                    </p>
+                    <Badge
+                      variant="outline"
+                      className="border-amber-200 bg-amber-50 text-amber-950 type-caption"
+                    >
+                      Deck suggestion
+                    </Badge>
+                  </div>
+                  <p className={cn(briefMainBody, "mt-1 line-clamp-2")}>{item.reason}</p>
+                  <p className={cn(briefMainMuted, "mt-1 flex items-center gap-1.5")}>
+                    <FolderKanban className="h-3.5 w-3.5 shrink-0" />
+                    <span className="line-clamp-1">{projectSummary(item)}</span>
                   </p>
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "type-caption",
-                      item.status === "missing"
-                        ? "border-rose-200 bg-rose-50 text-rose-950"
-                        : "border-amber-200 bg-amber-50 text-amber-950"
-                    )}
-                  >
-                    {STATUS_LABEL[item.status]}
-                  </Badge>
                 </div>
-                <p className={briefMainBody}>
-                  <span className={briefMainLead}>Why generate it: </span>
-                  {item.reason}
-                </p>
-                <p className={cn(briefMainBody, briefMainMuted)}>
-                  <span className="font-semibold text-foreground/90">Needed for: </span>
-                  {item.neededFor}
-                </p>
-              </BriefDetailRow>
+              </div>
             </li>
           ))}
         </ul>

@@ -6,10 +6,7 @@ import { Button } from "@dc-copilot/ui/components/button";
 import {
   BriefDetailCard,
   BRIEF_RELEVANT_CONTENT_SCROLL_MAX,
-  briefMainLead,
   briefMainMuted,
-  briefMainNestedSurfaceClass,
-  briefMainUnderline,
 } from "@/components/pre-call/brief-detail-card";
 import { KbDocumentViewerDialog } from "@/components/pre-call/kb-document-viewer-dialog";
 import { RelevantProjectDetailDialog } from "@/components/pre-call/relevant-project-detail-dialog";
@@ -53,14 +50,14 @@ interface BriefRelevantContentProps {
 function RelevanceBar({ score, className }: { score: number; className?: string }) {
   const pct = Math.round(Math.min(1, Math.max(0, score)) * 100);
   return (
-    <div className={cn("flex w-full max-w-[220px] items-center gap-2", className)}>
-      <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+    <div className={cn("flex w-full max-w-[126px] items-center gap-1.5", className)}>
+      <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
         <div
           className="h-full rounded-full bg-emerald-500 transition-colors"
           style={{ width: `${Math.min(100, pct)}%` }}
         />
       </div>
-      <span className="w-8 shrink-0 text-right type-caption font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+      <span className="w-7 shrink-0 text-right text-[0.6875rem] font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
         {pct}%
       </span>
     </div>
@@ -113,22 +110,20 @@ export function BriefRelevantContent({
 
   const body = (
     <>
-      <p className={cn(briefMainMuted, embedded ? "mb-3" : "-mt-2 mb-3")}>
-        From your knowledge base — use View to preview in the app.
-      </p>
-      <div className="space-y-5 min-w-0">
+      <div className="space-y-4 min-w-0">
         {visibleDocuments.length > 0 && (
           <div className="space-y-2">
             {section === "all" ? (
               <p className="type-label text-muted-foreground">Documents</p>
             ) : null}
-            <ul className={cn("space-y-0 rounded-lg border border-border/40 overflow-hidden", briefMainNestedSurfaceClass)}>
+            <ul className="min-w-0 divide-y divide-border/40 rounded-lg border border-border/40 overflow-hidden">
               {visibleDocuments.map((doc) => (
-                <li
-                  key={doc.assetId}
-                  className="border-b border-border/40 px-4 py-3 last:border-b-0"
-                >
-                  <div className="flex items-start justify-between gap-3">
+                <li key={doc.assetId} className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveDoc(doc)}
+                    className="group flex w-full min-w-0 items-start justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
                     <div className="flex min-w-0 flex-1 items-start gap-3">
                       <KbFileTypeIcon
                         fileName={doc.fileName}
@@ -136,36 +131,26 @@ export function BriefRelevantContent({
                         className="h-9 w-9"
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                        <div className="flex min-w-0 flex-wrap items-start gap-x-3 gap-y-1">
                           <p
                             className={cn(
-                              briefMainLead,
-                              doc.relevanceScore >= 0.7 && briefMainUnderline,
-                              "min-w-0 flex-1 break-words"
+                              "min-w-0 flex-1 break-words line-clamp-2",
+                              "text-sm font-semibold leading-snug text-foreground"
                             )}
                           >
                             {doc.title}
                           </p>
-                          <span className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 type-caption font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
-                            {Math.round(Math.min(1, Math.max(0, doc.relevanceScore)) * 100)}% relevance
-                          </span>
                         </div>
-                        <RelevanceBar score={doc.relevanceScore} className="mt-2" />
+                        <RelevanceBar score={doc.relevanceScore} className="mt-1.5" />
                         {doc.snippet ? (
                           <p className={cn(briefMainMuted, "mt-1 line-clamp-2")}>{doc.snippet}</p>
                         ) : null}
                       </div>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 shrink-0 px-2.5 type-label"
-                      onClick={() => setActiveDoc(doc)}
-                    >
+                    <span className="mt-1 shrink-0 type-label text-muted-foreground transition-colors group-hover:text-foreground">
                       View
-                    </Button>
-                  </div>
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -177,31 +162,30 @@ export function BriefRelevantContent({
             {section === "all" ? (
               <p className="type-label text-muted-foreground">Project matches</p>
             ) : null}
-            <ul className={cn("divide-y divide-border/40 rounded-lg border border-border/40 overflow-hidden", briefMainNestedSurfaceClass)}>
+            <ul className="min-w-0 divide-y divide-border/40 rounded-lg border border-border/40 overflow-hidden">
               {visibleProjects.map((project) => (
                 <li key={project.id}>
                   <button
                     type="button"
                     onClick={() => setActiveProject(project)}
-                    className="w-full border-0 bg-transparent px-4 py-2.5 text-left transition-opacity hover:opacity-80"
+                    className="group w-full px-3 py-2.5 text-left transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
                       <span
                         className={cn(
-                          briefMainLead,
-                          project.relevanceScore >= 0.7 && briefMainUnderline,
-                          "truncate flex-1 min-w-0"
+                          "line-clamp-2 flex-1 min-w-0",
+                          "text-sm font-semibold leading-snug text-foreground"
                         )}
                       >
                         {project.title}
                       </span>
-                      <span className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 type-caption font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
-                        {Math.round(Math.min(1, Math.max(0, project.relevanceScore)) * 100)}% relevance
+                      <span className="shrink-0 type-label text-muted-foreground transition-colors group-hover:text-foreground">
+                        View details
                       </span>
                     </div>
-                    <RelevanceBar score={project.relevanceScore} className="mt-2 max-w-[160px]" />
+                    <RelevanceBar score={project.relevanceScore} className="mt-1.5" />
                     {project.summary ? (
-                      <p className={cn(briefMainMuted, "mt-1 line-clamp-1")}>{project.summary}</p>
+                      <p className={cn(briefMainMuted, "mt-1 line-clamp-2")}>{project.summary}</p>
                     ) : null}
                   </button>
                 </li>

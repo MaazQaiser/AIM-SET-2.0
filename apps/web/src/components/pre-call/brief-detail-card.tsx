@@ -90,6 +90,9 @@ export const BRIEF_SIDEBAR_CARD_SCROLL_MAX = "min(32rem,calc(100vh-8rem))";
 /** Main column brief cards — same sticky header + inner scroll pattern as sidebar. */
 export const BRIEF_MAIN_CARD_SCROLL_MAX = "min(40rem,calc(100vh-10rem))";
 
+/** Side-by-side Pre-DC cards — fixed to 72% of the prior 28rem card height. */
+export const BRIEF_PARALLEL_CARD_SCROLL_MAX = "min(20.16rem,calc(72vh-7.2rem))";
+
 /** KB matches — half the main column cap, scroll inside. */
 export const BRIEF_RELEVANT_CONTENT_SCROLL_MAX = "min(20rem,calc((100vh - 10rem) / 2))";
 
@@ -114,6 +117,9 @@ export interface BriefDetailCardProps {
   hideEmbeddedTitle?: boolean;
   /** Main column: set false to let the card grow without inner scroll */
   enableMainScroll?: boolean;
+  /** Optional card-level accordion behavior. */
+  collapsible?: boolean;
+  defaultOpen?: boolean;
 }
 
 const stickyHeaderSurface = () => "border-0 bg-transparent";
@@ -208,13 +214,39 @@ export function BriefDetailCard({
   embedded = false,
   hideEmbeddedTitle = false,
   enableMainScroll = true,
+  collapsible = false,
+  defaultOpen = false,
 }: BriefDetailCardProps) {
   const { isIntercom } = useThemePreview();
+  const [cardOpen, setCardOpen] = useState(defaultOpen);
+  const showContent = !collapsible || cardOpen;
+  const collapseButton = collapsible ? (
+    <button
+      type="button"
+      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label={`${cardOpen ? "Collapse" : "Expand"} ${title}`}
+      aria-expanded={cardOpen}
+      onClick={() => setCardOpen((open) => !open)}
+    >
+      <ChevronDown
+        className={cn("h-4 w-4 transition-transform", cardOpen && "rotate-180")}
+      />
+    </button>
+  ) : null;
+  const resolvedHeaderExtra =
+    collapsible && (headerExtra || collapseButton) ? (
+      <div className="flex shrink-0 items-center gap-2">
+        {headerExtra}
+        {collapseButton}
+      </div>
+    ) : (
+      headerExtra
+    );
 
   const resolvedScrollMaxHeight =
     scrollMaxHeight ??
     (tone === "main" && enableMainScroll ? BRIEF_MAIN_CARD_SCROLL_MAX : undefined);
-  const scrollableBody = Boolean(resolvedScrollMaxHeight);
+  const scrollableBody = showContent && Boolean(resolvedScrollMaxHeight);
 
   if (embedded) {
     if (resolvedScrollMaxHeight) {
@@ -229,26 +261,28 @@ export function BriefDetailCard({
                 title={title}
                 icon={Icon}
                 headerIcon={headerIcon}
-                headerExtra={headerExtra}
+                headerExtra={resolvedHeaderExtra}
                 sourceInfo={sourceInfo}
                 tone={tone}
                 variant={variant}
               />
             </div>
           )}
-          <div
-            className={cn(
-              briefCardScrollClass,
-              "min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-2"
-            )}
-          >
-            {children}
-          </div>
+          {showContent ? (
+            <div
+              className={cn(
+                briefCardScrollClass,
+                "min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-2"
+              )}
+            >
+              {children}
+            </div>
+          ) : null}
         </div>
       );
     }
 
-    return <div className={cn("min-w-0", className)}>{children}</div>;
+    return <div className={cn("min-w-0", className)}>{showContent ? children : null}</div>;
   }
 
   return (
@@ -273,23 +307,25 @@ export function BriefDetailCard({
           title={title}
           icon={Icon}
           headerIcon={headerIcon}
-          headerExtra={headerExtra}
+          headerExtra={resolvedHeaderExtra}
           sourceInfo={sourceInfo}
           tone={tone}
           variant={variant}
         />
       </CardHeader>
-      <CardContent
-        className={cn(
-          tone === "main" ? briefMainBody : briefBodyClass,
-          tone === "main" && briefMainNestedSurfaceInset,
-          scrollableBody
-            ? briefScrollBodyClassName(tone)
-            : cn("min-h-0", tone === "main" ? mainCardPadding.body : defaultCardPadding.body)
-        )}
-      >
-        {children}
-      </CardContent>
+      {showContent ? (
+        <CardContent
+          className={cn(
+            tone === "main" ? briefMainBody : briefBodyClass,
+            tone === "main" && briefMainNestedSurfaceInset,
+            scrollableBody
+              ? briefScrollBodyClassName(tone)
+              : cn("min-h-0", tone === "main" ? mainCardPadding.body : defaultCardPadding.body)
+          )}
+        >
+          {children}
+        </CardContent>
+      ) : null}
     </Card>
   );
 }
