@@ -358,7 +358,6 @@ function buildLayoutBody(slide: ScratchSlideDraft, slideNumber: number): string 
     <h2>${title}</h2>
     <p>${body}</p>
   </div>`;
-    case "cover":
     default:
       return `<div class="slide-copy cover-copy">
     <div class="eyebrow">${kicker}</div>

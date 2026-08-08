@@ -50,7 +50,7 @@ export default function LandingPageActivityPage({ params }: PageParams) {
               )}
               {(v.documentsOpened?.length ?? 0) > 0 && (
                 <span className="mt-1 block type-caption text-muted-foreground">
-                  Opened {v.documentsOpened!.length} document(s)
+                  Opened {v.documentsOpened?.length} document(s)
                 </span>
               )}
             </li>

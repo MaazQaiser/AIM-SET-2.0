@@ -5,7 +5,6 @@ import { CheckCircle2, Code2, Eye, LayoutTemplate, Lock, Pencil, Plus, Trash2, U
 import { Button } from "@dc-copilot/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dc-copilot/ui/components/card";
 import { Badge } from "@dc-copilot/ui/components/badge";
-import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { useContentTemplates, useDeleteTemplate, useParentTemplate } from "@/lib/data/content-studio-hooks";
 import type { ContentTemplate } from "@/types/content_studio";
 

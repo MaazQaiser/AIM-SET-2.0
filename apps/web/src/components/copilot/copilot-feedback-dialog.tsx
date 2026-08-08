@@ -103,9 +103,10 @@ export function CopilotFeedbackDialog({
             <span>{isPositive ? "Helpful" : "Needs improvement"}</span>
           </div>
 
-          <label className="block space-y-2">
+          <label className="block space-y-2" htmlFor="copilot-feedback-comment">
             <span className="type-body font-medium text-foreground">What should we know?</span>
             <Textarea
+              id="copilot-feedback-comment"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder="Add a short note for the team..."

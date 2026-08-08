@@ -159,7 +159,7 @@ export function dataUrlToFile(dataUrl: string, fileName: string): File {
 
 export function compactSlideForSave(slide: ScratchSlideDraft): ScratchSlideDraft {
   const next: ScratchSlideDraft = { ...slide };
-  delete next.backgroundImageDataUrl;
+  next.backgroundImageDataUrl = undefined;
   return next;
 }
 

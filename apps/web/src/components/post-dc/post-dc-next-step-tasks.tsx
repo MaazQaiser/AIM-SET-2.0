@@ -256,7 +256,7 @@ function WorkflowTaskDetailCard({
                   size="sm"
                   variant="outline"
                   className="h-7 type-label"
-                  onClick={() => onScrollToWidget?.(task.scrollTarget!)}
+                  onClick={() => task.scrollTarget && onScrollToWidget?.(task.scrollTarget)}
                 >
                   {task.actionLabel}
                 </Button>

@@ -65,9 +65,20 @@ def test_live_segment_sentiment_survives_agent_config_tenant_failure(monkeypatch
         elapsed_seconds=35,
     )
 
+    # Pure business-pain language ("nightmare", "bottleneck") is intentionally kept
+    # neutral for tone scoring (see app/tools/sentiment.py) — it's discovery evidence,
+    # not proof of negative buyer sentiment. This mirrors
+    # test_analyze_segment_survives_tenant_resolution_failure in test_intent_detection.py,
+    # which covers the same scenario at the intent-detection layer.
     sentiment_messages = _messages_of_type(out, "sentiment")
     assert sentiment_messages
-    assert sentiment_messages[-1]["payload"]["customer"] < 0
+    assert sentiment_messages[-1]["payload"]["customer"] == 0
+
+    nudge_messages = _messages_of_type(out, "nudge")
+    assert any(
+        (msg.get("payload") or {}).get("message", "").startswith("Customer raised:")
+        for msg in nudge_messages
+    )
 
 
 def test_live_segment_pain_point_nudge_reaches_ws_messages():

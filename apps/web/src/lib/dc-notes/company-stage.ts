@@ -53,11 +53,15 @@ function stageFromKeywords(
   fundingStage?: string,
   fundingAmount?: string
 ): CompanyStage | null {
-  const canonical = matchCanonicalStage(raw);
-  if (canonical) return canonical;
-
   const t = raw.trim().toLowerCase();
   if (!t && !fundingStage && !fundingAmount) return null;
+
+  if (isFundedStartupSignal(t, fundingStage, fundingAmount)) {
+    return "Funded Startup";
+  }
+
+  const canonical = matchCanonicalStage(raw);
+  if (canonical) return canonical;
 
   if (
     t.includes("enterprise") ||
@@ -67,10 +71,6 @@ function stageFromKeywords(
     t.includes("fortune")
   ) {
     return "Enterprise";
-  }
-
-  if (isFundedStartupSignal(t, fundingStage, fundingAmount)) {
-    return "Funded Startup";
   }
 
   if (

@@ -7,9 +7,9 @@ import { PostSummaryCard } from "@/components/post-dc/post-dc-widget-cards";
 import { DashboardWidget } from "@/components/dashboard-grid/dashboard-widget";
 import { resolveDealSignals, resolveLeadStage } from "@/lib/post-dc/deal-signals";
 import { getPostDcRecommendation } from "@/lib/post-dc/workflow-tasks";
-import {
-  type PostDcWidgetProps,
-  type WidgetSpec,
+import type {
+  PostDcWidgetProps,
+  WidgetSpec,
 } from "@/lib/dashboard/widget-registry";
 import { cn } from "@/lib/cn";
 

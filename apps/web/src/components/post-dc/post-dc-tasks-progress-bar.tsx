@@ -36,6 +36,7 @@ export function PostDcTasksProgressBar({
           compact ? "h-2" : "h-2.5"
         )}
         role="progressbar"
+        tabIndex={0}
         aria-valuenow={done}
         aria-valuemin={0}
         aria-valuemax={total}

@@ -57,7 +57,7 @@ export function LandingPageDashboard() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-2 type-body-sm">
-              {data!.topAccounts.map((row) => (
+              {data?.topAccounts.map((row) => (
                 <li key={row.callId} className="flex justify-between gap-2">
                   <span>{row.accountName}</span>
                   <span className="text-muted-foreground tabular-nums">{row.engagementScore}</span>

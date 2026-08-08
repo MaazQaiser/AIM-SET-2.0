@@ -44,7 +44,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
     if (!templateId) return undefined;
     const list = queryClient.getQueryData<ContentTemplate[]>(["content-templates"]);
     return list?.find((template) => template.id === templateId);
-  }, [queryClient, templateId, detail.data, detail.isError]);
+  }, [queryClient, templateId]);
   const resolvedTemplate = detail.data ?? cachedTemplate;
 
   const [name, setName] = useState("New template");

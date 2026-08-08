@@ -15,6 +15,7 @@ import {
 } from "@dc-copilot/ui/components/dialog";
 import { Input } from "@dc-copilot/ui/components/input";
 import { Label } from "@dc-copilot/ui/components/label";
+import { cn } from "@/lib/cn";
 import { KbFileFormatBadge } from "@/components/knowledge/kb-file-format-badge";
 import { KB_ASSET_TYPES, defaultAssetTypeForFile } from "@/lib/kb/asset-types";
 import type { AssetType } from "@/types";
@@ -196,20 +197,17 @@ export function KbUploadButton({ onAssetReady, trigger, defaultTitle }: KbUpload
         }}
       />
       {trigger ? (
-        <span
-          role="button"
-          tabIndex={busy ? -1 : 0}
-          className={busy ? "pointer-events-none opacity-60" : "inline-flex"}
-          onClick={() => !busy && inputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (!busy && (e.key === "Enter" || e.key === " ")) {
-              e.preventDefault();
-              inputRef.current?.click();
-            }
-          }}
+        <button
+          type="button"
+          disabled={busy}
+          className={cn(
+            "inline-flex appearance-none border-0 bg-transparent p-0",
+            busy && "pointer-events-none opacity-60"
+          )}
+          onClick={() => inputRef.current?.click()}
         >
           {trigger}
-        </span>
+        </button>
       ) : (
         <Button type="button" disabled={busy} onClick={() => inputRef.current?.click()}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}

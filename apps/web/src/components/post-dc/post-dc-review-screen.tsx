@@ -75,13 +75,12 @@ function normalizeBantStatus(value: unknown): BANTStatus | null {
 function mergePostDcBantStatus(base: BANTScore, review?: PostCallReview | null): BANTScore {
   const score = review?.bantScore as Record<string, unknown> | undefined;
   if (!score) return base;
-  return BANT_TICKET_KEYS.reduce<BANTScore>(
-    (next, key) => {
-      const status = normalizeBantStatus(score[key]);
-      return status ? { ...next, [key]: status } : next;
-    },
-    base
-  );
+  const next = { ...base };
+  for (const key of BANT_TICKET_KEYS) {
+    const status = normalizeBantStatus(score[key]);
+    if (status) next[key] = status;
+  }
+  return next;
 }
 
 interface PostDcReviewScreenProps {

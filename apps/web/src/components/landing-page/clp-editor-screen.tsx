@@ -56,7 +56,7 @@ export function ClpEditorScreen({ callId }: ClpEditorScreenProps) {
       onSuccess: (p) => setDraft(syncAssetSections(p)),
       onError: () => toast.error("Could not generate landing page draft"),
     });
-  }, [isLoading, page, generate.isPending]);
+  }, [isLoading, page, generate.isPending, generate.mutate]);
 
   function saveDraft(next: CustomerLandingPage) {
     const synced = syncAssetSections(next);

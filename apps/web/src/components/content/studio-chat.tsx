@@ -181,6 +181,7 @@ export function StudioChat({
   }, [persistedDisplay.length]);
 
   // Auto-scroll on new content
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deps intentionally re-trigger the scroll on new content, not referenced in the body
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [persistedDisplay, streamingText]);
@@ -307,7 +308,7 @@ export function StudioChat({
 
   function handleKbChipClick(asset: KBAsset) {
     const ref = `Using "${asset.title}" as reference — `;
-    setInput((prev) => (prev ? prev + " " + ref : ref));
+    setInput((prev) => (prev ? `${prev} ${ref}` : ref));
     textareaRef.current?.focus();
   }
 
@@ -734,7 +735,7 @@ function MarkdownText({ text }: { text: string }) {
     nodes.push(
       <ul key={nextKey()} className="list-disc pl-4 space-y-0.5 my-1">
         {listItems.map((item, i) => (
-          <li key={i} className="leading-relaxed">{renderInline(item)}</li>
+          <li key={`${i}-${item}`} className="leading-relaxed">{renderInline(item)}</li>
         ))}
       </ul>
     );
@@ -783,14 +784,14 @@ function renderInline(text: string): React.ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
+      return <strong key={`${i}-${part}`}>{part.slice(2, -2)}</strong>;
     }
     if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
-      return <em key={i}>{part.slice(1, -1)}</em>;
+      return <em key={`${i}-${part}`}>{part.slice(1, -1)}</em>;
     }
     if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
       return (
-        <code key={i} className="rounded bg-muted px-1 py-0.5 text-xs font-mono">
+        <code key={`${i}-${part}`} className="rounded bg-muted px-1 py-0.5 text-xs font-mono">
           {part.slice(1, -1)}
         </code>
       );
@@ -926,7 +927,7 @@ function extractText(content: Record<string, unknown>): string {
   // Build readable text version of slide outline (used for copy)
   const outline = content.slide_outline;
   if (Array.isArray(outline) && outline.length > 0) {
-    const intro = typeof content.message === "string" ? content.message + "\n\n" : "";
+    const intro = typeof content.message === "string" ? `${content.message}\n\n` : "";
     const slides = outline
       .map((item) => {
         if (typeof item !== "object" || !item) return "";

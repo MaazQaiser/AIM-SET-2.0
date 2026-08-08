@@ -1,6 +1,4 @@
 "use client";
-
-import { useState } from "react";
 import { Lightbulb } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import type { SuggestedAction } from "@/lib/bot-chat/types";

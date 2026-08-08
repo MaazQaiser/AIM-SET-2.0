@@ -160,7 +160,9 @@ function lineToTranscriptEvent(
     keywords: [],
     sentiment:
       line.speakerRole === "customer"
-        ? line.text.match(/not sure how you|not convinced|skeptical|worried|concerned|frustrated/i)
+        ? line.text.match(
+            /not sure how you|not convinced|skeptical|worried|concerned|frustrated|nightmare|bottleneck|pain point|zero visibility|struggl|broken|chaotic|manual (?:process|work)|waste[ds]? time/i
+          )
           ? "negative"
           : line.text.match(/exactly what|appreciate|great|first answer|move forward/i)
             ? "positive"
@@ -506,6 +508,21 @@ export function applyClientDemoSegment(
       });
       break;
     default:
+      if (event.sentiment === "negative" && line.speakerRole === "customer") {
+        const excerpt = line.text.length > 90 ? `${line.text.slice(0, 90).trim()}…` : line.text;
+        addNudge(store, {
+          message: `Customer raised: "${excerpt}" - align next questions to this pain.`,
+          citation: {
+            id: `demo-pain-${lineIndex}`,
+            title: "Pain point detected",
+            type: "transcript",
+            excerpt: line.text,
+          },
+          role: "ae",
+          timestamp: line.offsetSeconds,
+          source: "live-call",
+        });
+      }
       break;
   }
 

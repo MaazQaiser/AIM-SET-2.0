@@ -41,6 +41,7 @@ export function SidebarAiInsightDots({ className }: { className?: string }) {
       fill="none"
       aria-hidden
     >
+      <title>Decorative dot matrix</title>
       {COLUMN_ORDER.map((variantId, colIndex) => {
         const ox = colIndex * (COL_W + COL_GAP) + DOT_R;
         return COLUMN_VARIANTS[variantId].map(([y, fill]) => (

@@ -18,9 +18,10 @@ function inferSourceFileName(template: {
   artifactType?: string;
 }) {
   if (template.sourceFileName?.trim()) return template.sourceFileName.trim();
-  const lowerName = template.name?.toLowerCase() ?? "";
-  if (lowerName.endsWith(".ppt") || lowerName.endsWith(".pptx")) return template.name!;
-  if (lowerName.endsWith(".pdf")) return template.name!;
+  const name = template.name;
+  const lowerName = name?.toLowerCase() ?? "";
+  if (name && (lowerName.endsWith(".ppt") || lowerName.endsWith(".pptx"))) return name;
+  if (name && lowerName.endsWith(".pdf")) return name;
   if (template.artifactType === "deck" || template.artifactType === "case_study") {
     return "template.ppt";
   }
