@@ -10,8 +10,8 @@ export type AgentId =
 // ── Agent health ───────────────────────────────────────────────────────────
 export type AgentHealth = "healthy" | "degraded" | "outage" | "idle";
 
-// ── Model tiers (from 04_Tech_Stack.md MODEL_POLICY) ──────────────────────
-export type ModelTier = "haiku" | "sonnet" | "opus";
+// ── Model tiers (OpenAI mini + Anthropic Claude) ───────────────────────────
+export type ModelTier = "mini" | "haiku" | "sonnet" | "opus";
 
 export interface ModelPolicy {
   primary: ModelTier;

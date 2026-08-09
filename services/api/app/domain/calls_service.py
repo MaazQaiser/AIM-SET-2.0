@@ -130,42 +130,47 @@ def _normalize_company_stage(
     *,
     call_id: str,
 ) -> str:
-    combined = " ".join(
-        [
-            _field_text(fields, "Company Stage", "Company Stage-PreDC"),
-            _field_text(fields, "Company Type ICP - PreDC"),
-            _field_text(fields, "ICP Bucket"),
-        ]
-    ).lower()
+    """Prefer explicit Pre-DC Company Stage; never let ICP bucket example text override it."""
+    raw_stage = _field_text(fields, "Company Stage", "Company Stage-PreDC")
+    raw_l = raw_stage.lower()
+
+    if raw_l:
+        for stage in _COMPANY_STAGES:
+            if raw_l == stage.lower():
+                return stage
+        if raw_l == "sme" or "small and medium" in raw_l:
+            return "SMB"
+        if "ideation" in raw_l:
+            return "Ideation"
+        if "enterprise" in raw_l or "enterprice" in raw_l:
+            return "Enterprise"
+        if "funded" in raw_l and ("startup" in raw_l or "start-up" in raw_l):
+            return "Funded Startup"
+        if raw_l in {"startup", "start-up"} or raw_l.startswith("startup ") or raw_l.startswith("start-up "):
+            return "Startup"
+        if raw_l == "smb" or "small business" in raw_l:
+            return "SMB"
 
     funding_stage = _field_text(fields, "If its a startup, what Stage of Funding?").lower()
     funding_amount = _field_text(fields, "If its startup, funding amount received?").lower()
-    funding_blob = f"{funding_stage} {funding_amount}"
-
-    if any(
-        token in combined
-        for token in ("enterprise", "enterprice", "desirable", "fortune", "large cap")
-    ):
-        return "Enterprise"
-    if (
-        "funded startup" in combined
-        or "funded start-up" in combined
-        or "venture" in combined
-        or any(token in combined for token in ("series a", "series b", "series c", "series d"))
-        or (funding_amount and ("seed" in funding_blob or "series" in funding_blob))
+    funding_blob = f"{funding_stage} {funding_amount}".strip()
+    if funding_blob and (
+        "series a" in funding_blob
+        or "series b" in funding_blob
+        or "series c" in funding_blob
+        or "series d" in funding_blob
+        or "venture" in funding_blob
+        or (funding_amount and ("seed" in funding_blob or "series" in funding_blob or "startup" in funding_blob))
     ):
         return "Funded Startup"
-    if any(
-        token in combined
-        for token in ("startup", "start-up", "seed", "early stage")
-    ):
-        return "Startup"
-    if any(
-        token in combined
-        for token in ("ideation", "evaluation", "discovery", "active opportunity")
-    ):
+
+    # ICP bucket labels list multiple stages — map only the bucket family.
+    icp = _field_text(fields, "ICP Bucket").lower()
+    if "desirable" in icp or ("enterprise" in icp and "sweet spot" not in icp):
+        return "Enterprise"
+    if "potential" in icp or "ideation" in icp or "boutique" in icp:
         return "Ideation"
-    if any(token in combined for token in ("smb", "small business", "sme", "small cap")):
+    if "sweet spot" in icp:
         return "SMB"
 
     revenue = _field_text(fields, "Annual Revenue - PreDC").lower()
@@ -208,6 +213,53 @@ def _resolve_call_status(
     return persisted or imported or "upcoming"
 
 
+def _parse_discovery_scheduled_at(date_pkt: str | None, time_pkt: str | None) -> str | None:
+    """Parse Pre-DC Discovery Call Date/Time (PKT) into an ISO timestamp."""
+    date_str = (date_pkt or "").strip()
+    if not date_str:
+        return None
+
+    date_formats = ("%m/%d/%Y", "%m/%d/%y", "%d/%m/%Y", "%Y-%m-%d")
+    base: datetime | None = None
+    for fmt in date_formats:
+        try:
+            base = datetime.strptime(date_str, fmt)
+            break
+        except ValueError:
+            continue
+    if base is None:
+        return None
+
+    time_str = (time_pkt or "").strip()
+    if time_str:
+        for fmt in ("%I:%M %p", "%I %p", "%H:%M"):
+            try:
+                parsed_time = datetime.strptime(time_str, fmt)
+                base = base.replace(
+                    hour=parsed_time.hour,
+                    minute=parsed_time.minute,
+                    second=0,
+                    microsecond=0,
+                )
+                break
+            except ValueError:
+                continue
+
+    if base.tzinfo is None:
+        base = base.replace(tzinfo=timezone.utc)
+    return base.isoformat()
+
+
+def _first_non_empty(*values: Any) -> Any:
+    for value in values:
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        return value
+    return None
+
+
 def build_calls_from_pre_dc(
     pre_rows: List[Dict[str, Any]], post_rows: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
@@ -222,11 +274,17 @@ def build_calls_from_pre_dc(
         annual_revenue = _field_text(fields, "Annual Revenue - PreDC")
         employee_count = _field_text(fields, "No. of Employees - PreDC")
         lead_title = _field_text(fields, "Prospect's Persona")
+        discovery_date = _field_text(fields, "Discovery Call Date (PKT)") or None
+        discovery_time = _field_text(fields, "Discovery Call Time (PKT)") or None
+        scheduled_at = (
+            _parse_discovery_scheduled_at(discovery_date, discovery_time)
+            or datetime.now(timezone.utc).isoformat()
+        )
         calls.append(
             {
                 "id": call_id,
                 "accountName": company,
-                "scheduledAt": datetime.now(timezone.utc).isoformat(),
+                "scheduledAt": scheduled_at,
                 "status": "upcoming",
                 "briefReady": True,
                 "pod": [],
@@ -245,8 +303,8 @@ def build_calls_from_pre_dc(
                 "dealStage": _deal_stage_from_fields(fields, call_id=call_id),
                 "icpBucket": icp_bucket or None,
                 "icpMatch": _icp_score_from_bucket(icp_bucket),
-                "discoveryCallDatePkt": _field_text(fields, "Discovery Call Date (PKT)") or None,
-                "discoveryCallTimePkt": _field_text(fields, "Discovery Call Time (PKT)") or None,
+                "discoveryCallDatePkt": discovery_date,
+                "discoveryCallTimePkt": discovery_time,
                 "meetingUrl": _meeting_url_from_fields(fields),
             }
         )
@@ -481,14 +539,42 @@ class CallsService:
                 {
                     **enriched,
                     **call,
-                    "scheduledAt": call.get("scheduledAt") or enriched.get("scheduledAt"),
+                    "scheduledAt": _first_non_empty(
+                        call.get("scheduledAt"), enriched.get("scheduledAt")
+                    ),
                     "status": _resolve_call_status(call.get("status"), enriched.get("status")),
                     "bant": enriched.get("bant") or call.get("bant"),
-                    "dealStage": call.get("dealStage") or enriched.get("dealStage"),
-                    "industry": call.get("industry") or enriched.get("industry"),
-                    "icpBucket": call.get("icpBucket") or enriched.get("icpBucket"),
-                    "leadName": call.get("leadName") or enriched.get("leadName"),
-                    "leadTitle": call.get("leadTitle") or enriched.get("leadTitle"),
+                    "dealStage": _first_non_empty(
+                        call.get("dealStage"), enriched.get("dealStage")
+                    ),
+                    "industry": _first_non_empty(call.get("industry"), enriched.get("industry")),
+                    "icpBucket": _first_non_empty(
+                        call.get("icpBucket"), enriched.get("icpBucket")
+                    ),
+                    "leadName": _first_non_empty(call.get("leadName"), enriched.get("leadName")),
+                    "leadTitle": _first_non_empty(
+                        call.get("leadTitle"), enriched.get("leadTitle")
+                    ),
+                    "discoveryCallDatePkt": _first_non_empty(
+                        call.get("discoveryCallDatePkt"),
+                        enriched.get("discoveryCallDatePkt"),
+                    ),
+                    "discoveryCallTimePkt": _first_non_empty(
+                        call.get("discoveryCallTimePkt"),
+                        enriched.get("discoveryCallTimePkt"),
+                    ),
+                    "annualRevenueRaw": _first_non_empty(
+                        call.get("annualRevenueRaw"), enriched.get("annualRevenueRaw")
+                    ),
+                    "employeeCount": _first_non_empty(
+                        call.get("employeeCount"), enriched.get("employeeCount")
+                    ),
+                    "companyTypeIcp": _first_non_empty(
+                        call.get("companyTypeIcp"), enriched.get("companyTypeIcp")
+                    ),
+                    "meetingUrl": _first_non_empty(
+                        call.get("meetingUrl"), enriched.get("meetingUrl")
+                    ),
                 }
             )
         return merged

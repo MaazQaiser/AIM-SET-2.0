@@ -17,20 +17,45 @@ function hashString(s: string): number {
   return Math.abs(h);
 }
 
-function matchCanonicalStage(raw: string): CompanyStage | null {
-  const t = raw.trim().toLowerCase();
+/** Prefer explicit Pre-DC "Company Stage" values from CSV / imports. */
+function stageFromExplicitField(raw?: string): CompanyStage | null {
+  const t = (raw ?? "").trim().toLowerCase();
   if (!t) return null;
-  const hit = COMPANY_STAGES.find((s) => s.toLowerCase() === t);
-  if (hit) return hit;
-  if (t.includes("funded") && t.includes("startup")) return "Funded Startup";
+
+  const exact = COMPANY_STAGES.find((s) => s.toLowerCase() === t);
+  if (exact) return exact;
+
+  // Common Pre-DC CSV labels
+  if (t === "sme" || t.includes("small and medium")) return "SMB";
+  if (t.includes("ideation") || t.includes("evaluation")) return "Ideation";
+  if (t.includes("enterprise") || t.includes("enterprice")) return "Enterprise";
+  if (
+    /series\s*[a-d]/.test(t) ||
+    (t.includes("funded") && (t.includes("startup") || t.includes("start-up")))
+  ) {
+    return "Funded Startup";
+  }
+  if (
+    t === "startup" ||
+    t === "start-up" ||
+    t.startsWith("startup ") ||
+    t.startsWith("start-up ") ||
+    t.includes("early startup") ||
+    t.includes("early start-up") ||
+    t.includes("early stage")
+  ) {
+    return "Startup";
+  }
+  if (t === "smb" || t.includes("small business") || t.includes("smb ")) return "SMB";
+
   return null;
 }
 
-function isFundedStartupSignal(text: string, fundingStage?: string, fundingAmount?: string): boolean {
-  const combined = [text, fundingStage, fundingAmount].filter(Boolean).join(" ").toLowerCase();
+function isFundedStartupSignal(fundingStage?: string, fundingAmount?: string): boolean {
+  const combined = [fundingStage, fundingAmount].filter(Boolean).join(" ").toLowerCase();
   if (!combined.trim()) return false;
 
-  if (
+  return (
     combined.includes("funded startup") ||
     combined.includes("funded start-up") ||
     combined.includes("venture backed") ||
@@ -40,68 +65,47 @@ function isFundedStartupSignal(text: string, fundingStage?: string, fundingAmoun
     combined.includes("series b") ||
     combined.includes("series c") ||
     combined.includes("series d") ||
-    (combined.includes("seed") && (fundingAmount?.trim() || fundingStage?.trim()))
-  ) {
-    return true;
-  }
-
-  return Boolean(fundingAmount?.trim() && /startup|seed|series/i.test(combined));
+    (Boolean(fundingAmount?.trim()) && /seed|series|startup|start-up/i.test(combined))
+  );
 }
 
-function stageFromKeywords(
-  raw: string,
-  fundingStage?: string,
-  fundingAmount?: string
-): CompanyStage | null {
-  const t = raw.trim().toLowerCase();
-  if (!t && !fundingStage && !fundingAmount) return null;
-
-  if (isFundedStartupSignal(t, fundingStage, fundingAmount)) {
-    return "Funded Startup";
-  }
-
-  const canonical = matchCanonicalStage(raw);
-  if (canonical) return canonical;
-
-  if (
-    t.includes("enterprise") ||
-    t.includes("enterprice") ||
-    t.includes("desirable") ||
-    t.includes("large cap") ||
-    t.includes("fortune")
-  ) {
-    return "Enterprise";
-  }
-
-  if (
-    t.includes("startup") ||
-    t.includes("start-up") ||
-    t.includes("seed") ||
-    t.includes("early stage")
-  ) {
-    return "Startup";
-  }
-
-  if (
-    t.includes("ideation") ||
-    t.includes("evaluation") ||
-    t.includes("discovery") ||
-    t.includes("active opportunity") ||
-    t.includes("pre-revenue")
-  ) {
+/**
+ * ICP bucket labels list multiple stages (e.g. "Sweet Spot (Funded Start-up, SMB, SME)").
+ * Use only the bucket family — never treat listed examples as this company's stage.
+ */
+function stageFromIcpBucket(icpBucket?: string): CompanyStage | null {
+  const t = (icpBucket ?? "").trim().toLowerCase();
+  if (!t) return null;
+  if (t.includes("desirable") || t.includes("enterprise")) return "Enterprise";
+  if (t.includes("potential") || t.includes("ideation") || t.includes("boutique")) {
     return "Ideation";
   }
+  if (t.includes("sweet spot")) return "SMB";
+  return null;
+}
 
+function stageFromKeywords(raw: string): CompanyStage | null {
+  const t = raw.trim().toLowerCase();
+  if (!t) return null;
+
+  if (t.includes("enterprise") || t.includes("enterprice") || t.includes("fortune") || t.includes("large cap")) {
+    return "Enterprise";
+  }
   if (
-    t.includes("smb") ||
-    t.includes("small business") ||
-    t.includes("small cap") ||
-    t.includes("mid-market") ||
-    t.includes("sme")
+    /series\s*[a-d]/.test(t) ||
+    (t.includes("funded") && (t.includes("startup") || t.includes("start-up")))
   ) {
+    return "Funded Startup";
+  }
+  if (t.includes("ideation") || t.includes("evaluation") || t.includes("pre-revenue")) {
+    return "Ideation";
+  }
+  if (t.includes("startup") || t.includes("start-up") || t.includes("early stage") || t.includes("seed")) {
+    return "Startup";
+  }
+  if (t.includes("smb") || t.includes("small business") || t.includes("sme") || t.includes("mid-market")) {
     return "SMB";
   }
-
   return null;
 }
 
@@ -119,10 +123,7 @@ function stageFromRevenueSignals(
     return "Enterprise";
   }
 
-  if (
-    /series\s*[a-d]|venture|funded|raised/i.test(rev + funding) ||
-    (fundingAmount?.trim() && /seed|series/i.test(funding))
-  ) {
+  if (isFundedStartupSignal(fundingStage, fundingAmount) || /series\s*[a-d]|venture|raised/i.test(funding)) {
     return "Funded Startup";
   }
 
@@ -131,7 +132,7 @@ function stageFromRevenueSignals(
   }
 
   if (/\$?\s*\d+(\.\d+)?\s*m/i.test(rev) || /\b\d{2,3}\b/.test(emp)) {
-    return "Startup";
+    return "SMB";
   }
 
   if (/\$?\s*\d+k|\b\d{1,2}\b/.test(rev + emp)) {
@@ -152,21 +153,22 @@ export function normalizeCompanyStage(sources: {
   fundingAmount?: string;
   seed?: string;
 }): CompanyStage {
-  const combined = [
-    sources.rawStage,
-    sources.companyTypeIcp,
-    sources.icpBucket,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  // 1) Explicit Company Stage column wins (do not let ICP bucket labels override it).
+  const fromExplicit = stageFromExplicitField(sources.rawStage);
+  if (fromExplicit) return fromExplicit;
 
+  // 2) Funding fields (not ICP bucket example text).
+  if (isFundedStartupSignal(sources.fundingStage, sources.fundingAmount)) {
+    return "Funded Startup";
+  }
+
+  // 3) Other free-text on the stage-like fields only (exclude ICP bucket).
   const fromText = stageFromKeywords(
-    combined,
-    sources.fundingStage,
-    sources.fundingAmount
+    [sources.rawStage, sources.companyTypeIcp].filter(Boolean).join(" ")
   );
   if (fromText) return fromText;
 
+  // 4) Revenue / headcount heuristics.
   const fromRevenue = stageFromRevenueSignals(
     sources.annualRevenueRaw,
     sources.employeeCount,
@@ -174,6 +176,10 @@ export function normalizeCompanyStage(sources: {
     sources.fundingAmount
   );
   if (fromRevenue) return fromRevenue;
+
+  // 5) Coarse ICP bucket family only.
+  const fromBucket = stageFromIcpBucket(sources.icpBucket);
+  if (fromBucket) return fromBucket;
 
   if (sources.seed) {
     return COMPANY_STAGES[hashString(sources.seed) % COMPANY_STAGES.length];

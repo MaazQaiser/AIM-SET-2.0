@@ -384,9 +384,13 @@ def _estimate_cost(model: str, tokens_in: int, tokens_out: int) -> float:
 
 
 def _estimate_openai_cost(model: str, tokens_in: int, tokens_out: int) -> float:
+    """Estimate USD from list prices (see docs/LLM_COST_AND_MODEL_REPORT.md)."""
     lower = model.lower()
-    if "mini" in lower:
-        rate_in, rate_out = 0.15, 0.6
+    # gpt-5.4-mini Standard: $0.75 / 1M input, $4.50 / 1M output
+    if "gpt-5.4-mini" in lower or ("mini" in lower and "gpt" in lower):
+        rate_in, rate_out = 0.75, 4.5
+    elif "mini" in lower:
+        rate_in, rate_out = 0.75, 4.5
     elif "gpt-5" in lower or "gpt-4" in lower:
         rate_in, rate_out = 2.5, 10.0
     else:

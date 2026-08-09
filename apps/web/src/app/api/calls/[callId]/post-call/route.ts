@@ -17,7 +17,8 @@ export async function GET(_request: NextRequest, { params }: Params) {
       method: "GET",
       headers: {
         "x-user-id": userId,
-        ...(orgId ? { "x-tenant-id": orgId, "x-clerk-org-id": orgId } : { "x-tenant-id": userId }),
+        ...(orgId ? { "x-clerk-org-id": orgId } : {}),
+        "x-tenant-id": process.env.NEXT_PUBLIC_KB_SHARED === "true" ? "dc-copilot-shared" : (orgId ?? userId),
       },
     }
   );
@@ -41,7 +42,8 @@ export async function POST(_request: NextRequest, { params }: Params) {
       method: "POST",
       headers: {
         "x-user-id": userId,
-        ...(orgId ? { "x-tenant-id": orgId, "x-clerk-org-id": orgId } : { "x-tenant-id": userId }),
+        ...(orgId ? { "x-clerk-org-id": orgId } : {}),
+        "x-tenant-id": process.env.NEXT_PUBLIC_KB_SHARED === "true" ? "dc-copilot-shared" : (orgId ?? userId),
       },
     }
   );

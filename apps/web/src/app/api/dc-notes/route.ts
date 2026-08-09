@@ -1,15 +1,8 @@
-import { auth } from "@/lib/api/auth";
+import { apiBaseUrl, internalApiHeaders } from "@/lib/api/internal-headers";
 import { getInternalApiSecret } from "@/lib/public-env";
 import { NextResponse } from "next/server";
 
-const internalApiUrl = () => process.env.INTERNAL_API_URL ?? process.env.API_URL ?? "http://localhost:8000";
-
 export async function GET() {
-  const { userId, orgId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const secret = getInternalApiSecret();
   if (!secret) {
     return NextResponse.json(
@@ -19,21 +12,21 @@ export async function GET() {
   }
 
   try {
-    const res = await fetch(`${internalApiUrl()}/dc-notes`, {
-      headers: {
-        "X-Internal-Secret": secret,
-        "x-user-id": userId,
-        ...(orgId ? { "x-tenant-id": orgId, "x-clerk-org-id": orgId } : { "x-tenant-id": userId }),
-      },
+    const headers = await internalApiHeaders();
+    const res = await fetch(`${apiBaseUrl()}/dc-notes`, {
+      headers,
       cache: "no-store",
     });
 
     const data = await res.json().catch(() => ({ error: "Invalid upstream response" }));
     return NextResponse.json(data, { status: res.status });
   } catch (err) {
+    if (err instanceof Error && err.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const message =
       err instanceof Error && err.message.includes("fetch failed")
-        ? `Cannot reach the API at ${internalApiUrl()}. Start the Python API on port 8000.`
+        ? `Cannot reach the API at ${apiBaseUrl()}. Start the Python API on port 8000.`
         : err instanceof Error
           ? err.message
           : "Upstream request failed";

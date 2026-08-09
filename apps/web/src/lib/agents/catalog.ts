@@ -92,43 +92,26 @@ export const DEFAULT_COST_CAPS: Record<
   content_generation: { per_run_usd: 0.05, project_usd: 1.5, abort_strategy: "hard_stop" },
 };
 
+const GPT_MINI_POLICY: ModelPolicy = {
+  primary: "mini",
+  fallback: "mini",
+  model_name: "gpt-5.4-mini",
+  fallback_model_name: "gpt-5.4-mini",
+};
+
+/** Default model policies (match services/api/app/domain/agent_config_defaults.py). */
 const DEFAULT_MODEL_POLICY: Record<AgentId, ModelPolicy> = {
-  "live-call": {
-    primary: "haiku",
-    fallback: "sonnet",
-    model_name: "claude-3-haiku-20240307",
-    fallback_model_name: "claude-sonnet-4-20250514",
-  },
+  "live-call": GPT_MINI_POLICY,
   "discovery-checklist": {
     primary: "haiku",
     fallback: "sonnet",
     model_name: "claude-3-haiku-20240307",
     fallback_model_name: "claude-sonnet-4-20250514",
   },
-  content: {
-    primary: "opus",
-    fallback: "sonnet",
-    model_name: "claude-opus-4-1-20250805",
-    fallback_model_name: "claude-sonnet-4-20250514",
-  },
-  workflow: {
-    primary: "opus",
-    fallback: "sonnet",
-    model_name: "claude-opus-4-1-20250805",
-    fallback_model_name: "claude-sonnet-4-20250514",
-  },
-  post_dc: {
-    primary: "opus",
-    fallback: "sonnet",
-    model_name: "claude-opus-4-1-20250805",
-    fallback_model_name: "claude-sonnet-4-20250514",
-  },
-  content_generation: {
-    primary: "opus",
-    fallback: "sonnet",
-    model_name: "claude-opus-4-1-20250805",
-    fallback_model_name: "claude-sonnet-4-20250514",
-  },
+  content: GPT_MINI_POLICY,
+  workflow: GPT_MINI_POLICY,
+  post_dc: GPT_MINI_POLICY,
+  content_generation: GPT_MINI_POLICY,
 };
 
 function displayCapUsd(agentId: AgentId): number {

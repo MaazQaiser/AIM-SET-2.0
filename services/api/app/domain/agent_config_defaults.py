@@ -423,6 +423,7 @@ EDITABLE_CONFIG_KEYS = frozenset(
         "throttle",
         "signal_routing",
         "failure_behaviour",
+        "guardrails",
         "jira",
     }
 )

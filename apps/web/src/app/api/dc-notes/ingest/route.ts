@@ -1,15 +1,8 @@
-import { auth } from "@/lib/api/auth";
+import { apiBaseUrl, internalApiHeaders } from "@/lib/api/internal-headers";
 import { getInternalApiSecret } from "@/lib/public-env";
 import { NextResponse, type NextRequest } from "next/server";
 
-const internalApiUrl = () => process.env.INTERNAL_API_URL ?? process.env.API_URL ?? "http://localhost:8000";
-
 export async function POST(req: NextRequest) {
-  const { userId, orgId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const secret = getInternalApiSecret();
   if (!secret) {
     return NextResponse.json(
@@ -21,23 +14,22 @@ export async function POST(req: NextRequest) {
   const body = await req.text();
 
   try {
-    const res = await fetch(`${internalApiUrl()}/dc-notes/ingest`, {
+    const headers = await internalApiHeaders({ "Content-Type": "application/json" });
+    const res = await fetch(`${apiBaseUrl()}/dc-notes/ingest`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Internal-Secret": secret,
-        "x-user-id": userId,
-        ...(orgId ? { "x-tenant-id": orgId, "x-clerk-org-id": orgId } : { "x-tenant-id": userId }),
-      },
+      headers,
       body,
     });
 
     const data = await res.json().catch(() => ({ error: "Invalid upstream response" }));
     return NextResponse.json(data, { status: res.status });
   } catch (err) {
+    if (err instanceof Error && err.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const message =
       err instanceof Error && err.message.includes("fetch failed")
-        ? `Cannot reach the API at ${internalApiUrl()}. Start it with: cd services/api && uvicorn app.main:app --reload --port 8000`
+        ? `Cannot reach the API at ${apiBaseUrl()}. Start it with: cd services/api && uvicorn app.main:app --reload --port 8000`
         : err instanceof Error
           ? err.message
           : "Upstream request failed";

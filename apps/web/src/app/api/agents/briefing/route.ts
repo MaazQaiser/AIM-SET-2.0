@@ -4,7 +4,8 @@ import { type NextRequest, NextResponse } from "next/server";
 function tenantHeaders(userId: string, orgId: string | null | undefined) {
   return {
     "x-user-id": userId,
-    ...(orgId ? { "x-tenant-id": orgId, "x-clerk-org-id": orgId } : { "x-tenant-id": userId }),
+    ...(orgId ? { "x-clerk-org-id": orgId } : {}),
+        "x-tenant-id": process.env.NEXT_PUBLIC_KB_SHARED === "true" ? "dc-copilot-shared" : (orgId ?? userId),
   };
 }
 

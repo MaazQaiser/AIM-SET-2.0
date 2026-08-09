@@ -50,7 +50,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       headers: {
         "Content-Type": "application/json",
         "x-user-id": userId,
-        ...(orgId ? { "x-tenant-id": orgId, "x-clerk-org-id": orgId } : { "x-tenant-id": userId }),
+        ...(orgId ? { "x-clerk-org-id": orgId } : {}),
+        "x-tenant-id": process.env.NEXT_PUBLIC_KB_SHARED === "true" ? "dc-copilot-shared" : (orgId ?? userId),
       },
       body: JSON.stringify({ meeting_url: meetingUrl }),
     }

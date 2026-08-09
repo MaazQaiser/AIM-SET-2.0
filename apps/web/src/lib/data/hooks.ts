@@ -35,7 +35,6 @@ import {
   FRANCHISE_DEMO_CALL_ID,
   franchiseDemoPostCallArtifacts,
   franchiseDemoPostReview,
-  mergeFranchiseDemoCalls,
 } from "@/lib/demo/franchise-ai-platform-demo";
 import { mergeCallsWithImport } from "@/lib/dc-data/merge-calls-with-import";
 import { getPostDcTranscriptForCall } from "@/lib/demo/build-post-dc-transcript";
@@ -45,7 +44,6 @@ import {
   resolveCall,
   resolveCallBrief,
   resolveCalls,
-  resolveFranchiseDemoCallForList,
   resolvePostCallReview,
   resolvePostDcRecordForCall,
 } from "@/lib/dc-data/resolvers";
@@ -193,16 +191,16 @@ function buildInternalEmailFallback(
 async function fetchCallsFromApi(): Promise<Call[]> {
   const imported = resolveCalls();
   const statusOverrides = resolveCallStatusOverrides();
-  const demoCall = resolveFranchiseDemoCallForList();
   const api = await bffFetch<Call[]>("/api/calls");
+  // Supabase via API is the source of truth; DC-notes hydrate only fills sparse display fields.
   if (api && api.length > 0) {
-    return mergeFranchiseDemoCalls(mergeCallsWithImport(api, imported, statusOverrides), demoCall);
+    return mergeCallsWithImport(api, imported, statusOverrides);
   }
-  return mergeFranchiseDemoCalls(imported, demoCall);
+  return imported;
 }
 
 export function useCalls() {
-  const localCalls = mergeFranchiseDemoCalls(resolveCalls(), resolveFranchiseDemoCallForList());
+  const localCalls = resolveCalls();
   return useQuery({
     queryKey: ["calls", getImportVersion()],
     queryFn: fetchCallsFromApi,
@@ -553,7 +551,10 @@ export function useKbAssets() {
   return useQuery({
     queryKey: ["kb-assets"],
     queryFn: async () => {
-      const res = await fetch("/api/kb/assets");
+      const res = await fetch("/api/kb/assets", {
+        cache: "no-store",
+        signal: AbortSignal.timeout(30_000),
+      });
       if (!res.ok) {
         throw new Error(`KB assets request failed (${res.status})`);
       }
@@ -562,6 +563,8 @@ export function useKbAssets() {
       return assets;
     },
     staleTime: QUERY_STALE_TIME_MS,
+    refetchOnMount: "always",
+    retry: 2,
   });
 }
 
@@ -614,10 +617,19 @@ export function useKbProjects() {
   return useQuery({
     queryKey: ["kb-projects"],
     queryFn: async () => {
-      const api = await bffFetch<KBProject[]>("/api/kb/projects");
-      return api ?? [];
+      const res = await fetch("/api/kb/projects", {
+        cache: "no-store",
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (!res.ok) {
+        throw new Error(`KB projects request failed (${res.status})`);
+      }
+      const projects = (await res.json()) as KBProject[];
+      return Array.isArray(projects) ? projects : [];
     },
     staleTime: QUERY_STALE_TIME_MS,
+    refetchOnMount: "always",
+    retry: 2,
   });
 }
 
@@ -693,11 +705,12 @@ function nonOpenGapKeys(gaps: ContentGap[]) {
 }
 
 /** Sidebar + Knowledge Base: count unique content assets to generate (grouped by document, not by lead). */
-export function useContentManagerSidebarStats() {
+export function useContentManagerSidebarStats(options?: { enabled?: boolean }) {
+  const enabled = options?.enabled ?? true;
   const { data: preDcGaps = [], isLoading: preLoading, isFetching: preFetching } =
-    usePreDcContentGenerationGaps();
+    usePreDcContentGenerationGaps({ enabled });
   const { data: postDcGaps = [], isLoading: postLoading, isFetching: postFetching } =
-    usePostDcContentGenerationGaps();
+    usePostDcContentGenerationGaps({ enabled });
   const { data: draftGaps = [] } = useContentGaps();
 
   return useMemo(() => {
@@ -716,9 +729,10 @@ export function useContentManagerSidebarStats() {
       preDcAssetCount,
       postDcAssetCount,
       draftReviewCount,
-      isLoading: preLoading || preFetching || postLoading || postFetching,
+      isLoading: enabled && (preLoading || preFetching || postLoading || postFetching),
     };
   }, [
+    enabled,
     preDcGaps,
     postDcGaps,
     draftGaps,
@@ -729,49 +743,94 @@ export function useContentManagerSidebarStats() {
   ]);
 }
 
-export function usePreDcContentGenerationGaps() {
+const BRIEF_FETCH_CONCURRENCY = 3;
+
+async function mapPool<T, R>(items: T[], concurrency: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
+  if (items.length === 0) return [];
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const current = nextIndex;
+      nextIndex += 1;
+      results[current] = await mapper(items[current]!);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
+
+function preDcGapsFromBrief(
+  call: Call,
+  brief: CallBrief | null | undefined
+): PreDcContentGenerationGap[] {
+  if (!brief?.contentToGenerate?.length) return [];
+  const accountName = brief.accountName || call.accountName;
+  return brief.contentToGenerate.map((item) => ({
+    ...item,
+    id: `${call.id}:${item.id}`,
+    callId: call.id,
+    accountName,
+    leadName: call.leadName,
+    leadTitle: call.leadTitle,
+    industry: call.industry?.trim() || undefined,
+    scheduledAt: call.scheduledAt,
+    sourceItemId: item.id,
+    sourcePath: item.sourcePath || `/calls/${call.id}`,
+    contentRequirements: item.contentRequirements || item.reason,
+    context: {
+      ...(item.context ?? {}),
+      source: "pre_dc",
+      sourcePath: item.sourcePath || `/calls/${call.id}`,
+      callId: call.id,
+      accountName,
+      leadName: call.leadName,
+      industry: call.industry?.trim() || undefined,
+      whatToCreate: item.contentRequirements || item.reason,
+    },
+    studioHref: contentStudioHref(item, call, accountName),
+  }));
+}
+
+export function usePreDcContentGenerationGaps(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["pre-dc-content-generation-gaps", getImportVersion()],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const calls = await fetchCallsFromApi();
-      const gaps = await Promise.all(
-        calls.map(async (call) => {
+      // Prefer local briefs first so Knowledge Base tabs are not blocked by N parallel brief calls.
+      const needFetch: Call[] = [];
+      const localGaps: PreDcContentGenerationGap[] = [];
+      for (const call of calls) {
+        const local = resolveCallBrief(call.id);
+        if (
+          local &&
+          (local.contentToGenerate?.length ||
+            local.agentStatus === "success" ||
+            local.agentStatus === "failed")
+        ) {
+          localGaps.push(...preDcGapsFromBrief(call, local));
+        } else {
+          needFetch.push(call);
+        }
+      }
+
+      const fetchedGaps = (
+        await mapPool(needFetch, BRIEF_FETCH_CONCURRENCY, async (call) => {
           const local = resolveCallBrief(call.id);
           const api = await bffFetch<CallBrief>(`/api/calls/${call.id}/brief`);
           const brief = api && local ? mergeCallBrief(local, api) : api ?? local;
-          const accountName = brief?.accountName || call.accountName;
-          return (brief?.contentToGenerate ?? []).map((item) => ({
-            ...item,
-            id: `${call.id}:${item.id}`,
-            callId: call.id,
-            accountName,
-            leadName: call.leadName,
-            leadTitle: call.leadTitle,
-            industry: call.industry?.trim() || undefined,
-            scheduledAt: call.scheduledAt,
-            sourceItemId: item.id,
-            sourcePath: item.sourcePath || `/calls/${call.id}`,
-            contentRequirements: item.contentRequirements || item.reason,
-            context: {
-              ...(item.context ?? {}),
-              source: "pre_dc",
-              sourcePath: item.sourcePath || `/calls/${call.id}`,
-              callId: call.id,
-              accountName,
-              leadName: call.leadName,
-              industry: call.industry?.trim() || undefined,
-              whatToCreate: item.contentRequirements || item.reason,
-            },
-            studioHref: contentStudioHref(item, call, accountName),
-          }));
+          return preDcGapsFromBrief(call, brief);
         })
-      );
-      return gaps
-        .flat()
-        .sort((a, b) => {
-          if (a.priority !== b.priority) return a.priority - b.priority;
-          return new Date(a.scheduledAt ?? 0).getTime() - new Date(b.scheduledAt ?? 0).getTime();
-        });
+      ).flat();
+
+      return [...localGaps, ...fetchedGaps].sort((a, b) => {
+        if (a.priority !== b.priority) return a.priority - b.priority;
+        return new Date(a.scheduledAt ?? 0).getTime() - new Date(b.scheduledAt ?? 0).getTime();
+      });
     },
     staleTime: QUERY_STALE_TIME_MS,
   });
@@ -840,9 +899,10 @@ function collectPostDcMissingGaps(
   });
 }
 
-export function usePostDcContentGenerationGaps() {
+export function usePostDcContentGenerationGaps(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["post-dc-content-generation-gaps", getImportVersion()],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const calls = await fetchCallsFromApi();
       const { postRunMetaByCallId, emailDraftsByCallId } = useDcImportsStore.getState();

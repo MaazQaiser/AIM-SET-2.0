@@ -7,6 +7,7 @@ import { Badge } from "@dc-copilot/ui/components/badge";
 import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import { DemoTranscriptPlayer } from "@/components/live/demo-transcript-player";
 import { RecallBotLauncher } from "@/components/live/recall-bot-launcher";
+import { AgentConfigLink } from "@/components/agents/agent-config-link";
 import { ParticipantAvatar } from "@/components/participant-avatar";
 import { hasSentimentScore, scoreToTone } from "@/lib/live/sentiment-display";
 import { cn } from "@/lib/cn";
@@ -118,6 +119,7 @@ export function LiveCallPageHeader({
             <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
             {sentimentLabel}
           </span>
+          <AgentConfigLink agentId="live-call" />
           <RecallBotLauncher callId={callId} meetingUrl={call?.meetingUrl} />
           <DemoTranscriptPlayer callId={callId} isConnected={isConnected} />
           <CallWrapUpActions

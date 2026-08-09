@@ -6,10 +6,13 @@ const internalApiUrl = () => process.env.INTERNAL_API_URL ?? process.env.API_URL
 
 function headers(userId: string, orgId: string | null | undefined) {
   const secret = getInternalApiSecret();
+  const shared = process.env.NEXT_PUBLIC_KB_SHARED === "true";
+  const tenantId = shared ? "dc-copilot-shared" : (orgId ?? userId);
   return {
     ...(secret ? { "X-Internal-Secret": secret } : {}),
     "x-user-id": userId,
-    ...(orgId ? { "x-tenant-id": orgId, "x-clerk-org-id": orgId } : { "x-tenant-id": userId }),
+    "x-tenant-id": tenantId,
+    ...(orgId ? { "x-clerk-org-id": orgId } : {}),
   };
 }
 

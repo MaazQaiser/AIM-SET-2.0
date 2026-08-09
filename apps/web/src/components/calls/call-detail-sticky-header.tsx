@@ -9,6 +9,7 @@ import { PreDcBantStrip } from "@/components/calls/pre-dc-bant-strip";
 import { PreDcPrepReadyAction } from "@/components/calls/pre-dc-prep-ready-action";
 import { PostDcActionStrip } from "@/components/post-dc/post-dc-action-strip";
 import { PostDcCloseDealAction } from "@/components/post-dc/post-dc-close-deal-action";
+import { AgentConfigLink } from "@/components/agents/agent-config-link";
 import { ParticipantAvatar } from "@/components/participant-avatar";
 import { useThemePreview } from "@/hooks/use-theme-preview";
 import { cn } from "@/lib/cn";
@@ -228,6 +229,8 @@ export function CallDetailStickyHeader({
               className="mx-0 shrink-0"
             />
           )}
+          {!isPostDc ? <AgentConfigLink agentId="workflow" /> : null}
+          {isPostDc ? <AgentConfigLink agentId="post_dc" /> : null}
           <LayoutSettingsButton
             isEditingLayout={isEditingLayout}
             onToggleLayout={onToggleLayout}

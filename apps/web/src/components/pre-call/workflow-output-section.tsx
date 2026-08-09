@@ -6,6 +6,7 @@ import { BriefArtifactsPanel } from "@/components/pre-call/brief-artifacts-panel
 import { BriefContentToGeneratePanel } from "@/components/pre-call/brief-content-to-generate-panel";
 import { BriefPreDeckPanel } from "@/components/pre-call/brief-pre-deck-panel";
 import { WorkflowAgentBadge } from "@/components/pre-call/workflow-agent-badge";
+import { AgentConfigLink } from "@/components/agents/agent-config-link";
 import type { CallBrief } from "@/lib/brief-types";
 
 interface WorkflowOutputSectionProps {
@@ -38,13 +39,26 @@ export function WorkflowOutputSection({ brief }: WorkflowOutputSectionProps) {
             Summary, artifacts &amp; KB fulfillment
           </span>
         </div>
-        <WorkflowAgentBadge />
+        <div className="flex items-center gap-2">
+          <AgentConfigLink
+            agentId="workflow"
+            variant="text"
+            label="Configure model & prompts"
+          />
+          <WorkflowAgentBadge />
+        </div>
       </div>
 
       {brief.agentStatus === "failed" && (
         <p className="type-label text-warning rounded-md border border-warning/30 bg-warning/10 px-3 py-2">
-          PRE-DC Workflow could not complete for this lead. Re-import or run again from Agents →
-          PRE-DC Workflow.
+          PRE-DC Workflow could not complete for this lead. Re-import or{" "}
+          <AgentConfigLink
+            agentId="workflow"
+            variant="text"
+            label="open agent settings"
+            className="text-warning underline"
+          />{" "}
+          to adjust models and prompts.
         </p>
       )}
 

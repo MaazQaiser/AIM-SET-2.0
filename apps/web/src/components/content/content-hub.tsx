@@ -75,11 +75,15 @@ export function ContentHub() {
   const searchParams = useSearchParams();
   const persona = usePersona();
   const [mounted, setMounted] = useState(false);
-  const { data: assets = [], isLoading: assetsLoading } = useKbAssets();
+  const { data: assets = [], isLoading: assetsLoading, isFetched: assetsFetched } = useKbAssets();
   const { data: projects = [], isLoading: projectsLoading } = useKbProjects();
   const { data: templates = [], isLoading: templatesLoading } = useContentTemplates();
   const { data: studioProjects = [], isLoading: studioProjectsLoading } = useStudioProjects();
-  const { toGenerateCount, isLoading: suggestionsLoading } = useContentManagerSidebarStats();
+  // Defer suggestion-gap fan-out until KB assets resolve — otherwise dozens of brief
+  // requests saturate the browser and Knowledge Base stays stuck on "Loading assets...".
+  const { toGenerateCount, isLoading: suggestionsLoading } = useContentManagerSidebarStats({
+    enabled: assetsFetched || !assetsLoading,
+  });
 
   const tabParam = searchParams.get("tab");
   const libraryTabParam = searchParams.get("libraryTab");

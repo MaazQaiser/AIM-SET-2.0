@@ -10,6 +10,7 @@ import { EmptyState } from "@dc-copilot/ui/components/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dc-copilot/ui/components/tabs";
 import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { CallsListPageLoader } from "@/components/layout/page-loaders";
+import { callScheduleDate, isCallOnDay } from "@/lib/dashboard/call-metrics";
 import { useCalls } from "@/lib/data/hooks";
 import { useDcImportsStore } from "@/stores/use-dc-imports";
 import type { Call } from "@/types";
@@ -53,11 +54,13 @@ const tabsContentClassName =
 
 function CallsTabPanels({
   calls,
+  today,
   upcoming,
   past,
   view,
 }: {
   calls: Call[];
+  today: Call[];
   upcoming: Call[];
   past: Call[];
   view: CallsViewMode;
@@ -66,6 +69,22 @@ function CallsTabPanels({
     <>
       <TabsContent value="all" className={tabsContentClassName}>
         <CallsTabContent calls={calls} view={view} />
+      </TabsContent>
+
+      <TabsContent value="today" className={tabsContentClassName}>
+        <CallsTabContent
+          calls={today}
+          view={view}
+          emptyState={
+            today.length === 0 ? (
+              <EmptyState
+                icon={Phone}
+                title="No calls today"
+                description="No discovery calls are scheduled for today (PKT)."
+              />
+            ) : undefined
+          }
+        />
       </TabsContent>
 
       <TabsContent value="upcoming" className={tabsContentClassName}>
@@ -108,9 +127,12 @@ export function CallsListClient() {
   const { data: calls = [], isLoading } = useCalls();
   const importsHydrated = useDcImportsStore((s) => s.importsHydrated);
   const hasImport = useDcImportsStore((s) => s.preDcRecords.length > 0);
-  const [view, setView] = useState<CallsViewMode>("list");
+  const [view, setView] = useState<CallsViewMode>("cards");
 
   const hasCalls = calls.length > 0;
+  const today = calls
+    .filter((c) => isCallOnDay(c))
+    .sort((a, b) => callScheduleDate(a).getTime() - callScheduleDate(b).getTime());
   const upcoming = calls.filter((c) => c.status === "upcoming" || c.status === "live");
   const past = calls.filter((c) => c.status === "completed" || c.status === "no-show");
 
@@ -142,12 +164,18 @@ export function CallsListClient() {
           action={{ label: "Import CSV", href: "/settings" }}
         />
       ) : (
-        <Tabs defaultValue="all" className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+        <Tabs defaultValue="today" className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
           <TabsList className="h-auto w-full shrink-0 justify-start gap-4 rounded-none border-b border-border/60 bg-transparent p-0">
             <TabsTrigger value="all">
               All
-              <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 type-caption font-medium tabular-nums text-primary">
+              <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 type-caption font-medium tabular-nums">
                 {calls.length}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value="today">
+              Today
+              <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 type-caption font-medium tabular-nums text-primary">
+                {today.length}
               </span>
             </TabsTrigger>
             <TabsTrigger value="upcoming">
@@ -169,6 +197,7 @@ export function CallsListClient() {
               <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 pt-2 pb-0">
                 <CallsTabPanels
                   calls={calls}
+                  today={today}
                   upcoming={upcoming}
                   past={past}
                   view={view}
@@ -179,6 +208,7 @@ export function CallsListClient() {
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <CallsTabPanels
                 calls={calls}
+                today={today}
                 upcoming={upcoming}
                 past={past}
                 view={view}

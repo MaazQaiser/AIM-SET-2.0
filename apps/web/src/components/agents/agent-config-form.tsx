@@ -10,10 +10,12 @@ import { ModelPolicyBadge } from "./model-policy-badge";
 import { NudgeThrottleControl } from "./nudge-throttle-control";
 import { SignalRoutingTable } from "./signal-routing-table";
 import { WorkflowAgentConfigSections } from "./workflow-agent-config-sections";
+import { GuardrailsConfigSection } from "./guardrails-config-section";
+import { CostCalculatorSection } from "./cost-calculator-section";
+import { MODEL_OPTIONS } from "@/lib/agents/llm-pricing";
 import type {
   AgentConfig,
   AgentId,
-  ModelTier,
   CostAbortStrategy,
   FallbackStrategy,
 } from "@/types/agents";
@@ -26,15 +28,13 @@ interface AgentConfigFormProps {
   isSaving?: boolean;
 }
 
-const MODEL_OPTIONS: { tier: ModelTier; model: string; label: string }[] = [
-  { tier: "haiku", model: "claude-3-haiku-20240307", label: "Claude 3 Haiku (fast, cheap)" },
-  { tier: "sonnet", model: "claude-sonnet-4-20250514", label: "Claude Sonnet 4 (balanced)" },
-  { tier: "opus", model: "claude-opus-4-1-20250805", label: "Claude Opus 4.1 (highest quality)" },
-  { tier: "opus", model: "claude-3-opus-20240229", label: "Claude 3 Opus (legacy)" },
-];
-
 const ABORT_OPTIONS: CostAbortStrategy[] = ["hard_stop", "degrade", "alert_only"];
 const FALLBACK_OPTIONS: FallbackStrategy[] = ["serve_from_cache", "degrade_gracefully", "alert_and_skip"];
+
+function selectModelValue(modelName: string): string {
+  const match = MODEL_OPTIONS.find((m) => m.model === modelName);
+  return match?.model ?? modelName;
+}
 
 export function AgentConfigForm({
   agentId,
@@ -68,6 +68,9 @@ export function AgentConfigForm({
 
   const prompts = local.active_prompt_versions ?? [];
   const operations = local.operations ?? config.operations ?? [];
+  const primarySelect = selectModelValue(local.model_policy.model_name);
+  const fallbackSelect = selectModelValue(local.model_policy.fallback_model_name);
+  const knownModels = new Set(MODEL_OPTIONS.map((m) => m.model));
 
   return (
     <div className="space-y-8">
@@ -89,7 +92,8 @@ export function AgentConfigForm({
       <section className="space-y-4">
         <h3 className="type-panel-title">Model policy</h3>
         <p className="type-caption text-muted-foreground">
-          Primary and fallback models used when this agent calls the LLM.
+          Primary and fallback models used when this agent calls the LLM. Default for Call Prep
+          and Live Call is OpenAI GPT-5.4 Mini.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -98,9 +102,9 @@ export function AgentConfigForm({
               <ModelPolicyBadge policy={local.model_policy} />
             ) : (
               <select
-                value={local.model_policy.primary}
+                value={primarySelect}
                 onChange={(e) => {
-                  const opt = MODEL_OPTIONS.find((m) => m.tier === e.target.value);
+                  const opt = MODEL_OPTIONS.find((m) => m.model === e.target.value);
                   if (!opt) return;
                   patch("model_policy", {
                     ...local.model_policy,
@@ -110,8 +114,13 @@ export function AgentConfigForm({
                 }}
                 className="flex h-9 w-full rounded-md border bg-background px-3 py-1 type-body shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
               >
+                {!knownModels.has(local.model_policy.model_name) ? (
+                  <option value={local.model_policy.model_name}>
+                    Current: {local.model_policy.model_name}
+                  </option>
+                ) : null}
                 {MODEL_OPTIONS.map((m) => (
-                  <option key={m.tier + m.model} value={m.tier}>
+                  <option key={m.model} value={m.model}>
                     {m.label}
                   </option>
                 ))}
@@ -130,9 +139,9 @@ export function AgentConfigForm({
               />
             ) : (
               <select
-                value={local.model_policy.fallback}
+                value={fallbackSelect}
                 onChange={(e) => {
-                  const opt = MODEL_OPTIONS.find((m) => m.tier === e.target.value);
+                  const opt = MODEL_OPTIONS.find((m) => m.model === e.target.value);
                   if (!opt) return;
                   patch("model_policy", {
                     ...local.model_policy,
@@ -142,8 +151,13 @@ export function AgentConfigForm({
                 }}
                 className="flex h-9 w-full rounded-md border bg-background px-3 py-1 type-body shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
               >
+                {!knownModels.has(local.model_policy.fallback_model_name) ? (
+                  <option value={local.model_policy.fallback_model_name}>
+                    Current: {local.model_policy.fallback_model_name}
+                  </option>
+                ) : null}
                 {MODEL_OPTIONS.map((m) => (
-                  <option key={m.tier + m.model} value={m.tier}>
+                  <option key={`fb-${m.model}`} value={m.model}>
                     {m.label}
                   </option>
                 ))}
@@ -222,6 +236,14 @@ export function AgentConfigForm({
           </div>
         </div>
       </section>
+
+      <Separator />
+
+      <CostCalculatorSection
+        agentId={agentId}
+        modelPolicy={local.model_policy}
+        costCap={local.cost_cap}
+      />
 
       <Separator />
 
@@ -313,6 +335,14 @@ export function AgentConfigForm({
         </div>
       </section>
 
+      <Separator />
+
+      <GuardrailsConfigSection
+        policy={local.guardrails}
+        readOnly={readOnly}
+        onChange={(g) => patch("guardrails", g)}
+      />
+
       {agentId === "workflow" && (
         <>
           <Separator />
@@ -333,6 +363,9 @@ export function AgentConfigForm({
         <h3 className="type-panel-title">Prompts</h3>
         <p className="type-caption text-muted-foreground">
           Active prompt files from the repository. Override below applies on the next run when supported.
+          {agentId === "workflow"
+            ? " PRE-DC also has dedicated summary / artifact prompt editors above."
+            : null}
         </p>
         {prompts.length === 0 ? (
           <p className="type-body text-muted-foreground">No prompt files on disk for this agent yet.</p>

@@ -10,7 +10,8 @@ export async function GET() {
   const res = await fetch(`${process.env.API_URL ?? "http://localhost:8000"}/api/v1/agents/runs`, {
     headers: {
       "x-user-id": userId,
-      ...(orgId ? { "x-tenant-id": orgId, "x-clerk-org-id": orgId } : { "x-tenant-id": userId }),
+      ...(orgId ? { "x-clerk-org-id": orgId } : {}),
+        "x-tenant-id": process.env.NEXT_PUBLIC_KB_SHARED === "true" ? "dc-copilot-shared" : (orgId ?? userId),
     },
     cache: "no-store",
   });

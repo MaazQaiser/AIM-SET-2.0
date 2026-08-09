@@ -12,10 +12,51 @@ describe("normalizeCompanyStage", () => {
         rawStage: "Startup",
         fundingAmount: "$4M seed",
       })
+    ).toBe("Startup");
+    expect(
+      normalizeCompanyStage({
+        fundingStage: "Series A",
+        fundingAmount: "$4M",
+      })
     ).toBe("Funded Startup");
     expect(normalizeCompanyStage({ rawStage: "Early startup" })).toBe("Startup");
     expect(normalizeCompanyStage({ rawStage: "Evaluation" })).toBe("Ideation");
     expect(normalizeCompanyStage({ rawStage: "SMB lead" })).toBe("SMB");
+  });
+
+  it("prefers explicit Company Stage over ICP bucket labels", () => {
+    expect(
+      normalizeCompanyStage({
+        rawStage: "SMB",
+        icpBucket: "Sweet Spot (Funded Start-up, SMB, SME)",
+      })
+    ).toBe("SMB");
+    expect(
+      normalizeCompanyStage({
+        rawStage: "Ideation / Boutique / Startup",
+        icpBucket: "Potential (Ideation, Boutique, Startup)",
+      })
+    ).toBe("Ideation");
+    expect(
+      normalizeCompanyStage({
+        rawStage: "SME",
+        icpBucket: "Sweet Spot (Funded Start-up, SMB, SME)",
+      })
+    ).toBe("SMB");
+    expect(
+      normalizeCompanyStage({
+        rawStage: "Enterprise",
+        icpBucket: "Desirable (Enterprise)",
+      })
+    ).toBe("Enterprise");
+  });
+
+  it("does not treat Sweet Spot bucket examples as Funded Startup", () => {
+    expect(
+      normalizeCompanyStage({
+        icpBucket: "Sweet Spot (Funded Start-up, SMB, SME)",
+      })
+    ).toBe("SMB");
   });
 
   it("returns only allowed stage values", () => {

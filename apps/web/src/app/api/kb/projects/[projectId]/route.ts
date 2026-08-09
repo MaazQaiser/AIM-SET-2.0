@@ -9,7 +9,8 @@ function headers(userId: string, orgId: string | null | undefined) {
   return {
     ...(secret ? { "X-Internal-Secret": secret } : {}),
     "x-user-id": userId,
-    ...(orgId ? { "x-tenant-id": orgId, "x-clerk-org-id": orgId } : { "x-tenant-id": userId }),
+    ...(orgId ? { "x-clerk-org-id": orgId } : {}),
+        "x-tenant-id": process.env.NEXT_PUBLIC_KB_SHARED === "true" ? "dc-copilot-shared" : (orgId ?? userId),
   };
 }
 

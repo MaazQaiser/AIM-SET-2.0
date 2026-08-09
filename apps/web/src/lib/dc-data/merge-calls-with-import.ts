@@ -27,10 +27,11 @@ export function mergeCallsWithImport(
       overrideStatus: statusOverrides[api.id],
     });
 
+    // Prefer Supabase/API fields; fill gaps from hydrated DC notes only.
     const merged = {
       ...local,
       ...api,
-      scheduledAt: local.scheduledAt || api.scheduledAt,
+      scheduledAt: api.scheduledAt || local.scheduledAt,
       status,
       dealStage: companyStageForCall({
         ...local,
