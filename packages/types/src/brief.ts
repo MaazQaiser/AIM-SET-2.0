@@ -23,8 +23,9 @@ export interface PreDeckSlide {
   id: string;
   title: string;
   narrative: string;
-  sourceType: "workflow" | "knowledge_base";
+  sourceType: "workflow" | "knowledge_base" | "project_database";
   assetId?: string;
+  sourceId?: string;
   previewText?: string;
 }
 

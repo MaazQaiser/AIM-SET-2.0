@@ -80,11 +80,6 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
     leadTitle: call.leadTitle ?? (preRecord ? preDcField(preRecord, "prospectPersona") : undefined),
     clientAttendees: brief?.clientAttendees,
   });
-  const leadLinkedInUrl =
-    brief?.clientAttendees?.find(
-      (attendee) => attendee.name.trim().toLowerCase() === call.leadName?.trim().toLowerCase()
-    )?.linkedinUrl || (preRecord ? preDcField(preRecord, "personLinkedIn") : undefined);
-  const companyLinkedInUrl = preRecord ? preDcField(preRecord, "companyLinkedIn") : undefined;
 
   return (
     <PageShell
@@ -102,8 +97,6 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
         showJoinCall={showJoinCall}
         isEditingLayout={isEditingLayout}
         onToggleLayout={() => setEditingLayout(!isEditingLayout)}
-        personLinkedInUrl={leadLinkedInUrl}
-        companyLinkedInUrl={companyLinkedInUrl}
       />
       <CallDetailTabs
         callId={callId}

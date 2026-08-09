@@ -64,8 +64,6 @@ function suggestionsForSurface(surface: CopilotGreetingSurface) {
       return ["Agent status", "Recent runs", "Run briefing"];
     case "settings":
       return ["Import status", "Agent settings", "Data sources"];
-    case "home":
-    case "global":
     default:
       return ["Today's priorities", "Missing briefs", "Upcoming prep"];
   }

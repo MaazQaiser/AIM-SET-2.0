@@ -91,7 +91,7 @@ export function useDailyBriefing(enabled = true) {
     queryKey: ["daily-briefing", briefingDate, payloadSignature],
     queryFn: async () => generateBriefing(payload, briefingDate, true),
     enabled,
-    staleTime: Infinity,
+    staleTime: Number.POSITIVE_INFINITY,
     retry: 1,
   });
 
