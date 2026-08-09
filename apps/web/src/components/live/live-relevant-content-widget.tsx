@@ -359,7 +359,10 @@ export function LiveRelevantContentWidget({
     const docs = [
       ...(relevantContent?.recommendedDeck ? [relevantContent.recommendedDeck] : []),
       ...(relevantContent?.relevantDocuments ?? []),
-    ].filter((doc) => doc.format === "ppt" || doc.format === "pptx");
+    ].filter((doc) => {
+      const format = String(doc.format || "").toLowerCase();
+      return format === "ppt" || format === "pptx" || format === "pdf";
+    });
     return dedupeItems(docs.map(routeDocumentToDisplay));
   }, [relevantContent]);
 

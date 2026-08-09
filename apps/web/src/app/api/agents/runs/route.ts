@@ -26,6 +26,8 @@ export async function GET() {
     status?: string;
     cost_usd?: number;
     tokens_used?: number;
+    tokens_in?: number;
+    tokens_out?: number;
     model_used?: string;
     created_at?: string;
   }[];
@@ -41,6 +43,8 @@ export async function GET() {
       outcome: row.status === "success" ? "success" : "failed",
       cost_usd: Number(row.cost_usd) || 0,
       tokens_used: Number(row.tokens_used) || 0,
+      tokens_in: row.tokens_in != null ? Number(row.tokens_in) : undefined,
+      tokens_out: row.tokens_out != null ? Number(row.tokens_out) : undefined,
       model_used: row.model_used ?? "",
       operation: row.operation ?? "",
       trace_id: row.trace_id ?? "",

@@ -55,6 +55,43 @@ def test_handle_transcript_segment_preserves_snake_case_speaker_name():
     assert events[-1]["speaker_name"] == "Local Tester"
 
 
+def test_handle_transcript_segment_emits_sentiment_before_heavy_work(monkeypatch):
+    ctx = TenantContext(tenant_id="live-test-early-sentiment", user_id="u1")
+    call_id = "call-live-early-sentiment"
+    broadcasts: list[dict] = []
+
+    class FakeChannel:
+        def broadcast_sync(self, cid, msg):
+            broadcasts.append({"call_id": cid, "msg": msg})
+
+    monkeypatch.setattr(
+        "app.agents.live_call.handler.get_call_channel",
+        lambda: FakeChannel(),
+    )
+
+    def slow_advanced(*_args, **_kwargs):
+        assert any(b["msg"].get("type") == "sentiment" for b in broadcasts)
+        return []
+
+    monkeypatch.setattr(
+        "app.agents.live_call.handler.process_transcript_segment",
+        slow_advanced,
+    )
+
+    out = handle_transcript_segment(
+        ctx,
+        call_id,
+        {
+            "text": "I'm excited about this partnership",
+            "speakerId": "prospect-1",
+            "speakerRole": "customer",
+            "timestamp": 8,
+        },
+    )
+    assert any(msg.get("type") == "sentiment" and msg.get("early") for msg in out["ws_messages"])
+    assert any(b["msg"].get("type") == "sentiment" for b in broadcasts)
+
+
 def test_handle_transcript_segment_emits_analyzed_sentiment():
     ctx = TenantContext(tenant_id="live-test-sentiment", user_id="u1")
     call_id = "call-live-sentiment"

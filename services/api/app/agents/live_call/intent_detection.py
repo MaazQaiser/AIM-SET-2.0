@@ -46,9 +46,9 @@ _INTENT_DISPLAY: Dict[str, str] = {
 }
 
 _PAIN_EMERGENT_PATTERNS = [
-    r"\b(struggle|struggling|pain|problem|challenge|frustrat|difficult|blocked|bottleneck)\b",
+    r"\b(struggle|struggling|pain point|painful|nightmare|problem|challenge|frustrat|difficult|blocked|bottleneck)\b",
     r"\b(can't|cannot|unable to|hard to|too slow|too expensive)\b",
-    r"\b(manual|spreadsheet|spreadsheets|workaround|rework|visibility gap|requirements?|not sure|unclear)\b",
+    r"\b(manual(?:\s+process)?|spreadsheet hell|workaround|rework|visibility gap|broken process|not sure|unclear)\b",
 ]
 
 _TOPIC_SPIKE_THRESHOLD = 3
@@ -155,7 +155,7 @@ def _detect_pains(
         pain_text = pain.get("text") or ""
         if _pain_already_detected(session, pain_text):
             continue
-        if _fuzzy_pain_match(text, pain_text) >= 0.72:
+        if _fuzzy_pain_match(text, pain_text) >= 0.85:
             entry = {
                 "id": str(uuid.uuid4()),
                 "text": pain_text,
@@ -287,14 +287,18 @@ def _latest_meaningful_sentiment_score(
     series_key: str,
     fallback: float,
 ) -> float:
-    scores = (
-        float(point.get("valence", 0.0))
-        for point in reversed(session.sentiment_series.get(series_key, [])[-8:])
-    )
-    for score in scores:
+    recent = session.sentiment_series.get(series_key, [])[-8:]
+    if not recent:
+        return fallback
+    # Prefer the most recent point so the UI tracks latest context promptly.
+    latest = float(recent[-1].get("valence", 0.0))
+    if abs(latest) >= 0.12:
+        return round(latest, 3)
+    # Soft decay toward neutral when the latest utterance is weak/neutral.
+    for score in (float(point.get("valence", 0.0)) for point in reversed(recent[:-1])):
         if abs(score) >= 0.2:
-            return round(score, 3)
-    return fallback
+            return round(score * 0.7 + latest * 0.3, 3)
+    return round(latest, 3)
 
 
 def _is_internal_speaker(speaker_role: str) -> bool:
@@ -574,15 +578,25 @@ def analyze_segment(
             series_key,
             session.last_ae_score,
         )
-        session.last_sales_rep_tone = _public_sales_rep_tone(sales_rep_tone)
+        # Always refresh tone cue when present; otherwise clear sticky negative labels
+        # after a calm/neutral turn so guidance tracks the latest context.
+        public_tone = _public_sales_rep_tone(sales_rep_tone)
+        if public_tone:
+            session.last_sales_rep_tone = public_tone
+        elif abs(sentiment["score"]) < 0.2:
+            session.last_sales_rep_tone = None
     else:
         session.last_customer_score = _latest_meaningful_sentiment_score(
             session,
             series_key,
             session.last_customer_score,
         )
-        if customer_sentiment:
-            session.last_customer_sentiment = _public_customer_sentiment(customer_sentiment)
+        public_customer = _public_customer_sentiment(customer_sentiment)
+        if public_customer:
+            session.last_customer_sentiment = public_customer
+        elif abs(sentiment["score"]) < 0.2 and session.segment_count % 3 == 0:
+            # Periodically drop sticky customer cues when tone has gone quiet.
+            session.last_customer_sentiment = None
 
     new_pains = _detect_pains(text, session, call_id, timestamp, speaker_role)
     shift = _detect_sentiment_shift(session, speaker_role, sentiment["score"], timestamp)

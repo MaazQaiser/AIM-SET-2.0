@@ -148,9 +148,9 @@ const LIVE_COMMON: SuggestedAction[] = [
   },
   {
     id: "live-kb",
-    label: "KB asset to show",
+    label: "Best case study",
     prompt:
-      "Which knowledge-base asset or case study best fits what the customer just said, and how should I introduce it?",
+      "Show the most relevant case studies and projects for this call from the knowledge base and projects library, then tell me how to introduce the top match.",
     category: "live",
   },
   {

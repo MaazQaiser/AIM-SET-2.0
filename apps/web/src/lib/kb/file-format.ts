@@ -83,5 +83,5 @@ export function kbSlideUrl(
 }
 
 export function isPresentationFormat(format: KbFileFormat): boolean {
-  return format === "ppt" || format === "pptx";
+  return format === "ppt" || format === "pptx" || format === "pdf";
 }

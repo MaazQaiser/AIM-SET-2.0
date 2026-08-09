@@ -155,14 +155,6 @@ export function PostDcReviewScreen({
         })
       : null;
   const displayedInternalEmailDraft = internalEmailDraft ?? fallbackInternalDraft ?? null;
-  const displayedJiraTicket =
-    jiraTicket ??
-    buildJiraTicketDraft({
-      accountName: call?.accountName ?? callId,
-      review: displayedReview,
-      tasks: taskList,
-      bant: call?.bant,
-    });
 
   const snapshot =
     accountSnapshot.length > 0
@@ -174,6 +166,15 @@ export function PostDcReviewScreen({
       call?.leadTitle ?? (preRecord ? preDcField(preRecord, "prospectPersona") : undefined),
     clientAttendees: brief?.clientAttendees,
   }), displayedReview);
+
+  const displayedJiraTicket =
+    jiraTicket ??
+    buildJiraTicketDraft({
+      accountName: call?.accountName ?? callId,
+      review: displayedReview,
+      tasks: taskList,
+      bant: resolvedBant,
+    });
 
   function handleApproveTasks(ids: string[]) {
     const approved = taskList.map((task) =>
@@ -477,25 +478,32 @@ function buildJiraTicketDraft({
 }): PostCallJiraTicket | null {
   if (!review && tasks.length === 0) return null;
 
-  const gaps = review?.openDiscoveryGaps ?? [];
-  const lowerGaps = gaps.map((gap) => gap.toLowerCase());
-  const coverage = review?.discoveryBantCoverage ?? 0;
+  const score = review?.bantScore;
   const bantSnapshot = Object.fromEntries(
     BANT_TICKET_KEYS.map((key) => {
+      const fromScore = normalizeBantStatus(score?.[key]);
+      if (fromScore) return [key, fromScore === "confirmed"];
       const explicitStatus = bant?.[key];
       if (explicitStatus) return [key, explicitStatus === "confirmed"];
-      if (lowerGaps.some((gap) => gap.includes(key))) return [key, false];
-      return [key, coverage >= 1 && gaps.length === 0];
+      return [key, false];
     })
   ) as PostCallJiraTicket["bantSnapshot"];
   const allBantConfirmed = BANT_TICKET_KEYS.every((key) => bantSnapshot[key]);
+  const coverage = review?.discoveryBantCoverage ?? 0;
 
   const summaryLines = jiraSafeLines([review?.headline, ...(review?.summary ?? [])], 4);
-  const needLines = jiraSafeLines(review?.summary ?? [], 4).filter((line) => !JIRA_TIMELINE_RE.test(line));
+  const needFromScore = score?.need?.value ? [score.need.value] : [];
+  const timelineFromScore = score?.timeline?.value ? [score.timeline.value] : [];
+  const needLines = jiraSafeLines(
+    [...needFromScore, ...(review?.summary ?? [])],
+    4
+  ).filter((line) => !JIRA_TIMELINE_RE.test(line));
   const timelineLines = jiraSafeLines(
-    [...(review?.summary ?? []), ...tasks.map((task) => task.description)],
+    [...timelineFromScore, ...(review?.summary ?? []), ...tasks.map((task) => task.description)],
     8
-  ).filter((line) => JIRA_TIMELINE_RE.test(line)).slice(0, 4);
+  )
+    .filter((line) => JIRA_TIMELINE_RE.test(line) || timelineFromScore.includes(line))
+    .slice(0, 4);
   const neededMaterials = jiraSafeLines(
     tasks
       .filter((task) => task.task_type === "content_request")

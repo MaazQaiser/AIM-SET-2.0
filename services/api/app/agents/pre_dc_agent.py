@@ -1220,6 +1220,8 @@ def run_pre_dc_pipeline(
 
     fields_blob = json.dumps(fields, ensure_ascii=False)
     total_tokens = 0
+    total_tokens_in = 0
+    total_tokens_out = 0
     total_cost = 0.0
     trace_id = str(uuid.uuid4())
     model_used = "heuristic"
@@ -1241,6 +1243,8 @@ def run_pre_dc_pipeline(
             else summary_completion.text.strip()
         )
         total_tokens += summary_completion.tokens_in + summary_completion.tokens_out
+        total_tokens_in += summary_completion.tokens_in
+        total_tokens_out += summary_completion.tokens_out
         total_cost += summary_completion.cost_usd
         trace_id = summary_completion.trace_id
         model_used = summary_completion.model
@@ -1255,6 +1259,8 @@ def run_pre_dc_pipeline(
         plan_json = _extract_json_block(plan_completion.text) or {}
         artifact_plan = plan_json.get("artifacts") or _heuristic_artifact_plan(fields)
         total_tokens += plan_completion.tokens_in + plan_completion.tokens_out
+        total_tokens_in += plan_completion.tokens_in
+        total_tokens_out += plan_completion.tokens_out
         total_cost += plan_completion.cost_usd
     else:
         ai_summary = _heuristic_summary(fields, account_name)
@@ -1287,6 +1293,8 @@ def run_pre_dc_pipeline(
         fulfill_json = _extract_json_block(fulfill_completion.text) or {}
         fulfillments = fulfill_json.get("fulfillment") or _fulfill_artifacts_heuristic(artifact_plan, hits)
         total_tokens += fulfill_completion.tokens_in + fulfill_completion.tokens_out
+        total_tokens_in += fulfill_completion.tokens_in
+        total_tokens_out += fulfill_completion.tokens_out
         total_cost += fulfill_completion.cost_usd
     else:
         fulfillments = _fulfill_artifacts_heuristic(artifact_plan, hits)
@@ -1401,7 +1409,13 @@ def run_pre_dc_pipeline(
         result=result,
         citations=citations,
         confidence=0.82,
-        cost={"tokens": total_tokens, "usd": total_cost, "model": model_used},
+        cost={
+            "tokens": total_tokens,
+            "tokens_in": total_tokens_in,
+            "tokens_out": total_tokens_out,
+            "usd": total_cost,
+            "model": model_used,
+        },
         trace_id=trace_id,
     )
     validate_envelope(envelope)

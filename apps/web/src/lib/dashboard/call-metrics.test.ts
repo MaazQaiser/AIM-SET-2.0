@@ -47,7 +47,7 @@ describe("formatOpportunityValue", () => {
 });
 
 describe("todaysOpenCalls", () => {
-  it("uses discovery date/time columns for today filtering", () => {
+  it("uses discovery date/time columns for today filtering in PKT", () => {
     const calls = [
       call({
         id: "today",
@@ -66,8 +66,23 @@ describe("todaysOpenCalls", () => {
       }),
     ];
 
+    // 2026-06-08 05:00 UTC == 2026-06-08 10:00 PKT
     expect(todaysOpenCalls(calls, new Date("2026-06-08T05:00:00.000Z")).map((c) => c.id)).toEqual([
       "today",
     ]);
+  });
+
+  it("keeps late-evening PKT calls on the correct PKT calendar day", () => {
+    const calls = [
+      call({
+        id: "evening",
+        discoveryCallDatePkt: "06/08/2026",
+        discoveryCallTimePkt: "11:30 PM",
+      }),
+    ];
+    // 2026-06-08 20:00 UTC == 2026-06-09 01:00 PKT — still should match 06/08 when day is that PKT date
+    expect(
+      todaysOpenCalls(calls, new Date("2026-06-08T10:00:00.000Z")).map((c) => c.id)
+    ).toEqual(["evening"]);
   });
 });

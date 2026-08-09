@@ -40,6 +40,57 @@ HANDOFF_SENTIMENT_SIGNAL_LIMIT = 30
 BANT_DIMENSIONS = ("budget", "authority", "need", "timeline")
 
 
+def _normalize_intent_update(
+    parsed: Dict[str, Any],
+    *,
+    call_id: str,
+    text: str,
+) -> Dict[str, Any]:
+    """Map LLM intent payloads onto the frontend IntentSnapshot shape and keep heuristic pains."""
+    raw = parsed if isinstance(parsed, dict) else {}
+    pains: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def add_pain(value: Any, *, confidence: float = 0.7, source: str = "llm") -> None:
+        if isinstance(value, dict):
+            phrase = str(value.get("text") or value.get("pain") or "").strip()
+            conf = float(value.get("confidence") or confidence)
+            src = str(value.get("source") or source)
+        else:
+            phrase = str(value or "").strip()
+            conf = confidence
+            src = source
+        if not phrase:
+            return
+        key = re.sub(r"\s+", " ", phrase.lower())[:80]
+        if key in seen:
+            return
+        seen.add(key)
+        pains.append(
+            {
+                "id": f"{call_id}-llm-pain-{len(pains)+1}",
+                "text": phrase[:160],
+                "source": src,
+                "confidence": conf,
+                "evidence": text[:200],
+            }
+        )
+
+    for item in raw.get("pains") or []:
+        add_pain(item, source="llm")
+    for item in raw.get("pain_points") or []:
+        add_pain(item, source="llm")
+
+    label = str(raw.get("intent_label") or raw.get("label") or "").strip()
+    direction = str(raw.get("call_direction") or raw.get("direction") or "").strip()
+    return {
+        "intent": {"label": label, "display": label.replace("_", " ").title() if label else ""},
+        "pains": pains,
+        "call_direction": direction,
+        "focus_areas": list(raw.get("focus_areas") or []),
+    }
+
+
 def _transcript_citation(call_id: str, snippet: str, confidence: float = 0.7) -> Citation:
     return Citation(
         source_type="transcript",
@@ -150,6 +201,8 @@ def _invoke_llm_json(
     parsed = _parse_json_block(completion.text)
     cost = {
         "tokens": completion.tokens_in + completion.tokens_out,
+        "tokens_in": completion.tokens_in,
+        "tokens_out": completion.tokens_out,
         "usd": completion.cost_usd,
         "model": completion.model,
         "trace_id": completion.trace_id,
@@ -310,12 +363,16 @@ def process_transcript_segment(
             intent_parsed, intent_cost = _invoke_llm_json(
                 runtime,
                 user=user,
-                schema_hint='{"intent_label":"","pain_points":[""],"call_direction":""}',
+                schema_hint=(
+                    '{"intent_label":"","pains":[{"text":"","confidence":0.7}],'
+                    '"call_direction":""}'
+                ),
             )
+            intent_result = _normalize_intent_update(intent_parsed, call_id=call_id, text=text)
             intent_env = AgentEnvelope(
                 agent="live-call",
                 operation="intent_update",
-                result=intent_parsed,
+                result=intent_result,
                 citations=[_transcript_citation(call_id, window or text)],
                 confidence=0.75,
                 cost=intent_cost,
@@ -323,7 +380,7 @@ def process_transcript_segment(
             )
             validate_envelope(intent_env)
             envelopes.append(intent_env)
-            state.intent_snapshot = intent_parsed
+            state.intent_snapshot = intent_result
 
     elif hits and state.nudge_count_in_window() < max_nudges:
         hit = hits[0]

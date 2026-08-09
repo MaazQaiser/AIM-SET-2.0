@@ -23,13 +23,54 @@ def test_get_relevant_content_returns_cached_brief_without_kb_search(monkeypatch
         {
             "callId": call_id,
             "relevantDocuments": [{"assetId": "a1", "title": "Deck", "relevanceScore": 0.9}],
-            "relevantProjects": [],
+            "relevantProjects": [{"id": "p1", "title": "Case study", "relevanceScore": 0.8}],
+            "recommendedDeck": {"assetId": "a1", "title": "Deck", "format": "pptx"},
         },
     )
 
     out = orch.get_relevant_content(ctx, call_id, refresh=False)
     assert out["cached"] is True
     assert out["relevantDocuments"][0]["title"] == "Deck"
+    assert out["relevantProjects"][0]["title"] == "Case study"
+
+
+def test_get_relevant_content_rebuilds_when_projects_empty(monkeypatch):
+    ctx = TenantContext(tenant_id="t-rel-empty-projects", user_id="u1")
+    call_id = "call-rel-empty-projects"
+    orch = Orchestrator()
+
+    clerk_key = ctx.tenant_id
+    get_memory_store().save_call_brief(
+        clerk_key,
+        call_id,
+        {
+            "callId": call_id,
+            "relevantDocuments": [{"assetId": "a1", "title": "Deck", "relevanceScore": 0.9}],
+            "relevantProjects": [],
+        },
+    )
+
+    monkeypatch.setattr(
+        "app.orchestrator.dispatcher.build_relevant_content",
+        lambda *_a, **_k: {
+            "relevantDocuments": [{"assetId": "a1", "title": "Deck", "relevanceScore": 0.9}],
+            "relevantProjects": [{"id": "p1", "title": "Rebuilt project", "relevanceScore": 0.7}],
+        },
+    )
+    monkeypatch.setattr(
+        orch,
+        "_pre_dc_fields_for_call",
+        lambda *_a, **_k: {"Company Name-PreDC": "Acme"},
+    )
+    monkeypatch.setattr(
+        orch.calls,
+        "get_call",
+        lambda *_a, **_k: {"accountName": "Acme"},
+    )
+
+    out = orch.get_relevant_content(ctx, call_id, refresh=False)
+    assert out["cached"] is False
+    assert out["relevantProjects"][0]["title"] == "Rebuilt project"
 
 
 def test_get_relevant_content_refresh_rebuilds(monkeypatch):

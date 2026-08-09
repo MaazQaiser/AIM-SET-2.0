@@ -61,6 +61,8 @@ async def _process_live_segment(
                 elapsed_seconds=elapsed_seconds,
         )
         for msg in out.get("ws_messages") or []:
+            if msg.get("early"):
+                continue
             await channel.broadcast(call_id, msg)
     except Exception:
         _logger.exception("live segment dispatch failed call_id=%s", call_id)

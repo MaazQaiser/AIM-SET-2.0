@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Label } from "@dc-copilot/ui/components/label";
-import { Input } from "@dc-copilot/ui/components/input";
-import type { AgentId, CostCapConfig, ModelPolicy } from "@/types/agents";
 import {
   COST_SCENARIOS,
   estimateLlmCostUsd,
   findModelPrice,
   formatUsd,
 } from "@/lib/agents/llm-pricing";
+import type { AgentId, CostCapConfig, ModelPolicy } from "@/types/agents";
+import { Input } from "@dc-copilot/ui/components/input";
+import { Label } from "@dc-copilot/ui/components/label";
+import { useEffect, useMemo, useState } from "react";
 
 interface CostCalculatorSectionProps {
   agentId: AgentId;
@@ -28,10 +28,11 @@ export function CostCalculatorSection({
   const [calls, setCalls] = useState(scenario.calls);
 
   useEffect(() => {
-    setInputTokens(scenario.inputPerCall);
-    setOutputTokens(scenario.outputPerCall);
-    setCalls(scenario.calls);
-  }, [agentId, scenario.inputPerCall, scenario.outputPerCall, scenario.calls]);
+    const next = COST_SCENARIOS[agentId] ?? COST_SCENARIOS.content;
+    setInputTokens(next.inputPerCall);
+    setOutputTokens(next.outputPerCall);
+    setCalls(next.calls);
+  }, [agentId]);
 
   const price = findModelPrice(modelPolicy.model_name);
   const perCall = useMemo(
@@ -47,9 +48,7 @@ export function CostCalculatorSection({
         <h3 className="type-panel-title">Cost calculator</h3>
         <p className="type-caption text-muted-foreground mt-1">
           Estimate LLM spend for the selected primary model. Formula:{" "}
-          <span className="font-mono">
-            (input × $/1M + output × $/1M) / 1,000,000
-          </span>
+          <span className="font-mono">(input × $/1M + output × $/1M) / 1,000,000</span>
         </p>
       </div>
 
@@ -58,9 +57,7 @@ export function CostCalculatorSection({
           <p className="type-body font-medium">{scenario.label}</p>
           <p className="type-caption font-mono text-muted-foreground">
             {modelPolicy.model_name}
-            {price
-              ? ` · $${price.inputPer1M}/1M in · $${price.outputPer1M}/1M out`
-              : ""}
+            {price ? ` · $${price.inputPer1M}/1M in · $${price.outputPer1M}/1M out` : ""}
           </p>
         </div>
         <p className="type-caption text-muted-foreground">{scenario.note}</p>
@@ -112,11 +109,7 @@ export function CostCalculatorSection({
           </div>
           <div>
             <p className="type-caption text-muted-foreground">Per-run ceiling</p>
-            <p
-              className={`type-body font-mono font-medium ${
-                overCap ? "text-destructive" : ""
-              }`}
-            >
+            <p className={`type-body font-mono font-medium ${overCap ? "text-destructive" : ""}`}>
               {formatUsd(costCap.per_run_ceiling_usd)}
               {overCap ? " · estimate over cap" : ""}
             </p>

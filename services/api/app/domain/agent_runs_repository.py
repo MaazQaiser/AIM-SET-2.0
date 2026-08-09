@@ -15,8 +15,24 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _payload_tokens(row: Dict[str, Any]) -> tuple[Optional[int], Optional[int]]:
+    payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+    tokens_in = row.get("tokens_in", payload.get("tokens_in") if payload else None)
+    tokens_out = row.get("tokens_out", payload.get("tokens_out") if payload else None)
+    try:
+        tin = int(tokens_in) if tokens_in is not None else None
+    except (TypeError, ValueError):
+        tin = None
+    try:
+        tout = int(tokens_out) if tokens_out is not None else None
+    except (TypeError, ValueError):
+        tout = None
+    return tin, tout
+
+
 def _normalize_run(row: Dict[str, Any]) -> Dict[str, Any]:
-    return {
+    tokens_in, tokens_out = _payload_tokens(row)
+    out: Dict[str, Any] = {
         "id": str(row.get("id", "")),
         "agent_id": row.get("agent_id", ""),
         "operation": row.get("operation", ""),
@@ -27,6 +43,11 @@ def _normalize_run(row: Dict[str, Any]) -> Dict[str, Any]:
         "model_used": row.get("model_used") or "",
         "created_at": row.get("created_at") or _now_iso(),
     }
+    if tokens_in is not None:
+        out["tokens_in"] = tokens_in
+    if tokens_out is not None:
+        out["tokens_out"] = tokens_out
+    return out
 
 
 class AgentRunsRepository:
@@ -73,6 +94,8 @@ class AgentRunsRepository:
         trace_id: str,
         cost_usd: float = 0.0,
         tokens_used: int = 0,
+        tokens_in: Optional[int] = None,
+        tokens_out: Optional[int] = None,
         model_used: str = "",
         status: str = "success",
         run_id: Optional[str] = None,
@@ -82,7 +105,13 @@ class AgentRunsRepository:
         tenant_uuid, clerk_key = resolve_kb_tenant(ctx)
         run_id = run_id or str(uuid.uuid4())
         created_at = _now_iso()
-        run = {
+        payload: Dict[str, Any] = {}
+        if tokens_in is not None:
+            payload["tokens_in"] = int(tokens_in)
+        if tokens_out is not None:
+            payload["tokens_out"] = int(tokens_out)
+
+        run: Dict[str, Any] = {
             "id": run_id,
             "agent_id": agent_id,
             "operation": operation,
@@ -92,7 +121,12 @@ class AgentRunsRepository:
             "tokens_used": int(tokens_used),
             "model_used": model_used or "",
             "created_at": created_at,
+            "payload": payload,
         }
+        if tokens_in is not None:
+            run["tokens_in"] = int(tokens_in)
+        if tokens_out is not None:
+            run["tokens_out"] = int(tokens_out)
 
         get_memory_store().add_agent_run(clerk_key, run)
 
@@ -110,7 +144,7 @@ class AgentRunsRepository:
                         "cost_usd": run["cost_usd"],
                         "tokens_used": run["tokens_used"],
                         "model_used": run["model_used"],
-                        "payload": {},
+                        "payload": payload,
                         "created_at": created_at,
                     }
                 ).execute()

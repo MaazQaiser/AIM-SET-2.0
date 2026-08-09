@@ -54,6 +54,27 @@ REP_QUESTION_RE = re.compile(
 )
 
 
+_TIMELINE_QUESTION_RE = re.compile(
+    r"\b(?:timeline|deadline|eta|go-?live|launch|kickoff|when|by when|timeframe|time frame|"
+    r"how soon|how quickly|target date|start date)\b",
+    re.I,
+)
+_TIMELINE_ANSWER_RE = re.compile(
+    r"\b(?:timeline|deadline|eta|q[1-4]|go-?live|launch|kickoff|within|by |before |"
+    r"next (?:week|month|quarter|year)|end of|asap|soon|urgent|friday|monday|"
+    r"\d+\s+(?:days?|weeks?|months?)|move quickly)\b",
+    re.I,
+)
+
+
+def _is_timeline_restatement(events: List[Dict[str, Any]], index: int, text: str) -> bool:
+    """True when an AE line restates a timeline answer after a timeline question."""
+    if not _TIMELINE_ANSWER_RE.search(text):
+        return False
+    lookback = events[max(0, index - 6) : index]
+    return any(_TIMELINE_QUESTION_RE.search(_event_text(event)) for event in lookback)
+
+
 def _discovery_context_text(
     events: List[Dict[str, Any]],
     fallback: str,
@@ -68,26 +89,32 @@ def _discovery_context_text(
     if strict_roles and latest_role not in CUSTOMER_LIKE_ROLES:
         return fallback
 
-    latest_offset = _float_or_zero(latest.get("offset_seconds"))
+    latest_offset = _float_or_zero(latest.get("offset_seconds") or latest.get("timestamp"))
     latest_speaker = str(latest.get("speaker_id") or latest.get("speaker_name") or "")
     fallback_text = fallback.strip()
     parts: List[str] = [fallback_text] if fallback_text else []
 
-    for event in events[-8:]:
-        role = str(event.get("speaker_role") or "").lower()
+    for event in events[-12:]:
+        role = str(event.get("speaker_role") or event.get("speakerRole") or "").lower()
         if strict_roles and role not in CUSTOMER_LIKE_ROLES:
             continue
-        if latest_offset and latest_offset - _float_or_zero(event.get("offset_seconds")) > 14:
+        if latest_offset and latest_offset - _float_or_zero(
+            event.get("offset_seconds") or event.get("timestamp")
+        ) > 45:
             continue
         speaker = str(event.get("speaker_id") or event.get("speaker_name") or "")
+        # Prefer same speaker, but allow nearby customer lines in the window.
         if latest_speaker and speaker and speaker != latest_speaker:
-            continue
+            if latest_offset and latest_offset - _float_or_zero(
+                event.get("offset_seconds") or event.get("timestamp")
+            ) > 20:
+                continue
         text = str(event.get("text") or "").strip()
         if text and text != fallback_text:
             parts.append(text)
 
     context = " ".join(parts).strip()
-    return context[:360] if context else fallback
+    return context[:720] if context else fallback
 
 
 def _event_offset_seconds(event: Dict[str, Any]) -> float:
@@ -127,15 +154,21 @@ def _replay_discovery_from_transcript(state: Any, transcript_events: List[Dict[s
         text = _event_text(event)
         if not text:
             continue
-        strict_roles = has_customer_like_events
-        if strict_roles and not _is_customer_like_event(event):
+        is_customer = _is_customer_like_event(event)
+        is_ae_timeline = (
+            has_customer_like_events
+            and not is_customer
+            and _is_timeline_restatement(ordered, index, text)
+        )
+        strict_roles = has_customer_like_events and not is_ae_timeline
+        if strict_roles and not is_customer:
             continue
-        if not strict_roles and not _is_bant_replay_candidate(event):
+        if not has_customer_like_events and not _is_bant_replay_candidate(event):
             continue
         context_text = _discovery_context_text(
             ordered[: index + 1],
             text,
-            strict_roles=strict_roles,
+            strict_roles=strict_roles and not is_ae_timeline,
         )
         replayed, _, _ = update_checklist_from_segment(
             replayed,
@@ -233,7 +266,8 @@ class Orchestrator:
             documents = existing.get("relevantDocuments") or []
             projects = existing.get("relevantProjects") or []
             deck = existing.get("recommendedDeck")
-            if documents or deck:
+            # Require both docs/deck and projects before treating cache as complete.
+            if (documents or deck) and projects:
                 return {
                     "relevantDocuments": documents,
                     "relevantProjects": projects,
@@ -760,6 +794,8 @@ class Orchestrator:
     def _log_run(self, ctx: TenantContext, envelope: Any) -> None:
         cost = envelope.cost if isinstance(envelope.cost, dict) else {}
         try:
+            tokens_in = cost.get("tokens_in")
+            tokens_out = cost.get("tokens_out")
             get_agent_runs_repository().append_run(
                 ctx,
                 agent_id=envelope.agent,
@@ -767,6 +803,8 @@ class Orchestrator:
                 trace_id=envelope.trace_id,
                 cost_usd=float(cost.get("usd", 0) or 0),
                 tokens_used=int(cost.get("tokens", 0) or 0),
+                tokens_in=int(tokens_in) if tokens_in is not None else None,
+                tokens_out=int(tokens_out) if tokens_out is not None else None,
                 model_used=str(cost.get("model", "") or ""),
             )
         except Exception:

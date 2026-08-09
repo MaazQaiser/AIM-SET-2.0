@@ -53,7 +53,7 @@ export function AgentConfigPageClient({ agentId, label }: AgentConfigPageClientP
         <div>
           <h1 className="type-page-title">{label} — Configuration</h1>
           <p className="mt-1 type-body-sm text-muted-foreground">
-            Switch models, edit prompts and guardrails, set cost caps, and estimate run spend. Settings are saved per tenant and apply on the next agent run.
+            Model, prompt, and guardrails — plus live usage (input/output tokens and dollar cost) across users in your workspace. Settings apply on the next agent run.
           </p>
         </div>
       </PageHeader>

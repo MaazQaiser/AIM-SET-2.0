@@ -638,6 +638,8 @@ def run_content_plan(
     model_name = "rule-based-plan"
     cost_usd = 0.0
     tokens = 0
+    tokens_in = 0
+    tokens_out = 0
 
     if settings.openai_configured:
         system = load_prompt("content/plan/v1.0.0.md")
@@ -687,6 +689,8 @@ def run_content_plan(
             model_name = completion.model
             cost_usd = completion.cost_usd
             tokens = completion.tokens_in + completion.tokens_out
+            tokens_in = completion.tokens_in
+            tokens_out = completion.tokens_out
         except Exception:
             pass
 
@@ -743,7 +747,13 @@ def run_content_plan(
         result={"suggestion_plan": suggestion_plan, "slide_outline": slide_plan_to_outline(slide_plan)},
         citations=citations,
         confidence=0.88 if evidence_projects or evidence_kb else 0.72,
-        cost={"tokens": tokens, "usd": cost_usd, "model": model_name},
+        cost={
+            "tokens": tokens,
+            "tokens_in": tokens_in,
+            "tokens_out": tokens_out,
+            "usd": cost_usd,
+            "model": model_name,
+        },
         trace_id=str(uuid.uuid4()),
         creative=True,
     )

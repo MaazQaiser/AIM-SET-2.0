@@ -14,13 +14,20 @@ const LABEL_TO_KEY: Record<string, keyof BANTScore> = {
   Timeline: "timeline",
 };
 
-function evidenceFromLearned(
-  learned: PostCallReview["learned"]
+function evidenceFromReview(
+  review: PostCallReview
 ): Partial<Record<keyof BANTScore, string>> {
   const out: Partial<Record<keyof BANTScore, string>> = {};
-  for (const item of learned ?? []) {
+  const score = review.bantScore;
+  if (score) {
+    for (const key of ["budget", "authority", "need", "timeline"] as const) {
+      const value = score[key]?.value?.trim();
+      if (value) out[key] = value;
+    }
+  }
+  for (const item of review.learned ?? []) {
     const key = LABEL_TO_KEY[item.label];
-    if (key && item.note && item.note !== "—") {
+    if (key && item.note && item.note !== "—" && !out[key]) {
       out[key] = item.note;
     }
   }
@@ -32,6 +39,11 @@ function needItemsFromReview(
   evidence: Partial<Record<keyof BANTScore, string>>
 ): string[] {
   const items: string[] = [];
+
+  const scoreNeed = review.bantScore?.need?.value?.trim();
+  if (scoreNeed) {
+    items.push(...splitNeedText(scoreNeed));
+  }
 
   for (const item of review.learned ?? []) {
     if (item.label === "Need" && item.note && item.note !== "—") {
@@ -56,7 +68,7 @@ interface PostDcBantPanelProps {
 }
 
 export function PostDcBantPanel({ bant, review }: PostDcBantPanelProps) {
-  const evidence = evidenceFromLearned(review.learned);
+  const evidence = evidenceFromReview(review);
   const needItems = needItemsFromReview(review, evidence);
   const coverage = review.discoveryBantCoverage;
   const openGaps = review.openDiscoveryGaps ?? [];

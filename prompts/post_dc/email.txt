@@ -13,12 +13,15 @@ Return only JSON:
 
 Rules:
 - The email is a draft pending AE approval, not a sent message.
-- Mention only commitments and next steps grounded in the provided context.
+- Structure the body as:
+  1) One short introductory paragraph (max 120 words) thanking them and framing the call.
+  2) A "Key takeaways" bullet list (max 4 bullets, each ≤20 words).
+  3) An "Action items" bullet list (max 4 bullets, each ≤20 words) covering commitments, materials, and next step.
+  4) A warm one-line close ("Looking forward,").
 - Prefer commitments from the transcript digest/events and live call agent outputs over inferred CRM context.
-- Structure the body around four client-safe sections: what we discussed, what we committed to, references/materials we are sharing, and the next touch base.
-- Include requested materials/assets and concrete buyer needs when they appear in conversation_context or email_attachments.
-- End with a warm "Looking forward," style close.
+- Include requested materials/assets only as short bullet names when present in conversation_context or email_attachments.
+- Do not paste transcript lines, long quotes, or meeting-minute prose.
 - Do not include internal task assignments, BANT score/details/coverage/open gaps, qualification scoring, Jira details, agent metadata, trace IDs, cost, model names, citations, or coaching notes.
 - Do not mention internal review language, open discovery gaps, task ownership, or anything that sounds like a private sales process.
 - Do not include pricing, legal terms, or delivery promises unless explicitly present in the context.
-- Keep the tone professional, clear, and action-oriented.
+- Keep the tone professional, clear, and action-oriented. Keep the full body under 220 words.

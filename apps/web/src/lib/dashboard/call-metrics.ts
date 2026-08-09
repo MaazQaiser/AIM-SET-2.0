@@ -1,5 +1,5 @@
-import { isSameDay, startOfDay } from "date-fns";
-import { parseDiscoveryDateTime } from "@/lib/dc-notes/parse-discovery";
+import { startOfDay } from "date-fns";
+import { isSamePktDay, parseDiscoveryDateTime, toPktParts } from "@/lib/dc-notes/parse-discovery";
 import type { Call } from "@/types";
 
 export function isOpenCall(call: Call): boolean {
@@ -19,7 +19,7 @@ export function callScheduleDate(call: Call): Date {
 
 export function isCallOnDay(call: Call, day: Date = new Date()): boolean {
   const at = callScheduleDate(call);
-  return Number.isFinite(at.getTime()) && isSameDay(at, startOfDay(day));
+  return Number.isFinite(at.getTime()) && isSamePktDay(at, day);
 }
 
 export function todaysOpenCalls(calls: Call[], day: Date = new Date()): Call[] {
@@ -29,13 +29,21 @@ export function todaysOpenCalls(calls: Call[], day: Date = new Date()): Call[] {
 }
 
 export function upcomingOpenCalls(calls: Call[], day: Date = new Date()): Call[] {
-  const floor = startOfDay(day).getTime();
+  const floorParts = toPktParts(startOfDay(day));
   return calls
     .filter((call) => {
       if (!isOpenCall(call)) return false;
       const at = callScheduleDate(call);
       if (!Number.isFinite(at.getTime())) return false;
-      return call.status === "live" || at.getTime() >= floor;
+      if (call.status === "live") return true;
+      const parts = toPktParts(at);
+      if (parts.year !== floorParts.year || parts.month !== floorParts.month) {
+        return (
+          parts.year > floorParts.year ||
+          (parts.year === floorParts.year && parts.month > floorParts.month)
+        );
+      }
+      return parts.day >= floorParts.day;
     })
     .sort((a, b) => callScheduleDate(a).getTime() - callScheduleDate(b).getTime());
 }

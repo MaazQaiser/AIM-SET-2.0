@@ -30,10 +30,15 @@ BANT_LABELS = {
     "next_step": "Next step",
 }
 
-TRANSCRIPT_DIGEST_LIMIT = 220
-TRANSCRIPT_DIGEST_HEAD = 40
+TRANSCRIPT_DIGEST_LIMIT = 80
+TRANSCRIPT_DIGEST_HEAD = 20
 TRANSCRIPT_EXCERPT_LIMIT = 12
 LIVE_SUGGESTION_LIMIT = 80
+EMAIL_INTRO_MAX_WORDS = 120
+EMAIL_BULLET_MAX = 6
+EMAIL_BULLET_MAX_WORDS = 20
+EMAIL_BODY_MAX_WORDS = 220
+CONTEXT_PHRASE_MAX_CHARS = 120
 
 
 def load_prompt(rel_path: str) -> str:
@@ -689,6 +694,84 @@ def _asset_requests_from_sentence(sentence: Dict[str, Any]) -> List[Dict[str, An
     return out[:4]
 
 
+def _distill_phrase(value: Any, *, max_chars: int = CONTEXT_PHRASE_MAX_CHARS) -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if not text:
+        return ""
+    # Prefer first clause / sentence fragment for short bullets.
+    for sep in (". ", "; ", " — ", " - "):
+        if sep in text:
+            text = text.split(sep, 1)[0].strip()
+            break
+    words = text.split()
+    if len(words) > EMAIL_BULLET_MAX_WORDS:
+        text = " ".join(words[:EMAIL_BULLET_MAX_WORDS])
+    if len(text) > max_chars:
+        text = text[: max_chars - 1].rstrip() + "…"
+    return text.rstrip(".")
+
+
+def _distill_conversation_context(context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    raw = context or {}
+
+    def distill_items(items: Any, *, key: str = "text", limit: int = 4) -> List[Dict[str, Any]]:
+        out: List[Dict[str, Any]] = []
+        seen: set[str] = set()
+        for item in items or []:
+            if not isinstance(item, dict):
+                continue
+            phrase = _distill_phrase(item.get(key) or item.get("name") or item.get("text"))
+            norm = phrase.lower()
+            if not phrase or norm in seen:
+                continue
+            seen.add(norm)
+            next_item = dict(item)
+            if key in next_item or "text" in next_item:
+                next_item["text"] = phrase
+            if "name" in next_item:
+                next_item["name"] = _distill_phrase(next_item.get("name"), max_chars=80)
+            out.append(next_item)
+            if len(out) >= limit:
+                break
+        return out
+
+    return {
+        "needs": distill_items(raw.get("needs"), key="text", limit=4),
+        "requestedAssets": distill_items(raw.get("requestedAssets"), key="name", limit=4),
+        "nextSteps": distill_items(raw.get("nextSteps"), key="text", limit=4),
+        "objectionsOrRisks": distill_items(raw.get("objectionsOrRisks"), key="text", limit=3),
+        "focusAreas": [str(item).strip() for item in (raw.get("focusAreas") or []) if str(item).strip()][:4],
+        "topKeywords": [str(item).strip() for item in (raw.get("topKeywords") or []) if str(item).strip()][:6],
+    }
+
+
+def _trim_email_body(body: str) -> str:
+    text = (body or "").strip()
+    if not text:
+        return text
+    words = text.split()
+    if len(words) <= EMAIL_BODY_MAX_WORDS:
+        return text
+    # Prefer keeping intro + bullets by truncating trailing paragraphs.
+    parts = re.split(r"\n\s*\n", text)
+    kept: List[str] = []
+    count = 0
+    for part in parts:
+        part_words = part.split()
+        if count and count + len(part_words) > EMAIL_BODY_MAX_WORDS:
+            break
+        kept.append(part)
+        count += len(part_words)
+        if count >= EMAIL_BODY_MAX_WORDS:
+            break
+    trimmed = "\n\n".join(kept).strip()
+    if not trimmed:
+        trimmed = " ".join(words[:EMAIL_BODY_MAX_WORDS])
+    if not trimmed.endswith((".", "!", "?")):
+        trimmed = trimmed.rstrip(",;:") + "."
+    return trimmed
+
+
 def _conversation_context(
     transcript_events: Optional[List[Dict[str, Any]]],
     live_snapshot: Optional[Dict[str, Any]],
@@ -716,14 +799,16 @@ def _conversation_context(
         for item in ((live_snapshot or {}).get("top_keywords") or [])
         if isinstance(item, dict) and str(item.get("term") or "").strip()
     ]
-    return {
-        "needs": _dedupe_context_items(needs, limit=8),
-        "requestedAssets": _dedupe_context_items(requested_assets, key="name", limit=8),
-        "nextSteps": _dedupe_context_items(next_steps, limit=8),
-        "objectionsOrRisks": _dedupe_context_items(objections, limit=6),
-        "focusAreas": focus_areas[:6],
-        "topKeywords": top_keywords[:10],
-    }
+    return _distill_conversation_context(
+        {
+            "needs": _dedupe_context_items(needs, limit=8),
+            "requestedAssets": _dedupe_context_items(requested_assets, key="name", limit=8),
+            "nextSteps": _dedupe_context_items(next_steps, limit=8),
+            "objectionsOrRisks": _dedupe_context_items(objections, limit=6),
+            "focusAreas": focus_areas[:6],
+            "topKeywords": top_keywords[:10],
+        }
+    )
 
 
 def _kb_search(ctx: TenantContext, query: str, limit: int = 4) -> Tuple[List[Dict[str, Any]], str]:
@@ -1115,71 +1200,74 @@ def _client_email_fallback(
     email_attachments: Dict[str, List[Dict[str, Any]]],
     conversation_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
+    del gaps  # never expose internal gaps to client email
     next_step = _client_safe_next_step(summary.get("nextStepProposal"))
-    bullets = _client_safe_lines(summary.get("summary") or [])
-    client_commitments = _client_safe_lines(commitments)
-    requested_assets = [
-        str(item.get("name") or "").strip()
-        for item in (conversation_context or {}).get("requestedAssets", [])
-        if str(item.get("name") or "").strip()
-    ]
-    needs = [
-        str(item.get("text") or "").strip()
-        for item in (conversation_context or {}).get("needs", [])
-        if str(item.get("text") or "").strip()
-    ]
-    next_steps = [
-        str(item.get("text") or "").strip()
-        for item in (conversation_context or {}).get("nextSteps", [])
-        if str(item.get("text") or "").strip()
-    ]
-    discussion_lines = _client_safe_lines([*needs[:3], *next_steps[:2], *bullets[:4]])
-    if discussion_lines:
-        deduped_lines: List[str] = []
-        seen_lines: set[str] = set()
-        for line in discussion_lines:
-            key = re.sub(r"\s+", " ", line).strip().lower()
-            if not key or key in seen_lines:
-                continue
-            seen_lines.add(key)
-            deduped_lines.append(line)
-        discussion_lines = deduped_lines
+    takeaways = [
+        _distill_phrase(line)
+        for line in _client_safe_lines(
+            [
+                *(summary.get("summary") or []),
+                *[
+                    item.get("text")
+                    for item in (conversation_context or {}).get("needs", [])
+                    if isinstance(item, dict)
+                ],
+            ]
+        )
+        if _distill_phrase(line)
+    ][:4]
+    actions = [
+        _distill_phrase(line)
+        for line in _client_safe_lines(
+            [
+                *commitments,
+                *[
+                    item.get("name")
+                    for item in (conversation_context or {}).get("requestedAssets", [])
+                    if isinstance(item, dict)
+                ],
+                *[
+                    item.get("text")
+                    for item in (conversation_context or {}).get("nextSteps", [])
+                    if isinstance(item, dict)
+                ],
+                next_step,
+                *[
+                    item.get("name")
+                    for item in email_attachments.get("found", [])
+                    if isinstance(item, dict)
+                ],
+            ]
+        )
+        if _distill_phrase(line)
+    ][:4]
+    if not actions:
+        actions = [_distill_phrase(next_step) or "Confirm next steps"]
     body_lines = [
         "Hi,",
         "",
-        "Thank you for the time today. I appreciated the discussion and the context your team shared.",
+        (
+            f"Thank you for the time today with {account_name}. "
+            "I appreciated the discussion and wanted to share a brief recap with clear next steps."
+        ),
+        "",
+        "Key takeaways:",
+        *(f"- {item}" for item in (takeaways or ["Discovery discussion captured key needs and priorities."])),
+        "",
+        "Action items:",
+        *(f"- {item}" for item in actions),
+        "",
+        "Looking forward,",
     ]
-    if discussion_lines:
-        body_lines.append("")
-        body_lines.append("Minutes of meeting:")
-        body_lines.extend(f"- {str(item).rstrip('.')}" for item in discussion_lines[:5])
-    elif needs:
-        body_lines.append("")
-        body_lines.append("Minutes of meeting:")
-        body_lines.extend(f"- {item}" for item in needs[:3])
-    if requested_assets:
-        body_lines.append("")
-        body_lines.append("Materials we discussed:")
-        body_lines.extend(f"- {item}" for item in requested_assets[:4])
-    ready_attachments = [str(item.get("name") or "").strip() for item in email_attachments.get("found", []) if str(item.get("name") or "").strip()]
-    if ready_attachments:
-        body_lines.append("")
-        body_lines.append("I will include the following attachments:")
-        body_lines.extend(f"- {item}" for item in ready_attachments[:4])
-    if client_commitments:
-        body_lines.append("")
-        body_lines.append("What we committed to:")
-        body_lines.extend(f"- {item}" for item in client_commitments[:4])
-    body_lines.extend(["", next_step, "", "Looking forward,"])
     return {
         "id": f"email-{call_safe_id(account_name)}",
         "audience": "client",
         "to": recipients,
         "cc": [],
         "subject": f"Follow-up from our {account_name} discovery call",
-        "body_markdown": "\n".join(body_lines),
+        "body_markdown": _trim_email_body("\n".join(body_lines)),
         "style_signals": ["concise", "consultative", "action-oriented"],
-        "commitments_referenced": client_commitments,
+        "commitments_referenced": actions[:3],
         "status": "draft_pending_approval",
     }
 
@@ -1672,14 +1760,14 @@ JIRA_FINANCIAL_RE = re.compile(
 
 JIRA_TIMELINE_RE = re.compile(
     r"\b(?:timeline|pilot|poc|proof of concept|launch|go-live|production|readout|"
-    r"next step|follow up|schedule|meeting|workshop|proposal|by|before|after|q[1-4]|"
-    r"week|month|date|deadline)\b",
+    r"deadline|eta|kickoff|rollout|q[1-4]|within \d+|by (?:end|friday|monday|q[1-4])|"
+    r"end of (?:the )?month|next (?:week|month|quarter))\b",
     re.I,
 )
 
 
 def _jira_safe_line(value: Any) -> str:
-    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    text = _distill_phrase(value)
     if not text or JIRA_FINANCIAL_RE.search(text):
         return ""
     return text
@@ -1707,52 +1795,55 @@ def _jira_description(
     task_list: List[Dict[str, Any]],
     conversation_context: Optional[Dict[str, Any]],
 ) -> str:
-    summary_lines = _jira_safe_lines(
-        [summary.get("headline"), *(summary.get("summary") or [])],
+    intro = _distill_phrase(
+        summary.get("headline") or f"{account_name} post-discovery follow-up.",
+        max_chars=180,
+    )
+    takeaways = _jira_safe_lines(
+        [*(summary.get("summary") or []), *[
+            item.get("text")
+            for item in (conversation_context or {}).get("needs", [])
+            if isinstance(item, dict)
+        ]],
         limit=4,
     )
-    needs = _jira_safe_lines(
-        [item.get("text") for item in (conversation_context or {}).get("needs", []) if isinstance(item, dict)],
-        limit=4,
+    timeline_lines = _jira_safe_lines(
+        [
+            item.get("text")
+            for item in (conversation_context or {}).get("nextSteps", [])
+            if isinstance(item, dict) and JIRA_TIMELINE_RE.search(str(item.get("text") or ""))
+        ],
+        limit=3,
     )
     requested_assets = _jira_safe_lines(
         [item.get("name") for item in (conversation_context or {}).get("requestedAssets", []) if isinstance(item, dict)],
-        limit=4,
+        limit=3,
     )
-    next_steps_source = [
-        item.get("text")
-        for item in (conversation_context or {}).get("nextSteps", [])
-        if isinstance(item, dict)
-    ]
-    next_steps_source.extend(task.get("description") for task in task_list)
-    timeline_lines = [
-        line
-        for line in _jira_safe_lines(next_steps_source, limit=8)
-        if JIRA_TIMELINE_RE.search(line)
-    ][:4]
     action_items = _jira_safe_lines(
-        [task.get("description") for task in task_list],
-        limit=6,
+        [
+            *[task.get("description") for task in task_list],
+            *[
+                item.get("text")
+                for item in (conversation_context or {}).get("nextSteps", [])
+                if isinstance(item, dict)
+            ],
+        ],
+        limit=4,
     )
 
     sections = [
-        "Client summary:",
-        *(f"- {line}" for line in (summary_lines or [f"{account_name} post-discovery follow-up."])),
+        intro or f"{account_name} post-discovery follow-up.",
         "",
-        "Client details / needs:",
-        *(f"- {line}" for line in (needs or ["Confirm the client needs captured in the discovery call."])),
+        "Key takeaways:",
+        *(f"- {line}" for line in (takeaways or ["Confirm needs captured in the discovery call."])),
+        "",
+        "Action items:",
+        *(f"- {line}" for line in (action_items or ["Assign owner for the next client follow-up."])),
     ]
     if timeline_lines:
-        sections.extend(["", "Timeline / POC:", *(f"- {line}" for line in timeline_lines)])
+        sections.extend(["", "Timeline:", *(f"- {line}" for line in timeline_lines)])
     if requested_assets:
-        sections.extend(["", "Needed materials:", *(f"- {line}" for line in requested_assets)])
-    sections.extend(
-        [
-            "",
-            "Action items:",
-            *(f"- {line}" for line in (action_items or ["Assign owner for the next client follow-up."])),
-        ]
-    )
+        sections.extend(["", "Materials:", *(f"- {line}" for line in requested_assets)])
     return "\n".join(sections)
 
 
@@ -1938,6 +2029,28 @@ def _deal_signals(
     }
 
 
+def _canonical_bant_snapshot(
+    discovery_snapshot: Optional[Dict[str, Any]],
+    post_dc_record: Optional[Dict[str, Any]] = None,
+    transcript_events: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, str]:
+    """Single BANT status source for Post-DC review and Jira (confirmed/partial/unknown)."""
+    score = _bant_score(discovery_snapshot, post_dc_record, transcript_events)
+    out: Dict[str, str] = {}
+    for dim in ("budget", "authority", "need", "timeline"):
+        item = score.get(dim) if isinstance(score.get(dim), dict) else {}
+        status = str((item or {}).get("status") or "unknown")
+        if status not in ("confirmed", "partial", "unknown"):
+            status = "unknown"
+        out[dim] = status
+    return out
+
+
+def _bant_snapshot_booleans(statuses: Dict[str, str]) -> Dict[str, bool]:
+    """Jira chip contract: true when dimension is confirmed (matches Post-DC confirmed)."""
+    return {dim: statuses.get(dim) == "confirmed" for dim in ("budget", "authority", "need", "timeline")}
+
+
 def _jira_ticket(
     call_id: str,
     account_name: str,
@@ -1949,13 +2062,12 @@ def _jira_ticket(
     task_list: List[Dict[str, Any]],
     cfg: Dict[str, Any],
     conversation_context: Optional[Dict[str, Any]] = None,
+    transcript_events: Optional[List[Dict[str, Any]]] = None,
 ) -> Optional[Dict[str, Any]]:
-    progression = _bant_progression(discovery_snapshot)
-    after = progression.get("after") if isinstance(progression.get("after"), dict) else {}
-    bant_snapshot = {
-        dim: after.get(dim) == "confirmed"
-        for dim in ("budget", "authority", "need", "timeline")
-    }
+    bant_statuses = _canonical_bant_snapshot(
+        discovery_snapshot, post_dc_record, transcript_events
+    )
+    bant_snapshot = _bant_snapshot_booleans(bant_statuses)
     is_qualified = all(bant_snapshot.values())
     if not is_qualified:
         return None
@@ -1988,6 +2100,7 @@ def _jira_ticket(
         "labels": labels,
         "projectKey": project_key,
         "bantSnapshot": bant_snapshot,
+        "bantStatuses": bant_statuses,
         "callId": call_id,
     }
 
@@ -2155,6 +2268,8 @@ def run_post_dc_pipeline(
     }
 
     total_tokens = 0
+    total_tokens_in = 0
+    total_tokens_out = 0
     total_cost = 0.0
     trace_id = str(uuid.uuid4())
     model_used = "heuristic"
@@ -2173,6 +2288,8 @@ def run_post_dc_pipeline(
         )
         summary_json = _extract_json_block(completion.text) or {}
         total_tokens += completion.tokens_in + completion.tokens_out
+        total_tokens_in += completion.tokens_in
+        total_tokens_out += completion.tokens_out
         total_cost += completion.cost_usd
         trace_id = completion.trace_id
         model_used = completion.model
@@ -2226,6 +2343,8 @@ def run_post_dc_pipeline(
         )
         email_json = _extract_json_block(completion.text) or {}
         total_tokens += completion.tokens_in + completion.tokens_out
+        total_tokens_in += completion.tokens_in
+        total_tokens_out += completion.tokens_out
         total_cost += completion.cost_usd
 
     if not email_json:
@@ -2250,6 +2369,7 @@ def run_post_dc_pipeline(
     raw_body = str(email_json.get("body_markdown") or email_json.get("body") or "")
     if not raw_body or not _client_safe_text(raw_body):
         raw_body = str(client_fallback_email.get("body_markdown") or "")
+    raw_body = _trim_email_body(raw_body)
     raw_subject = str(email_json.get("subject") or f"Follow-up from our {account_name} discovery call")
     if not _client_safe_text(raw_subject):
         raw_subject = f"Follow-up from our {account_name} discussion"
@@ -2301,6 +2421,8 @@ def run_post_dc_pipeline(
         if isinstance(parsed_scorecard, list) and parsed_scorecard:
             scorecard = _normalize_scorecard_rows(parsed_scorecard, pod_talk_time)
         total_tokens += completion.tokens_in + completion.tokens_out
+        total_tokens_in += completion.tokens_in
+        total_tokens_out += completion.tokens_out
         total_cost += completion.cost_usd
     else:
         scorecard = _normalize_scorecard_rows(scorecard, pod_talk_time)
@@ -2346,6 +2468,7 @@ def run_post_dc_pipeline(
         task_list=task_list,
         cfg=cfg,
         conversation_context=conversation_context,
+        transcript_events=transcript_events,
     )
 
     citations = _citations(
@@ -2383,7 +2506,13 @@ def run_post_dc_pipeline(
         },
         citations=citations,
         confidence=0.82,
-        cost={"tokens": total_tokens, "usd": total_cost, "model": model_used},
+        cost={
+            "tokens": total_tokens,
+            "tokens_in": total_tokens_in,
+            "tokens_out": total_tokens_out,
+            "usd": total_cost,
+            "model": model_used,
+        },
         trace_id=trace_id,
     )
     validate_envelope(envelope)

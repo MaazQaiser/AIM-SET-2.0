@@ -288,6 +288,10 @@ export interface AgentRun {
   outcome: RunOutcome;
   cost_usd: number;
   tokens_used: number;
+  /** Prompt / input tokens when recorded; may be estimated in UI for older runs. */
+  tokens_in?: number;
+  /** Completion / output tokens when recorded; may be estimated in UI for older runs. */
+  tokens_out?: number;
   model_used: string;
   operation: string;
   trace_id: string;

@@ -278,6 +278,8 @@ async def poll_transcript(
                     elapsed_seconds=int(ev.get("offset_seconds", 0)),
                 )
                 for msg in result.get("ws_messages") or []:
+                    if msg.get("early"):
+                        continue
                     await channel.broadcast(call_id, msg)
             except Exception:
                 pass

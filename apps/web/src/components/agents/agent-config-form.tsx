@@ -4,21 +4,13 @@ import { useEffect, useState } from "react";
 import { Save, RotateCcw } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Label } from "@dc-copilot/ui/components/label";
-import { Input } from "@dc-copilot/ui/components/input";
 import { Separator } from "@dc-copilot/ui/components/separator";
 import { ModelPolicyBadge } from "./model-policy-badge";
-import { NudgeThrottleControl } from "./nudge-throttle-control";
-import { SignalRoutingTable } from "./signal-routing-table";
 import { WorkflowAgentConfigSections } from "./workflow-agent-config-sections";
 import { GuardrailsConfigSection } from "./guardrails-config-section";
-import { CostCalculatorSection } from "./cost-calculator-section";
+import { AgentUsageSection } from "./agent-usage-section";
 import { MODEL_OPTIONS } from "@/lib/agents/llm-pricing";
-import type {
-  AgentConfig,
-  AgentId,
-  CostAbortStrategy,
-  FallbackStrategy,
-} from "@/types/agents";
+import type { AgentConfig, AgentId } from "@/types/agents";
 
 interface AgentConfigFormProps {
   agentId: AgentId;
@@ -27,9 +19,6 @@ interface AgentConfigFormProps {
   readOnly?: boolean;
   isSaving?: boolean;
 }
-
-const ABORT_OPTIONS: CostAbortStrategy[] = ["hard_stop", "degrade", "alert_only"];
-const FALLBACK_OPTIONS: FallbackStrategy[] = ["serve_from_cache", "degrade_gracefully", "alert_and_skip"];
 
 function selectModelValue(modelName: string): string {
   const match = MODEL_OPTIONS.find((m) => m.model === modelName);
@@ -67,33 +56,16 @@ export function AgentConfigForm({
   }
 
   const prompts = local.active_prompt_versions ?? [];
-  const operations = local.operations ?? config.operations ?? [];
   const primarySelect = selectModelValue(local.model_policy.model_name);
   const fallbackSelect = selectModelValue(local.model_policy.fallback_model_name);
   const knownModels = new Set(MODEL_OPTIONS.map((m) => m.model));
 
   return (
     <div className="space-y-8">
-      <section className="rounded-md border bg-muted/30 p-4 space-y-2">
-        <h3 className="type-panel-title">Agent in this project</h3>
-        <p className="type-caption text-muted-foreground">
-          {local.profile?.identity?.role ?? "Specialist agent"} — domains:{" "}
-          {(local.profile?.identity?.allowed_domains ?? []).join(", ") || "—"}
-        </p>
-        {operations.length > 0 ? (
-          <p className="type-caption text-muted-foreground">
-            Operations: <span className="font-mono">{operations.join(", ")}</span>
-          </p>
-        ) : null}
-      </section>
-
-      <Separator />
-
       <section className="space-y-4">
-        <h3 className="type-panel-title">Model policy</h3>
+        <h3 className="type-panel-title">Model</h3>
         <p className="type-caption text-muted-foreground">
-          Primary and fallback models used when this agent calls the LLM. Default for Call Prep
-          and Live Call is OpenAI GPT-5.4 Mini.
+          Primary and fallback models used when this agent calls the LLM.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -170,201 +142,12 @@ export function AgentConfigForm({
       <Separator />
 
       <section className="space-y-4">
-        <h3 className="type-panel-title">Cost controls</h3>
+        <h3 className="type-panel-title">Prompt</h3>
         <p className="type-caption text-muted-foreground">
-          Enforced per agent run. Studio also tracks cumulative project spend against the project ceiling.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label className="type-caption text-muted-foreground">Per-run ceiling (USD)</Label>
-            <Input
-              type="number"
-              min={0.01}
-              step={0.01}
-              value={local.cost_cap.per_run_ceiling_usd}
-              readOnly={readOnly}
-              onChange={(e) =>
-                patch("cost_cap", {
-                  ...local.cost_cap,
-                  per_run_ceiling_usd: Number.parseFloat(e.target.value) || 0,
-                })
-              }
-              className="w-36 h-8 type-body"
-            />
-          </div>
-          {agentId === "content_generation" && (
-            <div className="space-y-2">
-              <Label className="type-caption text-muted-foreground">Project ceiling (USD)</Label>
-              <Input
-                type="number"
-                min={0.1}
-                step={0.1}
-                value={local.cost_cap.project_ceiling_usd ?? 1.5}
-                readOnly={readOnly}
-                onChange={(e) =>
-                  patch("cost_cap", {
-                    ...local.cost_cap,
-                    project_ceiling_usd: Number.parseFloat(e.target.value) || 0,
-                  })
-                }
-                className="w-36 h-8 type-body"
-              />
-            </div>
-          )}
-          <div className="space-y-2">
-            <Label className="type-caption text-muted-foreground">When cap is hit</Label>
-            {readOnly ? (
-              <span className="type-body font-mono">{local.cost_cap.abort_strategy}</span>
-            ) : (
-              <select
-                value={local.cost_cap.abort_strategy}
-                onChange={(e) =>
-                  patch("cost_cap", {
-                    ...local.cost_cap,
-                    abort_strategy: e.target.value as CostAbortStrategy,
-                  })
-                }
-                className="flex h-9 w-48 rounded-md border bg-background px-3 py-1 type-body shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                {ABORT_OPTIONS.map((o) => (
-                  <option key={o} value={o}>
-                    {o.replace("_", " ")}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <Separator />
-
-      <CostCalculatorSection
-        agentId={agentId}
-        modelPolicy={local.model_policy}
-        costCap={local.cost_cap}
-      />
-
-      <Separator />
-
-      <section className="space-y-4">
-        <h3 className="type-panel-title">Throttle</h3>
-        <NudgeThrottleControl
-          config={local.throttle}
-          readOnly={readOnly}
-          onChange={(t) => patch("throttle", t)}
-        />
-      </section>
-
-      {agentId === "live-call" && local.signal_routing !== undefined && (
-        <>
-          <Separator />
-          <section>
-            <h3 className="type-panel-title mb-3">Signal routing</h3>
-            <SignalRoutingTable
-              rules={local.signal_routing}
-              readOnly={readOnly}
-              onChange={(r) => patch("signal_routing", r)}
-            />
-          </section>
-        </>
-      )}
-
-      <Separator />
-
-      <section className="space-y-4">
-        <h3 className="type-panel-title">Failure behaviour</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="space-y-2">
-            <Label className="type-caption text-muted-foreground">Max retries</Label>
-            <Input
-              type="number"
-              min={0}
-              max={5}
-              value={local.failure_behaviour.max_retries}
-              readOnly={readOnly}
-              onChange={(e) =>
-                patch("failure_behaviour", {
-                  ...local.failure_behaviour,
-                  max_retries: Number.parseInt(e.target.value, 10) || 0,
-                })
-              }
-              className="w-24 h-8 type-body"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label className="type-caption text-muted-foreground">Retry delay (ms)</Label>
-            <Input
-              type="number"
-              min={100}
-              step={100}
-              value={local.failure_behaviour.retry_delay_ms}
-              readOnly={readOnly}
-              onChange={(e) =>
-                patch("failure_behaviour", {
-                  ...local.failure_behaviour,
-                  retry_delay_ms: Number.parseInt(e.target.value, 10) || 0,
-                })
-              }
-              className="w-24 h-8 type-body"
-            />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label className="type-caption text-muted-foreground">Fallback strategy</Label>
-            {readOnly ? (
-              <span className="type-body font-mono">{local.failure_behaviour.fallback_strategy}</span>
-            ) : (
-              <select
-                value={local.failure_behaviour.fallback_strategy}
-                onChange={(e) =>
-                  patch("failure_behaviour", {
-                    ...local.failure_behaviour,
-                    fallback_strategy: e.target.value as FallbackStrategy,
-                  })
-                }
-                className="flex h-9 w-full rounded-md border bg-background px-3 py-1 type-body shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                {FALLBACK_OPTIONS.map((o) => (
-                  <option key={o} value={o}>
-                    {o.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <Separator />
-
-      <GuardrailsConfigSection
-        policy={local.guardrails}
-        readOnly={readOnly}
-        onChange={(g) => patch("guardrails", g)}
-      />
-
-      {agentId === "workflow" && (
-        <>
-          <Separator />
-          <WorkflowAgentConfigSections
-            config={local}
-            readOnly={readOnly}
-            onChange={(next) => {
-              setLocal(next);
-              setDirty(true);
-            }}
-          />
-        </>
-      )}
-
-      <Separator />
-
-      <section className="space-y-4">
-        <h3 className="type-panel-title">Prompts</h3>
-        <p className="type-caption text-muted-foreground">
-          Active prompt files from the repository. Override below applies on the next run when supported.
+          Active prompt files from the repository. Override below applies on the next run when
+          supported.
           {agentId === "workflow"
-            ? " PRE-DC also has dedicated summary / artifact prompt editors above."
+            ? " PRE-DC also has dedicated summary / artifact prompt editors below."
             : null}
         </p>
         {prompts.length === 0 ? (
@@ -378,11 +161,15 @@ export function AgentConfigForm({
                     {p.label} <span className="text-muted-foreground font-mono">v{p.version}</span>
                   </span>
                   {p.is_active ? (
-                    <span className="type-label rounded bg-primary/10 text-primary px-2 py-0.5">active</span>
+                    <span className="type-label rounded bg-primary/10 text-primary px-2 py-0.5">
+                      active
+                    </span>
                   ) : null}
                 </div>
                 {"path" in p && p.path ? (
-                  <p className="type-label font-mono text-muted-foreground mt-1">prompts/{String(p.path)}</p>
+                  <p className="type-label font-mono text-muted-foreground mt-1">
+                    prompts/{String(p.path)}
+                  </p>
                 ) : null}
               </li>
             ))}
@@ -400,6 +187,32 @@ export function AgentConfigForm({
           />
         </div>
       </section>
+
+      {agentId === "workflow" && (
+        <>
+          <Separator />
+          <WorkflowAgentConfigSections
+            config={local}
+            readOnly={readOnly}
+            onChange={(next) => {
+              setLocal(next);
+              setDirty(true);
+            }}
+          />
+        </>
+      )}
+
+      <Separator />
+
+      <GuardrailsConfigSection
+        policy={local.guardrails}
+        readOnly={readOnly}
+        onChange={(g) => patch("guardrails", g)}
+      />
+
+      <Separator />
+
+      <AgentUsageSection agentId={agentId} />
 
       {!readOnly && (
         <div className="flex items-center gap-3 pt-2">

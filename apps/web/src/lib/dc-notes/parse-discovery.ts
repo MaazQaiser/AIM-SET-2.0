@@ -1,10 +1,45 @@
-import { isValid, parse, startOfDay } from "date-fns";
+import { isValid, parse } from "date-fns";
+
+/** Pakistan Standard Time is UTC+5 year-round (no DST). */
+export const PKT_OFFSET_MS = 5 * 60 * 60 * 1000;
+
+export function toPktParts(date: Date): { year: number; month: number; day: number } {
+  const shifted = new Date(date.getTime() + PKT_OFFSET_MS);
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+    day: shifted.getUTCDate(),
+  };
+}
+
+export function isSamePktDay(a: Date, b: Date): boolean {
+  const pa = toPktParts(a);
+  const pb = toPktParts(b);
+  return pa.year === pb.year && pa.month === pb.month && pa.day === pb.day;
+}
+
+function pktWallToIso(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number
+): string {
+  // Wall clock is Asia/Karachi; convert to UTC by subtracting the PKT offset.
+  return new Date(Date.UTC(year, month - 1, day, hour, minute, 0, 0) - PKT_OFFSET_MS).toISOString();
+}
 
 export function parseDiscoveryDateTime(datePkt: string, timePkt: string): string | null {
   const dateStr = datePkt.trim();
   if (!dateStr) return null;
 
-  const dateFormats = ["M/d/yyyy", "MM/dd/yyyy", "d/M/yyyy", "dd/MM/yyyy", "M/d/yy", "MM/dd/yy"];
+  const dateFormats = [
+    "yyyy-MM-dd",
+    "M/d/yyyy",
+    "MM/dd/yyyy",
+    "M/d/yy",
+    "MM/dd/yy",
+  ];
   let base: Date | null = null;
 
   for (const fmt of dateFormats) {
@@ -17,22 +52,37 @@ export function parseDiscoveryDateTime(datePkt: string, timePkt: string): string
 
   if (!base) return null;
 
+  let hour = 0;
+  let minute = 0;
   const timeStr = timePkt.trim();
   if (timeStr) {
-    const timeFormats = ["h:mm a", "hh:mm a", "H:mm", "h a"];
+    const timeFormats = ["h:mm a", "hh:mm a", "H:mm", "HH:mm", "h a"];
     for (const fmt of timeFormats) {
       const timeParsed = parse(timeStr, fmt, new Date());
       if (isValid(timeParsed)) {
-        base.setHours(timeParsed.getHours(), timeParsed.getMinutes(), 0, 0);
+        hour = timeParsed.getHours();
+        minute = timeParsed.getMinutes();
         break;
       }
     }
   }
 
-  return base.toISOString();
+  return pktWallToIso(
+    base.getFullYear(),
+    base.getMonth() + 1,
+    base.getDate(),
+    hour,
+    minute
+  );
 }
 
-/** Upcoming if discovery date is today or in the future (by calendar day) */
+/** Upcoming if discovery date is today or in the future (by PKT calendar day) */
 export function isDiscoveryCallUpcoming(scheduledAtIso: string): boolean {
-  return new Date(scheduledAtIso).getTime() >= startOfDay(new Date()).getTime();
+  const at = new Date(scheduledAtIso);
+  const today = toPktParts(new Date());
+  const callDay = toPktParts(at);
+  if (callDay.year !== today.year || callDay.month !== today.month) {
+    return callDay.year > today.year || (callDay.year === today.year && callDay.month > today.month);
+  }
+  return callDay.day >= today.day;
 }

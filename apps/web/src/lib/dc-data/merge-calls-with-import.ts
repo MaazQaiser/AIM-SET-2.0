@@ -1,6 +1,7 @@
 import { enrichCallBant } from "@/lib/bant/authority-from-lead";
 import { resolveMergedCallStatus } from "@/lib/dc-data/call-status";
 import { companyStageForCall } from "@/lib/dc-notes/company-stage";
+import { parseDiscoveryDateTime } from "@/lib/dc-notes/parse-discovery";
 import type { Call, CallStatus } from "@/types";
 
 /** API list calls are sparse; fill display fields from CSV-built import rows. */
@@ -27,11 +28,17 @@ export function mergeCallsWithImport(
       overrideStatus: statusOverrides[api.id],
     });
 
-    // Prefer Supabase/API fields; fill gaps from hydrated DC notes only.
+    // Prefer fresh Pre-DC PKT schedule over stale API scheduledAt when CSV dates exist.
+    const discoveryCallDatePkt = local.discoveryCallDatePkt || api.discoveryCallDatePkt;
+    const discoveryCallTimePkt = local.discoveryCallTimePkt || api.discoveryCallTimePkt;
+    const fromPkt = discoveryCallDatePkt
+      ? parseDiscoveryDateTime(discoveryCallDatePkt, discoveryCallTimePkt ?? "")
+      : null;
+
     const merged = {
       ...local,
       ...api,
-      scheduledAt: api.scheduledAt || local.scheduledAt,
+      scheduledAt: fromPkt || api.scheduledAt || local.scheduledAt,
       status,
       dealStage: companyStageForCall({
         ...local,
@@ -43,8 +50,8 @@ export function mergeCallsWithImport(
       icpMatch: api.icpMatch ?? local.icpMatch,
       leadName: api.leadName?.trim() || local.leadName,
       leadTitle: api.leadTitle?.trim() || local.leadTitle,
-      discoveryCallDatePkt: api.discoveryCallDatePkt || local.discoveryCallDatePkt,
-      discoveryCallTimePkt: api.discoveryCallTimePkt || local.discoveryCallTimePkt,
+      discoveryCallDatePkt,
+      discoveryCallTimePkt,
       annualRevenue: api.annualRevenue || local.annualRevenue,
       employeeCount: api.employeeCount || local.employeeCount,
       companyTypeIcp: api.companyTypeIcp || local.companyTypeIcp,

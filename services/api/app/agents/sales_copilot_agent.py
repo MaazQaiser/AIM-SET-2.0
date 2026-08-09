@@ -541,13 +541,12 @@ _QUERY_STOPWORDS = {
     "about",
     "back",
     "base",
-    "case",
     "come",
     "find",
     "for",
     "from",
     "give",
-    "industry",
+    "industry",  # meta ask word — avoid matching "LinkedIn Industry:" labels
     "knowledge",
     "list",
     "match",
@@ -556,8 +555,6 @@ _QUERY_STOPWORDS = {
     "need",
     "product",
     "products",
-    "project",
-    "projects",
     "proper",
     "read",
     "recommend",
@@ -565,7 +562,6 @@ _QUERY_STOPWORDS = {
     "share",
     "show",
     "source",
-    "study",
     "tell",
     "the",
     "what",
@@ -607,6 +603,26 @@ def _field_lookup(fields: Dict[str, Any], keys: Tuple[str, ...]) -> str:
 def _looks_like_kb_search(message: str) -> bool:
     lower = message.lower()
     return any(term in lower for term in _KB_SEARCH_TERMS)
+
+
+def _looks_like_case_study_or_project(message: str) -> bool:
+    lower = message.lower()
+    return any(
+        term in lower
+        for term in (
+            "case study",
+            "case studies",
+            "relevant project",
+            "relevant projects",
+            "project proof",
+            "show a project",
+            "best project",
+            "best case",
+        )
+    ) or (
+        ("project" in lower or "projects" in lower or "case study" in lower)
+        and any(w in lower for w in ("show", "find", "recommend", "relevant", "best", "which", "share"))
+    )
 
 
 def _parse_field_line(line: str) -> Dict[str, str]:
@@ -1110,8 +1126,11 @@ class SalesCopilotAgent:
                         "discoveryQuestions": brief.get("discoveryQuestions"),
                         "clientAttendees": brief.get("clientAttendees"),
                         "relevantContent": brief.get("relevantContent"),
+                        "relevantProjects": (brief.get("relevantProjects") or [])[:5],
+                        "relevantDocuments": (brief.get("relevantDocuments") or [])[:5],
+                        "recommendedDeck": brief.get("recommendedDeck"),
                     },
-                    2400,
+                    2800,
                 )
                 lines.append(f"Pre-DC brief: {brief_excerpt}")
                 self._citations.append(
@@ -1721,11 +1740,63 @@ class SalesCopilotAgent:
             self._actions_taken.append(
                 {"tool": "search_knowledge_base", "query": message[:120], "hit_count": len(hits), "fast_path": True}
             )
-            return _format_kb_hits(
+            project_block = ""
+            if call_id and _looks_like_case_study_or_project(message):
+                try:
+                    from app.orchestrator.dispatcher import Orchestrator
+
+                    relevant = Orchestrator().get_relevant_content(self.ctx, call_id, refresh=False)
+                    projects = relevant.get("relevantProjects") or []
+                    docs = relevant.get("relevantDocuments") or []
+                    self._actions_taken.append(
+                        {
+                            "tool": "relevant_content",
+                            "call_id": call_id,
+                            "project_count": len(projects),
+                            "document_count": len(docs),
+                            "fast_path": True,
+                        }
+                    )
+                    lines = []
+                    if projects:
+                        lines.append("Relevant projects for this call:")
+                        for project in projects[:5]:
+                            title = (
+                                project.get("title")
+                                or project.get("name")
+                                or project.get("projectName")
+                                or "Project"
+                            )
+                            detail = (
+                                project.get("summary")
+                                or project.get("solution")
+                                or project.get("industry")
+                                or ""
+                            )
+                            lines.append(f"- **{title}**{f' — {detail}' if detail else ''}")
+                    if docs:
+                        lines.append("")
+                        lines.append("Related decks / documents:")
+                        for doc in docs[:4]:
+                            title = doc.get("title") or doc.get("name") or "Document"
+                            lines.append(f"- **{title}**")
+                    if lines:
+                        project_block = "\n".join(lines)
+                except Exception:
+                    project_block = ""
+            kb_answer = _format_kb_hits(
                 hits,
                 query=message,
                 empty="No matching knowledge base or project entries found.",
-            ), {
+            )
+            if project_block:
+                if "No matching knowledge base" in kb_answer:
+                    answer = project_block
+                else:
+                    answer = f"{project_block}\n\nAlso from the knowledge base:\n{kb_answer}"
+            else:
+                answer = kb_answer
+            return answer, {
                 "tokens": len(message) // 4,
                 "usd": 0.0,
                 "model": "fast-path-kb",
@@ -1983,6 +2054,8 @@ class SalesCopilotAgent:
                 answer = (assistant_message.content or "").strip() or "Done."
                 return answer, {
                     "tokens": tokens_in + tokens_out,
+                    "tokens_in": tokens_in,
+                    "tokens_out": tokens_out,
                     "usd": 0.0,
                     "model": active_model,
                     "trace_id": trace_id,
@@ -1993,6 +2066,8 @@ class SalesCopilotAgent:
                 if assistant_message.content:
                     return assistant_message.content.strip(), {
                         "tokens": tokens_in + tokens_out,
+                        "tokens_in": tokens_in,
+                        "tokens_out": tokens_out,
                         "usd": 0.0,
                         "model": active_model,
                         "trace_id": trace_id,
@@ -2043,6 +2118,8 @@ class SalesCopilotAgent:
         )
         return completion.text, {
             "tokens": completion.tokens_in + completion.tokens_out,
+            "tokens_in": completion.tokens_in,
+            "tokens_out": completion.tokens_out,
             "usd": completion.cost_usd,
             "model": completion.model,
             "trace_id": completion.trace_id,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from dc_core.tenancy import TenantContext
@@ -214,12 +214,12 @@ def _resolve_call_status(
 
 
 def _parse_discovery_scheduled_at(date_pkt: str | None, time_pkt: str | None) -> str | None:
-    """Parse Pre-DC Discovery Call Date/Time (PKT) into an ISO timestamp."""
+    """Parse Pre-DC Discovery Call Date/Time (PKT / Asia/Karachi) into an ISO UTC timestamp."""
     date_str = (date_pkt or "").strip()
     if not date_str:
         return None
 
-    date_formats = ("%m/%d/%Y", "%m/%d/%y", "%d/%m/%Y", "%Y-%m-%d")
+    date_formats = ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%d/%m/%Y")
     base: datetime | None = None
     for fmt in date_formats:
         try:
@@ -245,9 +245,10 @@ def _parse_discovery_scheduled_at(date_pkt: str | None, time_pkt: str | None) ->
             except ValueError:
                 continue
 
+    pkt = timezone(timedelta(hours=5))
     if base.tzinfo is None:
-        base = base.replace(tzinfo=timezone.utc)
-    return base.isoformat()
+        base = base.replace(tzinfo=pkt)
+    return base.astimezone(timezone.utc).isoformat()
 
 
 def _first_non_empty(*values: Any) -> Any:
@@ -535,12 +536,21 @@ class CallsService:
             if not enriched:
                 merged.append(call)
                 continue
+            date_pkt = _first_non_empty(
+                enriched.get("discoveryCallDatePkt"),
+                call.get("discoveryCallDatePkt"),
+            )
+            time_pkt = _first_non_empty(
+                enriched.get("discoveryCallTimePkt"),
+                call.get("discoveryCallTimePkt"),
+            )
+            from_pkt = _parse_discovery_scheduled_at(date_pkt, time_pkt)
             merged.append(
                 {
                     **enriched,
                     **call,
                     "scheduledAt": _first_non_empty(
-                        call.get("scheduledAt"), enriched.get("scheduledAt")
+                        from_pkt, enriched.get("scheduledAt"), call.get("scheduledAt")
                     ),
                     "status": _resolve_call_status(call.get("status"), enriched.get("status")),
                     "bant": enriched.get("bant") or call.get("bant"),
@@ -555,14 +565,8 @@ class CallsService:
                     "leadTitle": _first_non_empty(
                         call.get("leadTitle"), enriched.get("leadTitle")
                     ),
-                    "discoveryCallDatePkt": _first_non_empty(
-                        call.get("discoveryCallDatePkt"),
-                        enriched.get("discoveryCallDatePkt"),
-                    ),
-                    "discoveryCallTimePkt": _first_non_empty(
-                        call.get("discoveryCallTimePkt"),
-                        enriched.get("discoveryCallTimePkt"),
-                    ),
+                    "discoveryCallDatePkt": date_pkt,
+                    "discoveryCallTimePkt": time_pkt,
                     "annualRevenueRaw": _first_non_empty(
                         call.get("annualRevenueRaw"), enriched.get("annualRevenueRaw")
                     ),

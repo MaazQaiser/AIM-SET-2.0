@@ -71,6 +71,35 @@ def _qualifying_discovery_snapshot():
     }
 
 
+def test_post_dc_bant_score_matches_jira_snapshot(monkeypatch):
+    _clear_memory(monkeypatch)
+    ctx = TenantContext(tenant_id="tenant-post-dc", user_id="user-post-dc")
+
+    env = run_post_dc_pipeline(
+        ctx,
+        "call-post-agent",
+        call={"id": "call-post-agent", "accountName": "Parity Co"},
+        pre_dc_fields={"Company Name-PreDC": "Parity Co", "Campaign Service - PreDC": "AI"},
+        discovery_snapshot=_qualifying_discovery_snapshot(),
+        transcript_events=[
+            {
+                "text": "Budget is approved at $200K. CFO owns the decision. We need automation urgently. Timeline is go-live by Q3.",
+                "speaker_role": "customer",
+                "offset_seconds": 30,
+            }
+        ],
+    )
+
+    review = env.result["review"]
+    ticket = env.result["jiraTicket"]
+    assert ticket is not None
+    score = review["bantScore"]
+    for dim in ("budget", "authority", "need", "timeline"):
+        status = (score.get(dim) or {}).get("status")
+        assert ticket["bantSnapshot"][dim] is (status == "confirmed")
+        assert ticket["bantStatuses"][dim] == (status or "unknown")
+
+
 def test_post_dc_agent_heuristic_result_shape(monkeypatch):
     _clear_memory(monkeypatch)
     ctx = TenantContext(tenant_id="tenant-post-dc", user_id="user-post-dc")
@@ -133,7 +162,7 @@ def test_post_dc_agent_generates_jira_draft_for_qualified_call(monkeypatch):
     assert ticket["status"] == "draft_pending_approval"
     assert ticket["projectKey"] == "SALES"
     assert "description" in ticket
-    assert "Client summary:" in ticket["description"]
+    assert "Key takeaways:" in ticket["description"] or "Action items:" in ticket["description"]
     assert "Action items:" in ticket["description"]
     assert "BANT" not in ticket["description"]
     assert "Budget" not in ticket["description"]
@@ -264,12 +293,13 @@ def test_post_dc_agent_builds_email_tasks_and_assets_from_transcript_context(mon
 
     assert client_email["audience"] == "client"
     assert internal_email["audience"] == "internal"
-    assert "Minutes of meeting" in email_body
-    assert "POS integration details" in email_body
+    assert "Key takeaways:" in email_body
+    assert "Action items:" in email_body
+    assert "POS integration" in email_body or "Integration details" in email_body
+    assert "Minutes of meeting" not in email_body
     assert "BANT" not in email_body
     assert "Open discovery gaps" not in email_body
     assert "Jira" not in email_body
-    assert "What we committed to" in email_body
     assert client_email["attachments"] == env.result["emailAttachments"]
     assert "BANT score" in internal_email["body_markdown"]
     assert "Next action items" in internal_email["body_markdown"]

@@ -1,9 +1,10 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { format, isSameDay, startOfDay } from "date-fns";
+import { format } from "date-fns";
 import { useCallback, useMemo, useState } from "react";
 import { useAiTodos } from "@/hooks/use-ai-todos";
+import { todaysOpenCalls } from "@/lib/dashboard/call-metrics";
 import { useCalls } from "@/lib/data/hooks";
 import type { Call } from "@/types";
 
@@ -22,12 +23,7 @@ function buildBriefingPayload(
   pendingApprovalCount: number,
   todos: ReturnType<typeof useAiTodos>["todos"]
 ) {
-  const today = startOfDay(new Date());
-  const todaysCalls = calls.filter(
-    (c) =>
-      (c.status === "upcoming" || c.status === "live") &&
-      isSameDay(new Date(c.scheduledAt), today)
-  );
+  const todaysCalls = todaysOpenCalls(calls);
   const briefsNotReady = todaysCalls.filter((c) => !c.briefReady).length;
   const highPriorityTodos = todos.filter((t) => t.priority === "high").length;
 

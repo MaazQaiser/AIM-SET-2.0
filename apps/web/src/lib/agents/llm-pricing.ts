@@ -78,6 +78,33 @@ export function formatUsd(value: number, digits = 4): string {
   return `$${value.toFixed(digits)}`;
 }
 
+/**
+ * When a run only stored total tokens + cost, reverse-estimate input vs output
+ * from list prices. Falls back to a 75/25 split if cost is missing or inconsistent.
+ */
+export function estimateTokenSplit(
+  modelName: string,
+  totalTokens: number,
+  costUsd: number
+): { input: number; output: number } {
+  const total = Math.max(0, Math.round(totalTokens) || 0);
+  if (total === 0) return { input: 0, output: 0 };
+
+  const row = findModelPrice(modelName);
+  const rin = row?.inputPer1M ?? 0.75;
+  const rout = row?.outputPer1M ?? 4.5;
+  const denom = rin - rout;
+
+  if (costUsd > 0 && Math.abs(denom) > 1e-9) {
+    const rawIn = (costUsd * 1_000_000 - total * rout) / denom;
+    const input = Math.min(total, Math.max(0, Math.round(rawIn)));
+    return { input, output: total - input };
+  }
+
+  const input = Math.round(total * 0.75);
+  return { input, output: total - input };
+}
+
 /** Typical token budgets used for config-page estimates. */
 export const COST_SCENARIOS: Record<
   string,

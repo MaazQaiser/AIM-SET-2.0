@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -93,17 +94,55 @@ def _persist_and_collect_messages(
                 suggestion_id=suggestion_id,
             )
 
+        # Collect non-intent WS messages here; intent is merged below so LLM
+        # schema mismatches cannot wipe heuristic pains.
+        if envelope.operation == "intent_update":
+            continue
         for ws_msg in envelope_to_ws_messages(
             envelope, suggestion_id=suggestion_id, shown_at=shown_at
         ):
+            if ws_msg.get("type") == "intent_update":
+                continue
             ws_messages.append(ws_msg)
 
     analysis_intent = None
+    heuristic_intent = None
     for envelope in envelopes:
-        if envelope.result.get("intent_update"):
-            analysis_intent = envelope.result["intent_update"]
-            break
-    if analysis_intent and not any(m.get("type") == "intent_update" for m in ws_messages):
+        result = envelope.result or {}
+        if envelope.operation == "intent_update":
+            analysis_intent = (
+                result.get("intent_update")
+                if "intent_update" in result and "pains" not in result
+                else result
+            )
+            continue
+        if result.get("intent_update") and heuristic_intent is None:
+            heuristic_intent = result.get("intent_update")
+    if analysis_intent is None:
+        analysis_intent = heuristic_intent
+    elif heuristic_intent and analysis_intent is not heuristic_intent:
+        merged = dict(heuristic_intent)
+        llm_pains = analysis_intent.get("pains") if isinstance(analysis_intent, dict) else None
+        if isinstance(llm_pains, list) and llm_pains:
+            existing = list(merged.get("pains") or [])
+            seen = {
+                re.sub(r"\s+", " ", str(p.get("text") or "").lower())[:80]
+                for p in existing
+                if isinstance(p, dict)
+            }
+            for pain in llm_pains:
+                if not isinstance(pain, dict):
+                    continue
+                key = re.sub(r"\s+", " ", str(pain.get("text") or "").lower())[:80]
+                if not key or key in seen:
+                    continue
+                seen.add(key)
+                existing.append(pain)
+            merged["pains"] = existing
+        if isinstance(analysis_intent, dict) and analysis_intent.get("intent"):
+            merged["intent"] = analysis_intent.get("intent")
+        analysis_intent = merged
+    if analysis_intent:
         ws_messages.append({"type": "intent_update", "payload": analysis_intent})
 
     return ws_messages
@@ -185,6 +224,37 @@ def handle_transcript_segment(
             signal_type=stored.get("signal_type"),
         )
 
+    channel = get_call_channel()
+    # Emit sentiment immediately so the UI is not blocked by KB/LLM work below.
+    early_sentiment_messages: List[Dict[str, Any]] = []
+    if analysis.get("sentiment"):
+        sent = analysis["sentiment"]
+        payload: Dict[str, Any] = {"ae": sent.get("ae", 0), "customer": sent.get("customer", 0)}
+        if sent.get("shift"):
+            payload["shift"] = sent["shift"]
+        if sent.get("signal"):
+            payload["signal"] = sent["signal"]
+        if sent.get("salesRepTone"):
+            payload["salesRepTone"] = sent["salesRepTone"]
+        if sent.get("customerSentiment"):
+            payload["customerSentiment"] = sent["customerSentiment"]
+        early_sentiment_messages.append({"type": "sentiment", "payload": payload})
+        if sent.get("signal"):
+            early_sentiment_messages.append({"type": "sentiment_signal", "payload": sent["signal"]})
+        for msg in early_sentiment_messages:
+            try:
+                channel.broadcast_sync(call_id, msg)
+            except Exception:
+                _logger.exception("early sentiment broadcast failed call_id=%s", call_id)
+
+    if analysis.get("intent_update"):
+        try:
+            channel.broadcast_sync(
+                call_id, {"type": "intent_update", "payload": analysis["intent_update"]}
+            )
+        except Exception:
+            _logger.exception("early intent broadcast failed call_id=%s", call_id)
+
     advanced: List[AgentEnvelope] = []
     try:
         brief = CallsService().get_brief(ctx, call_id)
@@ -204,7 +274,6 @@ def handle_transcript_segment(
         _logger.exception("advanced live-call analysis failed call_id=%s", call_id)
 
     envelopes: List[AgentEnvelope] = [_analysis_to_envelope(call_id, analysis)]
-    channel = get_call_channel()
     for env in advanced:
         if env.operation == "signal_annotation":
             bant = (env.result or {}).get("bant")
@@ -235,20 +304,16 @@ def handle_transcript_segment(
     if analysis.get("keyword_stats"):
         ws_messages.append({"type": "keyword_stats", "payload": analysis["keyword_stats"]})
 
-    if analysis.get("sentiment"):
-        sent = analysis["sentiment"]
-        payload = {"ae": sent.get("ae", 0), "customer": sent.get("customer", 0)}
-        if sent.get("shift"):
-            payload["shift"] = sent["shift"]
-        if sent.get("signal"):
-            payload["signal"] = sent["signal"]
-        if sent.get("salesRepTone"):
-            payload["salesRepTone"] = sent["salesRepTone"]
-        if sent.get("customerSentiment"):
-            payload["customerSentiment"] = sent["customerSentiment"]
-        ws_messages.append({"type": "sentiment", "payload": payload})
-        if sent.get("signal"):
-            ws_messages.append({"type": "sentiment_signal", "payload": sent["signal"]})
+    # Keep sentiment in the returned list for callers that broadcast the batch,
+    # but mark early emission so routers can skip duplicate fan-out if desired.
+    for msg in early_sentiment_messages:
+        tagged = dict(msg)
+        tagged["early"] = True
+        if not any(
+            existing.get("type") == msg.get("type") and existing.get("early")
+            for existing in ws_messages
+        ):
+            ws_messages.append(tagged)
 
     nudge = analysis.get("nudge")
     for e in envelopes:

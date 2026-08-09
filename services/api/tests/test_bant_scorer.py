@@ -165,6 +165,49 @@ def test_update_checklist_extracts_deadline_not_more_than_duration():
     assert "project timeline will be not more than three months" in timeline_item.evidence[-1].value
 
 
+def test_update_checklist_captures_natural_timeline_phrases():
+    state = initial_checklist_state("call-1")
+
+    updated, changed, dims = update_checklist_from_segment(
+        state,
+        "We need this by Friday and want to move quickly — ideally within 2 weeks, end of the month at latest.",
+        elapsed_seconds=210,
+        speaker_role="customer",
+    )
+
+    assert "timeline" in changed
+    assert "timeline" in dims
+    assert updated.bant["timeline"] in ("partial", "confirmed")
+
+    timeline_item = next(item for item in updated.items if item.id == "timeline")
+    value = timeline_item.evidence[-1].value.lower()
+    assert "friday" in value or "within 2 weeks" in value or "end of the month" in value or "move quickly" in value
+
+
+def test_update_checklist_captures_repeated_timeline_mentions():
+    state = initial_checklist_state("call-1")
+
+    updated, _, _ = update_checklist_from_segment(
+        state,
+        "Timeline is critical for us.",
+        elapsed_seconds=60,
+        speaker_role="customer",
+    )
+    updated, changed, dims = update_checklist_from_segment(
+        updated,
+        "We keep saying the timeline — decision by Q2 2026 and go-live by September.",
+        elapsed_seconds=180,
+        speaker_role="customer",
+    )
+
+    assert "timeline" in changed
+    assert "timeline" in dims
+    assert updated.bant["timeline"] in ("partial", "confirmed")
+    timeline_item = next(item for item in updated.items if item.id == "timeline")
+    value = timeline_item.evidence[-1].value
+    assert "Q2" in value or "September" in value or "decision by" in value.lower()
+
+
 def test_should_nudge_budget_after_threshold():
     state = initial_checklist_state("call-1")
     state.elapsed_seconds = 31 * 60

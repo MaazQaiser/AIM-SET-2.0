@@ -114,6 +114,8 @@ async def recall_transcript_webhook(
                 return
             result = await asyncio.to_thread(_orch.dispatch_live_segment, ctx, cid, event)
             for msg in result.get("ws_messages") or []:
+                if msg.get("early"):
+                    continue
                 await channel.broadcast(cid, msg)
         except Exception:
             _logger.exception("background analysis failed call_id=%s", cid)
@@ -167,6 +169,8 @@ async def demo_segment(
             try:
                 result = await asyncio.to_thread(_orch.dispatch_live_segment, ctx, call_id, event)
                 for msg in result.get("ws_messages") or []:
+                    if msg.get("early"):
+                        continue
                     await channel.broadcast(call_id, msg)
             except Exception:
                 _logger.exception("demo background analysis failed call_id=%s", call_id)
@@ -190,6 +194,8 @@ async def demo_segment(
     try:
         result = await asyncio.to_thread(_orch.dispatch_live_segment, ctx, call_id, event)
         for msg in result.get("ws_messages") or []:
+            if msg.get("early"):
+                continue
             await channel.broadcast(call_id, msg)
     except Exception as exc:
         _logger.exception("demo analysis failed call_id=%s", call_id)
