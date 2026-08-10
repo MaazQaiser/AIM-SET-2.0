@@ -158,6 +158,39 @@ def test_dispatch_live_segment_uses_recent_fragments_for_budget_value():
     assert "400k" in budget_item["evidence"][-1]["value"].lower()
 
 
+def test_dispatch_live_segment_infers_ae_commitment_and_does_not_update_bant():
+    ctx = TenantContext(tenant_id="live-test-ae-commitment-role", user_id="u1")
+    call_id = "call-live-ae-commitment-role"
+    orchestrator = Orchestrator()
+
+    out = orchestrator.dispatch_live_segment(
+        ctx,
+        call_id,
+        {
+            "text": (
+                "Good. I will send a proposal that includes the healthcare workflow map, "
+                "integration plan, team structure, pilot timeline, and budget breakdown."
+            ),
+            "speakerId": "speaker-1",
+            "speakerName": "Sarah",
+            "timestamp": 372,
+        },
+    )
+
+    checklist = out["checklist"]
+    assert checklist["bant"]["budget"] == "unknown"
+    assert checklist["bant"]["authority"] == "unknown"
+    assert checklist["bant"]["timeline"] == "unknown"
+    assert not [
+        msg
+        for msg in out["ws_messages"]
+        if msg.get("type") == "bant_signal"
+    ]
+
+    events = get_live_call_repository().list_transcript_events(ctx, call_id)
+    assert events[-1]["speaker_role"] == "ae"
+
+
 def test_passive_intent_envelopes_do_not_create_suggestion_logs():
     citation = Citation(
         source_type="transcript",

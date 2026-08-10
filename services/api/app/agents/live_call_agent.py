@@ -27,6 +27,7 @@ from app.domain.kb_repository import get_kb_repository
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.live_call_repository import get_live_call_repository
 from app.domain.memory_store import get_memory_store
+from app.domain.speaker_roles import normalize_speaker_role
 
 _OBJECTION_PATTERNS = re.compile(
     r"\b(too expensive|not in budget|concerned about|worried about|pushback|objection|"
@@ -230,6 +231,7 @@ def process_transcript_segment(
     offset = float(segment.get("offset_seconds") or 0)
 
     hits, keywords = cheap_pass(text, speaker_role, routing)
+    allow_bant_signals = normalize_speaker_role(speaker_role) == "customer"
     segment["keywords"] = keywords
     track_prospect_question(state, segment)
     unanswered = check_unanswered_questions(state, segment)
@@ -243,6 +245,8 @@ def process_transcript_segment(
             hit.get("signal_type", "").replace("_", " ").title(),
             offset,
         )
+        if bant and not allow_bant_signals:
+            bant = None
         if bant:
             env = AgentEnvelope(
                 agent="live-call",

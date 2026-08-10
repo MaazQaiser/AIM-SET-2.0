@@ -16,6 +16,7 @@ from app.domain.brief_summary_sections import apply_summary_titles_to_brief
 from app.domain.post_dc_import import (
     apply_post_dc_records,
     build_post_call_payload_from_import,
+    match_post_dc_to_call,
     post_dc_record_for_call,
 )
 from app.domain.post_dc_transcript_builder import build_transcript_events_from_post_dc
@@ -442,6 +443,102 @@ class CallsService:
         if rows:
             supabase.table("calls").upsert(rows).execute()
 
+    def _post_dc_record_ids_for_call(self, ctx: TenantContext, call_id: str) -> List[str]:
+        notes = self._dc.get_notes(ctx)
+        aliases = set(call_id_aliases(call_id))
+        calls = build_calls_from_pre_dc(notes["pre_dc_records"], notes["post_dc_records"])
+        ids: List[str] = []
+        for row in notes["post_dc_records"]:
+            matched = row.get("matched_call_id") or match_post_dc_to_call(
+                row,
+                calls,
+                notes["pre_dc_records"],
+            )
+            if matched and str(matched) in aliases:
+                ids.append(str(row.get("id")))
+        return [item for item in ids if item]
+
+    def _clear_post_dc_content(self, ctx: TenantContext, call_id: str, clerk_key: str) -> None:
+        aliases = set(call_id_aliases(call_id))
+        try:
+            post_dc_row_ids = set(self._post_dc_record_ids_for_call(ctx, call_id))
+        except Exception:
+            post_dc_row_ids = set()
+
+        store = get_memory_store()
+        for tenant_key in _memory_clerk_aliases(ctx, clerk_key):
+            for alias in aliases:
+                store.call_post_reviews.get(tenant_key, {}).pop(alias, None)
+                store.call_live_signals.get(tenant_key, {}).pop(alias, None)
+                store.transcript_events.get(tenant_key, {}).pop(alias, None)
+                store.live_suggestions.get(tenant_key, {}).pop(alias, None)
+                store.live_sessions.get(tenant_key, {}).pop(alias, None)
+
+            existing_posts = store.post_dc_records.get(tenant_key, [])
+            store.post_dc_records[tenant_key] = [
+                row
+                for row in existing_posts
+                if str(row.get("id") or "") not in post_dc_row_ids
+                and str(row.get("matched_call_id") or "") not in aliases
+            ]
+
+        try:
+            get_live_call_repository().clear_call_content(ctx, call_id)
+        except Exception:
+            pass
+
+        if not get_settings().supabase_configured:
+            return
+
+        try:
+            tenant_uuid = self._tenant_uuid(ctx)
+        except Exception:
+            return
+
+        supabase = get_supabase()
+        for row_id in post_dc_row_ids:
+            try:
+                (
+                    supabase.table("post_dc_records")
+                    .delete()
+                    .eq("tenant_id", tenant_uuid)
+                    .eq("id", row_id)
+                    .execute()
+                )
+            except Exception:
+                pass
+        for alias in aliases:
+            try:
+                (
+                    supabase.table("post_dc_records")
+                    .delete()
+                    .eq("tenant_id", tenant_uuid)
+                    .eq("matched_call_id", alias)
+                    .execute()
+                )
+            except Exception:
+                pass
+
+    def _update_call_status_only(self, ctx: TenantContext, call_id: str, status: str) -> None:
+        if not get_settings().supabase_configured:
+            return
+        try:
+            tenant_uuid = self._tenant_uuid(ctx)
+        except Exception:
+            return
+        for alias in call_id_aliases(call_id):
+            try:
+                (
+                    get_supabase()
+                    .table("calls")
+                    .update({"status": status})
+                    .eq("tenant_id", tenant_uuid)
+                    .eq("id", alias)
+                    .execute()
+                )
+            except Exception:
+                pass
+
     def mark_call_status(
         self,
         ctx: TenantContext,
@@ -456,23 +553,35 @@ class CallsService:
         except Exception:
             clerk_key = self._fallback_clerk_key(ctx)
 
-        call = self.get_call(ctx, call_id) or {
+        existing_call = self.get_call(ctx, call_id)
+        call = existing_call or {
             "id": call_id,
             "accountName": call_id,
             "scheduledAt": datetime.now(timezone.utc).isoformat(),
             "briefReady": False,
             "pod": [],
         }
+        if status == "upcoming":
+            self._clear_post_dc_content(ctx, call_id, clerk_key)
         call["status"] = status
 
         for tenant_key in _memory_clerk_aliases(ctx, clerk_key):
             get_memory_store().upsert_calls(tenant_key, [call])
 
         if get_settings().supabase_configured:
-            try:
-                self._persist_calls(ctx, [call])
-            except Exception:
-                pass
+            if status == "upcoming":
+                try:
+                    self._persist_calls(ctx, [call])
+                except Exception:
+                    pass
+            else:
+                if existing_call:
+                    self._update_call_status_only(ctx, str(call.get("id") or call_id), status)
+                else:
+                    try:
+                        self._persist_calls(ctx, [call])
+                    except Exception:
+                        pass
 
         return call
 

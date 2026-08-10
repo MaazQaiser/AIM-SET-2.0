@@ -1,7 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, Loader2, Maximize2 } from "lucide-react";
+import { KbFileFormatIcon } from "@/components/knowledge/kb-file-format-badge";
+import {
+  briefDetailDialogClass,
+  briefMainNestedSurfaceClass,
+} from "@/components/pre-call/brief-detail-card";
+import { cn } from "@/lib/cn";
+import {
+  KB_SLIDE_PREVIEW_CACHE_VERSION,
+  kbFileUrl,
+  kbPreviewUrl,
+  kbSlideMetaUrl,
+  kbSlideUrl,
+} from "@/lib/kb/file-format";
+import type { KBAsset } from "@/types";
 import { Button } from "@dc-copilot/ui/components/button";
 import {
   Dialog,
@@ -11,31 +23,22 @@ import {
   DialogTitle,
 } from "@dc-copilot/ui/components/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@dc-copilot/ui/components/tooltip";
-import { KbFileFormatIcon } from "@/components/knowledge/kb-file-format-badge";
-import {
-  KB_SLIDE_PREVIEW_CACHE_VERSION,
-  kbFileUrl,
-  kbPreviewUrl,
-  kbSlideMetaUrl,
-  kbSlideUrl,
-} from "@/lib/kb/file-format";
-import { cn } from "@/lib/cn";
-import {
-  briefDetailDialogClass,
-  briefMainNestedSurfaceClass,
-} from "@/components/pre-call/brief-detail-card";
-import type { KBAsset } from "@/types";
+import { ChevronLeft, ChevronRight, Download, Loader2, Maximize2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 interface KbSlidePreviewProps {
-  asset: Pick<
-    KBAsset,
-    "id" | "title" | "fileName" | "mimeType" | "status" | "previewSlideCount"
-  >;
+  asset: Pick<KBAsset, "id" | "title" | "fileName" | "mimeType" | "status" | "previewSlideCount">;
   compact?: boolean;
+  fullScreen?: boolean;
   className?: string;
 }
 
-export function KbSlidePreview({ asset, compact = false, className }: KbSlidePreviewProps) {
+export function KbSlidePreview({
+  asset,
+  compact = false,
+  fullScreen = false,
+  className,
+}: KbSlidePreviewProps) {
   const [slideCount, setSlideCount] = useState(asset.previewSlideCount ?? 0);
   const [currentSlide, setCurrentSlide] = useState(1);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
@@ -69,10 +72,13 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
         if (metaRes.ok) {
           const meta = (await metaRes.json()) as { slideCount?: number; cacheVersion?: string };
           if ((meta.slideCount ?? 0) > 0) count = meta.slideCount ?? count;
-          if (meta.cacheVersion) cacheVersion = `${KB_SLIDE_PREVIEW_CACHE_VERSION}-${meta.cacheVersion}`;
+          if (meta.cacheVersion)
+            cacheVersion = `${KB_SLIDE_PREVIEW_CACHE_VERSION}-${meta.cacheVersion}`;
         } else if (count <= 0) {
           if (!cancelled) {
-            setError("Visual slide preview is not ready yet. Click Re-embed and refresh in a moment.");
+            setError(
+              "Visual slide preview is not ready yet. Click Re-embed and refresh in a moment."
+            );
           }
           return;
         }
@@ -128,8 +134,9 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
       <div
         className={cn(
           "flex items-center justify-center gap-2 type-body text-muted-foreground rounded-lg border bg-muted/20",
-          briefMainNestedSurfaceClass,
+          !fullScreen && briefMainNestedSurfaceClass,
           compact ? "min-h-[200px]" : "min-h-[420px]",
+          fullScreen && "h-full rounded-none border-0",
           className
         )}
       >
@@ -144,12 +151,32 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
       <div
         className={cn(
           "flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center type-body text-muted-foreground",
-          briefMainNestedSurfaceClass,
+          !fullScreen && briefMainNestedSurfaceClass,
+          fullScreen && "h-full rounded-none border-0",
           className
         )}
       >
         <p>{error ?? "Slide preview unavailable."}</p>
       </div>
+    );
+  }
+
+  if (fullScreen) {
+    return (
+      <KbSlidePreviewFrame
+        asset={asset}
+        currentSlide={currentSlide}
+        downloadUrl={downloadUrl}
+        mode="fullscreen"
+        previewPdfUrl={previewPdfUrl}
+        setError={setError}
+        setCurrentSlide={setCurrentSlide}
+        setUsePdfFallback={setUsePdfFallback}
+        slideCacheVersion={slideCacheVersion}
+        slideCount={slideCount}
+        usePdfFallback={usePdfFallback}
+        className={cn("h-full", className)}
+      />
     );
   }
 
@@ -205,10 +232,7 @@ export function KbSlidePreview({ asset, compact = false, className }: KbSlidePre
 type SlidePreviewMode = "compact" | "default" | "fullscreen";
 
 interface KbSlidePreviewFrameProps {
-  asset: Pick<
-    KBAsset,
-    "id" | "title" | "fileName" | "mimeType" | "status" | "previewSlideCount"
-  >;
+  asset: Pick<KBAsset, "id" | "title" | "fileName" | "mimeType" | "status" | "previewSlideCount">;
   currentSlide: number;
   downloadUrl: string | null;
   mode: SlidePreviewMode;
@@ -266,7 +290,9 @@ function KbSlidePreviewFrame({
           <div
             className={cn(
               "flex min-w-0 items-center gap-2",
-              fullScreen ? "w-full sm:w-auto sm:max-w-[50vw]" : "w-full sm:w-auto sm:max-w-72 lg:max-w-96"
+              fullScreen
+                ? "w-full sm:w-auto sm:max-w-[50vw]"
+                : "w-full sm:w-auto sm:max-w-72 lg:max-w-96"
             )}
           >
             <KbFileFormatIcon
@@ -370,7 +396,9 @@ function KbSlidePreviewFrame({
                 if (previewPdfUrl) {
                   setUsePdfFallback(true);
                 } else {
-                  setError("Visual slide preview is unavailable for this file. Use Download original.");
+                  setError(
+                    "Visual slide preview is unavailable for this file. Use Download original."
+                  );
                 }
               }}
             />
@@ -397,10 +425,7 @@ function KbSlidePreviewFrame({
               <img
                 src={kbSlideUrl(asset.id, index, slideCacheVersion)}
                 alt=""
-                className={cn(
-                  "object-cover bg-white",
-                  fullScreen ? "h-16 w-28" : "h-14 w-24"
-                )}
+                className={cn("object-cover bg-white", fullScreen ? "h-16 w-28" : "h-14 w-24")}
                 loading="lazy"
               />
             </button>

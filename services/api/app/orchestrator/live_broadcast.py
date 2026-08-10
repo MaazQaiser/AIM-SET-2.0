@@ -117,9 +117,14 @@ def transcript_event_to_ws(event: Dict[str, Any]) -> Dict[str, Any]:
         "type": "transcript",
         "payload": {
             "id": event.get("id"),
-            "speakerId": event.get("speaker_id"),
-            "speakerName": event.get("speaker_name") or event.get("speaker_id"),
-            "speakerRole": _normalize_role(event.get("speaker_role")),
+            "speakerId": event.get("speaker_id") or event.get("speakerId"),
+            "speakerName": (
+                event.get("speaker_name")
+                or event.get("speakerName")
+                or event.get("speaker_id")
+                or event.get("speakerId")
+            ),
+            "speakerRole": _normalize_role(event.get("speaker_role") or event.get("speakerRole")),
             "text": event.get("text"),
             "timestamp": ts,
             "keywords": event.get("keywords") or [],

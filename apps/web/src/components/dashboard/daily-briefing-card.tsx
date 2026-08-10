@@ -5,14 +5,15 @@ import { Card, CardContent } from "@dc-copilot/ui/components/card";
 import { briefMainBody } from "@/components/pre-call/brief-detail-card";
 import { cn } from "@/lib/cn";
 import {
-  callOpportunityValue,
   callScheduleDate,
-  formatOpportunityValue,
+  isCallOnDay,
   todaysOpenCalls,
-  totalOpportunityValue,
 } from "@/lib/dashboard/call-metrics";
+import { companyRatingForCall, icpScoreFromBucket } from "@/lib/dc-notes/icp-rating";
 import {
   useCalls,
+  useContentManagerSidebarStats,
+  usePostCallTasks,
   usePreDcContentGenerationGaps,
   type PreDcContentGenerationGap,
 } from "@/lib/data/hooks";
@@ -21,13 +22,16 @@ import type { Call } from "@/types";
 type ContentPrepItem = {
   callId: string;
   type: string;
-  source: "ai" | "strategic";
+  source: "ai";
 };
 
 type AttentionItem = {
   call: Call;
+  agentRating: number;
   score: number;
 };
+
+const CLOSE_ICP_MATCH_THRESHOLD = 0.78;
 
 const CONTENT_TYPE_LABEL: Record<string, string> = {
   deck: "Deck",
@@ -53,16 +57,28 @@ function hasOpenBant(call: Call): boolean {
   );
 }
 
+function callIcpFitScore(call: Call): number {
+  if (typeof call.icpMatch === "number" && Number.isFinite(call.icpMatch)) {
+    return call.icpMatch;
+  }
+
+  return icpScoreFromBucket(call.icpBucket ?? "");
+}
+
+function hasCloseIcpMatch(call: Call): boolean {
+  return callIcpFitScore(call) >= CLOSE_ICP_MATCH_THRESHOLD;
+}
+
 function buildContentPrepItems(
   todaysCalls: Call[],
-  gaps: PreDcContentGenerationGap[],
-  gapsLoading: boolean
+  gaps: PreDcContentGenerationGap[]
 ): ContentPrepItem[] {
   const todayIds = new Set(todaysCalls.map((call) => call.id));
   const callTimeById = new Map(
     todaysCalls.map((call) => [call.id, callScheduleDate(call).getTime()])
   );
-  const aiItems = gaps
+
+  return gaps
     .filter((gap) => todayIds.has(gap.callId))
     .sort((a, b) => {
       if (a.priority !== b.priority) return a.priority - b.priority;
@@ -73,14 +89,6 @@ function buildContentPrepItems(
       type: gap.type,
       source: "ai",
     }));
-
-  if (aiItems.length > 0 || gapsLoading) return aiItems;
-
-  return todaysCalls.slice(0, 3).map((call) => ({
-    callId: call.id,
-    type: "deck",
-    source: "strategic",
-  }));
 }
 
 function buildAttentionItems(
@@ -95,54 +103,34 @@ function buildAttentionItems(
   return todaysCalls
     .map((call) => {
       const contentCount = contentCountByCall.get(call.id) ?? 0;
-      const opportunity = callOpportunityValue(call);
       const needsBant = hasOpenBant(call);
+      const agentRating = companyRatingForCall(call);
+      const closeIcpMatch = hasCloseIcpMatch(call);
       const score =
-        opportunity / 1_000_000 +
         contentCount * 20 +
+        (agentRating >= 7 ? 24 : 0) +
+        (closeIcpMatch ? 18 : 0) +
         (call.briefReady ? 0 : 16) +
         (needsBant ? 8 : 0) +
-        (call.status === "live" ? 30 : 0);
+        (call.status === "live" ? 30 : 0) +
+        (call.leadName ? 10 : 0) +
+        (call.leadTitle ? 6 : 0);
 
-      return { call, score };
+      return { call, agentRating, score };
     })
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return callScheduleDate(a.call).getTime() - callScheduleDate(b.call).getTime();
+    })
     .slice(0, 3);
 }
 
-function prepLabel(items: ContentPrepItem[], loading: boolean): string {
-  if (loading && items.length === 0) return "Checking prep";
-  if (items.length === 0) return "Prep clear";
-
-  const countByType = new Map<string, number>();
-  for (const item of items) {
-    countByType.set(item.type, (countByType.get(item.type) ?? 0) + 1);
-  }
-
-  const [primaryType, primaryCount] = [...countByType.entries()].sort(
-    (a, b) => b[1] - a[1]
-  )[0] ?? ["content", items.length];
-  const primaryLabel = contentTypeLabel(primaryType, primaryCount !== 1).toLowerCase();
-  const remainder = items.length - primaryCount;
-
-  if (remainder > 0) {
-    return `${items.length} prep items (${primaryCount} ${primaryLabel} + ${remainder} more)`;
-  }
-
-  return `${items.length} ${primaryLabel}`;
-}
-
-function leadFocusLabel(call?: Call): string {
-  if (!call) return "No urgent lead";
-  return call.leadName ? `${call.leadName} at ${call.accountName}` : call.accountName;
-}
-
-type HighlightTone = "calls" | "opportunity" | "lead" | "prep" | "ai";
+type HighlightTone = "calls" | "lead" | "postDc" | "prep" | "ai";
 
 const HIGHLIGHT_TONE_CLASS: Record<HighlightTone, string> = {
   calls: "bg-primary/15 text-primary dark:bg-primary/25",
-  opportunity: "bg-amber-100/90 text-amber-950 dark:bg-amber-500/20 dark:text-amber-100",
   lead: "bg-violet-100/90 text-violet-950 dark:bg-violet-500/20 dark:text-violet-100",
+  postDc: "bg-amber-100/90 text-amber-950 dark:bg-amber-500/20 dark:text-amber-100",
   prep: "bg-emerald-100/90 text-emerald-950 dark:bg-emerald-500/20 dark:text-emerald-100",
   ai: "bg-blue-100/90 text-blue-950 dark:bg-blue-500/20 dark:text-blue-100",
 };
@@ -160,41 +148,139 @@ function Highlight({ tone, children }: { tone: HighlightTone; children: ReactNod
   );
 }
 
+function joinList(items: string[]): string {
+  const unique = [...new Set(items.filter(Boolean))];
+  if (unique.length <= 1) return unique[0] ?? "";
+  if (unique.length === 2) return `${unique[0]} and ${unique[1]}`;
+  return `${unique.slice(0, -1).join(", ")}, and ${unique[unique.length - 1]}`;
+}
+
+function priorityReasonText(items: AttentionItem[], contentPrepItems: ContentPrepItem[]): string {
+  if (items.length === 0) return "they are nearest on the calendar";
+
+  const callIds = new Set(items.map((item) => item.call.id));
+  const hasMaterialPrep = contentPrepItems.some((item) => callIds.has(item.callId));
+  const hasStrongAgentRating = items.some((item) => item.agentRating >= 7);
+  const hasCloseIcp = items.some((item) => hasCloseIcpMatch(item.call));
+  const hasBriefReview = items.some((item) => !item.call.briefReady);
+  const hasDiscoveryGaps = items.some((item) => hasOpenBant(item.call));
+  const hasLiveCall = items.some((item) => item.call.status === "live");
+  const plural = items.length > 1;
+  const signals: string[] = [];
+
+  if (hasStrongAgentRating) {
+    signals.push(plural ? "carry agent rating 7+ signals" : "carries an agent rating of 7+");
+  }
+  if (hasCloseIcp) signals.push(plural ? "have close ICP match" : "has close ICP match");
+  if (hasLiveCall) signals.push(plural ? "are live or starting soon" : "is live or starting soon");
+  if (hasMaterialPrep) {
+    signals.push(plural ? "have material recommendations pending" : "has a material recommendation pending");
+  }
+  if (hasBriefReview) signals.push(plural ? "still need brief review" : "still needs brief review");
+  if (hasDiscoveryGaps) {
+    signals.push(plural ? "have discovery gaps to cover" : "has discovery gaps to cover");
+  }
+
+  if (signals.length === 0) {
+    return plural ? "they are nearest on the calendar" : "it is nearest on the calendar";
+  }
+
+  return `${plural ? "they" : "it"} ${joinList(signals.slice(0, 2))}`;
+}
+
+function postDcActionLabels(taskTypes: string[]): string {
+  const labels = taskTypes.map((type) => {
+    if (type === "follow_up") return "send follow-up";
+    if (type === "content_request") return "send requested material";
+    if (type === "schedule_next_meeting") return "schedule next meeting";
+    if (type === "internal_review") return "complete internal review";
+    return "confirm next steps";
+  });
+
+  return joinList(labels.slice(0, 3)) || "confirm next steps";
+}
+
+function materialRecommendation(items: ContentPrepItem[], loading: boolean): string {
+  if (loading && items.length === 0) {
+    return "AI is checking material recommendations for your priority calls.";
+  }
+
+  if (items.length === 0) {
+    return "AI has no new material recommendation for priority calls.";
+  }
+
+  const labels = joinList(
+    [...new Set(items.map((item) => contentTypeLabel(item.type).toLowerCase()))].slice(0, 2)
+  );
+
+  return `AI recommends ${labels} for your priority calls.`;
+}
+
+function overallPrepLine({
+  count,
+  loading,
+  label,
+}: {
+  count: number;
+  loading: boolean;
+  label: string;
+}): ReactNode {
+  if (loading) return "Overall prep creation count is still being checked.";
+  if (count === 0) return "Overall, no prep items are pending creation.";
+
+  return (
+    <>
+      Overall, <Highlight tone="prep">{label}</Highlight> {count === 1 ? "is" : "are"} still
+      pending creation.
+    </>
+  );
+}
+
 export function DailyBriefingCard({ enabled = true }: { enabled?: boolean }) {
   const { data: calls = [] } = useCalls();
+  const { data: postCallTasks = [] } = usePostCallTasks();
   const { data: contentGaps = [], isLoading: contentGapsLoading } =
     usePreDcContentGenerationGaps();
+  const {
+    toGenerateCount: overallPrepCount,
+    isLoading: overallPrepLoading,
+  } = useContentManagerSidebarStats();
 
   const todaysCalls = useMemo(() => todaysOpenCalls(calls), [calls]);
-  const totalOpportunity = useMemo(
-    () => totalOpportunityValue(todaysCalls),
-    [todaysCalls]
+  const completedTodayCount = useMemo(
+    () => calls.filter((call) => call.status === "completed" && isCallOnDay(call)).length,
+    [calls]
   );
   const contentPrepItems = useMemo(
-    () => buildContentPrepItems(todaysCalls, contentGaps, contentGapsLoading),
-    [contentGaps, contentGapsLoading, todaysCalls]
+    () => buildContentPrepItems(todaysCalls, contentGaps),
+    [contentGaps, todaysCalls]
   );
   const attentionItems = useMemo(
     () => buildAttentionItems(todaysCalls, contentPrepItems),
     [contentPrepItems, todaysCalls]
   );
-  const topOpportunity = todaysCalls
-    .slice()
-    .sort((a, b) => callOpportunityValue(b) - callOpportunityValue(a))[0];
-  const leadFocus = attentionItems[0]?.call ?? topOpportunity;
-  const prepText = prepLabel(contentPrepItems, contentGapsLoading);
-  const aiPrepCount = contentPrepItems.filter((item) => item.source === "ai").length;
+  const pendingPostDcActions = useMemo(
+    () => postCallTasks.filter((task) => task.status === "pending_approval"),
+    [postCallTasks]
+  );
+  const priorityItems = attentionItems.slice(0, 2);
+  const priorityText = joinList(priorityItems.map((item) => item.call.accountName));
   const callsText = `${todaysCalls.length} call${todaysCalls.length === 1 ? "" : "s"}`;
-  const opportunityText =
-    totalOpportunity > 0 ? formatOpportunityValue(totalOpportunity) : "opportunity";
-  const leadText = leadFocusLabel(leadFocus);
-
-  const summary =
-    todaysCalls.length === 0
-      ? enabled
-        ? "No discovery calls are scheduled for today. Use the window to clear approvals, review upcoming accounts, and create the next reusable sales assets."
-        : "Dashboard data is still loading. The brief will summarize calls, opportunity, lead focus, and content prep once imports are ready."
-      : null;
+  const postDcText = `${pendingPostDcActions.length} post-DC action${
+    pendingPostDcActions.length === 1 ? "" : "s"
+  }`;
+  const pendingPrepText = `${overallPrepCount} prep item${
+    overallPrepCount === 1 ? "" : "s"
+  }`;
+  const recommendationText = materialRecommendation(contentPrepItems, contentGapsLoading);
+  const postDcLabels = postDcActionLabels(
+    pendingPostDcActions.map((task) => task.task_type)
+  );
+  const overallPrep = overallPrepLine({
+    count: overallPrepCount,
+    loading: overallPrepLoading,
+    label: pendingPrepText,
+  });
 
   return (
     <Card>
@@ -207,34 +293,39 @@ export function DailyBriefingCard({ enabled = true }: { enabled?: boolean }) {
             "max-w-6xl break-words text-[1.35rem] leading-[1.55] text-foreground/90"
           )}
         >
-          {summary ?? (
+          {!enabled ? (
+            "Dashboard data is still loading. The brief will summarize calls, post-DC actions, and material creation once imports are ready."
+          ) : todaysCalls.length === 0 ? (
             <>
-              <Highlight tone="calls">{callsText}</Highlight> today with{" "}
-              <Highlight tone="opportunity">{opportunityText}</Highlight>{" "}
-              {totalOpportunity > 0 ? "in visible opportunity" : "still needing sizing"}.{" "}
-              {leadFocus ? (
+              No calls are scheduled in the brief window. Use the time to clear post-DC actions, review
+              completed discovery notes, and create pending materials.{" "}
+              {overallPrep}
+            </>
+          ) : (
+            <>
+              You have <Highlight tone="calls">{callsText}</Highlight> in focus.{" "}
+              {priorityItems.length > 0 ? (
                 <>
-                  <Highlight tone="lead">{leadText}</Highlight> needs the first prep pass.
+                  Prioritize <Highlight tone="lead">{priorityText}</Highlight> because{" "}
+                  {priorityReasonText(priorityItems, contentPrepItems)}.
                 </>
               ) : (
-                "No lead needs urgent attention yet."
+                "No call needs special attention yet."
               )}{" "}
-              {contentGapsLoading && contentPrepItems.length === 0 ? (
-                "AI is checking the content gaps now."
-              ) : contentPrepItems.length > 0 ? (
+              {pendingPostDcActions.length > 0 ? (
                 <>
-                  <Highlight tone="prep">{prepText}</Highlight> should be prepared
-                  {aiPrepCount > 0 ? (
-                    <>
-                      {" "}
-                      with <Highlight tone="ai">AI suggestions</Highlight> ready
-                    </>
-                  ) : null}
-                  .
+                  From completed discovery calls, <Highlight tone="postDc">{postDcText}</Highlight>{" "}
+                  {pendingPostDcActions.length === 1 ? "is" : "are"} pending: {postDcLabels}.
+                </>
+              ) : completedTodayCount > 0 ? (
+                <>
+                  From completed discovery calls,{" "}
+                  <Highlight tone="postDc">no post-DC actions</Highlight> are pending right now.
                 </>
               ) : (
-                "No deck or content gaps are flagged yet."
-              )}
+                "No completed discovery calls need post-DC follow-up yet."
+              )}{" "}
+              <Highlight tone="ai">{recommendationText}</Highlight> {overallPrep}
             </>
           )}
         </p>

@@ -216,28 +216,40 @@ export async function createProjectFromPreDeck(input: {
     title: string;
     narrative: string;
     sourceType?: string;
+    sourceId?: string | null;
     assetId?: string | null;
   }>;
   industry?: string;
 }): Promise<string> {
-  const slidePlan = input.slides.map((slide, index) => ({
-    slide: index + 1,
-    heading: slide.title,
-    body: slide.narrative,
-    intent: slide.narrative.slice(0, 200),
-    mode: slide.sourceType === "knowledge_base" && slide.assetId ? ("reuse" as const) : ("generate" as const),
-    evidence_refs: slide.assetId ? [`kb:${slide.assetId}`] : [`session:${input.callId}`],
-    data_points: [slide.narrative.slice(0, 120)],
-    ...(slide.sourceType === "knowledge_base" && slide.assetId
-      ? {
-          reuse: {
-            source_asset_id: slide.assetId,
-            source_slide_index: Math.min(index + 1, 3),
-            rationale: "Imported from pre-call deck KB match",
-          },
-        }
-      : {}),
-  }));
+  const slidePlan = input.slides.map((slide, index) => {
+    const evidenceRefs =
+      slide.sourceType === "project_database"
+        ? [`project:${slide.sourceId ?? slide.assetId ?? slide.id}`]
+        : slide.assetId
+          ? [`kb:${slide.assetId}`]
+          : [`session:${input.callId}`];
+    return {
+      slide: index + 1,
+      heading: slide.title,
+      body: slide.narrative,
+      intent: slide.narrative.slice(0, 200),
+      mode:
+        slide.sourceType === "knowledge_base" && slide.assetId
+          ? ("reuse" as const)
+          : ("generate" as const),
+      evidence_refs: evidenceRefs,
+      data_points: [slide.narrative.slice(0, 120)],
+      ...(slide.sourceType === "knowledge_base" && slide.assetId
+        ? {
+            reuse: {
+              source_asset_id: slide.assetId,
+              source_slide_index: Math.min(index + 1, 3),
+              rationale: "Imported from pre-call deck KB match",
+            },
+          }
+        : {}),
+    };
+  });
 
   const suggestionPlan: import("@/types/content_studio").SuggestionPlan = {
     suggestion_id: `predeck:${input.callId}`,

@@ -1,4 +1,5 @@
-import type { DiscoveryChecklistState } from "@dc-copilot/types";
+import { formatBudgetUsd } from "@/lib/currency-format";
+import type { BantSignal, DiscoveryChecklistState } from "@dc-copilot/types";
 
 const FALLBACK_LABELS: Record<string, string> = {
   budget: "Budget",
@@ -8,9 +9,24 @@ const FALLBACK_LABELS: Record<string, string> = {
   next_step: "Next step",
 };
 
+export const LIVE_BANT_KEYS = ["budget", "authority", "need", "timeline"] as const;
+export type LiveBantKey = (typeof LIVE_BANT_KEYS)[number];
+
+export const liveBantLabels: Record<LiveBantKey, string> = {
+  budget: "Budget",
+  authority: "Authority",
+  need: "Need",
+  timeline: "Timeline",
+};
+
 export interface ChecklistDisplayGaps {
   missing: string[];
   partial: string[];
+}
+
+export interface BantDisplayEvidence {
+  value?: string | null;
+  snippet?: string | null;
 }
 
 function labelFromId(id: string): string {
@@ -33,7 +49,8 @@ export function checklistDisplayGaps(
 
   for (const item of items) {
     const isOpenTracked =
-      item.tier === "bant" || (Array.isArray(checklist.openGaps) && checklist.openGaps.includes(item.id));
+      item.tier === "bant" ||
+      (Array.isArray(checklist.openGaps) && checklist.openGaps.includes(item.id));
     if (!isOpenTracked) continue;
 
     if (item.status === "partial" && item.tier === "bant") {
@@ -55,9 +72,7 @@ export function checklistDisplayGaps(
   return { missing, partial };
 }
 
-export function formatChecklistDisplayGaps(
-  checklist: DiscoveryChecklistState | null
-): string {
+export function formatChecklistDisplayGaps(checklist: DiscoveryChecklistState | null): string {
   const gaps = checklistDisplayGaps(checklist);
   const parts: string[] = [];
   if (gaps.missing.length > 0) {
@@ -67,4 +82,62 @@ export function formatChecklistDisplayGaps(
     parts.push(`Partial: ${gaps.partial.join(", ")}`);
   }
   return parts.join(" · ");
+}
+
+export function formatBantEvidenceValue(dimension: LiveBantKey, value: string): string {
+  return dimension === "budget" ? formatBudgetUsd(value) : value.trim();
+}
+
+function stripBantLabelPrefix(dimension: LiveBantKey, label: string): string {
+  const dimensionLabel = liveBantLabels[dimension];
+  return label.replace(new RegExp(`^${dimensionLabel}(?:\\s+signal)?:\\s*`, "i"), "").trim();
+}
+
+function isGenericBantLabel(dimension: LiveBantKey, label: string): boolean {
+  const normalized = label.trim().toLowerCase();
+  const dimensionLabel = liveBantLabels[dimension].toLowerCase();
+  return normalized === dimensionLabel || normalized === `${dimensionLabel} signal`;
+}
+
+function signalDisplayValue(signal: BantSignal): string | null {
+  const value = signal.value?.trim();
+  if (value) return formatBantEvidenceValue(signal.dimension, value);
+
+  const snippet = signal.snippet?.trim();
+  if (snippet) return formatBantEvidenceValue(signal.dimension, snippet);
+
+  const label = signal.label?.trim();
+  if (!label || isGenericBantLabel(signal.dimension, label)) return null;
+
+  const strippedLabel = stripBantLabelPrefix(signal.dimension, label);
+  if (!strippedLabel || isGenericBantLabel(signal.dimension, strippedLabel)) return null;
+
+  return formatBantEvidenceValue(signal.dimension, strippedLabel);
+}
+
+export function confirmedBantDisplayValue({
+  dimension,
+  status,
+  evidence,
+  signals = [],
+}: {
+  dimension: LiveBantKey;
+  status: string;
+  evidence?: BantDisplayEvidence;
+  signals?: BantSignal[];
+}): string | null {
+  if (status !== "confirmed") return null;
+
+  const evidenceValue = evidence?.value?.trim();
+  if (evidenceValue) return formatBantEvidenceValue(dimension, evidenceValue);
+
+  for (const signal of signals) {
+    const value = signalDisplayValue(signal);
+    if (value) return value;
+  }
+
+  const snippet = evidence?.snippet?.trim();
+  if (snippet) return formatBantEvidenceValue(dimension, snippet);
+
+  return null;
 }

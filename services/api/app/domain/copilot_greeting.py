@@ -48,12 +48,12 @@ def _suggestions(surface: str) -> List[str]:
 
 def _content(surface: str) -> str:
     if surface == "live_dc":
-        return "Hi. What can I help you with on this call?"
+        return "Hi, I'm with you. Let's keep this call moving well. What do you want help with next?"
     if surface == "pre_dc":
-        return "Hi. What can I help you prepare?"
+        return "Hi, I'm ready. What should we tighten before the call?"
     if surface == "post_dc":
-        return "Hi. What can I help you wrap up?"
-    return "Hi. What can I help you with?"
+        return "Hi, nice work getting through the call. What should we wrap up first?"
+    return "Hi, I'm ready to help. What should we tackle first?"
 
 
 def simple_greeting_response(message: str, surface: str = "global") -> Dict[str, Any] | None:

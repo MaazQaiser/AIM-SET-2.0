@@ -89,7 +89,7 @@ def test_daily_briefing_regenerates_when_context_changes(monkeypatch):
     )
     assert first.status_code == 200
     assert first.json()["cached"] is False
-    assert "No discovery calls" in first.json()["paragraph"]
+    assert "No calls" in first.json()["paragraph"]
 
     changed = client.post(
         "/api/v1/agents/briefing",

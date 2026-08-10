@@ -337,6 +337,49 @@ def test_live_call_repository_falls_back_to_memory_when_tenant_resolution_fails(
     assert fake_supabase.calls == []
 
 
+def test_append_transcript_event_marks_call_completed_in_memory(monkeypatch):
+    from app.domain import live_call_repository as repo_module
+
+    class _SupabaseDisabledSettings:
+        supabase_configured = False
+
+    call_id = "call-transcript-complete"
+    ctx = TenantContext(tenant_id="tenant-transcript-complete", user_id="u1", clerk_org_id=None)
+    tenant_key = "tenant-transcript-complete"
+    store = get_memory_store()
+    store.live_sessions.pop(tenant_key, None)
+    store.transcript_events.pop(tenant_key, None)
+    store.calls[tenant_key] = [
+        {
+            "id": call_id,
+            "accountName": "Transcript Complete",
+            "scheduledAt": "2026-06-08T07:00:00+00:00",
+            "status": "upcoming",
+            "briefReady": True,
+            "pod": [],
+        }
+    ]
+
+    monkeypatch.setattr(repo_module, "get_settings", lambda: _SupabaseDisabledSettings())
+
+    repo = LiveCallRepository()
+    repo.append_transcript_event(
+        ctx,
+        call_id,
+        {
+            "id": "segment-complete",
+            "speaker_id": "buyer",
+            "speaker_role": "customer",
+            "text": "We need the proposal after this discovery call.",
+            "offset_seconds": 12,
+            "provider_event_id": "segment-complete",
+        },
+    )
+
+    assert store.list_calls(tenant_key)[0]["status"] == "completed"
+    assert store.transcript_events[tenant_key][call_id][0]["text"].startswith("We need")
+
+
 def test_live_call_session_defaults_to_null_until_provider_or_transcript(monkeypatch):
     from app.domain import live_call_repository as repo_module
 

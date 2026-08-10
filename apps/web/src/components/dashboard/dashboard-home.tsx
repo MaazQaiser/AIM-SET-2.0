@@ -4,8 +4,7 @@ import { useDcImportsStore } from "@/stores/use-dc-imports";
 import { usePersona } from "@/hooks/use-persona";
 import { AssistantGreeting } from "./assistant-greeting";
 import { DailyBriefingCard } from "./daily-briefing-card";
-import { AiTodoList } from "./ai-todo-list";
-import { UnifiedAgenda } from "./unified-agenda";
+import { CallFocusPanel } from "./call-focus-panel";
 import { QuickActions } from "./quick-actions";
 import { LeadershipDashboardExtras } from "./leadership-dashboard";
 import { DashboardImportPrompt } from "./dashboard-import-prompt";
@@ -34,10 +33,7 @@ export function DashboardHome() {
       <AssistantGreeting />
       {showImportPrompt && <DashboardImportPrompt />}
       <DailyBriefingCard enabled={importsHydrated} />
-      <div className="grid gap-3 lg:grid-cols-2 lg:items-stretch">
-        <AiTodoList />
-        <UnifiedAgenda />
-      </div>
+      <CallFocusPanel />
       <QuickActions />
     </PageShell>
   );

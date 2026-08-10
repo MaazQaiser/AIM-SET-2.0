@@ -263,7 +263,6 @@ export function LiveCallWorkspace({
     <LiveWidgetAccordionCard
       icon={BookOpen}
       title="Relevant Content"
-      summary="Projects and presentations"
       bodyClassName="min-h-0"
     >
       <LiveRelevantContentWidget

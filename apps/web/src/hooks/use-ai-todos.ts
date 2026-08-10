@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { addHours, format, isWithinInterval } from "date-fns";
+import { addHours, format, isWithinInterval, subMinutes } from "date-fns";
 import { latestPostDcHref } from "@/lib/dashboard/call-links";
 import {
   useCalls,
@@ -14,12 +14,24 @@ import {
   callOpportunityValue,
   callScheduleDate,
   todaysOpenCalls,
+  upcomingOpenCalls,
 } from "@/lib/dashboard/call-metrics";
 import { buildArtifactStudioHref } from "@/lib/content-studio/artifact-studio-href";
 import type { AgentId } from "@/types/agents";
+import { useDcImportsStore } from "@/stores/use-dc-imports";
+import { isPrepMarkedReady } from "@/lib/dc-data/prep-ready-overrides";
+import { useCallWorkflowStore } from "@/stores/use-call-workflow";
 
 export type AiTodoAgent = AgentId;
 export type AiTodoPriority = "high" | "medium" | "low";
+export type AiTodoKind =
+  | "call_prep"
+  | "content_asset"
+  | "deck"
+  | "brief"
+  | "post_dc"
+  | "coaching"
+  | "lead_hub";
 
 export interface AiTodo {
   id: string;
@@ -28,13 +40,8 @@ export interface AiTodo {
   agent: AiTodoAgent;
   priority: AiTodoPriority;
   href: string;
-}
-
-function contentTypeLabel(type: string): string {
-  if (type === "case_study") return "case study";
-  if (type === "one_pager") return "one-pager";
-  if (type === "demo_script") return "demo script";
-  return type.replace(/_/g, " ");
+  kind: AiTodoKind;
+  callId?: string;
 }
 
 function compactText(value: string, limit = 56): string {
@@ -61,18 +68,54 @@ export function useAiTodos() {
   );
   const topClpCallId = topClpAccount?.callId ?? latestCompletedCall?.id;
   const { data: topLandingPage } = useLandingPage(topClpCallId ?? "");
+  const crmTasksByCallId = useDcImportsStore((state) => state.crmTasksByCallId);
+  const prepReadyByCallId = useCallWorkflowStore((state) => state.prepReadyByCallId);
 
   const todos = useMemo(() => {
     const items: AiTodo[] = [];
     const now = new Date();
     const in24h = addHours(now, 24);
     const in2h = addHours(now, 2);
+    const focusStart = subMinutes(now, 30);
     const todayCalls = todaysOpenCalls(calls, now);
-    const todayCallIds = new Set(todayCalls.map((call) => call.id));
-    const todayContentGaps = contentGaps.filter((gap) => todayCallIds.has(gap.callId));
+    const focusCalls = upcomingOpenCalls(calls, now).filter((call) => {
+      if (call.status === "live") return true;
+      const at = callScheduleDate(call);
+      return (
+        Number.isFinite(at.getTime()) &&
+        isWithinInterval(at, { start: focusStart, end: in24h })
+      );
+    });
+    const focusCallIds = new Set(focusCalls.map((call) => call.id));
+    const focusContentGaps = contentGaps.filter(
+      (gap) => focusCallIds.has(gap.callId) && !isPrepMarkedReady(gap.callId, prepReadyByCallId)
+    );
 
+    const pendingTaskGroups = Object.entries(crmTasksByCallId)
+      .map(([callId, tasks]) => ({
+        callId,
+        tasks: tasks.filter((task) => task.status === "pending_approval"),
+      }))
+      .filter((group) => group.tasks.length > 0);
     const pendingTasks = taskList.filter((t) => t.status === "pending_approval");
-    if (pendingTasks.length > 0) {
+
+    if (pendingTaskGroups.length > 0) {
+      for (const group of pendingTaskGroups) {
+        const hasFollowUp = group.tasks.some((task) => task.task_type === "follow_up");
+        items.push({
+          id: `todo-task-list-${group.callId}`,
+          title: hasFollowUp
+            ? "Approve follow-up email & tasks"
+            : `Approve ${group.tasks.length} task${group.tasks.length > 1 ? "s" : ""}`,
+          subtitle: `${group.tasks.length} awaiting sign-off`,
+          agent: "post_dc",
+          priority: "high",
+          href: `/calls/${group.callId}/post-dc`,
+          kind: "post_dc",
+          callId: group.callId,
+        });
+      }
+    } else if (pendingTasks.length > 0) {
       const hasFollowUp = pendingTasks.some((t) => t.task_type === "follow_up");
       items.push({
         id: "todo-task-list-batch",
@@ -83,10 +126,13 @@ export function useAiTodos() {
         agent: "post_dc",
         priority: "high",
         href: latestPostDcHref(calls),
+        kind: "post_dc",
+        callId: latestCompletedCall?.id,
       });
     }
 
-    for (const call of todayCalls) {
+    for (const call of focusCalls) {
+      if (isPrepMarkedReady(call.id, prepReadyByCallId)) continue;
       const at = callScheduleDate(call);
       const lead = call.leadName
         ? `${call.leadName}${call.leadTitle ? ` · ${call.leadTitle}` : ""}`
@@ -105,27 +151,32 @@ export function useAiTodos() {
         agent: "live-call",
         priority: urgent ? "high" : "medium",
         href: call.status === "live" ? `/calls/${call.id}/live` : `/calls/${call.id}`,
+        kind: "call_prep",
+        callId: call.id,
       });
     }
 
-    for (const gap of todayContentGaps) {
-      const type = contentTypeLabel(gap.type);
+    for (const gap of focusContentGaps) {
       items.push({
         id: `todo-content-${gap.id}`,
-        title: `Generate ${type} for ${gap.accountName}`,
-        subtitle: compactText(gap.name, 48),
+        title: `Prepare and finalize material for ${gap.accountName}`,
+        subtitle: compactText(gap.contentRequirements || gap.reason || "AI suggested material", 48),
         agent: "content_generation",
         priority: gap.priority <= 1 ? "high" : "medium",
         href: gap.studioHref,
+        kind: "content_asset",
+        callId: gap.callId,
       });
     }
 
-    const callsWithAiContent = new Set(todayContentGaps.map((gap) => gap.callId));
-    for (const call of todayCalls.filter((c) => !callsWithAiContent.has(c.id))) {
+    const callsWithAiContent = new Set(focusContentGaps.map((gap) => gap.callId));
+    for (const call of focusCalls.filter(
+      (c) => !callsWithAiContent.has(c.id) && !isPrepMarkedReady(c.id, prepReadyByCallId)
+    )) {
       items.push({
         id: `todo-deck-${call.id}`,
-        title: `Prepare deck for ${call.accountName}`,
-        subtitle: "Tailor proof points",
+        title: `Prepare and finalize material for ${call.accountName}`,
+        subtitle: "Finalize proof points",
         agent: "content_generation",
         priority: "medium",
         href: buildArtifactStudioHref({
@@ -135,6 +186,8 @@ export function useAiTodos() {
           leadName: call.leadName,
           assetName: `${call.accountName} discovery deck`,
         }),
+        kind: "deck",
+        callId: call.id,
       });
     }
 
@@ -161,6 +214,8 @@ export function useAiTodos() {
             ? "high"
             : "medium",
         href: `/calls/${topClpCallId}/landing-page/activity`,
+        kind: "lead_hub",
+        callId: topClpCallId,
       });
     } else if (topClpCallId && topLandingPage?.status === "draft") {
       items.push({
@@ -170,6 +225,8 @@ export function useAiTodos() {
         agent: "post_dc",
         priority: "medium",
         href: `/calls/${topClpCallId}/landing-page`,
+        kind: "lead_hub",
+        callId: topClpCallId,
       });
     } else if (clpAnalytics && clpAnalytics.publishedCount > 0) {
       items.push({
@@ -179,6 +236,7 @@ export function useAiTodos() {
         agent: "post_dc",
         priority: clpAnalytics.totalUniqueVisitors > 0 ? "medium" : "low",
         href: "/analytics/landing-pages",
+        kind: "lead_hub",
       });
     }
 
@@ -190,15 +248,17 @@ export function useAiTodos() {
         agent: "discovery-checklist",
         priority: "high",
         href: insight.callId ? `/calls/${insight.callId}` : "/coaching",
+        kind: "coaching",
+        callId: insight.callId,
       });
     }
 
-    for (const call of calls) {
-      const at = new Date(call.scheduledAt);
+    for (const call of focusCalls) {
+      if (isPrepMarkedReady(call.id, prepReadyByCallId)) continue;
+      const at = callScheduleDate(call);
       if (
-        (call.status === "upcoming" || call.status === "live") &&
         !call.briefReady &&
-        isWithinInterval(at, { start: now, end: in24h })
+        isWithinInterval(at, { start: focusStart, end: in24h })
       ) {
         items.push({
           id: `todo-brief-${call.id}`,
@@ -207,6 +267,8 @@ export function useAiTodos() {
           agent: "content",
           priority: "medium",
           href: `/calls/${call.id}`,
+          kind: "brief",
+          callId: call.id,
         });
       }
     }
@@ -224,7 +286,9 @@ export function useAiTodos() {
     clpAnalytics,
     coachingInsights,
     contentGaps,
+    crmTasksByCallId,
     latestCompletedCall,
+    prepReadyByCallId,
     taskList,
     topClpAccount,
     topClpCallId,

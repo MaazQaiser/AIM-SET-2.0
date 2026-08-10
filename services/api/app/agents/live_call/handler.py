@@ -14,6 +14,7 @@ from app.agents.live_call_agent import bot_chat_response, build_session_summary,
 from app.domain.call_channel import get_call_channel
 from app.domain.calls_service import CallsService
 from app.domain.live_call_repository import get_live_call_repository
+from app.domain.speaker_roles import infer_speaker_role
 from app.orchestrator.live_broadcast import envelope_to_ws_messages, transcript_event_to_ws
 
 _logger = logging.getLogger(__name__)
@@ -155,18 +156,40 @@ def handle_transcript_segment(
 ) -> Dict[str, Any]:
     repo = get_live_call_repository()
     repo.get_or_create_session(ctx, call_id)
+    calls_service = CallsService()
+
+    raw_speaker_id = segment.get("speakerId") or segment.get("speaker_id") or "unknown"
+    raw_speaker_name = (
+        segment.get("speakerName")
+        or segment.get("speaker_name")
+        or raw_speaker_id
+        or "Speaker"
+    )
+    call_context: Dict[str, Any] = {}
+    brief_context: Optional[Dict[str, Any]] = None
+    try:
+        call_context = calls_service.get_call(ctx, call_id) or {}
+    except Exception:
+        _logger.exception("call lookup failed during speaker role inference call_id=%s", call_id)
+    try:
+        brief_context = calls_service.get_brief(ctx, call_id)
+    except Exception:
+        _logger.exception("brief lookup failed during speaker role inference call_id=%s", call_id)
+
+    speaker_role = infer_speaker_role(
+        explicit_role=segment.get("speakerRole") or segment.get("speaker_role"),
+        speaker_id=raw_speaker_id,
+        speaker_name=raw_speaker_name,
+        text=segment.get("text") or "",
+        call=call_context,
+        brief=brief_context,
+    )
 
     normalized = {
         "id": segment.get("id") or str(uuid.uuid4()),
-        "speaker_id": segment.get("speakerId") or segment.get("speaker_id") or "unknown",
-        "speaker_name": (
-            segment.get("speakerName")
-            or segment.get("speaker_name")
-            or segment.get("speakerId")
-            or segment.get("speaker_id")
-            or "Speaker"
-        ),
-        "speaker_role": segment.get("speakerRole") or segment.get("speaker_role") or "customer",
+        "speaker_id": raw_speaker_id,
+        "speaker_name": raw_speaker_name,
+        "speaker_role": speaker_role,
         "text": segment.get("text") or "",
         "offset_seconds": float(
             segment.get("timestamp")
@@ -178,7 +201,7 @@ def handle_transcript_segment(
     }
     stored = repo.append_transcript_event(ctx, call_id, normalized)
     try:
-        CallsService().mark_call_completed(ctx, call_id)
+        calls_service.mark_call_completed(ctx, call_id)
     except Exception:
         _logger.exception("failed to mark call completed after transcript event call_id=%s", call_id)
     stored["speaker_name"] = (
@@ -259,7 +282,7 @@ def handle_transcript_segment(
 
     advanced: List[AgentEnvelope] = []
     try:
-        brief = CallsService().get_brief(ctx, call_id)
+        brief = brief_context if brief_context is not None else calls_service.get_brief(ctx, call_id)
         advanced = process_transcript_segment(
             ctx,
             call_id,

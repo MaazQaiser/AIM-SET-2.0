@@ -20,6 +20,7 @@ from app.config import get_settings
 from app.agents.copilot_surface_contracts import COPILOT_SURFACE_CONTRACTS
 from app.domain.calls_service import CallsService
 from app.domain.kb_repository import get_kb_repository
+from app.domain.kb_project_repository import list_kb_projects
 from app.domain.kb_tenancy import resolve_kb_tenant
 from app.domain.live_call_repository import get_live_call_repository
 from app.domain.memory_store import get_memory_store
@@ -504,6 +505,11 @@ _KB_SEARCH_TERMS = (
     "proposals",
     "payment",
     "payments",
+    "policy",
+    "policies",
+    "company policy",
+    "sales policy",
+    "commercial policy",
     "pricing",
     "rate card",
     "product",
@@ -541,12 +547,18 @@ _QUERY_STOPWORDS = {
     "about",
     "back",
     "base",
+    "case",
     "come",
+    "call",
+    "company",
+    "current",
+    "detail",
+    "details",
     "find",
     "for",
     "from",
     "give",
-    "industry",  # meta ask word — avoid matching "LinkedIn Industry:" labels
+    "industry",
     "knowledge",
     "list",
     "match",
@@ -555,15 +567,23 @@ _QUERY_STOPWORDS = {
     "need",
     "product",
     "products",
+    "project",
+    "projects",
     "proper",
     "read",
     "recommend",
+    "related",
+    "relevant",
     "search",
     "share",
     "show",
+    "similar",
     "source",
+    "study",
+    "that",
     "tell",
     "the",
+    "this",
     "what",
     "which",
     "with",
@@ -605,23 +625,19 @@ def _looks_like_kb_search(message: str) -> bool:
     return any(term in lower for term in _KB_SEARCH_TERMS)
 
 
-def _looks_like_case_study_or_project(message: str) -> bool:
+def _looks_like_company_policy_question(message: str) -> bool:
     lower = message.lower()
     return any(
-        term in lower
-        for term in (
-            "case study",
-            "case studies",
-            "relevant project",
-            "relevant projects",
-            "project proof",
-            "show a project",
-            "best project",
-            "best case",
+        cue in lower
+        for cue in (
+            "company policy",
+            "company policies",
+            "sales policy",
+            "commercial policy",
+            "policy",
+            "policies",
+            "playbook",
         )
-    ) or (
-        ("project" in lower or "projects" in lower or "case study" in lower)
-        and any(w in lower for w in ("show", "find", "recommend", "relevant", "best", "which", "share"))
     )
 
 
@@ -927,6 +943,536 @@ def _format_kb_hits(hits: List[Dict[str, Any]], *, query: str, empty: str) -> st
     return "\n".join(lines)
 
 
+_PROJECT_VERTICAL_RULES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
+    (
+        "Healthcare",
+        (
+            "healthcare",
+            "health care",
+            "clinic",
+            "clinics",
+            "clinical",
+            "patient",
+            "patients",
+            "hospital",
+            "medical",
+            "pharmacy",
+            "pharma",
+            "ehr",
+            "emr",
+            "fhir",
+            "telehealth",
+            "care management",
+            "behavioral health",
+        ),
+    ),
+    (
+        "Financial Services",
+        (
+            "financial services",
+            "finance",
+            "fintech",
+            "bank",
+            "banking",
+            "payments",
+            "payment",
+            "lending",
+            "loan",
+            "trading",
+            "investment",
+            "wealth",
+        ),
+    ),
+    (
+        "Education",
+        (
+            "education",
+            "edtech",
+            "school",
+            "schools",
+            "student",
+            "students",
+            "classroom",
+            "learning",
+            "lms",
+            "course",
+            "training",
+        ),
+    ),
+    (
+        "Security",
+        (
+            "security",
+            "cybersecurity",
+            "cyber security",
+            "soc 2",
+            "soc2",
+            "compliance",
+            "guard",
+            "patrol",
+            "incident",
+        ),
+    ),
+    (
+        "Real Estate",
+        (
+            "real estate",
+            "property",
+            "properties",
+            "realtor",
+            "tenant",
+            "lease",
+            "leasing",
+        ),
+    ),
+    (
+        "Aviation & Travel",
+        (
+            "aviation",
+            "airline",
+            "flight",
+            "travel",
+            "reservation",
+            "booking",
+        ),
+    ),
+    (
+        "Human Resources",
+        (
+            "human resources",
+            "hr",
+            "hrms",
+            "payroll",
+            "employee",
+            "employees",
+            "leave management",
+            "onboarding",
+        ),
+    ),
+    (
+        "E-Commerce",
+        (
+            "e-commerce",
+            "ecommerce",
+            "online store",
+            "marketplace",
+            "cart",
+            "checkout",
+            "subscription commerce",
+        ),
+    ),
+    (
+        "Retail & Consumer Services",
+        (
+            "retail",
+            "consumer services",
+            "gift card",
+            "loyalty",
+            "store",
+        ),
+    ),
+    (
+        "Transportation & Logistics",
+        (
+            "transportation",
+            "logistics",
+            "fleet",
+            "rail",
+            "shipping",
+            "delivery",
+        ),
+    ),
+    (
+        "Hospitality",
+        (
+            "hospitality",
+            "hotel",
+            "guest",
+            "venue",
+        ),
+    ),
+    (
+        "Food & Beverage",
+        (
+            "food",
+            "restaurant",
+            "catering",
+            "kitchen",
+        ),
+    ),
+    (
+        "Automotive",
+        (
+            "automotive",
+            "dealership",
+            "vehicle",
+            "car",
+        ),
+    ),
+    (
+        "Manufacturing",
+        (
+            "manufacturing",
+            "factory",
+            "production",
+            "industrial",
+        ),
+    ),
+    (
+        "Construction",
+        (
+            "construction",
+            "contractor",
+            "estimation",
+        ),
+    ),
+    (
+        "Legal Services",
+        (
+            "legal",
+            "law firm",
+            "attorney",
+            "ediscovery",
+        ),
+    ),
+    (
+        "Software & IT Services",
+        (
+            "software",
+            "saas",
+            "it services",
+            "technology company",
+            "cloud",
+            "custom software",
+        ),
+    ),
+)
+
+_PROJECT_REQUEST_PHRASES = (
+    "relevant project",
+    "relevant projects",
+    "similar project",
+    "similar projects",
+    "past project",
+    "past projects",
+    "project reference",
+    "project references",
+    "project library",
+    "case study",
+    "case studies",
+)
+
+
+def _looks_like_project_library_question(message: str) -> bool:
+    lower = message.lower()
+    if any(phrase in lower for phrase in _PROJECT_REQUEST_PHRASES):
+        return True
+    if any(phrase in lower for phrase in ("engagement model", "engagement models", "delivery model", "delivery models")):
+        return False
+    has_project_noun = bool(re.search(r"\b(projects?|products?)\b", lower))
+    if not has_project_noun:
+        return False
+    has_request_cue = any(
+        cue in lower
+        for cue in (
+            "show",
+            "share",
+            "find",
+            "list",
+            "what are",
+            "which",
+            "recommend",
+            "for this client",
+            "for this account",
+            "for this call",
+        )
+    )
+    has_match_cue = any(cue in lower for cue in ("industry", "vertical", "client", "account", "similar", "relevant"))
+    return has_request_cue and has_match_cue
+
+
+def _vertical_terms(label: str) -> Tuple[str, ...]:
+    needle = label.lower().strip()
+    for vertical, terms in _PROJECT_VERTICAL_RULES:
+        if vertical.lower() == needle:
+            return terms
+    return (needle,) if needle else ()
+
+
+def _canonical_project_vertical(value: Any) -> str:
+    text = _clean_field_value(value)
+    if not text:
+        return ""
+    lower = text.lower()
+    for vertical, terms in _PROJECT_VERTICAL_RULES:
+        if vertical.lower() in lower or lower in vertical.lower():
+            return vertical
+        if any(term in lower for term in terms):
+            return vertical
+    return text
+
+
+def _project_context_parts(
+    message: str,
+    *,
+    context: Optional[Dict[str, Any]],
+    call: Optional[Dict[str, Any]],
+) -> List[str]:
+    ctx = context or {}
+    parts: List[str] = [message]
+    for source in (ctx, call or {}):
+        for key in (
+            "accountName",
+            "account_name",
+            "leadName",
+            "lead_name",
+            "industry",
+            "vertical",
+            "industryVertical",
+            "intentLabel",
+            "briefSummary",
+        ):
+            value = source.get(key) if isinstance(source, dict) else None
+            if _clean_field_value(value):
+                parts.append(str(value))
+
+    for key in ("openGaps", "pains", "painPoints", "keywords"):
+        value = ctx.get(key)
+        if isinstance(value, list):
+            parts.extend(str(item) for item in value[:8] if _clean_field_value(item))
+
+    selected = ctx.get("selectedInsight")
+    if isinstance(selected, dict):
+        for key in ("message", "label", "kind"):
+            value = selected.get(key)
+            if _clean_field_value(value):
+                parts.append(str(value))
+        details = selected.get("details")
+        if isinstance(details, list):
+            parts.extend(str(item) for item in details[:6] if _clean_field_value(item))
+
+    transcript_tail = ctx.get("transcriptTail")
+    if isinstance(transcript_tail, list):
+        for item in transcript_tail[-8:]:
+            if isinstance(item, dict):
+                text = item.get("text") or item.get("content") or item.get("message")
+                if _clean_field_value(text):
+                    parts.append(str(text))
+            elif _clean_field_value(item):
+                parts.append(str(item))
+
+    return parts
+
+
+def _detect_project_vertical(
+    message: str,
+    *,
+    context: Optional[Dict[str, Any]],
+    call: Optional[Dict[str, Any]],
+) -> Tuple[str, str]:
+    ctx = context or {}
+    for key in ("industry", "vertical", "industryVertical"):
+        value = ctx.get(key)
+        if _clean_field_value(value):
+            return _canonical_project_vertical(value), "call context"
+    if call:
+        for key in ("industry", "vertical", "industryVertical"):
+            value = call.get(key)
+            if _clean_field_value(value):
+                return _canonical_project_vertical(value), "call record"
+
+    haystack = " ".join(_project_context_parts(message, context=context, call=call)).lower()
+    for vertical, terms in _PROJECT_VERTICAL_RULES:
+        if vertical.lower() in haystack or any(term in haystack for term in terms):
+            return vertical, "call context and transcript"
+    return "", ""
+
+
+def _project_library_blob(project: Dict[str, Any]) -> str:
+    fields = project.get("fields") or {}
+    parts = [
+        project.get("title"),
+        project.get("projectName"),
+        project.get("rawProjectName"),
+        project.get("companyName"),
+        project.get("summary"),
+        project.get("industry"),
+        project.get("sector"),
+        project.get("domain"),
+        project.get("subDomain"),
+        project.get("problemStatement"),
+        project.get("businessOutcome"),
+        project.get("functionalSolution"),
+        project.get("technicalSolution"),
+        project.get("sourceAssetTitle"),
+        project.get("sourceFileName"),
+        " ".join(str(tag) for tag in project.get("tags") or []),
+        " ".join(str(value) for value in fields.values()),
+    ]
+    return " ".join(str(part or "") for part in parts)
+
+
+def _project_matches_vertical(project: Dict[str, Any], vertical: str) -> bool:
+    if not vertical:
+        return True
+    canonical = _canonical_project_vertical(vertical)
+    project_industry = _canonical_project_vertical(project.get("industry") or project.get("sector"))
+    if project_industry and project_industry.lower() == canonical.lower():
+        return True
+    blob = _project_library_blob(project).lower()
+    terms = _vertical_terms(canonical)
+    return bool(canonical and canonical.lower() in blob) or any(term in blob for term in terms)
+
+
+def _project_library_item(
+    project: Dict[str, Any],
+    *,
+    score: float,
+    is_exact: bool,
+    focus_score: int,
+) -> Dict[str, Any]:
+    title = _clean_field_value(project.get("title") or project.get("projectName")) or "Project reference"
+    industry = _clean_field_value(project.get("industry") or project.get("sector"))
+    domain = _clean_field_value(project.get("domain") or project.get("subDomain"))
+    context = " / ".join(part for part in (industry, domain) if part)
+
+    detail_parts = []
+    if context:
+        detail_parts.append(context)
+    for key in ("problemStatement", "functionalSolution", "technicalSolution", "businessOutcome", "summary"):
+        value = _field_excerpt(project.get(key), 180)
+        if value and value not in detail_parts:
+            detail_parts.append(value)
+        if len(detail_parts) >= 3:
+            break
+    detail = "; ".join(detail_parts) or _field_excerpt(project.get("summary"), 260) or "Project details are sparse."
+    source = (
+        _clean_field_value(project.get("sourceAssetTitle"))
+        or _clean_field_value(project.get("sourceFileName"))
+        or "Project library"
+    )
+    return {
+        "title": title,
+        "detail": detail,
+        "source": source,
+        "asset_id": str(project.get("sourceAssetId") or project.get("id") or ""),
+        "focus_score": focus_score,
+        "retrieval_score": float(score),
+        "is_exact": is_exact,
+        "source_type": "project_library",
+    }
+
+
+def _score_project_library_items(
+    projects: List[Dict[str, Any]],
+    *,
+    query: str,
+    vertical: str,
+) -> Tuple[List[Dict[str, Any]], bool]:
+    focus_terms = _query_focus_terms(query)
+    items: List[Dict[str, Any]] = []
+    for project in projects:
+        blob = _project_library_blob(project)
+        focus_score = _text_matches_focus(blob, focus_terms)
+        vertical_match = _project_matches_vertical(project, vertical)
+        if vertical and not vertical_match:
+            score = focus_score
+            items.append(
+                _project_library_item(
+                    project,
+                    score=score,
+                    is_exact=False,
+                    focus_score=focus_score,
+                )
+            )
+            continue
+        if not vertical and focus_terms and focus_score <= 0:
+            continue
+        score = (80 if vertical_match and vertical else 0) + (focus_score * 6)
+        if _clean_field_value(project.get("summary")):
+            score += 2
+        if _clean_field_value(project.get("technicalSolution")):
+            score += 2
+        items.append(
+            _project_library_item(
+                project,
+                score=score,
+                is_exact=bool(vertical_match or focus_score > 0 or not focus_terms),
+                focus_score=focus_score,
+            )
+        )
+
+    items.sort(
+        key=lambda item: (
+            1 if item["is_exact"] else 0,
+            float(item["retrieval_score"]),
+            int(item["focus_score"]),
+        ),
+        reverse=True,
+    )
+    exact_items = [item for item in items if item["is_exact"]]
+    if exact_items:
+        return exact_items[:5], True
+    return items[:5], False
+
+
+def _format_project_library_items(
+    items: List[Dict[str, Any]],
+    *,
+    vertical: str,
+    vertical_source: str,
+    has_exact: bool,
+    empty: str,
+) -> str:
+    vertical_line = (
+        f"- **{vertical}** from {vertical_source}."
+        if vertical
+        else "- I could not identify a clear industry vertical from the current call context."
+    )
+    if not items:
+        return (
+            "**Detected vertical**\n\n"
+            f"{vertical_line}\n\n"
+            "**Relevant projects from the project library**\n\n"
+            f"{empty}"
+        )
+
+    if has_exact:
+        lines = [
+            "**Detected vertical**",
+            "",
+            vertical_line,
+            "",
+            "**Relevant projects from the project library**",
+            "",
+            "I found these KB-backed matches. I would use the first one if you need the closest fit:",
+            "",
+            "| Project / product | Relevant information | KB source |",
+            "|---|---|---|",
+        ]
+        for item in items:
+            lines.append(
+                f"| {_md_cell(item['title'])} | {_md_cell(item['detail'])} | {_md_cell(item['source'])} |"
+            )
+        return "\n".join(lines)
+
+    lines = [
+        "**Detected vertical**",
+        "",
+        vertical_line,
+        "",
+        "I could not find a clean KB-backed match for that exact industry/product ask.",
+        "I filtered out the nearest KB hits because they do not match the requested terms:",
+        "",
+        "| KB source | Why I filtered it out |",
+        "|---|---|---|",
+    ]
+    for item in items:
+        reason = f"{item['title']}: {item['detail']}"
+        lines.append(f"| {_md_cell(item['source'])} | {_md_cell(reason)} |")
+    return "\n".join(lines)
+
+
 class SalesCopilotAgent:
     """RAG + tool-use Sales Co-pilot orchestrating calls, KB, and agents."""
 
@@ -1126,11 +1672,8 @@ class SalesCopilotAgent:
                         "discoveryQuestions": brief.get("discoveryQuestions"),
                         "clientAttendees": brief.get("clientAttendees"),
                         "relevantContent": brief.get("relevantContent"),
-                        "relevantProjects": (brief.get("relevantProjects") or [])[:5],
-                        "relevantDocuments": (brief.get("relevantDocuments") or [])[:5],
-                        "recommendedDeck": brief.get("recommendedDeck"),
                     },
-                    2800,
+                    2400,
                 )
                 lines.append(f"Pre-DC brief: {brief_excerpt}")
                 self._citations.append(
@@ -1216,21 +1759,25 @@ class SalesCopilotAgent:
                 missing.append("post-DC review")
 
         lower_message = message.lower()
+        wants_projects = _looks_like_project_library_question(message)
         wants_knowledge = (
-            clean_surface in ("knowledge", "content")
-            or _looks_like_kb_search(message)
-            or any(
-                term in lower_message
-                for term in (
-                    "proof",
-                    "case study",
-                    "asset",
-                    "battlecard",
-                    "objection",
-                    "competitor",
-                    "security",
-                    "compliance",
-                    "reference",
+            not wants_projects
+            and (
+                clean_surface in ("knowledge", "content")
+                or _looks_like_kb_search(message)
+                or any(
+                    term in lower_message
+                    for term in (
+                        "proof",
+                        "case study",
+                        "asset",
+                        "battlecard",
+                        "objection",
+                        "competitor",
+                        "security",
+                        "compliance",
+                        "reference",
+                    )
                 )
             )
         )
@@ -1243,7 +1790,10 @@ class SalesCopilotAgent:
                 SURFACE_GUIDANCE.get(clean_surface, ""),
             ]
             kb_query = "\n".join(part for part in kb_query_parts if part.strip())
-            kb_hits = _kb_search(self.ctx, kb_query, limit=10) if kb_query.strip() else []
+            if _looks_like_company_policy_question(message):
+                kb_hits = search_company_playbook(kb_query, limit=10) if kb_query.strip() else []
+            else:
+                kb_hits = _kb_search(self.ctx, kb_query, limit=10) if kb_query.strip() else []
             if kb_hits:
                 self._citations.extend(_hits_to_citations(kb_hits))
                 self._actions_taken.append(
@@ -1314,6 +1864,15 @@ class SalesCopilotAgent:
         call_id: Optional[str],
         context: Optional[Dict[str, Any]],
     ) -> Optional[Tuple[str, Dict[str, Any]]]:
+        if surface == "live_dc":
+            live_strategy = self._live_insight_strategy_answer(
+                message,
+                call_id=call_id,
+                context=context,
+            )
+            if live_strategy:
+                return live_strategy, self._surface_cost("surface-live-insight")
+
         clean_surface = surface if surface in COPILOT_SURFACE_CONTRACTS else ""
         if not clean_surface:
             return None
@@ -1603,6 +2162,197 @@ class SalesCopilotAgent:
             + "\n".join(follow)
         )
 
+    def _selected_live_insight(
+        self,
+        message: str,
+        context: Optional[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        ctx = context or {}
+        selected = ctx.get("selectedInsight")
+        if isinstance(selected, dict):
+            return {
+                "id": _field_excerpt(selected.get("id"), 120),
+                "label": _field_excerpt(selected.get("label"), 120) or "Live insight",
+                "kind": _field_excerpt(selected.get("kind"), 40) or "insight",
+                "message": _field_excerpt(selected.get("message"), 520) or _field_excerpt(message, 520),
+                "details": [
+                    _field_excerpt(detail, 260)
+                    for detail in selected.get("details", [])
+                    if _field_excerpt(detail, 260)
+                ][:4]
+                if isinstance(selected.get("details"), list)
+                else [],
+            }
+
+        lower = message.lower()
+        if (
+            ctx.get("requestedHelp") == "live_insight_strategy"
+            or ("help me" in lower and any(cue in lower for cue in ("signal", "insight", "alert", "question")))
+        ):
+            return {
+                "id": "message",
+                "label": "Live insight",
+                "kind": "insight",
+                "message": _field_excerpt(message, 520),
+                "details": [],
+            }
+        return None
+
+    def _live_insight_strategy_answer(
+        self,
+        message: str,
+        *,
+        call_id: Optional[str],
+        context: Optional[Dict[str, Any]],
+    ) -> Optional[str]:
+        insight = self._selected_live_insight(message, context)
+        if not insight:
+            return None
+
+        ctx = context or {}
+        account = _field_excerpt(ctx.get("accountName") or ctx.get("account_name"), 90)
+        lead = _field_excerpt(ctx.get("leadName") or ctx.get("lead_name"), 90)
+        audience = f" with {lead}" if lead else f" with {account}" if account else ""
+
+        text = " ".join(
+            [
+                str(insight.get("label") or ""),
+                str(insight.get("kind") or ""),
+                str(insight.get("message") or ""),
+                " ".join(str(detail) for detail in insight.get("details") or []),
+            ]
+        ).lower()
+
+        strategy = [
+            "Stay in discovery mode and make the buyer feel heard before positioning a solution.",
+            "Turn the signal into one specific confirmation question, then pause for the buyer to expand.",
+            "Capture the answer as a next-step criterion so follow-up is tied to what they just confirmed.",
+        ]
+        talk_track = (
+            "That makes sense. Before I suggest a path, can I check what would make this feel solved "
+            "from your side?"
+        )
+        rep_move = "Listen for the business impact, decision owner, and next-step trigger."
+
+        if "negative" in text or "sentiment" in text:
+            strategy = [
+                "Acknowledge the concern without defending too quickly.",
+                "Ask what changed or what feels risky so the rep can isolate the real objection.",
+                "Confirm whether the concern is commercial, technical, timing, or trust-related before pitching.",
+            ]
+            talk_track = (
+                "I hear some hesitation there. What part feels most uncertain right now: impact, implementation, "
+                "timeline, or commercial fit?"
+            )
+            rep_move = "Slow down, name the concern, and earn permission before moving back to solution detail."
+        elif any(term in text for term in ("budget", "commercial", "price", "pricing", "spend")):
+            strategy = [
+                "Treat this as a buying-process signal, not just a pricing question.",
+                "Ask for budget range, approval path, and the cost of staying with the current process.",
+                "Tie any proof point back to ROI or operational savings before discussing commercials.",
+            ]
+            talk_track = (
+                "To keep this practical, what budget range or approval path should we be designing around, "
+                "and what does the current problem cost you if it stays as-is?"
+            )
+            rep_move = "Get economic impact and approval ownership before offering packaging or discount language."
+        elif any(term in text for term in ("authority", "decision", "sign off", "sign-off", "stakeholder")):
+            strategy = [
+                "Map who owns the business case, technical approval, and final commercial sign-off.",
+                "Ask about the next internal review instead of asking bluntly who has power.",
+                "Use the answer to propose a mutual next step with the missing stakeholder included.",
+            ]
+            talk_track = (
+                "When this moves forward internally, who usually needs to weigh in on business value, technical fit, "
+                "and final approval?"
+            )
+            rep_move = "Convert the authority gap into a stakeholder map and calendarable next step."
+        elif any(term in text for term in ("timeline", "deadline", "go-live", "pilot", "q1", "q2", "q3", "q4")):
+            strategy = [
+                "Anchor timing to a business event, not an arbitrary implementation date.",
+                "Ask what must be true before a pilot or rollout can start.",
+                "Use the answer to separate urgent blockers from nice-to-have requirements.",
+            ]
+            talk_track = (
+                "What date or business event is driving this, and what would need to be decided before a pilot "
+                "could realistically start?"
+            )
+            rep_move = "Confirm urgency, blockers, and the next dated milestone."
+        elif any(term in text for term in ("integration", "security", "compliance", "soc 2", "api", "data")):
+            strategy = [
+                "Move from broad technical concern to concrete assumptions.",
+                "Ask which systems, data flows, compliance controls, and security reviewers matter most.",
+                "Offer to follow up with architecture or security proof only after the key assumptions are named.",
+            ]
+            talk_track = (
+                "Which systems and security assumptions should we validate first so our team can avoid guessing "
+                "about fit?"
+            )
+            rep_move = "Collect the integration map, data sensitivity, reviewer names, and proof needed for the next step."
+        elif insight.get("kind") == "question":
+            strategy = [
+                "Use the question now if the conversation is still in discovery.",
+                "Frame it as a clarification so it feels natural, not like an interrogation.",
+                "After the buyer answers, summarize the implication back in one sentence.",
+            ]
+            talk_track = str(insight.get("message") or talk_track)
+            rep_move = "Ask it cleanly, then stop talking until the buyer fills in the detail."
+        elif insight.get("kind") == "alert" or "objection" in text or "risk" in text:
+            strategy = [
+                "Do not counter the objection immediately.",
+                "Separate the stated objection from the underlying risk.",
+                "Ask whether resolving that risk would unblock the next step.",
+            ]
+            talk_track = (
+                "That is a fair concern. If we could address that risk clearly, would the next step be a deeper "
+                "technical or commercial review?"
+            )
+            rep_move = "Isolate the blocker, validate it, then attach the resolution to a concrete next step."
+        elif "intent" in text or "listening mode" in text:
+            strategy = [
+                "Keep the buyer talking; they are still forming the problem out loud.",
+                "Ask one open question about impact, then one follow-up about ownership.",
+                "Avoid a feature pitch until the pain and decision path are clearer.",
+            ]
+            talk_track = (
+                "Helpful context. What is the biggest impact of that today, and who feels that impact most directly?"
+            )
+            rep_move = "Use the next two minutes to deepen pain, quantify impact, and identify ownership."
+
+        details = insight.get("details") or []
+        detail_lines = "\n".join(f"> - {detail}" for detail in details[:3])
+        source_block = f"\n\n**Context detail**\n\n{detail_lines}" if detail_lines else ""
+
+        self._actions_taken.append(
+            {
+                "tool": "live_insight_strategy",
+                "surface": "live_dc",
+                "insight_id": insight.get("id"),
+                "insight_kind": insight.get("kind"),
+            }
+        )
+        self._citations.append(
+            Citation(
+                source_type="ui_context",
+                source_id=call_id or str(insight.get("id") or "live-insight"),
+                snippet=_field_excerpt(insight.get("message"), 200),
+                confidence=0.78,
+            )
+        )
+
+        return (
+            "**Read**\n\n"
+            f"- {insight['label']}{audience}: {insight['message']}\n"
+            f"{source_block}\n\n"
+            "**Strategy**\n\n"
+            + "\n".join(f"- {item}" for item in strategy)
+            + "\n\n"
+            "**Talk track**\n\n"
+            f"- {talk_track}\n\n"
+            "**Rep move**\n\n"
+            f"- {rep_move}"
+        )
+
     def run(
         self,
         message: str,
@@ -1632,7 +2382,7 @@ class SalesCopilotAgent:
             context=context,
         )
         if fast is None:
-            fast = self._run_fast_path(message, call_id=call_id, surface=surface)
+            fast = self._run_fast_path(message, call_id=call_id, surface=surface, context=context)
         if fast is not None:
             answer, cost = fast
         else:
@@ -1693,12 +2443,96 @@ class SalesCopilotAgent:
         validate_envelope(env)
         return env
 
+    def _call_for_project_context(self, call_id: Optional[str]) -> Optional[Dict[str, Any]]:
+        if not call_id:
+            return None
+        try:
+            return self.calls.get_call(self.ctx, call_id)
+        except Exception:
+            return None
+
+    def _project_library_answer(
+        self,
+        message: str,
+        *,
+        call_id: Optional[str],
+        context: Optional[Dict[str, Any]],
+    ) -> str:
+        call = self._call_for_project_context(call_id)
+        context_parts = _project_context_parts(message, context=context, call=call)
+        vertical, vertical_source = _detect_project_vertical(message, context=context, call=call)
+        query = "\n".join(part for part in [*context_parts, vertical] if _clean_field_value(part))
+
+        projects: List[Dict[str, Any]] = []
+        try:
+            projects = list_kb_projects(self.ctx)
+        except Exception:
+            projects = []
+
+        items, has_exact = _score_project_library_items(projects, query=query or message, vertical=vertical)
+        fallback_hits: List[Dict[str, Any]] = []
+        if not items:
+            fallback_hits = [
+                hit
+                for hit in _kb_search(self.ctx, query or message, limit=20)
+                if hit.get("source_type") != "company_playbook"
+            ]
+            if fallback_hits:
+                items, has_exact = _kb_items_from_hits(fallback_hits, query=query or message)
+                if vertical:
+                    vertical_terms = _vertical_terms(vertical)
+                    exact = []
+                    nearest = []
+                    for item in items:
+                        searchable = f"{item.get('title')} {item.get('detail')} {item.get('source')}".lower()
+                        if vertical.lower() in searchable or any(term in searchable for term in vertical_terms):
+                            exact.append({**item, "is_exact": True})
+                        else:
+                            nearest.append({**item, "is_exact": False})
+                    items = (exact or nearest)[:5]
+                    has_exact = bool(exact)
+
+        self._actions_taken.append(
+            {
+                "tool": "search_project_library",
+                "query": message[:120],
+                "vertical": vertical or None,
+                "vertical_source": vertical_source or None,
+                "project_count": len(projects),
+                "matched_count": len(items),
+                "fallback_hit_count": len(fallback_hits),
+                "fast_path": True,
+            }
+        )
+
+        if items:
+            for item in items[:5]:
+                raw_confidence = float(item.get("retrieval_score") or 0.75)
+                confidence = raw_confidence / 100 if raw_confidence > 1 else raw_confidence
+                self._citations.append(
+                    Citation(
+                        source_type=str(item.get("source_type") or "project_library"),
+                        source_id=str(item.get("asset_id") or item.get("title") or "project-library"),
+                        snippet=_field_excerpt(f"{item.get('title')}: {item.get('detail')}", 200),
+                        confidence=max(0.0, min(0.98, confidence or 0.75)),
+                    )
+                )
+
+        return _format_project_library_items(
+            items,
+            vertical=vertical,
+            vertical_source=vertical_source or "call context",
+            has_exact=has_exact,
+            empty="No matching project-library entries found for this call vertical.",
+        )
+
     def _run_fast_path(
         self,
         message: str,
         *,
         call_id: Optional[str] = None,
         surface: str = "global",
+        context: Optional[Dict[str, Any]] = None,
     ) -> Optional[Tuple[str, Dict[str, Any]]]:
         lower = message.lower()
         trace_id = str(uuid.uuid4())
@@ -1734,69 +2568,53 @@ class SalesCopilotAgent:
                 "trace_id": trace_id,
             }
 
+        if _looks_like_project_library_question(message):
+            answer = self._project_library_answer(message, call_id=call_id, context=context)
+            return answer, {
+                "tokens": len(message) // 4,
+                "usd": 0.0,
+                "model": "fast-path-project-library",
+                "trace_id": trace_id,
+            }
+
         if _looks_like_kb_search(message):
-            hits = _kb_search(self.ctx, message, limit=20)
+            ctx = context or {}
+            query_parts = [
+                message,
+                str(ctx.get("accountName") or ""),
+                str(ctx.get("industry") or ""),
+                str(ctx.get("intentLabel") or ""),
+                " ".join(str(gap) for gap in ctx.get("openGaps", [])[:4])
+                if isinstance(ctx.get("openGaps"), list)
+                else "",
+            ]
+            selected = ctx.get("selectedInsight")
+            if isinstance(selected, dict):
+                query_parts.append(str(selected.get("message") or ""))
+                details = selected.get("details")
+                if isinstance(details, list):
+                    query_parts.append(" ".join(str(detail) for detail in details[:4]))
+            query = "\n".join(part for part in query_parts if part.strip())
+            hits = (
+                search_company_playbook(query or message, limit=20)
+                if _looks_like_company_policy_question(message)
+                else _kb_search(self.ctx, query or message, limit=20)
+            )
             self._citations.extend(_hits_to_citations(hits))
             self._actions_taken.append(
-                {"tool": "search_knowledge_base", "query": message[:120], "hit_count": len(hits), "fast_path": True}
+                {
+                    "tool": "search_knowledge_base",
+                    "query": message[:120],
+                    "hit_count": len(hits),
+                    "fast_path": True,
+                    "source": "company_playbook" if _looks_like_company_policy_question(message) else "knowledge_base",
+                }
             )
-            project_block = ""
-            if call_id and _looks_like_case_study_or_project(message):
-                try:
-                    from app.orchestrator.dispatcher import Orchestrator
-
-                    relevant = Orchestrator().get_relevant_content(self.ctx, call_id, refresh=False)
-                    projects = relevant.get("relevantProjects") or []
-                    docs = relevant.get("relevantDocuments") or []
-                    self._actions_taken.append(
-                        {
-                            "tool": "relevant_content",
-                            "call_id": call_id,
-                            "project_count": len(projects),
-                            "document_count": len(docs),
-                            "fast_path": True,
-                        }
-                    )
-                    lines = []
-                    if projects:
-                        lines.append("Relevant projects for this call:")
-                        for project in projects[:5]:
-                            title = (
-                                project.get("title")
-                                or project.get("name")
-                                or project.get("projectName")
-                                or "Project"
-                            )
-                            detail = (
-                                project.get("summary")
-                                or project.get("solution")
-                                or project.get("industry")
-                                or ""
-                            )
-                            lines.append(f"- **{title}**{f' — {detail}' if detail else ''}")
-                    if docs:
-                        lines.append("")
-                        lines.append("Related decks / documents:")
-                        for doc in docs[:4]:
-                            title = doc.get("title") or doc.get("name") or "Document"
-                            lines.append(f"- **{title}**")
-                    if lines:
-                        project_block = "\n".join(lines)
-                except Exception:
-                    project_block = ""
-            kb_answer = _format_kb_hits(
+            return _format_kb_hits(
                 hits,
                 query=message,
                 empty="No matching knowledge base or project entries found.",
-            )
-            if project_block:
-                if "No matching knowledge base" in kb_answer:
-                    answer = project_block
-                else:
-                    answer = f"{project_block}\n\nAlso from the knowledge base:\n{kb_answer}"
-            else:
-                answer = kb_answer
-            return answer, {
+            ), {
                 "tokens": len(message) // 4,
                 "usd": 0.0,
                 "model": "fast-path-kb",
@@ -2054,8 +2872,6 @@ class SalesCopilotAgent:
                 answer = (assistant_message.content or "").strip() or "Done."
                 return answer, {
                     "tokens": tokens_in + tokens_out,
-                    "tokens_in": tokens_in,
-                    "tokens_out": tokens_out,
                     "usd": 0.0,
                     "model": active_model,
                     "trace_id": trace_id,
@@ -2066,8 +2882,6 @@ class SalesCopilotAgent:
                 if assistant_message.content:
                     return assistant_message.content.strip(), {
                         "tokens": tokens_in + tokens_out,
-                        "tokens_in": tokens_in,
-                        "tokens_out": tokens_out,
                         "usd": 0.0,
                         "model": active_model,
                         "trace_id": trace_id,
@@ -2118,8 +2932,6 @@ class SalesCopilotAgent:
         )
         return completion.text, {
             "tokens": completion.tokens_in + completion.tokens_out,
-            "tokens_in": completion.tokens_in,
-            "tokens_out": completion.tokens_out,
             "usd": completion.cost_usd,
             "model": completion.model,
             "trace_id": completion.trace_id,
@@ -2134,8 +2946,14 @@ class SalesCopilotAgent:
         trace_id = str(uuid.uuid4())
         lower = message.lower()
 
-        if _looks_like_kb_search(message):
-            hits = _kb_search(self.ctx, message, limit=20)
+        if _looks_like_project_library_question(message):
+            answer = self._project_library_answer(message, call_id=call_id, context=None)
+        elif _looks_like_kb_search(message):
+            hits = (
+                search_company_playbook(message, limit=20)
+                if _looks_like_company_policy_question(message)
+                else _kb_search(self.ctx, message, limit=20)
+            )
             self._citations.extend(_hits_to_citations(hits))
             self._actions_taken.append({"tool": "search_knowledge_base", "hit_count": len(hits)})
             answer = _format_kb_hits(

@@ -27,6 +27,15 @@ def _memory_keys(ctx: TenantContext, clerk_key: str) -> List[str]:
     return list(dict.fromkeys([clerk_key, _fallback_tenant_key(ctx)]))
 
 
+def _call_id_aliases(call_id: str) -> List[str]:
+    aliases = [call_id]
+    if call_id.startswith("call-"):
+        aliases.append(call_id.removeprefix("call-"))
+    else:
+        aliases.append(f"call-{call_id}")
+    return list(dict.fromkeys(aliases))
+
+
 def _resolve_live_tenant(ctx: TenantContext) -> tuple[str, str, bool]:
     if not get_settings().supabase_configured:
         fallback = _fallback_tenant_key(ctx)
@@ -45,6 +54,68 @@ def _resolve_live_tenant(ctx: TenantContext) -> tuple[str, str, bool]:
 
 
 class LiveCallRepository:
+    def _mark_call_completed_from_evidence(self, ctx: TenantContext, call_id: str) -> None:
+        tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
+        store = get_memory_store()
+        aliases = set(_call_id_aliases(call_id))
+        for key in _memory_keys(ctx, clerk_key):
+            calls = store.list_calls(key)
+            existing = next((item for item in calls if str(item.get("id") or "") in aliases), None)
+            call = dict(existing or {})
+            call.setdefault("id", call_id)
+            call.setdefault("accountName", call_id)
+            call.setdefault("scheduledAt", _now_iso())
+            call.setdefault("briefReady", False)
+            call.setdefault("pod", [])
+            call["status"] = "completed"
+            store.upsert_calls(key, [call])
+
+        if tenant_resolved and get_settings().supabase_configured:
+            for alias in aliases:
+                try:
+                    (
+                        get_supabase()
+                        .table("calls")
+                        .update({"status": "completed"})
+                        .eq("tenant_id", tenant_uuid)
+                        .eq("id", alias)
+                        .execute()
+                    )
+                except Exception:
+                    pass
+
+    def clear_call_content(self, ctx: TenantContext, call_id: str) -> None:
+        """Remove live-call artifacts that would otherwise keep a call in Post-DC."""
+        tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
+        aliases = set(_call_id_aliases(call_id))
+        store = get_memory_store()
+        for key in _memory_keys(ctx, clerk_key):
+            for bucket in (store.live_sessions, store.transcript_events, store.live_suggestions):
+                per_tenant = bucket.get(key)
+                if not per_tenant:
+                    continue
+                for alias in aliases:
+                    per_tenant.pop(alias, None)
+
+        if tenant_resolved and get_settings().supabase_configured:
+            for alias in aliases:
+                for table_name in (
+                    "call_transcript_events",
+                    "live_call_suggestions",
+                    "call_live_sessions",
+                ):
+                    try:
+                        (
+                            get_supabase()
+                            .table(table_name)
+                            .delete()
+                            .eq("tenant_id", tenant_uuid)
+                            .eq("call_id", alias)
+                            .execute()
+                        )
+                    except Exception:
+                        pass
+
     def get_or_create_session(
         self,
         ctx: TenantContext,
@@ -194,6 +265,7 @@ class LiveCallRepository:
         event: Dict[str, Any],
     ) -> Dict[str, Any]:
         self.mark_session_live(ctx, call_id, provider=event.get("provider", "recall"))
+        self._mark_call_completed_from_evidence(ctx, call_id)
         tenant_uuid, clerk_key, tenant_resolved = _resolve_live_tenant(ctx)
         event_id = event.get("id") or str(uuid.uuid4())
         row = {

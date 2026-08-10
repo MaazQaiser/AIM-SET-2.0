@@ -1,53 +1,54 @@
 "use client";
 
+import { MicrophoneDictationButton } from "@/components/chat/microphone-dictation-button";
+import { CopilotFeedbackDialog } from "@/components/copilot/copilot-feedback-dialog";
+import { SummitLogoMark } from "@/components/layout/sidebar-icons";
+import { liveColumnHorizontalPadding } from "@/components/live/live-column-header";
+import { usePersona } from "@/hooks/use-persona";
+import { podDisplayForRole } from "@/lib/bot-chat/pod-display";
+import type { BotChatMessage } from "@/lib/bot-chat/types";
+import { cn } from "@/lib/cn";
+import type { CopilotFeedbackRating } from "@/lib/copilot/chat-feedback-store";
+import { stripChatSourceFooters } from "@/lib/copilot/chat-response-display";
 import {
+  copilotSuggestionLabel,
+  uniqueCopilotSuggestionLabels,
+} from "@/lib/copilot/suggestion-label";
+import { EMPTY_BOT_CHAT_MESSAGES, useBotChatStore } from "@/stores/use-bot-chat";
+import type { Citation, PodRole } from "@/types";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Input } from "@dc-copilot/ui/components/input";
+import { ArrowUp, Check, Copy, Loader2, Send, ThumbsDown, ThumbsUp } from "lucide-react";
+import {
+  type FormEvent,
+  type ReactNode,
+  type RefObject,
   createContext,
   useCallback,
   useContext,
   useEffect,
   useRef,
   useState,
-  type FormEvent,
-  type ReactNode,
-  type RefObject,
 } from "react";
-import { ArrowUp, Check, Copy, Loader2, Send, ThumbsDown, ThumbsUp } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { CopilotFeedbackDialog } from "@/components/copilot/copilot-feedback-dialog";
-import { MicrophoneDictationButton } from "@/components/chat/microphone-dictation-button";
-import { Button } from "@dc-copilot/ui/components/button";
-import { Input } from "@dc-copilot/ui/components/input";
-import { usePersona } from "@/hooks/use-persona";
-import { podDisplayForRole } from "@/lib/bot-chat/pod-display";
-import type { BotChatMessage } from "@/lib/bot-chat/types";
-import type { Citation, PodRole } from "@/types";
-import { liveColumnHorizontalPadding } from "@/components/live/live-column-header";
-import { cn } from "@/lib/cn";
-import {
-  copilotSuggestionLabel,
-  uniqueCopilotSuggestionLabels,
-} from "@/lib/copilot/suggestion-label";
-import { stripChatSourceFooters } from "@/lib/copilot/chat-response-display";
-import type { CopilotFeedbackRating } from "@/lib/copilot/chat-feedback-store";
-import { EMPTY_BOT_CHAT_MESSAGES, useBotChatStore } from "@/stores/use-bot-chat";
 
 const CHAT_MODE = "direct" as const;
 const assistantProseClassName = [
-  "prose prose-xs dark:prose-invert max-w-none type-label leading-[1.65]",
+  "prose prose-xs dark:prose-invert max-w-none type-label leading-[1.62]",
   "prose-strong:font-medium",
   "[&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
-  "[&_p]:my-3 [&_p+ul]:mt-1.5 [&_p+ol]:mt-1.5",
-  "[&_h1]:mb-2 [&_h1]:mt-4 [&_h1]:type-panel-title",
-  "[&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:type-panel-title",
-  "[&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:type-label",
-  "[&_h4]:mb-2 [&_h4]:mt-4 [&_h4]:type-label",
-  "[&_ul]:my-3 [&_ol]:my-3 [&_li]:my-1.5 [&_li>p]:my-1",
-  "[&_blockquote]:my-3 [&_blockquote]:rounded-r-md [&_blockquote]:border-l-2",
-  "[&_blockquote]:border-muted-foreground/20 [&_blockquote]:bg-background/45",
-  "[&_blockquote]:py-1.5 [&_blockquote]:pl-3 [&_blockquote]:pr-2",
+  "[&_p]:my-2 [&_p+ul]:mt-1 [&_p+ol]:mt-1",
+  "[&_h1]:mb-1.5 [&_h1]:mt-6 [&_h1]:type-panel-title",
+  "[&_h2]:mb-1.5 [&_h2]:mt-6 [&_h2]:type-panel-title",
+  "[&_h3]:mb-1 [&_h3]:mt-5 [&_h3]:type-label",
+  "[&_h4]:mb-1 [&_h4]:mt-5 [&_h4]:type-label",
+  "[&_ul]:my-2 [&_ol]:my-2 [&_li]:my-1 [&_li>p]:my-0.5",
+  "[&_blockquote]:my-2 [&_blockquote]:border-l-2",
+  "[&_blockquote]:border-muted-foreground/25",
+  "[&_blockquote]:py-0.5 [&_blockquote]:pl-3",
   "[&_blockquote]:text-muted-foreground [&_blockquote]:font-normal",
-  "[&_blockquote_p]:my-1.5",
+  "[&_blockquote_p]:my-1",
 ].join(" ");
 type MessageFeedback = CopilotFeedbackRating;
 
@@ -59,7 +60,7 @@ type LiveCopilotChatContextValue = {
   suggestions: string[];
   input: string;
   setInput: (value: string) => void;
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string, extraContext?: Record<string, unknown>) => Promise<void>;
   handleSubmit: (e: FormEvent) => void;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
 };
@@ -72,6 +73,10 @@ function useLiveCopilotChatContext() {
     throw new Error("LiveCopilotChat components must be used within LiveCopilotChatProvider");
   }
   return ctx;
+}
+
+export function useLiveCopilotChat() {
+  return useLiveCopilotChatContext();
 }
 
 export function LiveCopilotChatProvider({
@@ -111,7 +116,7 @@ export function LiveCopilotChatProvider({
   }, [threadMessages.length, isLoading]);
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, extraContext?: Record<string, unknown>) => {
       const trimmed = text.trim();
       if (!trimmed || isLoading) return;
 
@@ -146,6 +151,7 @@ export function LiveCopilotChatProvider({
               surface: "live_dc",
               mode: CHAT_MODE,
               ...context,
+              ...extraContext,
             },
           }),
         });
@@ -287,10 +293,15 @@ export function LiveCopilotChatThread({
 
   return (
     <>
-      <div className={cn("space-y-2", className)} aria-live="polite">
-        <p className="type-caption font-medium text-muted-foreground border-t border-border/50 pt-3">
-          Copilot chat
-        </p>
+      <div className={cn("space-y-5", className)} aria-live="polite">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-t border-border/50 bg-background/95 pt-3 pb-2 backdrop-blur">
+          <div className="flex min-w-0 items-center gap-2 type-caption font-medium text-muted-foreground">
+            <span aria-hidden="true">
+              <SummitLogoMark className="h-4 w-4" />
+            </span>
+            <span className="truncate">Copilot chat</span>
+          </div>
+        </div>
         <div ref={chatTopRef} />
         {threadMessages.map((msg) => {
           const feedback = messageFeedback[msg.id];
@@ -299,79 +310,92 @@ export function LiveCopilotChatThread({
           return (
             <div
               key={msg.id}
-              className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}
+              className={cn(
+                "border-t border-border/35 pt-4 first:border-t-0 first:pt-0",
+                msg.role === "user" ? "flex flex-col items-end pl-8" : "pl-0"
+              )}
             >
-              <div
+              <p
                 className={cn(
-                  "max-w-[92%] type-label leading-relaxed",
+                  "mb-1 flex items-center gap-1.5 type-caption",
                   msg.role === "user"
-                    ? "rounded-lg bg-primary px-2.5 py-2 text-primary-foreground"
-                    : "px-0 py-1 text-foreground"
+                    ? "justify-end font-medium text-muted-foreground"
+                    : "font-semibold text-foreground"
                 )}
               >
-                {msg.role === "assistant" ? (
+                {msg.role === "user" ? (
                   <>
-                    <div className={assistantProseClassName}>
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{assistantContent}</ReactMarkdown>
-                    </div>
-                    <div className="mt-1.5 flex items-center gap-1 text-muted-foreground">
-                      <button
-                        type="button"
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors hover:bg-muted/70 hover:text-foreground"
-                        title="Copy response"
-                        aria-label="Copy response"
-                        onClick={() => void copyAssistantMessage(msg.id, msg.content)}
-                      >
-                        {copiedMessageId === msg.id ? (
-                          <Check className="h-3.5 w-3.5" aria-hidden />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5" aria-hidden />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        className={cn(
-                          "inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors hover:bg-muted/70 hover:text-foreground",
-                          feedback === "up" && "bg-muted text-foreground"
-                        )}
-                        title="Helpful"
-                        aria-label="Mark response helpful"
-                        onClick={() => openMessageFeedback(msg.id, "up", msg.content)}
-                      >
-                        <ThumbsUp className="h-3.5 w-3.5" aria-hidden />
-                      </button>
-                      <button
-                        type="button"
-                        className={cn(
-                          "inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors hover:bg-muted/70 hover:text-foreground",
-                          feedback === "down" && "bg-muted text-foreground"
-                        )}
-                        title="Not helpful"
-                        aria-label="Mark response not helpful"
-                        onClick={() => openMessageFeedback(msg.id, "down", msg.content)}
-                      >
-                        <ThumbsDown className="h-3.5 w-3.5" aria-hidden />
-                      </button>
-                    </div>
+                    <span>{msg.authorName ?? "You"}</span>
+                    <span aria-hidden="true">
+                      <SummitLogoMark className="h-3.5 w-3.5" />
+                    </span>
                   </>
                 ) : (
-                  <span className="whitespace-pre-wrap break-words">{msg.content}</span>
+                  "DC Copilot"
                 )}
-              </div>
+              </p>
+              {msg.role === "assistant" ? (
+                <>
+                  <div className={assistantProseClassName}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{assistantContent}</ReactMarkdown>
+                  </div>
+                  <div className="mt-2 flex items-center gap-1 text-muted-foreground">
+                    <button
+                      type="button"
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors hover:bg-muted/70 hover:text-foreground"
+                      title="Copy response"
+                      aria-label="Copy response"
+                      onClick={() => void copyAssistantMessage(msg.id, msg.content)}
+                    >
+                      {copiedMessageId === msg.id ? (
+                        <Check className="h-3.5 w-3.5" aria-hidden />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" aria-hidden />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors hover:bg-muted/70 hover:text-foreground",
+                        feedback === "up" && "bg-muted text-foreground"
+                      )}
+                      title="Helpful"
+                      aria-label="Mark response helpful"
+                      onClick={() => openMessageFeedback(msg.id, "up", msg.content)}
+                    >
+                      <ThumbsUp className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors hover:bg-muted/70 hover:text-foreground",
+                        feedback === "down" && "bg-muted text-foreground"
+                      )}
+                      title="Not helpful"
+                      aria-label="Mark response not helpful"
+                      onClick={() => openMessageFeedback(msg.id, "down", msg.content)}
+                    >
+                      <ThumbsDown className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="max-w-[86%] whitespace-pre-wrap break-words rounded-lg border border-border/60 bg-muted/45 px-3 py-2 text-right type-label leading-relaxed text-foreground">
+                  {msg.content}
+                </p>
+              )}
             </div>
           );
         })}
         {suggestions.length > 0 && !isLoading && (
-          <div className="rounded-md border border-border/60 bg-background/60 px-2.5 py-2">
-            <p className="mb-1.5 type-kicker text-muted-foreground">
-              Next
-            </p>
+          <div className="border-t border-border/40 pt-4">
+            <p className="mb-2 type-kicker text-muted-foreground">Next</p>
             <div className="flex flex-wrap gap-1.5">
               {uniqueCopilotSuggestionLabels(suggestions).map((suggestion) => (
                 <button
                   key={suggestion}
                   type="button"
-                  className="rounded-md border border-border/70 bg-background px-2 py-1 type-caption font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
+                  className="rounded-full border border-foreground/85 bg-transparent px-2.5 py-1 type-caption font-medium text-foreground transition-colors hover:border-foreground hover:bg-transparent"
                   onClick={() => void sendMessage(copilotSuggestionLabel(suggestion))}
                 >
                   {suggestion}
@@ -387,15 +411,15 @@ export function LiveCopilotChatThread({
           </p>
         )}
         {(threadMessages.length > 0 || isLoading) && (
-          <div className="sticky bottom-2 z-10 flex justify-center">
+          <div className="mt-4 flex justify-center">
             <button
               type="button"
-              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-border bg-background/90 px-3 type-caption font-medium text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+              className="inline-flex h-6 items-center justify-center gap-1.5 rounded-full border border-foreground bg-foreground px-2.5 type-caption font-medium text-background shadow-sm transition-colors hover:bg-foreground/90"
               title="Back to Running Summary"
               aria-label="Back to Running Summary"
               onClick={scrollChatToTop}
             >
-              <ArrowUp className="h-3.5 w-3.5" aria-hidden />
+              <ArrowUp className="h-3 w-3" aria-hidden />
               <span>Running Summary</span>
             </button>
           </div>
@@ -418,7 +442,11 @@ export function LiveCopilotChatComposer({ className }: { className?: string }) {
 
   return (
     <div className={cn("shrink-0 border-t border-border/60 bg-transparent", className)}>
-      {error && <p className={cn(liveColumnHorizontalPadding, "pt-2 type-caption text-destructive")}>{error}</p>}
+      {error && (
+        <p className={cn(liveColumnHorizontalPadding, "pt-2 type-caption text-destructive")}>
+          {error}
+        </p>
+      )}
       <form onSubmit={handleSubmit} className={cn("flex gap-2 py-4", liveColumnHorizontalPadding)}>
         <Input
           value={input}
@@ -427,10 +455,7 @@ export function LiveCopilotChatComposer({ className }: { className?: string }) {
           className="flex-1 type-body"
           aria-label="Message DC Copilot"
         />
-        <MicrophoneDictationButton
-          onTranscript={appendVoiceTranscript}
-          className="h-9 w-9"
-        />
+        <MicrophoneDictationButton onTranscript={appendVoiceTranscript} className="h-9 w-9" />
         <Button
           type="submit"
           size="icon"

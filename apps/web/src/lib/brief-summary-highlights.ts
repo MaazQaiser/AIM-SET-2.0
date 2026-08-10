@@ -22,7 +22,7 @@ function ruleToRegExp(rule: SummaryHighlightRule): RegExp {
 const RULES: SummaryHighlightRule[] = [
   {
     pattern:
-      /\b(budget|revenue|pricing|cost|ROI|investment|\$[\d,.]+[KMB]?|annual revenue)\b/gi,
+      /(\$[\d,.]+[KMB]?(?:\s+(?:seed round|funding round|funding))?|\b(?:budget|revenue|pricing|cost|ROI|investment|annual revenue)\b)/gi,
     className: "rounded px-1 py-0.5 bg-amber-100/90 text-amber-950 dark:bg-amber-500/20 dark:text-amber-100",
   },
   {

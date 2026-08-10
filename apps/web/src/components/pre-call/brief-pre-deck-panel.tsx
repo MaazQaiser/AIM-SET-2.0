@@ -16,7 +16,6 @@ import {
   BriefDetailCard,
   BRIEF_PARALLEL_CARD_SCROLL_MAX,
   briefDetailDialogClass,
-  briefMainMuted,
 } from "@/components/pre-call/brief-detail-card";
 import type { PreDeck, PreDeckSlide, RelevantDocument, RelevantProject } from "@/lib/brief-types";
 import { createProjectFromPreDeck } from "@/lib/content/create-project-from-suggestion";
@@ -471,7 +470,7 @@ export function BriefPreDeckPanel({
         }
       >
         <div className="space-y-3">
-          <p className="line-clamp-2 text-sm font-normal leading-snug text-foreground/80">
+          <p className="line-clamp-2 text-xs font-normal leading-snug text-foreground/75">
             {displayDeck.summary}
           </p>
           <div className="flex flex-wrap items-center gap-3">
@@ -493,12 +492,14 @@ export function BriefPreDeckPanel({
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <p className="truncate text-sm font-semibold leading-snug text-foreground">
+                      <p className="truncate text-[0.8125rem] font-bold leading-snug text-foreground">
                         {slide.title}
                       </p>
                       <SlideSourceBadge slide={slide} />
                     </div>
-                    <p className={cn(briefMainMuted, "mt-1 line-clamp-1")}>{slide.narrative}</p>
+                    <p className="mt-1 line-clamp-1 text-xs leading-snug text-muted-foreground">
+                      {slide.narrative}
+                    </p>
                   </div>
                 </button>
               </li>

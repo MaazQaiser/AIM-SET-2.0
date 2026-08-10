@@ -9,6 +9,7 @@ from dc_core.tenancy import TenantContext
 from app.deps import get_tenant_context
 from app.domain.calls_service import CallsService
 from app.domain.copilot_greeting import simple_greeting_response
+from app.domain.speaker_roles import infer_speaker_role
 from app.orchestrator.dispatcher import Orchestrator
 from app.services.transcript_provider.recall_client import (
     RecallAPIError,
@@ -188,6 +189,9 @@ async def poll_transcript(
     if not raw_segments:
         return {"ok": True, "new_segments": 0}
 
+    call_context = _calls.get_call(ctx, call_id) or {}
+    brief_context = _calls.get_brief(ctx, call_id)
+
     channel = get_call_channel()
     new_count = 0
     new_events: List[Dict[str, Any]] = []
@@ -235,6 +239,14 @@ async def poll_transcript(
         )
 
         peid = hashlib.sha256(f"{bot_id}:{speaker_id}:{text[:50]}".encode()).hexdigest()[:32]
+        speaker_role = infer_speaker_role(
+            explicit_role=seg.get("speaker_role") or seg.get("role") or participant.get("role"),
+            speaker_id=speaker_id,
+            speaker_name=speaker_name,
+            text=text,
+            call=call_context,
+            brief=brief_context,
+        )
 
         offset = 0.0
         if words and isinstance(words[0], dict):
@@ -251,7 +263,7 @@ async def poll_transcript(
             "id": peid,
             "speaker_id": str(speaker_id),
             "speaker_name": str(speaker_name),
-            "speaker_role": "customer",
+            "speaker_role": speaker_role,
             "text": text,
             "offset_seconds": offset,
             "provider": "recall",

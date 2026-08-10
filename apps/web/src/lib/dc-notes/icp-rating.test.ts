@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { companyRatingForCall } from "./icp-rating";
 
 describe("companyRatingForCall", () => {
-  it("returns an integer between 1 and 8", () => {
+  it("returns an integer between 1 and 10", () => {
     const ids = ["call-acme", "call-wardenwatch", "call-beta-corp"];
     for (const id of ids) {
       const score = companyRatingForCall({ id, icpBucket: "Sweet spot" });
       expect(score).toBeGreaterThanOrEqual(1);
-      expect(score).toBeLessThanOrEqual(8);
+      expect(score).toBeLessThanOrEqual(10);
       expect(Number.isInteger(score)).toBe(true);
     }
   });

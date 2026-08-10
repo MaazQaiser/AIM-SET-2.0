@@ -54,7 +54,7 @@ function AssistantGreetingBody({
   const statParts: string[] = [];
   if (todaysCalls.length > 0) {
     statParts.push(
-      `${todaysCalls.length} call${todaysCalls.length !== 1 ? "s" : ""} today`
+      `${todaysCalls.length} call${todaysCalls.length !== 1 ? "s" : ""} scheduled`
     );
   }
   if (pendingApprovals > 0) {

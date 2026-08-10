@@ -34,7 +34,7 @@ const ACTIONS = [
   },
   {
     id: "coaching",
-    label: "Today's coaching",
+    label: "Coaching patterns",
     description: "Patterns and scorecards",
     icon: TrendingUp,
     href: (_calls: Call[]) => "/coaching",

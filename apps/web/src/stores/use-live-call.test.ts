@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { applyApiDemoResult, applyClientDemoSegment } from "@/lib/demo/client-live-call-demo";
 import { useLiveCall } from "@/stores/use-live-call";
 import type { TranscriptEvent } from "@/types";
+import type { DiscoveryChecklistState } from "@dc-copilot/types";
 
 const baseEvent: TranscriptEvent = {
   id: "segment-1",
@@ -280,6 +281,53 @@ describe("useLiveCall live page state regressions", () => {
     const state = useLiveCall.getState();
     expect(state.checklistState).toBeNull();
     expect(state.sentimentCustomer).toBe(-0.5);
+  });
+
+  it("does not downgrade confirmed BANT when a later partial checklist arrives", () => {
+    const confirmed: DiscoveryChecklistState = {
+      callId: "call-1",
+      coverage: 1,
+      bantCoverage: 1,
+      bant: { budget: "confirmed", authority: "confirmed", need: "confirmed", timeline: "confirmed" },
+      elapsedSeconds: 300,
+      openGaps: [],
+      updatedAt: "2026-06-10T00:00:00Z",
+      items: [
+        {
+          id: "budget",
+          label: "Budget",
+          tier: "bant",
+          status: "confirmed",
+          evidence: [{ snippet: "Customer approved $650K to $800K", value: "$650K to $800K", confidence: 0.9 }],
+        },
+      ],
+    };
+    const partial: DiscoveryChecklistState = {
+      ...confirmed,
+      coverage: 0.5,
+      bantCoverage: 0.5,
+      bant: { budget: "partial", authority: "partial", need: "partial", timeline: "partial" },
+      elapsedSeconds: 372,
+      openGaps: ["budget"],
+      items: [
+        {
+          id: "budget",
+          label: "Budget",
+          tier: "bant",
+          status: "partial",
+          evidence: [{ snippet: "AE will send proposal with budget breakdown", value: "", confidence: 0.7 }],
+        },
+      ],
+    };
+
+    const store = useLiveCall.getState();
+    store.applyChecklistUpdate(confirmed);
+    store.applyChecklistUpdate(partial);
+
+    const budget = useLiveCall.getState().checklistState?.items.find((item) => item.id === "budget");
+    expect(useLiveCall.getState().checklistState?.bant.budget).toBe("confirmed");
+    expect(budget?.status).toBe("confirmed");
+    expect(budget?.evidence[0].snippet).toContain("$650K");
   });
 
   it("keeps client-only demo sentiment negative on customer pain", () => {

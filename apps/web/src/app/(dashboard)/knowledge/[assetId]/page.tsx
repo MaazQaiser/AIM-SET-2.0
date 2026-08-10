@@ -1,23 +1,41 @@
 "use client";
 
-import { use } from "react";
-import Link from "next/link";
-import { useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, RefreshCw, Trash2, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { Badge } from "@dc-copilot/ui/components/badge";
-import { Button } from "@dc-copilot/ui/components/button";
-import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { KbAssetPreview } from "@/components/knowledge/kb-asset-preview";
 import { KbFileFormatBadge } from "@/components/knowledge/kb-file-format-badge";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { useKbAsset } from "@/lib/data/hooks";
+import { Badge } from "@dc-copilot/ui/components/badge";
+import { Button } from "@dc-copilot/ui/components/button";
+import { useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { use, useEffect } from "react";
+import { toast } from "sonner";
 
 export default function KnowledgeAssetPage({ params }: { params: Promise<{ assetId: string }> }) {
   const { assetId } = use(params);
+  const searchParams = useSearchParams();
+  const fullscreen = searchParams.get("fullscreen") === "1";
   const { data: asset, isLoading } = useKbAsset(assetId);
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    if (!fullscreen) return;
+    document.body.classList.add("knowledge-asset-fullscreen");
+    return () => document.body.classList.remove("knowledge-asset-fullscreen");
+  }, [fullscreen]);
+
   if (isLoading) {
+    if (fullscreen) {
+      return (
+        <main className="fixed inset-0 z-[9999] flex items-center justify-center gap-2 bg-background text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading…
+        </main>
+      );
+    }
+
     return (
       <PageShell size="wide" className="flex items-center gap-2 text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
@@ -30,13 +48,24 @@ export default function KnowledgeAssetPage({ params }: { params: Promise<{ asset
     return (
       <PageShell size="wide">
         <PageHeader>
-          <Link href="/content?tab=library" className="flex items-center gap-1 type-body-sm text-muted-foreground hover:text-foreground">
+          <Link
+            href="/content?tab=library"
+            className="flex items-center gap-1 type-body-sm text-muted-foreground hover:text-foreground"
+          >
             <ChevronLeft className="h-4 w-4" />
             Knowledge Base
           </Link>
         </PageHeader>
         <p className="text-muted-foreground">Asset not found or could not be loaded.</p>
       </PageShell>
+    );
+  }
+
+  if (fullscreen) {
+    return (
+      <main className="fixed inset-0 z-[9999] bg-background">
+        <KbAssetPreview asset={asset} presentationFullScreen className="h-full" />
+      </main>
     );
   }
 
@@ -64,7 +93,10 @@ export default function KnowledgeAssetPage({ params }: { params: Promise<{ asset
   return (
     <PageShell size="wide">
       <PageHeader className="space-y-3">
-        <Link href="/content?tab=library" className="flex items-center gap-1 type-body-sm text-muted-foreground hover:text-foreground">
+        <Link
+          href="/content?tab=library"
+          className="flex items-center gap-1 type-body-sm text-muted-foreground hover:text-foreground"
+        >
           <ChevronLeft className="h-4 w-4" />
           Knowledge Base
         </Link>
@@ -74,14 +106,18 @@ export default function KnowledgeAssetPage({ params }: { params: Promise<{ asset
             <h1 className="truncate type-page-title">{asset.title}</h1>
             <div className="flex flex-wrap items-center gap-2">
               <KbFileFormatBadge fileName={asset.fileName} mimeType={asset.mimeType} />
-              <span className="type-caption text-muted-foreground capitalize">{asset.type} · v{asset.version}</span>
+              <span className="type-caption text-muted-foreground capitalize">
+                {asset.type} · v{asset.version}
+              </span>
               {asset.status && asset.status !== "ready" && (
                 <Badge variant="outline" className="capitalize type-caption">
                   {asset.status}
                 </Badge>
               )}
             </div>
-            {asset.fileName && <p className="type-caption text-muted-foreground">{asset.fileName}</p>}
+            {asset.fileName && (
+              <p className="type-caption text-muted-foreground">{asset.fileName}</p>
+            )}
           </div>
           <div className="flex gap-2 shrink-0">
             <Button variant="outline" size="sm" onClick={() => void onReEmbed()}>
@@ -101,7 +137,9 @@ export default function KnowledgeAssetPage({ params }: { params: Promise<{ asset
       {asset.chunkCount !== undefined && (
         <p className="type-caption text-muted-foreground">Chunks indexed: {asset.chunkCount}</p>
       )}
-      {asset.ingestError && <p className="type-body-sm text-destructive">Ingest error: {asset.ingestError}</p>}
+      {asset.ingestError && (
+        <p className="type-body-sm text-destructive">Ingest error: {asset.ingestError}</p>
+      )}
 
       <div className="flex flex-wrap gap-1">
         {asset.tags.map((tag) => (

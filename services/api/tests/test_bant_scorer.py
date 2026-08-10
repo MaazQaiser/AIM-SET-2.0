@@ -67,6 +67,143 @@ def test_update_checklist_extracts_live_bant_outputs_from_customer_transcript():
     assert "Q1 production go-live" in timeline_evidence.value
 
 
+def test_update_checklist_ignores_ae_proposal_language_for_bant_dimensions():
+    state = initial_checklist_state("call-1")
+
+    with_customer_budget, _, _ = update_checklist_from_segment(
+        state,
+        "Our approved budget range is $450K to $600K for year one.",
+        elapsed_seconds=90,
+        speaker_role="customer",
+    )
+    budget_item = next(item for item in with_customer_budget.items if item.id == "budget")
+    original_budget_evidence_count = len(budget_item.evidence)
+    original_budget_value = budget_item.evidence[-1].value
+
+    updated, changed, dims = update_checklist_from_segment(
+        with_customer_budget,
+        "I will send a proposal that includes the budget and timeline for implementation.",
+        elapsed_seconds=130,
+        speaker_role="ae",
+        signal_type="timeline_signal",
+    )
+
+    assert "budget" not in changed
+    assert "timeline" not in changed
+    assert "budget" not in dims
+    assert "timeline" not in dims
+    assert updated.bant["budget"] == with_customer_budget.bant["budget"]
+    assert updated.bant["timeline"] == "unknown"
+
+    updated_budget_item = next(item for item in updated.items if item.id == "budget")
+    timeline_item = next(item for item in updated.items if item.id == "timeline")
+    assert len(updated_budget_item.evidence) == original_budget_evidence_count
+    assert updated_budget_item.evidence[-1].value == original_budget_value
+    assert timeline_item.evidence == []
+
+
+@pytest.mark.parametrize("speaker_role", [None, "customer"])
+def test_update_checklist_ignores_mislabeled_ae_proposal_commitment(speaker_role):
+    state = initial_checklist_state("call-1")
+
+    updated, changed, dims = update_checklist_from_segment(
+        state,
+        (
+            "Good. I will send a proposal that includes the healthcare workflow map, "
+            "integration plan, team structure, pilot timeline, and budget breakdown. "
+            "We can also schedule a CIO review."
+        ),
+        elapsed_seconds=372,
+        speaker_role=speaker_role,
+        signal_type="timeline_signal",
+    )
+
+    assert "budget" not in changed
+    assert "authority" not in changed
+    assert "timeline" not in changed
+    assert "budget" not in dims
+    assert "authority" not in dims
+    assert "timeline" not in dims
+    assert updated.bant["budget"] == "unknown"
+    assert updated.bant["authority"] == "unknown"
+    assert updated.bant["timeline"] == "unknown"
+
+
+def test_update_checklist_keeps_customer_budget_statement_with_share_language():
+    state = initial_checklist_state("call-1")
+
+    updated, changed, dims = update_checklist_from_segment(
+        state,
+        "I can share our approved budget is $650K to $800K for year one.",
+        elapsed_seconds=130,
+        speaker_role="customer",
+    )
+
+    assert "budget" in changed
+    assert "budget" in dims
+    assert updated.bant["budget"] == "confirmed"
+    budget_item = next(item for item in updated.items if item.id == "budget")
+    assert "$650K to $800K" in budget_item.evidence[-1].value
+
+
+def test_update_checklist_keeps_client_authority_out_of_budget():
+    state = initial_checklist_state("call-1")
+    with_budget, _, _ = update_checklist_from_segment(
+        state,
+        (
+            "For budget, we have six hundred fifty thousand to eight hundred thousand "
+            "approved for year one."
+        ),
+        elapsed_seconds=272,
+        speaker_role="customer",
+    )
+    budget_item = next(item for item in with_budget.items if item.id == "budget")
+    original_budget_evidence = budget_item.evidence[-1]
+
+    updated, changed, dims = update_checklist_from_segment(
+        with_budget,
+        (
+            "I own operations approval. Priya owns the financial model. Our CIO, "
+            "Daniel Reed, needs to approve security and integration assumptions before we sign."
+        ),
+        elapsed_seconds=354,
+        speaker_role="customer",
+    )
+
+    assert "authority" in changed
+    assert "authority" in dims
+    assert "budget" not in changed
+    assert "budget" not in dims
+    assert updated.bant["authority"] == "confirmed"
+
+    updated_budget_item = next(item for item in updated.items if item.id == "budget")
+    authority_item = next(item for item in updated.items if item.id == "authority")
+    assert updated_budget_item.evidence[-1].value == original_budget_evidence.value
+    assert "I own operations approval" in authority_item.evidence[-1].value
+    assert "CIO" in authority_item.evidence[-1].value
+
+
+def test_update_checklist_confirms_carebridge_customer_bant_values():
+    state = initial_checklist_state("call-1")
+    for text in (
+        "Need three is a dedicated team of three to four people. We need product, engineering, quality, and support continuity.",
+        "For budget, we have six hundred fifty thousand to eight hundred thousand approved for year one.",
+        "Timeline is also clear. We need partner selection by July twentieth, discovery and design in late July, pilot build in August, and a working pilot in two clinics by October.",
+        "I own operations approval. Priya owns the financial model. Our CIO, Daniel Reed, needs to approve security and integration assumptions before we sign.",
+    ):
+        state, _, _ = update_checklist_from_segment(
+            state,
+            text,
+            elapsed_seconds=120,
+            speaker_role="customer",
+        )
+
+    assert state.bant["budget"] == "confirmed"
+    assert state.bant["authority"] == "confirmed"
+    assert state.bant["need"] == "confirmed"
+    assert state.bant["timeline"] == "confirmed"
+
+
 def test_update_checklist_authority_ignores_general_platform_need():
     state = initial_checklist_state("call-1")
 

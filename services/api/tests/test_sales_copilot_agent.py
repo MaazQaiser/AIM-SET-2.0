@@ -479,7 +479,7 @@ def test_copilot_chat_offline_project_industry_search(monkeypatch):
     assert "| Project / product | Relevant information | KB source |" in answer
     assert "kb-" not in answer
     assert "Sales Co-pilot (offline)" not in answer
-    assert env.result["actions_taken"][0]["tool"] == "search_knowledge_base"
+    assert env.result["actions_taken"][0]["tool"] == "search_project_library"
 
 
 def test_copilot_chat_offline_filters_non_matching_industry(monkeypatch):
@@ -514,3 +514,175 @@ def test_copilot_chat_offline_filters_non_matching_industry(monkeypatch):
     assert "filtered out" in answer
     assert "Projects for Sale Enablement" in answer
     assert "| KB source | Why I filtered it out |" in answer
+
+
+def test_live_copilot_help_me_returns_strategy_from_selected_insight(monkeypatch):
+    ctx = TenantContext(tenant_id="tenant-a", user_id="u1", clerk_org_id="tenant-a")
+
+    monkeypatch.setattr(
+        "app.agents.sales_copilot_agent.CallsService.get_call",
+        lambda self, _ctx, _call_id: None,
+    )
+    monkeypatch.setattr(
+        "app.agents.sales_copilot_agent.CallsService.get_brief",
+        lambda self, _ctx, _call_id: None,
+    )
+
+    env = copilot_chat_response(
+        ctx,
+        "Help me with this signal: Customer sentiment shifted toward negative.",
+        history=[],
+        call_id="call-live",
+        surface="live_dc",
+        context={
+            "accountName": "Prism Data Collective",
+            "leadName": "Nadia Rahman",
+            "transcriptLineCount": 1,
+            "transcriptTail": [{"speaker": "Nadia", "role": "customer", "text": "I am not sure this fits."}],
+            "requestedHelp": "live_insight_strategy",
+            "selectedInsight": {
+                "id": "sentiment-1",
+                "label": "Live signal",
+                "kind": "insight",
+                "message": "Customer sentiment shifted toward negative — check engagement.",
+                "details": ["The customer sounded less certain after integration was discussed."],
+            },
+        },
+    )
+
+    answer = env.result.get("answer") or ""
+    assert "**Read**" in answer
+    assert "**Strategy**" in answer
+    assert "**Talk track**" in answer
+    assert "**Rep move**" in answer
+    assert "Acknowledge the concern" in answer
+    assert "Nadia Rahman" in answer
+    assert env.result["actions_taken"][0]["tool"] == "live_insight_strategy"
+    assert any(c.source_type == "ui_context" for c in env.citations)
+
+
+def test_copilot_relevant_projects_returns_details_without_overfiltering(monkeypatch):
+    ctx = TenantContext(tenant_id="tenant-a", user_id="u1", clerk_org_id="tenant-a")
+
+    monkeypatch.setattr(
+        "app.agents.sales_copilot_agent._kb_search",
+        lambda _ctx, _query, limit=20: [
+            {
+                "asset_id": "healthcare-project-1",
+                "chunk_text": (
+                    "Project Name: ClinicOps Integration Hub; "
+                    "LinkedIn Industry: Healthcare; "
+                    "Technical Solution: Patient intake workflow, EHR integration, and reporting automation; "
+                    "Technology: FHIR APIs, workflow orchestration"
+                ),
+                "metadata": {"title": "Healthcare project database"},
+                "score": 0.94,
+            }
+        ],
+    )
+
+    env = copilot_chat_response(
+        ctx,
+        "show relevant projects",
+        history=[],
+        call_id=None,
+        surface="live_dc",
+        context={"accountName": "Prism Data Collective", "industry": "Healthcare"},
+    )
+
+    answer = env.result.get("answer") or ""
+    assert "ClinicOps Integration Hub" in answer
+    assert "Patient intake workflow" in answer
+    assert "Healthcare project database" in answer
+    assert "could not find a clean KB-backed match" not in answer
+    assert "| Project / product | Relevant information | KB source |" in answer
+
+
+def test_copilot_relevant_projects_uses_project_library_vertical_from_call_context(monkeypatch):
+    ctx = TenantContext(tenant_id="tenant-a", user_id="u1", clerk_org_id="tenant-a")
+
+    monkeypatch.setattr(
+        "app.agents.sales_copilot_agent.list_kb_projects",
+        lambda _ctx: [
+            {
+                "id": "care-ai-like-me",
+                "title": "Care AI Like Me",
+                "companyName": "XP-Care",
+                "industry": "Healthcare",
+                "domain": "AI Care Companion",
+                "problemStatement": "Clinics needed better patient engagement and care workflow consistency.",
+                "technicalSolution": "AI-native care companion with patient workflow automation.",
+                "sourceAssetId": "project-library",
+                "sourceAssetTitle": "Projects for Sale Enablement",
+            },
+            {
+                "id": "retail-buying-network",
+                "title": "PBD",
+                "industry": "Convenience Retail",
+                "domain": "Retail Buying Network",
+                "technicalSolution": "Retail CRM modernization.",
+                "sourceAssetId": "project-library",
+                "sourceAssetTitle": "Projects for Sale Enablement",
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "app.agents.sales_copilot_agent._kb_search",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("project request should use project library")),
+    )
+    monkeypatch.setattr(
+        "app.agents.sales_copilot_agent.search_company_playbook",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("project request should not use playbook")),
+    )
+
+    env = copilot_chat_response(
+        ctx,
+        "what are the relevant projects for this client?",
+        history=[],
+        call_id=None,
+        surface="live_dc",
+        context={
+            "accountName": "CareBridge Health Group",
+            "industry": "Healthcare",
+            "transcriptTail": [
+                {
+                    "speaker": "Sarah",
+                    "role": "customer",
+                    "text": "Existing clinic workflows are scattered and patient data handoffs are manual.",
+                }
+            ],
+        },
+    )
+
+    answer = env.result.get("answer") or ""
+    assert "Detected vertical" in answer
+    assert "Healthcare" in answer
+    assert "Care AI Like Me" in answer
+    assert "patient workflow automation" in answer
+    assert "PBD" not in answer
+    assert "company playbook" not in answer.lower()
+    assert env.result["actions_taken"][0]["tool"] == "search_project_library"
+    assert env.result["actions_taken"][0]["vertical"] == "Healthcare"
+    assert any(c.source_type == "project_library" for c in env.citations)
+
+
+def test_copilot_company_policy_uses_playbook_without_tenant_kb(monkeypatch):
+    ctx = TenantContext(tenant_id="tenant-a", user_id="u1", clerk_org_id="tenant-a")
+
+    monkeypatch.setattr(
+        "app.agents.sales_copilot_agent._tenant_kb_search",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("policy should use company playbook")),
+    )
+
+    env = copilot_chat_response(
+        ctx,
+        "what is the company policy on payment terms?",
+        history=[],
+        surface="live_dc",
+    )
+
+    answer = env.result.get("answer") or ""
+    assert "company playbook" in answer.lower()
+    assert "contract-specific" in answer
+    assert "proposal" in answer.lower()
+    assert any(c.source_type == "company_playbook" for c in env.citations)

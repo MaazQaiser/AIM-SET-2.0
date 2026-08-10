@@ -92,4 +92,41 @@ describe("resolvers", () => {
     expect(resolveCalls()[0]?.status).toBe("upcoming");
     expect(resolvePostCallReview("call-review-ready")).toBeNull();
   });
+
+  it("removes matched Post-DC import rows when resetting to Pre-DC", () => {
+    useDcImportsStore.setState({
+      calls: [
+        {
+          id: "call-review-ready",
+          accountName: "Review Ready",
+          scheduledAt: "2026-06-08T07:00:00.000Z",
+          status: "completed",
+          briefReady: true,
+          pod: [],
+        },
+      ],
+      postDcRecords: [
+        {
+          id: "post-review-ready",
+          matchedCallId: "call-review-ready",
+          fields: { "Bottom Line Context": "Review Ready completed discovery." },
+        },
+      ],
+      postReviewsByCallId: {
+        "call-review-ready": {
+          headline: "Wrapped",
+          summary: ["Call completed."],
+          podScorecard: [],
+          learned: [],
+        },
+      },
+    });
+
+    useDcImportsStore.getState().resetCallToPreDc("call-review-ready");
+
+    const state = useDcImportsStore.getState();
+    expect(state.postDcRecords).toEqual([]);
+    expect(resolveCalls()[0]?.status).toBe("upcoming");
+    expect(resolvePostCallReview("call-review-ready")).toBeNull();
+  });
 });

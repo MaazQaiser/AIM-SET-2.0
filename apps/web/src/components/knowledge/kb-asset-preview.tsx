@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Download, Loader2 } from "lucide-react";
-import { Button } from "@dc-copilot/ui/components/button";
 import { KbSlidePreview } from "@/components/knowledge/kb-slide-preview";
-import { isPresentationFormat, kbFileUrl, resolveKbFileFormat } from "@/lib/kb/file-format";
 import { briefMainNestedSurfaceClass } from "@/components/pre-call/brief-detail-card";
 import { cn } from "@/lib/cn";
+import { isPresentationFormat, kbFileUrl, resolveKbFileFormat } from "@/lib/kb/file-format";
 import type { KBAsset } from "@/types";
+import { Button } from "@dc-copilot/ui/components/button";
+import { Download, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface KbAssetPreviewProps {
   asset: Pick<
@@ -20,6 +20,8 @@ interface KbAssetPreviewProps {
   compact?: boolean;
   /** Expand preview to fill the parent panel (library full-screen view). */
   fillHeight?: boolean;
+  /** Render presentation decks directly in full-screen preview mode. */
+  presentationFullScreen?: boolean;
   className?: string;
 }
 
@@ -28,6 +30,7 @@ export function KbAssetPreview({
   indexedText,
   compact = false,
   fillHeight = false,
+  presentationFullScreen = false,
   className,
 }: KbAssetPreviewProps) {
   const meta = resolveKbFileFormat(asset.fileName, asset.mimeType);
@@ -59,7 +62,8 @@ export function KbAssetPreview({
           return;
         }
 
-        const needsOriginalFile = meta.canInlinePreview || meta.format === "docx" || meta.format === "pdf";
+        const needsOriginalFile =
+          meta.canInlinePreview || meta.format === "docx" || meta.format === "pdf";
 
         if (needsOriginalFile) {
           const res = await fetch(kbFileUrl(asset.id));
@@ -98,7 +102,14 @@ export function KbAssetPreview({
   }, [blobUrl]);
 
   if (isPresentation) {
-    return <KbSlidePreview asset={asset} compact={compact} className={className} />;
+    return (
+      <KbSlidePreview
+        asset={asset}
+        compact={compact}
+        fullScreen={presentationFullScreen}
+        className={className}
+      />
+    );
   }
 
   if (loading) {
@@ -157,16 +168,34 @@ export function KbAssetPreview({
 
   if (meta.canInlinePreview && blobUrl && meta.format !== "pdf") {
     return (
-      <div className={cn("flex min-h-[420px] items-center justify-center rounded-lg border bg-muted/10 p-4", briefMainNestedSurfaceClass, className)}>
+      <div
+        className={cn(
+          "flex min-h-[420px] items-center justify-center rounded-lg border bg-muted/10 p-4",
+          briefMainNestedSurfaceClass,
+          className
+        )}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={blobUrl} alt={asset.title} className="max-h-[65vh] max-w-full object-contain rounded-md shadow-sm" />
+        <img
+          src={blobUrl}
+          alt={asset.title}
+          className="max-h-[65vh] max-w-full object-contain rounded-md shadow-sm"
+        />
       </div>
     );
   }
 
   return (
-    <div className={cn("flex min-h-[420px] flex-col gap-3 rounded-lg border bg-muted/10 p-4", briefMainNestedSurfaceClass, className)}>
-      <p className="type-body text-muted-foreground shrink-0">Text preview from the knowledge base index.</p>
+    <div
+      className={cn(
+        "flex min-h-[420px] flex-col gap-3 rounded-lg border bg-muted/10 p-4",
+        briefMainNestedSurfaceClass,
+        className
+      )}
+    >
+      <p className="type-body text-muted-foreground shrink-0">
+        Text preview from the knowledge base index.
+      </p>
       {textPreview ? (
         <pre className="glass-insight-card flex-1 min-h-0 overflow-auto whitespace-pre-wrap p-4 type-label leading-relaxed shadow-none">
           {textPreview}

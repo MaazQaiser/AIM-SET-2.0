@@ -350,7 +350,7 @@ def default_agent_config(agent_id: str) -> Dict[str, Any]:
         cfg["workflow_prompts"] = _default_workflow_prompts()
         cfg["summary_highlight_rules"] = [
             {
-                "pattern": r"\b(budget|revenue|pricing|cost|ROI|\$[\d,.]+[KMB]?)\b",
+                "pattern": r"(\$[\d,.]+[KMB]?(?:\s+(?:seed round|funding round|funding))?|\b(?:budget|revenue|pricing|cost|ROI|investment|annual revenue)\b)",
                 "className": "rounded px-1 py-0.5 bg-amber-100/90 text-amber-950",
                 "flags": "gi",
             },

@@ -13,6 +13,7 @@ import type {
   PostCallTask,
 } from "@/lib/brief-types";
 import { buildCallsFromPreDc } from "@/lib/dc-data/build-calls-from-pre-dc";
+import { normalizeCallId } from "@/lib/dc-notes/build-from-import";
 import type { PostDCRecord, PreDCRecord } from "@/types/dc-notes";
 import type { PostDcWorkflowTaskStatus } from "@/lib/post-dc/workflow-tasks";
 
@@ -198,10 +199,13 @@ export const useDcImportsStore = create<DcImportsState>()((set, get) => ({
     set((s) => {
       const stripCallId = <T>(source: Record<string, T>) =>
         Object.fromEntries(Object.entries(source).filter(([id]) => id !== callId)) as Record<string, T>;
+      const matchesCallId = (candidate?: string) =>
+        Boolean(candidate) && normalizeCallId(candidate ?? "") === normalizeCallId(callId);
       return {
         calls: s.calls.map((call) =>
           call.id === callId ? { ...call, status: "upcoming" as const } : call
         ),
+        postDcRecords: s.postDcRecords.filter((record) => !matchesCallId(record.matchedCallId)),
         statusOverridesByCallId: { ...s.statusOverridesByCallId, [callId]: "upcoming" },
         postReviewsByCallId: stripCallId(s.postReviewsByCallId),
         emailDraftsByCallId: stripCallId(s.emailDraftsByCallId),

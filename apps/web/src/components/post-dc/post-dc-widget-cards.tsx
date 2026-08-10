@@ -26,10 +26,11 @@ import {
   briefMainBody,
 } from "@/components/pre-call/brief-detail-card";
 import { PostDcExpandableCard } from "@/components/post-dc/post-dc-expandable-card";
-import { PostDcAiNextSteps } from "@/components/post-dc/post-dc-ai-next-steps";
-import { PostDcDeadlineNote } from "@/components/post-dc/post-dc-deadline-note";
 import { PostDcModalSection } from "@/components/post-dc/post-dc-modal-section";
-import { PlainMarkdownBold } from "@/components/post-dc/plain-markdown-bold";
+import {
+  parseSummaryHighlights,
+  type SummaryHighlightRule,
+} from "@/lib/brief-summary-highlights";
 import type {
   PostCallEmailAttachmentFound,
   PostCallEmailAttachmentMissing,
@@ -39,6 +40,51 @@ import type {
 } from "@/lib/brief-types";
 import { KbAttachmentCard } from "@/components/post-dc/kb-attachment-card";
 import { cn } from "@/lib/cn";
+
+const POST_SUMMARY_HIGHLIGHT_RULES: SummaryHighlightRule[] = [
+  {
+    pattern:
+      /\b(need confirmed|needs?|AI-native|platform|operations|unit performance)\b/gi,
+    className:
+      "rounded px-1 py-0.5 bg-emerald-100/90 text-emerald-950 dark:bg-emerald-500/20 dark:text-emerald-100",
+  },
+  {
+    pattern:
+      /\b(budget|revenue|pricing|cost|ROI|investment|annual potential)\b|\$[\d,.]+(?:K|M|B)?(?:\s*(?:to|-)\s*\$?[\d,.]+(?:K|M|B)?)?/gi,
+    className:
+      "rounded px-1 py-0.5 bg-amber-100/90 text-amber-950 dark:bg-amber-500/20 dark:text-amber-100",
+  },
+  {
+    pattern:
+      /\b(timeline|deadline|Q[1-4]|pilot|production|January|February|March|April|May|June|July|August|September|October|November|December)\b/gi,
+    className:
+      "rounded px-1 py-0.5 bg-blue-100/90 text-blue-950 dark:bg-blue-500/20 dark:text-blue-100",
+  },
+  {
+    pattern:
+      /\b(pain|challenge|struggle|friction|bottleneck|manual|spreadsheets?|audits?|compliance|nightmare|integration(?:s)? vary)\b/gi,
+    className:
+      "rounded px-1 py-0.5 bg-orange-100/90 text-orange-950 dark:bg-orange-500/20 dark:text-orange-100",
+  },
+  {
+    pattern:
+      /\b(authority|decision|approval|board|CEO|CFO|CIO|stakeholder|buyer|executive)\b/gi,
+    className:
+      "rounded px-1 py-0.5 bg-violet-100/90 text-violet-950 dark:bg-violet-500/20 dark:text-violet-100",
+  },
+  {
+    pattern:
+      /\b(BANT|proposal|board-ready|integration map|reference customers|follow-up|readout|security|decision process)\b/gi,
+    className:
+      "rounded px-1 py-0.5 bg-indigo-100/90 text-indigo-950 dark:bg-indigo-500/20 dark:text-indigo-100",
+  },
+];
+
+interface PostSummarySection {
+  title: string;
+  body: string;
+  bodyLines?: string[];
+}
 
 export function PostBeforeContextCard({ callId }: { callId: string }) {
   return (
@@ -93,28 +139,37 @@ export function PostSummaryCard({
   const trimmedDeadline = deadlineNote?.trim();
   const openGaps = review?.openDiscoveryGaps ?? [];
   const headline = review?.headline?.trim();
-
-  const summaryList = (
-    <ul className="divide-y divide-border w-full">
-      {summary.map((p) => (
-        <li
-          key={p}
-          className={cn(
-            briefMainBody,
-            "py-2.5 text-foreground/90 whitespace-pre-wrap break-words first:pt-0 last:pb-0 w-full"
-          )}
-        >
-          <PlainMarkdownBold text={p} />
-        </li>
-      ))}
-    </ul>
-  );
+  const summarySections = summary
+    .map(splitPostSummaryItem)
+    .filter((section) => section.body.trim());
+  const followUpSections: PostSummarySection[] = [
+    ...(trimmedDeadline
+      ? [{ title: "Deadline / key note", body: trimmedDeadline }]
+      : []),
+    ...(trimmedRecommendation
+      ? [
+          {
+            title: "AI recommended next steps",
+            body: trimmedRecommendation,
+            bodyLines: recommendationLines(trimmedRecommendation),
+          },
+        ]
+      : []),
+  ];
+  const contentSections = [...summarySections, ...followUpSections];
 
   return (
     <PostDcExpandableCard
+      tone="main"
+      variant="highlight"
       title="Call summary"
       icon={Brain}
       expandLabel="Expand call summary"
+      sourceInfo={{
+        source: "AI from discovery call",
+        detail:
+          "The workflow summarizes call outcomes, BANT signals, transcript evidence, and recommended follow-up into Post-DC sections.",
+      }}
       modalContent={
         <div className="space-y-6">
           {headline ? (
@@ -125,39 +180,14 @@ export function PostSummaryCard({
             </PostDcModalSection>
           ) : null}
 
-          <PostDcModalSection title="What happened on the call">
-            <ul className="divide-y divide-border/60">
-              {summary.map((p) => (
-                <li
-                  key={p}
-                  className={cn(
-                    briefMainBody,
-                    "py-3 text-foreground/90 whitespace-pre-wrap break-words first:pt-0 last:pb-0"
-                  )}
-                >
-                  <PlainMarkdownBold text={p} />
-                </li>
-              ))}
-            </ul>
+          <PostDcModalSection title="Call summary and follow-up">
+            <PostSummarySections sections={contentSections} />
+            {contentSections.length === 0 ? (
+              <p className={cn(briefMainBody, "text-muted-foreground")}>
+                No call summary was generated yet.
+              </p>
+            ) : null}
           </PostDcModalSection>
-
-          {trimmedDeadline ? (
-            <PostDcModalSection
-              title="Deadline / key note"
-              description="Time-sensitive follow-up from the discovery call."
-            >
-              <PostDcDeadlineNote text={trimmedDeadline} showLabel={false} className="pt-0 mt-0 border-0" />
-            </PostDcModalSection>
-          ) : null}
-
-          {trimmedRecommendation ? (
-            <PostDcModalSection
-              title="AI recommended next steps"
-              description="Suggested follow-up based on discovery outcomes, BANT, and deal signals."
-            >
-              <PostDcAiNextSteps text={trimmedRecommendation} showLabel={false} className="pt-0 mt-0 border-0" />
-            </PostDcModalSection>
-          ) : null}
 
           {openGaps.length > 0 ? (
             <PostDcModalSection
@@ -176,10 +206,175 @@ export function PostSummaryCard({
         </div>
       }
     >
-      {summaryList}
-      {trimmedDeadline ? <PostDcDeadlineNote text={trimmedDeadline} /> : null}
-      {trimmedRecommendation ? <PostDcAiNextSteps text={trimmedRecommendation} /> : null}
+      <PostSummarySections sections={contentSections} />
+      {contentSections.length === 0 ? (
+        <p className={cn(briefMainBody, "text-muted-foreground")}>
+          No call summary was generated yet.
+        </p>
+      ) : null}
     </PostDcExpandableCard>
+  );
+}
+
+function splitPostSummaryItem(item: string, index: number): PostSummarySection {
+  const trimmed = item.trim().replace(/\*\*/g, "");
+  const match = trimmed.match(/^([^:\n]{2,96}):\s*(.+)$/s);
+
+  if (match?.[1] && match[2]) {
+    return {
+      title: cleanSummarySectionTitle(match[1]),
+      body: match[2].trim(),
+    };
+  }
+
+  return {
+    title: fallbackSummarySectionTitle(trimmed, index),
+    body: trimmed,
+  };
+}
+
+function fallbackSummarySectionTitle(text: string, index: number) {
+  const lower = text.toLowerCase();
+
+  if (/\$[\d,.]+/.test(text) || lower.includes("budget")) return "Budget";
+  if (
+    lower.includes("timeline") ||
+    lower.includes("deadline") ||
+    lower.includes("pilot") ||
+    /\bq[1-4]\b/i.test(text)
+  ) {
+    return "Timeline";
+  }
+  if (lower.includes("bant") || lower.includes("coverage")) return "Discovery coverage";
+  if (lower.includes("sentiment")) return "Sentiment";
+  if (
+    lower.includes("pain") ||
+    lower.includes("challenge") ||
+    lower.includes("bottleneck") ||
+    lower.includes("manual")
+  ) {
+    return "Pains validated";
+  }
+  if (
+    lower.includes("authority") ||
+    lower.includes("approval") ||
+    /\b(?:ceo|cfo|cio)\b/i.test(text)
+  ) {
+    return "Authority";
+  }
+  if (lower.includes("need") || lower.includes("confirmed")) return "Need confirmed";
+  if (lower.includes("proposal") || lower.includes("follow-up")) return "Recommended follow-up";
+
+  return index === 0 ? "Profile summary" : "Call detail";
+}
+
+function cleanSummarySectionTitle(title: string) {
+  return title
+    .replace(/\s+/g, " ")
+    .replace(/[.;\s]+$/g, "")
+    .trim();
+}
+
+function recommendationLines(text: string): string[] {
+  return text
+    .split(/\n+/)
+    .map((line) => line.replace(/^[-•*]\s*/, "").trim())
+    .filter(Boolean);
+}
+
+function highlightedParts(text: string) {
+  let offset = 0;
+  return parseSummaryHighlights(text, POST_SUMMARY_HIGHLIGHT_RULES).map((part) => {
+    const key = `${offset}-${part.value}`;
+    offset += part.value.length;
+    return { ...part, key };
+  });
+}
+
+function PostHighlightedInline({ text }: { text: string }) {
+  return (
+    <>
+      {highlightedParts(text).map((part) =>
+        part.type === "highlight" ? (
+          <mark
+            key={part.key}
+            className={cn(
+              part.className,
+              "box-decoration-clone font-bold underline decoration-foreground/35 underline-offset-2"
+            )}
+          >
+            {part.value}
+          </mark>
+        ) : (
+          <span key={part.key}>{part.value}</span>
+        )
+      )}
+    </>
+  );
+}
+
+function PostHighlightedText({ text, className }: { text: string; className?: string }) {
+  return (
+    <p
+      className={cn(
+        briefMainBody,
+        "whitespace-pre-wrap break-words text-foreground/90",
+        className
+      )}
+    >
+      <PostHighlightedInline text={text} />
+    </p>
+  );
+}
+
+function PostSummarySections({ sections }: { sections: PostSummarySection[] }) {
+  if (sections.length === 0) return null;
+
+  return (
+    <div className="space-y-3.5 min-w-0">
+      {sections.map((section, index) => (
+        <PostSummarySectionBlock
+          key={`${section.title}-${section.body.slice(0, 48)}`}
+          section={section}
+          first={index === 0}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PostSummarySectionBlock({
+  section,
+  first,
+}: {
+  section: PostSummarySection;
+  first: boolean;
+}) {
+  const lines = section.bodyLines?.filter(Boolean) ?? [];
+  const showLines = lines.length > 1;
+
+  return (
+    <section
+      className={cn(
+        "space-y-2 border-t border-border/60 pt-3.5",
+        first && "border-t-0 pt-0"
+      )}
+    >
+      <h3 className="type-kicker leading-none text-muted-foreground break-words">
+        <PostHighlightedInline text={section.title} />
+      </h3>
+      {showLines ? (
+        <ul className={cn(briefMainBody, "list-disc space-y-1.5 pl-5 text-foreground/90")}>
+          {lines.map((line) => (
+            <li key={line} className="break-words">
+              <PostHighlightedInline text={line} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <PostHighlightedText text={section.body} />
+      )}
+    </section>
   );
 }
 

@@ -258,7 +258,7 @@ export function useCallStream({ callId, enabled = true }: UseCallStreamOptions) 
               text: segment.text,
               speakerId: segment.speakerId ?? "unknown",
               speakerName: segment.speakerName ?? "Speaker",
-              speakerRole: segment.speakerRole ?? "customer",
+              speakerRole: segment.speakerRole,
               timestamp: segment.timestamp ?? segment.elapsedSeconds ?? 0,
             },
           })

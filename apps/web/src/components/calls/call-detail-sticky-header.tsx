@@ -5,20 +5,18 @@ import { ArrowLeft, Settings } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
 import { Badge } from "@dc-copilot/ui/components/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@dc-copilot/ui/components/tooltip";
-import { PreDcBantStrip } from "@/components/calls/pre-dc-bant-strip";
+import { CallQuickDetailsDialog } from "@/components/calls/call-quick-details-dialog";
 import { PreDcPrepReadyAction } from "@/components/calls/pre-dc-prep-ready-action";
 import { PostDcActionStrip } from "@/components/post-dc/post-dc-action-strip";
 import { PostDcCloseDealAction } from "@/components/post-dc/post-dc-close-deal-action";
-import { AgentConfigLink } from "@/components/agents/agent-config-link";
 import { ParticipantAvatar } from "@/components/participant-avatar";
 import { useThemePreview } from "@/hooks/use-theme-preview";
 import { cn } from "@/lib/cn";
-import type { BANTScore, Call } from "@/types";
+import type { Call } from "@/types";
 
 interface CallDetailStickyHeaderProps {
   call: Call;
   scheduleText: string;
-  bant?: BANTScore;
   showJoinCall: boolean;
   isEditingLayout: boolean;
   onToggleLayout: () => void;
@@ -27,6 +25,8 @@ interface CallDetailStickyHeaderProps {
   backHref?: string;
   backLabel?: string;
   leadStage?: string;
+  personLinkedInUrl?: string;
+  companyLinkedInUrl?: string;
   trailingActions?: React.ReactNode;
   postDcWorkflow?: {
     hasNextSteps: boolean;
@@ -118,7 +118,6 @@ function BackToCallsButton() {
 export function CallDetailStickyHeader({
   call,
   scheduleText,
-  bant,
   showJoinCall,
   isEditingLayout,
   onToggleLayout,
@@ -126,15 +125,17 @@ export function CallDetailStickyHeader({
   backHref,
   backLabel,
   leadStage,
+  personLinkedInUrl,
+  companyLinkedInUrl,
   trailingActions,
   postDcWorkflow,
 }: CallDetailStickyHeaderProps) {
   const { isIntercom } = useThemePreview();
   const isLive = call.status === "live";
   const isPostDc = phase === "post-dc";
-  const showPreDcActionBar = !isPostDc && (Boolean(bant) || showJoinCall);
   const showPreDcPrepAction = !isPostDc && showJoinCall;
   const showPostDcActionBar = isPostDc && Boolean(postDcWorkflow);
+  const joinLabel = isLive ? "Join live" : "Join call";
   const resolvedBackHref = backHref ?? (isPostDc ? `/calls/${call.id}` : "/calls");
   const resolvedBackLabel =
     backLabel ?? (isPostDc ? "Back to call brief" : "Back to calls");
@@ -169,18 +170,28 @@ export function CallDetailStickyHeader({
               )}
             >
               {call.leadName && (
-                <span className="inline-flex items-center gap-1.5 font-medium text-foreground/90">
-                  <ParticipantAvatar
-                    name={call.leadName}
-                    kind="external"
-                    size="xs"
-                    className="border border-border/60"
-                  />
-                  <span>
-                    {call.leadName}
-                    {call.leadTitle ? ` · ${call.leadTitle}` : ""}
-                  </span>
-                </span>
+                <CallQuickDetailsDialog
+                  call={call}
+                  personLinkedInUrl={personLinkedInUrl}
+                  companyLinkedInUrl={companyLinkedInUrl}
+                >
+                  <button
+                    type="button"
+                    className="group/lead inline-flex max-w-full items-center gap-1.5 rounded-md text-left font-medium text-foreground/90 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    aria-label={`View client details for ${call.leadName}`}
+                  >
+                    <ParticipantAvatar
+                      name={call.leadName}
+                      kind="external"
+                      size="xs"
+                      className="shrink-0 border border-border/60"
+                    />
+                    <span className="truncate transition-colors group-hover/lead:text-primary">
+                      {call.leadName}
+                      {call.leadTitle ? ` · ${call.leadTitle}` : ""}
+                    </span>
+                  </button>
+                </CallQuickDetailsDialog>
               )}
               <span>{scheduleText}</span>
               {!isIntercom && (
@@ -206,6 +217,18 @@ export function CallDetailStickyHeader({
           {trailingActions}
           {isPostDc ? <PostDcCloseDealAction callId={call.id} /> : null}
           {showPreDcPrepAction ? <PreDcPrepReadyAction callId={call.id} /> : null}
+          {!isPostDc && showJoinCall ? (
+            <Button
+              asChild
+              size="sm"
+              className={cn(
+                "h-8 shrink-0 rounded-full px-4 type-body font-bold",
+                isIntercom && "bg-[#111111] text-white hover:bg-[#111111]/90"
+              )}
+            >
+              <Link href={`/calls/${call.id}/live`}>{joinLabel}</Link>
+            </Button>
+          ) : null}
           {showPostDcActionBar && postDcWorkflow ? (
             <PostDcActionStrip
               hasNextSteps={postDcWorkflow.hasNextSteps}
@@ -219,18 +242,6 @@ export function CallDetailStickyHeader({
               className="mx-0 shrink-0"
             />
           ) : null}
-          {showPreDcActionBar && (
-            <PreDcBantStrip
-              bant={bant}
-              callId={call.id}
-              showJoinCall={showJoinCall}
-              isLive={isLive}
-              compact
-              className="mx-0 shrink-0"
-            />
-          )}
-          {!isPostDc ? <AgentConfigLink agentId="workflow" /> : null}
-          {isPostDc ? <AgentConfigLink agentId="post_dc" /> : null}
           <LayoutSettingsButton
             isEditingLayout={isEditingLayout}
             onToggleLayout={onToggleLayout}

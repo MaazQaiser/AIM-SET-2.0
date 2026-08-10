@@ -1,34 +1,35 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { AiGradientText } from "@/components/ai-gradient-text";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/cn";
+import type { LiveInsightKind, LiveInsightLine } from "@/lib/live/build-copilot-insights";
+import {
+  type RunningSummaryInput,
+  buildRunningSummaryLines,
+} from "@/lib/live/build-running-summary-lines";
+import { dedupePainSignals, painQuote, painSummary } from "@/lib/live/pain-display";
+import type { PainSignal } from "@/types";
 import {
   AlertTriangle,
   ChevronDown,
   FileText,
   HelpCircle,
   Lightbulb,
+  type LucideIcon,
   ScanEye,
+  Sparkles,
   Target,
   X,
-  type LucideIcon,
 } from "lucide-react";
-import { AiGradientText } from "@/components/ai-gradient-text";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/cn";
-import {
-  buildRunningSummaryLines,
-  type RunningSummaryInput,
-} from "@/lib/live/build-running-summary-lines";
-import type { LiveInsightKind, LiveInsightLine } from "@/lib/live/build-copilot-insights";
-import { dedupePainSignals, painQuote, painSummary } from "@/lib/live/pain-display";
-import type { PainSignal } from "@/types";
+import { useMemo, useState } from "react";
 
 const SUMMARY_PREVIEW_MAX = 280;
 const PAIN_LIMIT = 6;
 const INSIGHT_PREVIEW_MAX = 72;
 
 const rowActionButtonClass =
-  "shrink-0 type-caption text-muted-foreground transition-all group-hover:rounded-md group-hover:bg-foreground group-hover:px-2 group-hover:py-0.5 group-hover:text-background";
+  "inline-flex h-6 shrink-0 items-center justify-center gap-1 rounded-md px-2 type-caption text-muted-foreground transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25";
 
 const rowDismissButtonClass =
   "shrink-0 rounded p-0.5 text-muted-foreground opacity-70 transition-all group-hover:bg-foreground group-hover:text-background group-hover:opacity-100";
@@ -36,6 +37,7 @@ const rowDismissButtonClass =
 interface LiveCopilotSummaryProps extends RunningSummaryInput {
   pains: PainSignal[];
   insights: LiveInsightLine[];
+  onHelpWithInsight?: (item: LiveInsightLine) => void;
   className?: string;
 }
 
@@ -100,9 +102,7 @@ function SectionHeading({
     return (
       <div className="mb-2 flex items-center gap-1.5">
         <Icon className="h-3.5 w-3.5 shrink-0 text-orange-500" aria-hidden />
-        <p className="type-kicker text-orange-500">
-          {children}
-        </p>
+        <p className="type-kicker text-orange-500">{children}</p>
       </div>
     );
   }
@@ -111,9 +111,7 @@ function SectionHeading({
     return (
       <div className="mb-2 flex items-center gap-1.5">
         <Icon className="h-3.5 w-3.5 shrink-0 text-blue-500" aria-hidden />
-        <p className="type-kicker text-blue-500">
-          {children}
-        </p>
+        <p className="type-kicker text-blue-500">{children}</p>
       </div>
     );
   }
@@ -251,7 +249,9 @@ function RunningSummarySection({
     return (
       <section data-testid="running-summary">
         <SectionHeading icon={FileText}>Running Summary</SectionHeading>
-        <p className="type-body text-muted-foreground">Summary will build as the call progresses.</p>
+        <p className="type-body text-muted-foreground">
+          Summary will build as the call progresses.
+        </p>
       </section>
     );
   }
@@ -262,10 +262,7 @@ function RunningSummarySection({
       <p className="type-body leading-relaxed text-foreground break-words">
         {displaySummary}
         {isTruncated && (
-          <InlineExpandToggle
-            expanded={expanded}
-            onToggle={() => setExpanded((value) => !value)}
-          />
+          <InlineExpandToggle expanded={expanded} onToggle={() => setExpanded((value) => !value)} />
         )}
       </p>
     </section>
@@ -274,10 +271,7 @@ function RunningSummarySection({
 
 function PainPointsSection({ pains }: { pains: PainSignal[] }) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
-  const visiblePains = useMemo(
-    () => dedupePainSignals(pains).slice(-PAIN_LIMIT),
-    [pains]
-  );
+  const visiblePains = useMemo(() => dedupePainSignals(pains).slice(-PAIN_LIMIT), [pains]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -294,7 +288,9 @@ function PainPointsSection({ pains }: { pains: PainSignal[] }) {
         Pain Points Identified
       </SectionHeading>
       {visiblePains.length === 0 ? (
-        <p className="type-body text-muted-foreground">Pain points appear as the customer speaks.</p>
+        <p className="type-body text-muted-foreground">
+          Pain points appear as the customer speaks.
+        </p>
       ) : (
         <div>
           {visiblePains.map((pain) => (
@@ -317,6 +313,7 @@ function LiveInsightRow({
   onToggleExpand,
   onDismiss,
   onRestore,
+  onHelpWithInsight,
   dimmed = false,
 }: {
   item: LiveInsightLine;
@@ -324,6 +321,7 @@ function LiveInsightRow({
   onToggleExpand: () => void;
   onDismiss?: () => void;
   onRestore?: () => void;
+  onHelpWithInsight?: (item: LiveInsightLine) => void;
   dimmed?: boolean;
 }) {
   const meta = insightKindMeta[item.kind];
@@ -335,10 +333,7 @@ function LiveInsightRow({
 
   return (
     <div
-      className={cn(
-        "group border-b border-border/40 py-2 last:border-b-0",
-        dimmed && "opacity-60"
-      )}
+      className={cn("group border-b border-border/40 py-2 last:border-b-0", dimmed && "opacity-60")}
     >
       <div className={cn("flex min-w-0 gap-2", expanded ? "items-start" : "items-center")}>
         <Tooltip>
@@ -378,12 +373,21 @@ function LiveInsightRow({
           </button>
         )}
 
-        {item.onGotIt && !onRestore && (
+        {onHelpWithInsight && (
           <button
             type="button"
             className={rowActionButtonClass}
-            onClick={item.onGotIt}
+            aria-label={`Help me with ${item.label.toLowerCase()}`}
+            title="Help me"
+            onClick={() => onHelpWithInsight(item)}
           >
+            <Sparkles className="h-3 w-3" aria-hidden />
+            <span>Help me</span>
+          </button>
+        )}
+
+        {item.onGotIt && !onRestore && (
+          <button type="button" className={rowActionButtonClass} onClick={item.onGotIt}>
             {item.gotItLabel ?? "Got it"}
           </button>
         )}
@@ -417,7 +421,13 @@ function LiveInsightRow({
   );
 }
 
-function LiveInsightsSection({ insights }: { insights: LiveInsightLine[] }) {
+function LiveInsightsSection({
+  insights,
+  onHelpWithInsight,
+}: {
+  insights: LiveInsightLine[];
+  onHelpWithInsight?: (item: LiveInsightLine) => void;
+}) {
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => new Set());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [showDismissed, setShowDismissed] = useState(false);
@@ -479,6 +489,7 @@ function LiveInsightsSection({ insights }: { insights: LiveInsightLine[] }) {
                 expanded={expandedIds.has(item.id)}
                 onToggleExpand={() => toggleExpand(item.id)}
                 onDismiss={() => dismiss(item)}
+                onHelpWithInsight={onHelpWithInsight}
               />
             ))}
           </div>
@@ -496,9 +507,7 @@ function LiveInsightsSection({ insights }: { insights: LiveInsightLine[] }) {
               ) : (
                 <>
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="type-kicker text-muted-foreground">
-                      Dismissed
-                    </p>
+                    <p className="type-kicker text-muted-foreground">Dismissed</p>
                     <button
                       type="button"
                       className="type-label text-primary underline-offset-2 hover:underline"
@@ -515,6 +524,7 @@ function LiveInsightsSection({ insights }: { insights: LiveInsightLine[] }) {
                       expanded={expandedIds.has(item.id)}
                       onToggleExpand={() => toggleExpand(item.id)}
                       onRestore={() => restore(item.id)}
+                      onHelpWithInsight={onHelpWithInsight}
                     />
                   ))}
                   <button
@@ -543,6 +553,7 @@ export function LiveCopilotSummary({
   transcript,
   pains,
   insights,
+  onHelpWithInsight,
   className,
 }: LiveCopilotSummaryProps) {
   const summaryInput = useMemo(
@@ -561,7 +572,7 @@ export function LiveCopilotSummary({
     <div className={cn("min-w-0 shrink-0", className)} data-testid="live-copilot-summary">
       <RunningSummarySection {...summaryInput} />
       <PainPointsSection pains={pains} />
-      <LiveInsightsSection insights={insights} />
+      <LiveInsightsSection insights={insights} onHelpWithInsight={onHelpWithInsight} />
     </div>
   );
 }

@@ -6,7 +6,6 @@ import { Button } from "@dc-copilot/ui/components/button";
 import {
   BriefDetailCard,
   BRIEF_RELEVANT_CONTENT_SCROLL_MAX,
-  briefMainMuted,
 } from "@/components/pre-call/brief-detail-card";
 import { KbDocumentViewerDialog } from "@/components/pre-call/kb-document-viewer-dialog";
 import { RelevantProjectDetailDialog } from "@/components/pre-call/relevant-project-detail-dialog";
@@ -135,7 +134,7 @@ export function BriefRelevantContent({
                           <p
                             className={cn(
                               "min-w-0 flex-1 break-words line-clamp-2",
-                              "text-sm font-semibold leading-snug text-foreground"
+                              "text-[0.8125rem] font-bold leading-snug text-foreground"
                             )}
                           >
                             {doc.title}
@@ -143,7 +142,9 @@ export function BriefRelevantContent({
                         </div>
                         <RelevanceBar score={doc.relevanceScore} className="mt-1.5" />
                         {doc.snippet ? (
-                          <p className={cn(briefMainMuted, "mt-1 line-clamp-2")}>{doc.snippet}</p>
+                          <p className="mt-1 line-clamp-2 text-xs leading-snug text-muted-foreground">
+                            {doc.snippet}
+                          </p>
                         ) : null}
                       </div>
                     </div>
@@ -174,7 +175,7 @@ export function BriefRelevantContent({
                       <span
                         className={cn(
                           "line-clamp-2 flex-1 min-w-0",
-                          "text-sm font-semibold leading-snug text-foreground"
+                          "text-[0.8125rem] font-bold leading-snug text-foreground"
                         )}
                       >
                         {project.title}
@@ -185,7 +186,9 @@ export function BriefRelevantContent({
                     </div>
                     <RelevanceBar score={project.relevanceScore} className="mt-1.5" />
                     {project.summary ? (
-                      <p className={cn(briefMainMuted, "mt-1 line-clamp-2")}>{project.summary}</p>
+                      <p className="mt-1 line-clamp-2 text-xs leading-snug text-muted-foreground">
+                        {project.summary}
+                      </p>
                     ) : null}
                   </button>
                 </li>

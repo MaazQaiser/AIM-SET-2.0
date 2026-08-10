@@ -16,7 +16,7 @@ function hashString(s: string): number {
   return Math.abs(h);
 }
 
-/** Agent sales rating: whole number 1–8, stable per call id. */
+/** Agent sales rating: whole number 1–10, stable per call id. */
 export function companyRatingForCall(call: {
   id?: string;
   icpMatch?: number;
@@ -28,16 +28,16 @@ export function companyRatingForCall(call: {
       : icpScoreFromBucket(call.icpBucket ?? "");
 
   let min = 1;
-  let max = 4;
+  let max = 5;
   if (fit >= 0.85) {
-    min = 7;
-    max = 8;
+    min = 8;
+    max = 10;
   } else if (fit >= 0.74) {
-    min = 5;
-    max = 7;
+    min = 6;
+    max = 8;
   } else if (fit >= 0.58) {
-    min = 3;
-    max = 6;
+    min = 4;
+    max = 7;
   }
 
   const span = max - min;

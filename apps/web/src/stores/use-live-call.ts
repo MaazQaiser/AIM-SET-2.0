@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { filterKeywordStats } from "@/lib/live/keyword-filter";
 import { dedupePainSignals } from "@/lib/live/pain-display";
 import type {
+  ChecklistItem,
+  ChecklistItemStatus,
   TranscriptEvent,
   NudgePayload,
   CustomerSentimentCue,
@@ -15,7 +17,7 @@ import type {
   SuggestionLogEntry,
   UnansweredQuestionPayload,
 } from "@/types";
-import type { BantSignal, DiscoveryChecklistState } from "@dc-copilot/types";
+import type { BantSignal, BANTStatus, DiscoveryChecklistState } from "@dc-copilot/types";
 
 interface LiveCallState {
   callId: string | null;
@@ -197,6 +199,80 @@ function mergeBantSignal(existing: BantSignal, incoming: BantSignal): BantSignal
   };
 }
 
+function checklistStatusRank(status: ChecklistItemStatus | undefined): number {
+  if (status === "confirmed") return 3;
+  if (status === "partial") return 2;
+  if (status === "pending") return 1;
+  return 0;
+}
+
+function bantStatusFromChecklist(status: ChecklistItemStatus | undefined): BANTStatus {
+  if (status === "confirmed") return "confirmed";
+  if (status === "partial") return "partial";
+  return "unknown";
+}
+
+function mergeChecklistItem(
+  existing: ChecklistItem | undefined,
+  incoming: ChecklistItem
+): ChecklistItem {
+  if (!existing) return incoming;
+  const existingRank = checklistStatusRank(existing.status);
+  const incomingRank = checklistStatusRank(incoming.status);
+  const winner =
+    incomingRank > existingRank
+      ? incoming
+      : incomingRank < existingRank || existing.status === "confirmed"
+        ? existing
+        : incoming;
+  const evidence = winner === incoming ? incoming.evidence : existing.evidence;
+  return {
+    ...existing,
+    ...incoming,
+    status: winner.status,
+    evidence: evidence ?? [],
+  };
+}
+
+function computeChecklistCoverage(items: ChecklistItem[]): Pick<DiscoveryChecklistState, "coverage" | "bantCoverage" | "openGaps" | "bant"> {
+  const score = (status: ChecklistItemStatus) => (status === "confirmed" ? 1 : status === "partial" ? 0.5 : 0);
+  const bantItems = items.filter((item) => item.tier === "bant");
+  const coverage = items.length ? items.reduce((sum, item) => sum + score(item.status), 0) / items.length : 0;
+  const bantCoverage = bantItems.length
+    ? bantItems.reduce((sum, item) => sum + score(item.status), 0) / bantItems.length
+    : 0;
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  const bant: DiscoveryChecklistState["bant"] = {
+    budget: bantStatusFromChecklist(itemById.get("budget")?.status),
+    authority: bantStatusFromChecklist(itemById.get("authority")?.status),
+    need: bantStatusFromChecklist(itemById.get("need")?.status),
+    timeline: bantStatusFromChecklist(itemById.get("timeline")?.status),
+  };
+  const openGaps = items
+    .filter((item) => item.tier === "bant" && item.status !== "confirmed")
+    .map((item) => item.id);
+  return { coverage, bantCoverage, openGaps, bant };
+}
+
+function mergeChecklistState(
+  existing: DiscoveryChecklistState | null,
+  incoming: DiscoveryChecklistState
+): DiscoveryChecklistState {
+  if (!existing || existing.callId !== incoming.callId) return incoming;
+  const existingById = new Map(existing.items.map((item) => [item.id, item]));
+  const incomingIds = new Set(incoming.items.map((item) => item.id));
+  const mergedItems = [
+    ...incoming.items.map((item) => mergeChecklistItem(existingById.get(item.id), item)),
+    ...existing.items.filter((item) => !incomingIds.has(item.id)),
+  ];
+  const computed = computeChecklistCoverage(mergedItems);
+  return {
+    ...incoming,
+    items: mergedItems,
+    ...computed,
+  };
+}
+
 export const useLiveCall = create<LiveCallState>((set, get) => ({
   ...initialState,
 
@@ -292,7 +368,12 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
 
   applyChecklistUpdate: (state) => {
     if (!hasChecklistShape(state)) return;
-    set({ checklistState: state as DiscoveryChecklistState });
+    set((current) => ({
+      checklistState: mergeChecklistState(
+        current.checklistState,
+        state as DiscoveryChecklistState
+      ),
+    }));
   },
 
   setSurfacedKbAssets: (assets) => {

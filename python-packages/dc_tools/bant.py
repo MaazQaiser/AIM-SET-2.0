@@ -54,14 +54,14 @@ DEFAULT_PLAYBOOK: Dict[str, str] = {
 
 # keyword groups -> item id, minimum match tier (partial vs confirmed)
 SIGNAL_RULES: List[Tuple[str, List[str], ChecklistItemStatus]] = [
-    ("budget", ["budget", "pricing", "cost", "spend", "investment", "approved budget", "dollar", "price", "afford", "expensive", "cheap", "limited budget", "money", "funding", "financial", "carved", "envelope", "year one", "year-one", "four hundred", "six hundred", "million", "thousand", "budget owner", "budget range"], "partial"),
+    ("budget", ["budget", "pricing", "cost", "spend", "investment", "approved budget", "dollar", "price", "afford", "expensive", "cheap", "limited budget", "money", "funding", "carved", "envelope", "year one", "year-one", "four hundred", "six hundred", "million", "thousand", "budget owner", "budget range"], "partial"),
     ("budget", ["budget approved", "allocated", "signed off", "funding approved", "set aside", "earmarked", "board still has to bless", "board has to bless"], "confirmed"),
     ("authority", ["decision maker", "economic buyer", "sign off", "cio", "cto", "cfo", "ceo", "coo", "cpo", "vp ", "director", "board", "head of", "budget owner", "final approver", "signatory", "approval committee", "steering committee"], "partial"),
-    ("authority", ["reports to", "final say", "signatory", "approves", "approve it", "need to approve", "must approve", "has to approve", "board approval", "board bless", "approval path", "owns the decision", "own the decision", "i decide", "my call", "i approve", "full decision authority", "decision authority", "i have the final say", "final say is mine"], "confirmed"),
-    ("need", ["pain", "problem", "challenge", "struggling", "need to", "need a", "need an", "need the", "we need", "i need", "they need", "need help", "priority", "impact", "pain point", "overcome", "solution", "looking for", "looking forward", "looking to", "require", "want to", "wish we", "gap", "issue", "bottleneck", "friction", "limitation", "automat", "nightmare"], "partial"),
-    ("need", ["must have", "urgent need", "business case", "top priority", "deal breaker", "non-negotiable", "critical priority", "critical need"], "confirmed"),
-    ("timeline", ["timeline", "eta", "estimated time", "estimated delivery", "delivery date", "completion date", "deadline", "go-live", "go live", "launch", "q1", "q2", "q3", "q4", "by end of", "this quarter", "next quarter", "this year", "next month", "end of month", "end of the month", "by friday", "by monday", "asap", "soon", "urgent", "immediately", "move quickly", "moving quickly", "timeframe", "time frame", "time-sensitive", "time sensitive", "main constraint", "production-grade", "pilot", "next year", "kickoff", "rollout", "within weeks", "within months", "within days"], "partial"),
-    ("timeline", ["project eta", "board meeting", "decision by", "kick off", "kickoff", "pilot kickoff", "start date", "go live date", "go-live by", "production go-live", "target date", "production-grade by", "complete by", "delivery by", "by end of", "within 2 weeks", "within two weeks", "within 30 days", "decision by", "need it by", "needed by", "must be done by"], "confirmed"),
+    ("authority", ["reports to", "final say", "signatory", "approves", "approve it", "need to approve", "needs to approve", "must approve", "has to approve", "board approval", "board bless", "approval path", "owns the decision", "own the decision", "i decide", "my call", "i approve"], "confirmed"),
+    ("need", ["pain", "problem", "challenge", "struggling", "need to", "we need", "need one", "need two", "need three", "need four", "priority", "impact", "pain point", "overcome", "solution", "looking for", "looking forward", "require", "want to", "wish we", "gap", "issue", "bottleneck", "friction", "limitation", "automat"], "partial"),
+    ("need", ["must have", "critical", "urgent need", "business case", "top priority", "deal breaker", "non-negotiable"], "confirmed"),
+    ("timeline", ["timeline", "eta", "estimated time", "estimated delivery", "delivery date", "completion date", "deadline", "go-live", "go live", "launch", "q1", "q2", "q3", "q4", "by end of", "this quarter", "next quarter", "this year", "next month", "asap", "soon", "urgent", "immediately", "production-grade", "pilot", "next year", "kickoff", "rollout"], "partial"),
+    ("timeline", ["project eta", "board meeting", "decision by", "kick off", "kickoff", "pilot kickoff", "start date", "go live date", "go-live by", "production go-live", "target date", "production-grade by", "complete by", "delivery by"], "confirmed"),
     ("success_criteria", ["success looks like", "success criteria", "kpi", "outcome", "measure", "metric"], "partial"),
     ("stakeholders", ["stakeholder", "who else", "involved", "team members", "evaluating", "colleague"], "partial"),
     ("decision_process", ["procurement", "rfp", "evaluation process", "steps to", "approval process"], "partial"),
@@ -79,6 +79,23 @@ DEFAULT_NUDGE_THRESHOLDS_SECONDS: Dict[str, int] = {
     "need": 15 * 60,
     "timeline": 25 * 60,
     "next_step": 40 * 60,
+}
+
+CUSTOMER_BANT_ROLES = {"customer", "prospect", "buyer", "client", "lead", "contact", "guest"}
+INTERNAL_BANT_ROLES = {
+    "ae",
+    "account_executive",
+    "account executive",
+    "sales",
+    "sales_rep",
+    "sales rep",
+    "rep",
+    "se",
+    "solutions_engineer",
+    "solutions engineer",
+    "designer",
+    "pod",
+    "internal",
 }
 
 
@@ -172,6 +189,17 @@ def _merge_status(current: ChecklistItemStatus, new: ChecklistItemStatus) -> Che
     if current == "not_applicable" or new == "not_applicable":
         return current if _status_rank(current) >= _status_rank(new) else new
     return current if _status_rank(current) >= _status_rank(new) else new
+
+
+def _is_customer_bant_source(speaker_role: Optional[str]) -> bool:
+    role = (speaker_role or "").strip().lower()
+    if not role:
+        return True
+    if role in CUSTOMER_BANT_ROLES:
+        return True
+    if role in INTERNAL_BANT_ROLES:
+        return False
+    return False
 
 
 def _bant_status_to_checklist(status: BANTStatus) -> ChecklistItemStatus:
@@ -298,8 +326,7 @@ _MONEY_RE = re.compile(
     re.I,
 )
 _MONEY_RANGE_RE = re.compile(
-    rf"(?:{_MONEY_RE.pattern}\s*(?:-|–|—|to|through|and)\s*{_MONEY_RE.pattern}"
-    r"|\b\d+(?:\.\d+)?\s*(?:-|–|—|to)\s*\d+(?:\.\d+)?\s*(?:k|m|b|thousand|million|billion)\b)",
+    rf"{_MONEY_RE.pattern}\s*(?:-|–|—|to|through|and)\s*{_MONEY_RE.pattern}",
     re.I,
 )
 _WORD_NUMBER_VALUES = {
@@ -355,8 +382,7 @@ _AUTHORITY_APPROVAL_ENTITY_RE = re.compile(r"\b(?:procurement|finance|legal)\b",
 _AUTHORITY_APPROVAL_ACTION_RE = re.compile(r"\b(?:approv\w*|sign[ -]?off|review|bless\w*)\b", re.I)
 _SELF_AUTHORITY_RE = re.compile(
     r"\b(?:i decide|my call|i approve|i own(?:s)? the decision|i am the decision maker|"
-    r"(?:full )?decision authority|i have (?:the )?final say|final say is mine|"
-    r"i(?:'m| am) the (?:final )?approver)\b",
+    r"i own\s+(?:[\w-]+\s+){0,4}(?:approval|sign[ -]?off|decision|financial model|budget model))\b",
     re.I,
 )
 _MONTH_PATTERN = (
@@ -372,42 +398,36 @@ _TIMELINE_DURATION_PATTERN = (
     rf"(?:{_TIMELINE_NUMBER_PATTERN})\s+"
     r"(?:business\s+days?|days?|weeks?|months?|quarters?)"
 )
-_WEEKDAY_PATTERN = r"Monday|Mon|Tuesday|Tue|Wednesday|Wed|Thursday|Thu|Friday|Fri|Saturday|Sat|Sunday|Sun"
 _TIMELINE_RE = re.compile(
-    r"\b(?:Q[1-4](?:\s+(?:20\d{2}|pilot|kickoff|go-live|production|launch|rollout|readout|approval)){0,3}"
+    r"\b(?:Q[1-4](?:\s+(?:pilot|kickoff|go-live|production|launch|rollout|readout|approval)){0,3}"
     rf"|(?:project\s+)?ETA\s*(?:is|of|for|:)?\s*(?:about|around|roughly)?\s*{_TIMELINE_DURATION_PATTERN}(?:\s+(?:from|after|before)\s+[A-Za-z][\w-]*)?"
-    rf"|(?:deadline|timeline|project\s+timeline|delivery\s+timeline|timeframe|time\s+frame)\s*(?:is|will\s+be|should\s+be|:)?\s*(?:no|not)?\s*more\s+than\s+{_TIMELINE_DURATION_PATTERN}"
+    rf"|(?:deadline|timeline|project\s+timeline|delivery\s+timeline)\s*(?:is|will\s+be|should\s+be|:)?\s*(?:no|not)?\s*more\s+than\s+{_TIMELINE_DURATION_PATTERN}"
     rf"|(?:no|not)\s+more\s+than\s+{_TIMELINE_DURATION_PATTERN}"
     rf"|(?:in|within)\s+{_TIMELINE_DURATION_PATTERN}"
     rf"|{_TIMELINE_DURATION_PATTERN}\s+(?:from|after|before)\s+[A-Za-z][\w-]*"
     r"|(?:pilot|production|go-live|go live|launch|rollout|kickoff|readout)\s+"
-    rf"(?:by|in|before|after)\s+(?:the\s+)?(?:Q[1-4]|{_MONTH_PATTERN}|next quarter|this quarter|next month|this month|end of (?:the )?month|{_WEEKDAY_PATTERN})"
-    rf"|(?:by|before|after)\s+(?:the\s+)?(?:Q[1-4](?:\s+20\d{{2}})?|{_MONTH_PATTERN}|next quarter|this quarter|next month|this month|end of (?:the )?month|{_WEEKDAY_PATTERN})"
-    rf"|(?:need(?:ed)?|must|have to|want)\s+(?:it\s+)?(?:done|ready|live|complete|delivered)?\s*(?:by|before)\s+(?:the\s+)?(?:Q[1-4]|{_MONTH_PATTERN}|next quarter|this quarter|next month|this month|end of (?:the )?month|{_WEEKDAY_PATTERN}|{_TIMELINE_DURATION_PATTERN})"
+    rf"(?:by|in|before|after)\s+(?:the\s+)?(?:Q[1-4]|{_MONTH_PATTERN}|next quarter|this quarter|next month|this month)"
+    rf"|(?:by|before|after)\s+(?:the\s+)?(?:Q[1-4]|{_MONTH_PATTERN}|next quarter|this quarter|next month|this month)"
     rf"|(?:complete|delivery|delivered|ship|implementation)\s+(?:by|in|before|after|within)\s+(?:the\s+)?(?:Q[1-4]|{_MONTH_PATTERN}|next quarter|this quarter|next month|this month|{_TIMELINE_DURATION_PATTERN})"
     r"|(?:this|next)\s+(?:week|month|quarter|year)"
-    r"|(?:end of (?:the )?month|move quickly|moving quickly|time[- ]sensitive|asap|soon|urgent|immediately|main constraint)"
-    rf"|(?:\d{{1,2}}\s+)?(?:{_MONTH_PATTERN})(?:\s+20\d{{2}})?\b)",
+    rf"|(?:\d{{1,2}}\s+)?(?:{_MONTH_PATTERN})\b)",
     re.I,
 )
 _TIMELINE_MILESTONE_RE = re.compile(
-    r"\bQ[1-4](?:\s+(?:20\d{2}|pilot|kickoff|go-live|production|launch|rollout|readout|approval)){1,3}\b",
+    r"\bQ[1-4](?:\s+(?:pilot|kickoff|go-live|production|launch|rollout|readout|approval)){1,3}\b",
     re.I,
 )
 _TIMELINE_CONTEXT_RE = re.compile(
-    r"\b(?:deadline|timeline|eta|delivery|implementation|complete|go-live|go live|launch|rollout|kickoff|pilot|project|timeframe|time frame|schedule|urgency|urgent)\b",
+    r"\b(?:deadline|timeline|eta|delivery|implementation|complete|go-live|go live|launch|rollout|kickoff|pilot|project)\b",
     re.I,
 )
 _TIMELINE_BOUND_RE = re.compile(
-    rf"\b(?:(?:no|not)\s+more\s+than\s+{_TIMELINE_DURATION_PATTERN}|(?:in|within)\s+{_TIMELINE_DURATION_PATTERN}|{_TIMELINE_DURATION_PATTERN}\s+(?:from|after|before)\b|"
-    rf"(?:by|before)\s+(?:the\s+)?(?:Q[1-4]|{_MONTH_PATTERN}|next quarter|this quarter|next month|this month|end of (?:the )?month|{_WEEKDAY_PATTERN})\b|"
-    r"end of (?:the )?month|move quickly|moving quickly)\b",
+    rf"\b(?:(?:no|not)\s+more\s+than\s+{_TIMELINE_DURATION_PATTERN}|(?:in|within)\s+{_TIMELINE_DURATION_PATTERN}|{_TIMELINE_DURATION_PATTERN}\s+(?:from|after|before)\b)",
     re.I,
 )
 _NEED_RE = re.compile(
     r"\b(?:pain|problem|challenge|struggling|bottleneck|friction|gap|manual|broken|"
-    r"nightmare|limitation|need to|need a|need an|need the|we need|i need|they need|"
-    r"must have|critical|priority|looking for|looking to)\b",
+    r"nightmare|limitation|need to|need a|need an|must have|critical|priority)\b",
     re.I,
 )
 _APPROVAL_NEED_RE = re.compile(r"\bneed(?:s)?\s+to\s+approv(?:e|al)\b", re.I)
@@ -416,9 +436,36 @@ _PAIN_NEED_RE = re.compile(
     r"nightmare|limitation|must have|critical|priority|business case)\b",
     re.I,
 )
-_TIMELINE_URGENCY_RE = re.compile(
-    r"\b(?:asap|soon|urgent|immediately|time[- ]sensitive|move quickly|moving quickly|"
-    r"main constraint|tight timeline|time is (?:tight|critical))\b",
+_BUDGET_CONFIRMATION_RE = re.compile(
+    r"\b(?:approved|allocated|signed off|funding approved|set aside|earmarked|confirmed)\b",
+    re.I,
+)
+_EXPLICIT_NEED_RE = re.compile(
+    r"\b(?:need\s+(?:one|two|three|four|\d+)\s+is|we\s+need\s+(?:a|an|one|product|software|platform|solution|team|pod))\b",
+    re.I,
+)
+_TIMELINE_DATE_CONFIRMATION_RE = re.compile(
+    rf"\b(?:by|before|in|late|early)\s+(?:\d{{1,2}}\s+)?(?:{_MONTH_PATTERN}|Q[1-4]|next\s+(?:week|month|quarter|year))\b",
+    re.I,
+)
+_INTERNAL_BANT_COMMITMENT_RE = re.compile(
+    r"\b(?:i|we|let me|we can|i can|we'll|i'll|we will|i will)\s+"
+    r"(?:also\s+)?(?:send|share|provide|prepare|put together|draft|include|separate|"
+    r"schedule|follow up|follow-up|propose|estimate|scope|price|map)\b"
+    r"[\s\S]{0,180}\b(?:proposal|estimate|estimates|pricing breakdown|cost breakdown|"
+    r"budget breakdown|cio review|workflow map|integration plan|team structure|breakdown)\b",
+    re.I,
+)
+_INTERNAL_FUTURE_DELIVERY_RE = re.compile(
+    r"\b(?:i|we|let me|we can|i can|we'll|i'll|we will|i will)\s+"
+    r"(?:send|share|provide)\b[\s\S]{0,80}\b(?:budget|pricing|cost|timeline|pilot)\b"
+    r"[\s\S]{0,80}\b(?:tomorrow|later|after (?:this|the) call|next week|next month|"
+    r"in \d+ (?:day|days|week|weeks)|by (?:eod|eow|monday|tuesday|wednesday|thursday|friday))\b",
+    re.I,
+)
+_INTERNAL_SOLUTION_LANGUAGE_RE = re.compile(
+    r"\b(?:the proposal should show|we would not ask you|we can propose|we can defend|"
+    r"we would map|we will separate|i will separate)\b",
     re.I,
 )
 
@@ -431,6 +478,14 @@ def _extract_authority_values(text: str) -> str:
             values.append(match.group(0))
     values.extend(m.group(0) for m in _SELF_AUTHORITY_RE.finditer(text))
     return _unique_join(values, limit=4)
+
+
+def _looks_like_internal_bant_commitment(text: str) -> bool:
+    return bool(
+        _INTERNAL_BANT_COMMITMENT_RE.search(text)
+        or _INTERNAL_FUTURE_DELIVERY_RE.search(text)
+        or _INTERNAL_SOLUTION_LANGUAGE_RE.search(text)
+    )
 
 
 def _extract_bant_value(item_id: str, text: str, snippet: str) -> str:
@@ -467,19 +522,9 @@ def _extract_bant_value(item_id: str, text: str, snippet: str) -> str:
         )
         if value:
             return value
-        # Optimistic: urgency / constraint language still gets a display value.
-        # Do not fall back on broad context words like "schedule" / "project".
-        if _TIMELINE_URGENCY_RE.search(text):
-            return snippet[:120]
-        return ""
     elif item_id == "need":
-        # Approval-only language belongs to Authority, not Need.
-        if _APPROVAL_NEED_RE.search(text) and not _PAIN_NEED_RE.search(text):
-            return ""
-        # Optimistic: any clear need/pain cue stores the customer snippet.
-        if _PAIN_NEED_RE.search(text) or _NEED_RE.search(text):
+        if _NEED_RE.search(text):
             return snippet
-        return ""
     return snippet
 
 
@@ -592,15 +637,18 @@ def _confidence_for_evidence(item_id: str, value: str, sentiment: Optional[str])
     return 0.75
 
 
-_WEAK_RELATIVE_TIMELINE_RE = re.compile(
-    r"^(?:(?:this|next)\s+(?:week|month|quarter|year)|soon|asap)$",
-    re.I,
-)
-
-
-def _is_weak_relative_timeline_value(value: str) -> bool:
-    parts = [p.strip() for p in value.split("|") if p.strip()]
-    return bool(parts) and all(_WEAK_RELATIVE_TIMELINE_RE.match(p) for p in parts)
+def _confirmed_bant_status(item_id: str, text: str, snippet: str) -> Optional[ChecklistItemStatus]:
+    if item_id == "budget":
+        if _extract_bant_value("budget", text, snippet) and _BUDGET_CONFIRMATION_RE.search(text):
+            return "confirmed"
+        return None
+    if item_id == "need":
+        return "confirmed" if _EXPLICIT_NEED_RE.search(text) or _PAIN_NEED_RE.search(text) else None
+    if item_id == "timeline":
+        value = _extract_bant_value("timeline", text, snippet)
+        if value and (_TIMELINE_DATE_CONFIRMATION_RE.search(text) or _TIMELINE_BOUND_RE.search(text)):
+            return "confirmed"
+    return None
 
 
 def _apply_signals(
@@ -617,6 +665,7 @@ def _apply_signals(
     lower = text.lower()
     changed: List[str] = []
     matched_statuses: Dict[str, ChecklistItemStatus] = {}
+    allow_bant_updates = _is_customer_bant_source(speaker_role) and not _looks_like_internal_bant_commitment(text)
 
     money_hit = bool(
         re.search(
@@ -626,6 +675,8 @@ def _apply_signals(
     )
     signal_item_id = _signal_type_to_item(signal_type)
     for item_id, keywords, tier_status in SIGNAL_RULES:
+        if item_id in BANT_ITEM_IDS and not allow_bant_updates:
+            continue
         matched = any(kw in lower for kw in keywords)
         if item_id == "budget" and money_hit:
             matched = True
@@ -633,27 +684,31 @@ def _apply_signals(
             matched = True
         if item_id == "need" and _APPROVAL_NEED_RE.search(text) and not _PAIN_NEED_RE.search(text):
             matched = False
-        # Bare "critical" on a timeline sentence should not confirm Need.
-        if (
-            item_id == "need"
-            and tier_status == "confirmed"
-            and "critical priority" not in lower
-            and "critical need" not in lower
-            and re.search(r"\bcritical\b", lower)
-            and _TIMELINE_CONTEXT_RE.search(text)
-            and not _PAIN_NEED_RE.search(text)
-        ):
-            matched = False
         if not matched:
             continue
+        confirmed_status = (
+            _confirmed_bant_status(item_id, text, snippet)
+            if item_id in BANT_ITEM_IDS
+            else None
+        )
+        if confirmed_status:
+            tier_status = confirmed_status
         current = matched_statuses.get(item_id, "pending")
         matched_statuses[item_id] = _merge_status(current, tier_status)
 
-    if signal_item_id and signal_item_id not in matched_statuses:
+    if (
+        signal_item_id
+        and signal_item_id not in matched_statuses
+        and (signal_item_id not in BANT_ITEM_IDS or allow_bant_updates)
+    ):
         matched_statuses[signal_item_id] = "partial"
 
     timeline_value = _extract_bant_value("timeline", text, snippet)
-    if timeline_value and (_TIMELINE_CONTEXT_RE.search(text) or _TIMELINE_BOUND_RE.search(text)):
+    if (
+        allow_bant_updates
+        and timeline_value
+        and (_TIMELINE_CONTEXT_RE.search(text) or _TIMELINE_BOUND_RE.search(text))
+    ):
         timeline_status: ChecklistItemStatus = (
             "confirmed"
             if _TIMELINE_CONTEXT_RE.search(text) and _TIMELINE_BOUND_RE.search(text)
@@ -670,32 +725,7 @@ def _apply_signals(
                 continue
             new_status = _merge_status(it.status, tier_status)
             value = _extract_bant_value(item_id, text, snippet)
-            # Authority requires an extracted decision-maker value (avoids false hits).
             if item_id == "authority" and not value:
-                continue
-            # Optimistic Need/Timeline: if we matched status but extractor missed a
-            # structured value, keep the transcript snippet so the live UI updates.
-            if item_id in ("need", "timeline") and not value and snippet.strip():
-                value = snippet.strip()[:120]
-            # Budget stays strict — empty money extract should not invent a value.
-            if item_id == "budget" and not value:
-                if new_status != it.status:
-                    it.status = new_status
-                    if item_id not in changed:
-                        changed.append(item_id)
-                continue
-            # Don't let meeting-scheduling "next week" overwrite a confirmed timeline.
-            if (
-                item_id == "timeline"
-                and it.status in ("partial", "confirmed")
-                and any(e.value for e in it.evidence)
-                and _is_weak_relative_timeline_value(value)
-                and not re.search(
-                    r"\b(?:deadline|go-live|go live|kickoff|decision by|within\s+\d|"
-                    r"by friday|by monday|end of (?:the )?month|production)\b",
-                    lower,
-                )
-            ):
                 continue
             status_changed = new_status != it.status
             if status_changed:
@@ -752,10 +782,6 @@ def build_next_actions(checklist: Dict[str, Any], *, intent_label: Optional[str]
         ),
     }
 
-    if intent_label in ("commercial_discovery", "timeline_planning"):
-        # Keep intent-aligned coaching near the top so it survives the action cap.
-        actions.append("Align pitch to commercial + timeline signals — reference proposal path and dates.")
-
     for gap in open_gaps:
         if gap not in gap_prompts:
             continue
@@ -769,6 +795,9 @@ def build_next_actions(checklist: Dict[str, Any], *, intent_label: Optional[str]
     confirmed = [k for k in ("budget", "authority", "need", "timeline") if bant.get(k) == "confirmed"]
     if len(confirmed) >= 3 and "next_step" not in open_gaps:
         actions.append("Strong BANT coverage — propose pilot scope, proposal timeline, and executive readout.")
+
+    if intent_label in ("commercial_discovery", "timeline_planning"):
+        actions.append("Align pitch to commercial + timeline signals — reference proposal path and dates.")
 
     if not actions:
         actions.append("Continue discovery — open questions on budget, authority, need, and timeline.")

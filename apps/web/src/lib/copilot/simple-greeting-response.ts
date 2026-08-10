@@ -72,13 +72,13 @@ function suggestionsForSurface(surface: CopilotGreetingSurface) {
 function contentForSurface(surface: CopilotGreetingSurface) {
   switch (surface) {
     case "live_dc":
-      return "Hi. What can I help you with on this call?";
+      return "Hi, I'm with you. Let's keep this call moving well. What do you want help with next?";
     case "pre_dc":
-      return "Hi. What can I help you prepare?";
+      return "Hi, I'm ready. What should we tighten before the call?";
     case "post_dc":
-      return "Hi. What can I help you wrap up?";
+      return "Hi, nice work getting through the call. What should we wrap up first?";
     default:
-      return "Hi. What can I help you with?";
+      return "Hi, I'm ready to help. What should we tackle first?";
   }
 }
 

@@ -28,7 +28,7 @@ def _segment_from_message(msg: dict, elapsed: int) -> dict:
         "text": msg.get("text") or payload.get("text") or "",
         "speakerId": payload.get("speakerId") or msg.get("speakerId") or "unknown",
         "speakerName": payload.get("speakerName") or msg.get("speakerName") or "Speaker",
-        "speakerRole": payload.get("speakerRole") or msg.get("speakerRole") or "customer",
+        "speakerRole": payload.get("speakerRole") or msg.get("speakerRole"),
         "timestamp": payload.get("timestamp") if payload.get("timestamp") is not None else elapsed,
     }
 

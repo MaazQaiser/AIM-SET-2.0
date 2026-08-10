@@ -28,16 +28,26 @@ class BriefingCallIn(BaseModel):
     annual_revenue: Optional[str] = Field(default=None, alias="annualRevenue")
     lead_name: Optional[str] = Field(default=None, alias="leadName")
     deal_stage: Optional[str] = Field(default=None, alias="dealStage")
+    agent_rating: Optional[int] = Field(default=None, alias="agentRating")
 
 
 class DailyBriefingIn(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     todays_call_count: int = Field(default=0, alias="todaysCallCount")
+    completed_call_count: int = Field(default=0, alias="completedCallCount")
     pending_approval_count: int = Field(default=0, alias="pendingApprovalCount")
+    pending_post_dc_action_count: int = Field(default=0, alias="pendingPostDcActionCount")
+    pending_prep_item_count: int = Field(default=0, alias="pendingPrepItemCount")
     briefs_not_ready: int = Field(default=0, alias="briefsNotReady")
     high_priority_todo_count: int = Field(default=0, alias="highPriorityTodoCount")
     top_opportunity: Optional[BriefingCallIn] = Field(default=None, alias="topOpportunity")
+    priority_calls: List[BriefingCallIn] = Field(default_factory=list, alias="priorityCalls")
+    post_dc_action_types: List[str] = Field(default_factory=list, alias="postDcActionTypes")
+    recommended_material_types: List[str] = Field(
+        default_factory=list,
+        alias="recommendedMaterialTypes",
+    )
     todos: List[BriefingTodoIn] = Field(default_factory=list)
 
 
@@ -53,12 +63,20 @@ class DailyBriefingOut(BaseModel):
 def _briefing_context(body: DailyBriefingIn) -> Dict[str, Any]:
     return {
         "todaysCallCount": body.todays_call_count,
+        "completedCallCount": body.completed_call_count,
         "pendingApprovalCount": body.pending_approval_count,
+        "pendingPostDcActionCount": body.pending_post_dc_action_count,
+        "pendingPrepItemCount": body.pending_prep_item_count,
         "briefsNotReady": body.briefs_not_ready,
         "highPriorityTodoCount": body.high_priority_todo_count,
         "topOpportunity": (
             body.top_opportunity.model_dump(by_alias=True) if body.top_opportunity else None
         ),
+        "priorityCalls": [
+            call.model_dump(by_alias=True) for call in body.priority_calls[:3]
+        ],
+        "postDcActionTypes": body.post_dc_action_types[:6],
+        "recommendedMaterialTypes": body.recommended_material_types[:6],
         "todos": [t.model_dump() for t in body.todos[:12]],
     }
 
