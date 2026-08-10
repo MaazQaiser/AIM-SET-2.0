@@ -123,7 +123,7 @@ test.describe("Live call cockpit — DOM + API", () => {
 
     await expect(page.getByText("Connecting stream…")).toBeHidden({ timeout: 25_000 });
 
-    const playDemo = page.getByRole("button", { name: /Play demo transcript/i });
+    const playDemo = page.getByRole("button", { name: /Fast demo/i }).first();
     await expect(playDemo).toBeEnabled({ timeout: 10_000 });
     await playDemo.click();
 

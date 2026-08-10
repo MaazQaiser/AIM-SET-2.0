@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { filterKeywordStats } from "@/lib/live/keyword-filter";
+import { detectInstantBant } from "@/lib/live/instant-bant-detect";
 import { dedupePainSignals } from "@/lib/live/pain-display";
 import type {
   TranscriptEvent,
@@ -218,6 +219,18 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
     set((s) => ({
       transcript: [...s.transcript.slice(-499), event],
     }));
+
+    // Instant BANT detection — fire signals within the same tick
+    if (event.text && event.speakerRole === "customer") {
+      const instantSignals = detectInstantBant(
+        event.text,
+        event.speakerRole,
+        event.timestamp ?? 0
+      );
+      for (const signal of instantSignals) {
+        get().addBantSignal(signal);
+      }
+    }
   },
 
   addNudge: (nudge) =>

@@ -544,11 +544,77 @@ function checklistElapsedSeconds(state: DiscoveryChecklistState | null | undefin
   return typeof elapsed === "number" && Number.isFinite(elapsed) ? elapsed : -1;
 }
 
+function extractBantSignalsFromChecklist(
+  state: DiscoveryChecklistState
+): void {
+  const store = useLiveCall.getState();
+  const bantItems = Array.isArray(state.items)
+    ? state.items.filter((i) => i.tier === "bant")
+    : [];
+  for (const item of bantItems) {
+    if (item.status !== "confirmed" && item.status !== "partial") continue;
+    const evidence = item.evidence?.[item.evidence.length - 1];
+    if (!evidence?.snippet) continue;
+    store.addBantSignal({
+      id: `checklist-${item.id}-${state.elapsedSeconds ?? 0}`,
+      dimension: item.id as BantSignal["dimension"],
+      label: `${item.label}: ${evidence.value ?? evidence.snippet}`,
+      value: evidence.value,
+      snippet: evidence.snippet,
+      timestamp: evidence.transcriptOffsetSeconds ?? state.elapsedSeconds ?? 0,
+    });
+  }
+}
+
+function mergeBantDimensions(
+  incoming: DiscoveryChecklistState
+): void {
+  const store = useLiveCall.getState();
+  const current = store.checklistState;
+  if (!current) return;
+
+  const BANT_DIMS = ["budget", "authority", "need", "timeline"] as const;
+  const statusRank = (s: string) =>
+    s === "confirmed" ? 2 : s === "partial" ? 1 : 0;
+
+  let changed = false;
+  const mergedBant = { ...current.bant };
+  const mergedItems = current.items.map((item) => {
+    const dim = item.id as (typeof BANT_DIMS)[number];
+    if (item.tier !== "bant" || !BANT_DIMS.includes(dim)) return item;
+
+    const incomingStatus = incoming.bant[dim];
+    if (statusRank(incomingStatus) <= statusRank(item.status)) return item;
+
+    const incomingItem = incoming.items.find((i) => i.id === dim);
+    changed = true;
+    mergedBant[dim] = incomingStatus;
+    return {
+      ...item,
+      status: incomingItem?.status ?? item.status,
+      evidence: incomingItem?.evidence?.length
+        ? incomingItem.evidence
+        : item.evidence,
+    };
+  });
+
+  if (changed) {
+    store.applyChecklistUpdate(
+      scoreChecklist({ ...current, items: mergedItems, bant: mergedBant })
+    );
+  }
+}
+
 function applyFreshChecklistUpdate(state: DiscoveryChecklistState) {
   const store = useLiveCall.getState();
   const currentElapsed = checklistElapsedSeconds(store.checklistState);
   const incomingElapsed = checklistElapsedSeconds(state);
-  if (incomingElapsed >= 0 && currentElapsed > incomingElapsed) return;
+  if (incomingElapsed >= 0 && currentElapsed > incomingElapsed) {
+    // Checklist is stale, but still extract BANT evidence from it
+    extractBantSignalsFromChecklist(state);
+    mergeBantDimensions(state);
+    return;
+  }
   store.applyChecklistUpdate(state);
 }
 

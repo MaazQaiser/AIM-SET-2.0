@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyApiDemoResult, applyClientDemoSegment } from "@/lib/demo/client-live-call-demo";
+import { FRANCHISE_DEMO_TRANSCRIPT } from "@/lib/demo/franchise-ai-platform-demo";
 import { useLiveCall } from "@/stores/use-live-call";
 import type { TranscriptEvent } from "@/types";
 
@@ -294,5 +295,299 @@ describe("useLiveCall live page state regressions", () => {
     const state = useLiveCall.getState();
     expect(state.sentimentCustomer).toBeLessThan(0);
     expect(state.pendingNudges.some((n) => n.message.includes("Customer raised"))).toBe(true);
+  });
+
+  it("updates budget BANT signal and checklist when client states budget (line 16)", () => {
+    // Seed earlier lines so checklist is initialized (requires lineIndex >= 3)
+    for (let i = 0; i <= 15; i++) {
+      applyClientDemoSegment("frontera-franchise-group", i, {
+        text: `filler line ${i}`,
+        speakerId: "ae-sarah",
+        speakerName: "Sarah",
+        speakerRole: "ae",
+        offsetSeconds: i * 10,
+      });
+    }
+
+    // Line 16: Priya states the budget
+    applyClientDemoSegment("frontera-franchise-group", 16, {
+      text: "For budget, we have six hundred fifty thousand to eight hundred thousand approved for year one, assuming the scope includes the first release, integrations, and the dedicated team.",
+      speakerId: "priya-nair",
+      speakerName: "Priya",
+      speakerRole: "customer",
+      offsetSeconds: 272,
+    });
+
+    const state = useLiveCall.getState();
+
+    // BANT signal should exist for budget (instant or demo-scripted)
+    const budgetSignals = state.bantSignals.filter((s) => s.dimension === "budget");
+    expect(budgetSignals.length).toBeGreaterThanOrEqual(1);
+
+    // Checklist should mark budget as confirmed
+    expect(state.checklistState).not.toBeNull();
+    expect(state.checklistState!.bant.budget).toBe("confirmed");
+
+    // Budget should NOT be in openGaps
+    expect(state.checklistState!.openGaps).not.toContain("budget");
+  });
+
+  it("updates timeline BANT signal and checklist when client states timeline (lines 18-19)", () => {
+    // Seed earlier lines so checklist is initialized
+    for (let i = 0; i <= 17; i++) {
+      applyClientDemoSegment("frontera-franchise-group", i, {
+        text: `filler line ${i}`,
+        speakerId: "ae-sarah",
+        speakerName: "Sarah",
+        speakerRole: "ae",
+        offsetSeconds: i * 10,
+      });
+    }
+
+    // Line 18: Dr. Lena states the timeline
+    applyClientDemoSegment("frontera-franchise-group", 18, {
+      text: "Timeline is also clear. We need partner selection by July twentieth, discovery and design in late July, pilot build in August, and a working pilot in two clinics by October.",
+      speakerId: "lena-ortiz",
+      speakerName: "Dr. Lena",
+      speakerRole: "customer",
+      offsetSeconds: 306,
+    });
+
+    let state = useLiveCall.getState();
+
+    // BANT signal should exist for timeline (instant or demo-scripted)
+    const timelineSignals = state.bantSignals.filter((s) => s.dimension === "timeline");
+    expect(timelineSignals.length).toBeGreaterThanOrEqual(1);
+
+    // Checklist should mark timeline as confirmed
+    expect(state.checklistState).not.toBeNull();
+    expect(state.checklistState!.bant.timeline).toBe("confirmed");
+
+    // Timeline should NOT be in openGaps
+    expect(state.checklistState!.openGaps).not.toContain("timeline");
+
+    // Line 19: Omar adds January rollout detail
+    applyClientDemoSegment("frontera-franchise-group", 19, {
+      text: "By January, if the pilot works, we want to start rolling it into the next wave of clinics. That is why the expansion need matters so much.",
+      speakerId: "omar-brooks",
+      speakerName: "Omar",
+      speakerRole: "customer",
+      offsetSeconds: 324,
+    });
+
+    state = useLiveCall.getState();
+    // Timeline should still be confirmed after the follow-up line
+    expect(state.checklistState!.bant.timeline).toBe("confirmed");
+  });
+
+  it("shows budget and timeline in checklist display after both are confirmed", () => {
+    // Apply the actual budget line
+    useLiveCall.getState().reset();
+    for (let i = 0; i <= 18; i++) {
+      const lines: Record<number, { text: string; speakerId: string; speakerName: string; speakerRole: "customer" | "ae"; offsetSeconds: number }> = {
+        16: {
+          text: "For budget, we have six hundred fifty thousand to eight hundred thousand approved for year one.",
+          speakerId: "priya-nair",
+          speakerName: "Priya",
+          speakerRole: "customer",
+          offsetSeconds: 272,
+        },
+        18: {
+          text: "Timeline is also clear. We need partner selection by July twentieth, pilot build in August, and a working pilot by October.",
+          speakerId: "lena-ortiz",
+          speakerName: "Dr. Lena",
+          speakerRole: "customer",
+          offsetSeconds: 306,
+        },
+      };
+      const line = lines[i] ?? {
+        text: `filler line ${i}`,
+        speakerId: "ae-sarah",
+        speakerName: "Sarah",
+        speakerRole: "ae" as const,
+        offsetSeconds: i * 10,
+      };
+      applyClientDemoSegment("frontera-franchise-group", i, line);
+    }
+
+    const state = useLiveCall.getState();
+    expect(state.checklistState!.bant.budget).toBe("confirmed");
+    expect(state.checklistState!.bant.timeline).toBe("confirmed");
+
+    // Neither budget nor timeline should appear as open gaps
+    expect(state.checklistState!.openGaps).not.toContain("budget");
+    expect(state.checklistState!.openGaps).not.toContain("timeline");
+  });
+
+  it("full demo playback: budget and timeline update progressively with real transcript lines", () => {
+    const lines = FRANCHISE_DEMO_TRANSCRIPT;
+
+    useLiveCall.getState().reset();
+    useLiveCall.getState().setCallId("frontera-franchise-group");
+
+    // Before line 3: no checklist at all
+    for (let i = 0; i < 3; i++) {
+      applyClientDemoSegment("frontera-franchise-group", i, lines[i]);
+    }
+    expect(useLiveCall.getState().checklistState).toBeNull();
+
+    // Lines 3-15: checklist exists but budget+timeline should still be unknown/pending
+    for (let i = 3; i <= 15; i++) {
+      applyClientDemoSegment("frontera-franchise-group", i, lines[i]);
+    }
+    let state = useLiveCall.getState();
+    expect(state.checklistState).not.toBeNull();
+    expect(state.checklistState!.bant.budget).toBe("unknown");
+    expect(state.checklistState!.bant.timeline).toBe("unknown");
+    expect(state.checklistState!.openGaps).toContain("budget");
+    expect(state.checklistState!.openGaps).toContain("timeline");
+
+    // Line 16: Priya states budget — should flip to confirmed
+    applyClientDemoSegment("frontera-franchise-group", 16, lines[16]);
+    state = useLiveCall.getState();
+    expect(state.checklistState!.bant.budget).toBe("confirmed");
+    expect(state.checklistState!.openGaps).not.toContain("budget");
+    // Budget signal should exist (instant or demo-scripted)
+    expect(state.bantSignals.some((s) => s.dimension === "budget")).toBe(true);
+    // Budget evidence should be stored in checklist
+    const budgetItem = state.checklistState!.items.find((i) => i.id === "budget");
+    expect(budgetItem?.status).toBe("confirmed");
+    expect(budgetItem?.evidence?.length).toBeGreaterThan(0);
+    expect(budgetItem?.evidence?.[0]?.value).toBe("$650K to $800K year one");
+
+    // Line 17: Sarah responds — budget should stay confirmed
+    applyClientDemoSegment("frontera-franchise-group", 17, lines[17]);
+    state = useLiveCall.getState();
+    expect(state.checklistState!.bant.budget).toBe("confirmed");
+
+    // Line 18: Dr. Lena states timeline — should flip to confirmed
+    applyClientDemoSegment("frontera-franchise-group", 18, lines[18]);
+    state = useLiveCall.getState();
+    expect(state.checklistState!.bant.timeline).toBe("confirmed");
+    expect(state.checklistState!.openGaps).not.toContain("timeline");
+    // Timeline signal should exist (instant or demo-scripted)
+    expect(state.bantSignals.some((s) => s.dimension === "timeline")).toBe(true);
+    // Timeline evidence should be stored
+    const timelineItem = state.checklistState!.items.find((i) => i.id === "timeline");
+    expect(timelineItem?.status).toBe("confirmed");
+    expect(timelineItem?.evidence?.[0]?.value).toBe("July 20 decision, August build, October pilot");
+
+    // Line 19: Omar extends timeline — should stay confirmed with updated evidence
+    applyClientDemoSegment("frontera-franchise-group", 19, lines[19]);
+    state = useLiveCall.getState();
+    expect(state.checklistState!.bant.timeline).toBe("confirmed");
+    const updatedTimeline = state.checklistState!.items.find((i) => i.id === "timeline");
+    expect(updatedTimeline?.evidence?.[0]?.value).toBe("January rollout into next clinic wave");
+
+    // Play remaining lines — budget and timeline should remain confirmed
+    for (let i = 20; i < lines.length; i++) {
+      applyClientDemoSegment("frontera-franchise-group", i, lines[i]);
+    }
+    state = useLiveCall.getState();
+    expect(state.checklistState!.bant.budget).toBe("confirmed");
+    expect(state.checklistState!.bant.timeline).toBe("confirmed");
+    expect(state.checklistState!.openGaps).not.toContain("budget");
+    expect(state.checklistState!.openGaps).not.toContain("timeline");
+
+    // BANT coverage should be high
+    expect(state.checklistState!.bantCoverage).toBeGreaterThanOrEqual(0.75);
+  });
+
+  it("stale API checklist still merges budget confirmation into newer client state", () => {
+    // Directly set up a checklist state where budget is still unknown at elapsedSeconds=200
+    const store = useLiveCall.getState();
+    store.applyChecklistUpdate({
+      callId: "frontera-franchise-group",
+      coverage: 0.25,
+      bantCoverage: 0.25,
+      bant: { budget: "unknown", authority: "unknown", need: "confirmed", timeline: "unknown" },
+      items: [
+        { id: "budget", label: "Budget", tier: "bant", status: "pending", evidence: [] },
+        { id: "authority", label: "Authority", tier: "bant", status: "pending", evidence: [] },
+        { id: "need", label: "Need", tier: "bant", status: "confirmed", evidence: [{ snippet: "clinic workflows", confidence: 0.85 }] },
+        { id: "timeline", label: "Timeline", tier: "bant", status: "pending", evidence: [] },
+      ],
+      elapsedSeconds: 200,
+      openGaps: ["budget", "authority", "timeline"],
+      updatedAt: new Date().toISOString(),
+    });
+    expect(useLiveCall.getState().checklistState!.bant.budget).toBe("unknown");
+
+    // Now a stale API response arrives for an earlier segment with budget confirmed
+    applyApiDemoResult({
+      checklist: {
+        callId: "frontera-franchise-group",
+        coverage: 0.5,
+        bantCoverage: 0.5,
+        bant: { budget: "confirmed", authority: "unknown", need: "confirmed", timeline: "unknown" },
+        items: [
+          {
+            id: "budget",
+            label: "Budget",
+            tier: "bant",
+            status: "confirmed",
+            evidence: [{ snippet: "$650K to $800K year one", value: "$650K to $800K year one", confidence: 0.85 }],
+          },
+          { id: "authority", label: "Authority", tier: "bant", status: "pending", evidence: [] },
+          { id: "need", label: "Need", tier: "bant", status: "confirmed", evidence: [{ snippet: "clinic workflows", confidence: 0.85 }] },
+          { id: "timeline", label: "Timeline", tier: "bant", status: "pending", evidence: [] },
+        ],
+        elapsedSeconds: 180, // stale: lower than current 200
+        openGaps: ["authority", "timeline"],
+        updatedAt: new Date().toISOString(),
+      },
+      ws_messages: [],
+    });
+
+    const afterState = useLiveCall.getState();
+    // Budget should be merged even though checklist was stale
+    expect(afterState.checklistState!.bant.budget).toBe("confirmed");
+    // Budget should be removed from openGaps
+    expect(afterState.checklistState!.openGaps).not.toContain("budget");
+    // Budget BANT signal should have been extracted
+    expect(afterState.bantSignals.some((s) => s.dimension === "budget")).toBe(true);
+  });
+
+  it("stale API checklist merges timeline confirmation without regressing budget", () => {
+    // Client has processed through line 19, budget+timeline confirmed client-side
+    const lines = FRANCHISE_DEMO_TRANSCRIPT;
+    for (let i = 0; i <= 19; i++) {
+      applyClientDemoSegment("frontera-franchise-group", i, lines[i]);
+    }
+    const beforeState = useLiveCall.getState();
+    expect(beforeState.checklistState!.bant.budget).toBe("confirmed");
+    expect(beforeState.checklistState!.bant.timeline).toBe("confirmed");
+
+    // Stale API response for line 18 arrives with only timeline confirmed (not budget)
+    applyApiDemoResult({
+      checklist: {
+        callId: "frontera-franchise-group",
+        coverage: 0.4,
+        bantCoverage: 0.25,
+        bant: { budget: "unknown", authority: "unknown", need: "confirmed", timeline: "confirmed" },
+        items: [
+          { id: "budget", label: "Budget", tier: "bant", status: "pending", evidence: [] },
+          { id: "authority", label: "Authority", tier: "bant", status: "pending", evidence: [] },
+          { id: "need", label: "Need", tier: "bant", status: "confirmed", evidence: [] },
+          {
+            id: "timeline",
+            label: "Timeline",
+            tier: "bant",
+            status: "confirmed",
+            evidence: [{ snippet: "July decision", value: "July 20", confidence: 0.85 }],
+          },
+        ],
+        elapsedSeconds: 200, // stale
+        openGaps: ["budget", "authority"],
+        updatedAt: new Date().toISOString(),
+      },
+      ws_messages: [],
+    });
+
+    const afterState = useLiveCall.getState();
+    // Budget must NOT regress from confirmed back to unknown
+    expect(afterState.checklistState!.bant.budget).toBe("confirmed");
+    // Timeline should stay confirmed
+    expect(afterState.checklistState!.bant.timeline).toBe("confirmed");
   });
 });
