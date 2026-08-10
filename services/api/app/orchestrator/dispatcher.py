@@ -568,7 +568,8 @@ class Orchestrator:
             except Exception:
                 _logger.exception("call lookup failed during live checklist update call_id=%s", call_id)
                 raise
-            seed_bant = call.get("bant") if isinstance(call.get("bant"), dict) else None
+            # Do not seed pre-DC BANT into live checklist — start clean
+            seed_bant = None
             transcript_analysis = (
                 live_result.get("transcript") if isinstance(live_result.get("transcript"), dict) else {}
             )
@@ -639,9 +640,8 @@ class Orchestrator:
     ) -> Optional[Dict[str, Any]]:
         stored = self.memory.pop_discovery_checklist(ctx.tenant_id, call_id)
         if not stored:
-            call = self.calls.get_call(ctx, call_id) or {}
-            seed = call.get("bant") if isinstance(call.get("bant"), dict) else None
-            state = seed_checklist(call_id, seed_bant=seed)
+            # Do not seed pre-DC BANT — start clean for live/wrap-up
+            state = seed_checklist(call_id, seed_bant=None)
         else:
             state = checklist_from_dict(stored)
 
