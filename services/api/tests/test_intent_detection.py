@@ -30,6 +30,24 @@ def test_sentiment_uncertainty_phrase_is_negative():
     assert r["score"] < 0
 
 
+def test_sentiment_not_feeling_good_is_negative():
+    r = analyze_sentiment("I'm not feeling good about this partnership")
+    assert r["label"] == "negative"
+    assert r["score"] < 0
+
+
+def test_sentiment_not_happy_is_negative():
+    r = analyze_sentiment("I'm not happy with this approach")
+    assert r["label"] == "negative"
+    assert r["score"] < 0
+
+
+def test_sentiment_burned_by_vendors_is_negative():
+    r = analyze_sentiment("I'm a bit concerned we've been burned by vendors before.")
+    assert r["label"] == "negative"
+    assert r["score"] < 0
+
+
 def test_sentiment_pain_language_is_neutral_business_context():
     r = analyze_sentiment("Manual audits are a bottleneck and this is a nightmare")
     assert r["label"] == "neutral"
@@ -151,7 +169,7 @@ def test_analyze_segment_emits_sentiment_signal_and_ignores_neutral_filler():
     assert concern["sentiment"]["signal"]["tone"] == "negative"
     assert concern["sentiment"]["signal"]["label"] == "Customer sentiment: Decision risk"
     assert concern["sentiment"]["customerSentiment"]["label"] == "Decision risk"
-    assert "Clarify the doubt" in concern["sentiment"]["customerSentiment"]["guidance"]
+    assert "reduce risk" in concern["sentiment"]["customerSentiment"]["guidance"].lower()
     assert concern["sentiment"]["signal"]["snippet"].startswith("I'm not sure")
 
     filler = analyze_segment(
@@ -171,6 +189,89 @@ def test_analyze_segment_emits_sentiment_signal_and_ignores_neutral_filler():
     assert filler["sentiment"]["signal"] is None
     assert filler["sentiment"]["customer"] < 0
     assert filler["sentiment"]["customerSentiment"] == concern["sentiment"]["customerSentiment"]
+
+
+def test_analyze_segment_not_feeling_good_shows_decision_risk():
+    ctx = TenantContext(tenant_id="test-tenant-not-feeling-good", user_id="u1")
+    call_id = "call-test-not-feeling-good"
+
+    out = analyze_segment(
+        ctx,
+        call_id,
+        {
+            "id": "feel-1",
+            "text": "I'm not feeling good about this and I'm uncomfortable with the risk.",
+            "speakerId": "cust-1",
+            "speakerName": "Alex",
+            "speakerRole": "customer",
+            "timestamp": 22,
+        },
+    )
+
+    assert out["transcript"]["sentiment"] == "negative"
+    assert out["sentiment"]["customer"] < 0
+    assert out["sentiment"]["customerSentiment"]["label"] == "Decision risk"
+    assert out["sentiment"]["customerSentiment"]["tone"] == "negative"
+    assert out["sentiment"]["signal"]["tone"] == "negative"
+    assert "Decision risk" in out["sentiment"]["signal"]["label"]
+
+
+def test_analyze_segment_concern_with_pain_keeps_decision_risk():
+    ctx = TenantContext(tenant_id="test-tenant-pain-concern", user_id="u1")
+    call_id = "call-test-pain-concern"
+
+    out = analyze_segment(
+        ctx,
+        call_id,
+        {
+            "id": "pain-concern-1",
+            "text": "Manual audits are a nightmare and a bottleneck, and we are concerned this will block expansion.",
+            "speakerId": "cust-1",
+            "speakerName": "Alex",
+            "speakerRole": "customer",
+            "timestamp": 40,
+        },
+    )
+
+    assert out["sentiment"]["customerSentiment"]["label"] == "Decision risk"
+    assert out["sentiment"]["customerSentiment"]["tone"] == "negative"
+    assert out["sentiment"]["customer"] < 0
+    assert out["sentiment"]["signal"] is not None
+
+
+def test_analyze_segment_clears_sticky_customer_cue_on_calm_turn():
+    ctx = TenantContext(tenant_id="test-tenant-clear-sticky-cue", user_id="u1")
+    call_id = "call-test-clear-sticky-cue"
+
+    concern = analyze_segment(
+        ctx,
+        call_id,
+        {
+            "id": "sticky-1",
+            "text": "I'm concerned about the implementation risk.",
+            "speakerId": "cust-1",
+            "speakerName": "Alex",
+            "speakerRole": "customer",
+            "timestamp": 10,
+        },
+    )
+    assert concern["sentiment"]["customerSentiment"]["label"] == "Decision risk"
+
+    calm = analyze_segment(
+        ctx,
+        call_id,
+        {
+            "id": "sticky-2",
+            "text": "Can you walk me through the next steps for onboarding?",
+            "speakerId": "cust-1",
+            "speakerName": "Alex",
+            "speakerRole": "customer",
+            "timestamp": 25,
+        },
+    )
+    # Question cue replaces Decision risk (Evaluating fit), not sticky concern.
+    assert calm["sentiment"]["customerSentiment"]["label"] == "Evaluating fit"
+    assert calm["sentiment"]["customerSentiment"]["tone"] == "neutral"
 
 
 def test_internal_speaker_sentiment_signal_uses_sales_rep_label():
@@ -302,7 +403,7 @@ def test_analyze_segment_survives_tenant_resolution_failure(monkeypatch):
     call_id = "call-test-tenant-fallback"
     segment = {
         "id": "tenant-fallback-1",
-        "text": "Manual compliance work is a nightmare and we are not sure how to scale it.",
+        "text": "Manual compliance work is a nightmare and spreadsheet intake is a bottleneck.",
         "speakerId": "cust-1",
         "speakerName": "Alex",
         "speakerRole": "customer",

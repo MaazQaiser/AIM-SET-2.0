@@ -148,3 +148,109 @@ def test_build_relevant_content_uses_library_deck_and_project_fallbacks(monkeypa
     assert out["relevantDocuments"][0]["format"] == "pptx"
     assert out["relevantProjects"][0]["id"] == "project-care"
     assert out["relevantProjects"][0]["source"] == "project_database"
+    assert all(p["id"] != "project-fintech" for p in out["relevantProjects"])
+    assert all(d["assetId"] != "kb-fintech-deck" for d in out["relevantDocuments"])
+
+
+def test_build_relevant_content_includes_pdf_presentations(monkeypatch):
+    ctx = TenantContext(tenant_id="tenant-pdf", user_id="u1", clerk_org_id="tenant-pdf")
+
+    class FakeRepo:
+        def list_assets(self, _ctx):
+            return [
+                {
+                    "id": "kb-security-pdf",
+                    "title": "Security Operations One-Pager",
+                    "type": "pdf",
+                    "fileName": "security-ops.pdf",
+                    "mimeType": "application/pdf",
+                    "tags": ["security", "operations"],
+                    "status": "ready",
+                    "chunkCount": 4,
+                },
+                {
+                    "id": "kb-retail-pdf",
+                    "title": "Retail Playbook",
+                    "type": "pdf",
+                    "fileName": "retail.pdf",
+                    "mimeType": "application/pdf",
+                    "tags": ["retail"],
+                    "status": "ready",
+                    "chunkCount": 2,
+                },
+            ]
+
+        def list_asset_chunk_texts(self, _ctx, asset_id, limit=20):
+            if asset_id == "kb-security-pdf":
+                return ["Security operations platform for officer scheduling and incident reporting."]
+            return ["Retail merchandising."]
+
+        def get_asset_row(self, *_args, **_kwargs):
+            return None
+
+    monkeypatch.setattr("app.agents.relevant_content._kb_search", lambda *_a, **_k: [])
+    monkeypatch.setattr("app.agents.relevant_content.get_kb_repository", lambda: FakeRepo())
+    monkeypatch.setattr(
+        "app.agents.relevant_content.resolve_kb_tenant",
+        lambda _ctx: ("tenant-pdf", "tenant-pdf"),
+    )
+    monkeypatch.setattr("app.agents.relevant_content.list_kb_projects", lambda _ctx: [])
+
+    out = build_relevant_content(
+        ctx,
+        "GuardCo",
+        {
+            "needs": "security operations platform scheduling payroll incidents",
+            "industry": "Security Services",
+        },
+    )
+
+    assert out["relevantDocuments"]
+    assert out["relevantDocuments"][0]["assetId"] == "kb-security-pdf"
+    assert out["relevantDocuments"][0]["format"] == "pdf"
+    assert out["recommendedDeck"]["assetId"] == "kb-security-pdf"
+    assert all(d["assetId"] != "kb-retail-pdf" for d in out["relevantDocuments"])
+
+
+def test_build_relevant_content_drops_weak_generic_matches(monkeypatch):
+    ctx = TenantContext(tenant_id="tenant-weak", user_id="u1", clerk_org_id="tenant-weak")
+
+    class FakeRepo:
+        def list_assets(self, _ctx):
+            return []
+
+        def list_asset_chunk_texts(self, *_args, **_kwargs):
+            return []
+
+        def get_asset_row(self, *_args, **_kwargs):
+            return None
+
+    monkeypatch.setattr("app.agents.relevant_content._kb_search", lambda *_a, **_k: [])
+    monkeypatch.setattr("app.agents.relevant_content.get_kb_repository", lambda: FakeRepo())
+    monkeypatch.setattr(
+        "app.agents.relevant_content.resolve_kb_tenant",
+        lambda _ctx: ("tenant-weak", "tenant-weak"),
+    )
+    monkeypatch.setattr(
+        "app.agents.relevant_content.list_kb_projects",
+        lambda _ctx: [
+            {
+                "id": "project-generic",
+                "title": "Platform Services",
+                "summary": "A custom business management solution and workflow platform.",
+                "industry": "Other",
+                "fields": {},
+            }
+        ],
+    )
+
+    out = build_relevant_content(
+        ctx,
+        "Acme",
+        {
+            "needs": "platform solution system workflow management",
+            "industry": "Hospitals and Health Care",
+        },
+    )
+
+    assert out["relevantProjects"] == []

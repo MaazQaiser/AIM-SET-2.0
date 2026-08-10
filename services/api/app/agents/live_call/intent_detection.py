@@ -28,6 +28,8 @@ _INTENT_FROM_SIGNAL = {
     "competitor_mentioned": "competitive_evaluation",
     "technical_question": "technical_deep_dive",
     "timeline_signal": "timeline_planning",
+    "need_signal": "discovery_q_and_a",
+    "pain_signal": "discovery_q_and_a",
     "design_query": "design_exploration",
     "objection_raised": "objection_handling",
     "prospect_question": "discovery_q_and_a",
@@ -293,12 +295,49 @@ def _latest_meaningful_sentiment_score(
     # Prefer the most recent point so the UI tracks latest context promptly.
     latest = float(recent[-1].get("valence", 0.0))
     if abs(latest) >= 0.12:
+        # Hard replace on polarity flips so lingering positives don't mask concern.
         return round(latest, 3)
     # Soft decay toward neutral when the latest utterance is weak/neutral.
+    # Decay prior affect quickly so calm/pain-discovery turns don't keep a red rail.
     for score in (float(point.get("valence", 0.0)) for point in reversed(recent[:-1])):
         if abs(score) >= 0.2:
-            return round(score * 0.7 + latest * 0.3, 3)
+            weight = 0.25 if score < 0 else 0.5
+            return round(score * weight + latest * (1.0 - weight), 3)
     return round(latest, 3)
+
+
+_CUSTOMER_PAIN_RE = re.compile(
+    r"\b(nightmare|bottleneck|broken|manual|spreadsheet|spreadsheets|pain(?:\s+point)?|problem)\b",
+    re.I,
+)
+_CUSTOMER_DECISION_RISK_RE = re.compile(
+    r"\b("
+    r"not\s+sure|"
+    r"not\s+(?:feeling|feel)\s+(?:good|great|well|happy|ok|okay)|"
+    r"not\s+happy|"
+    r"don'?t\s+feel|"
+    r"doesn'?t\s+feel|"
+    r"does\s+not\s+feel|"
+    r"feeling\s+(?:bad|uneasy|uncomfortable|worried|concerned)|"
+    r"uncomfortable|"
+    r"uneasy|"
+    r"burned\s+by|"
+    r"burnt\s+by|"
+    r"concerned|"
+    r"worried|"
+    r"frustrated|"
+    r"skeptical|"
+    r"doubt|"
+    r"hesitant|"
+    r"disappointed|"
+    r"uncertain(?:\s+(?:about|whether))?"
+    r")\b",
+    re.I,
+)
+_CUSTOMER_BUYING_RE = re.compile(
+    r"\b(move forward|exactly what|great|excited|proposal|appreciate|ready|perfect)\b",
+    re.I,
+)
 
 
 def _is_internal_speaker(speaker_role: str) -> bool:
@@ -405,28 +444,26 @@ def _customer_sentiment_cue(
     word_count = len(re.findall(r"[a-z0-9']+", lowered))
     if label == "neutral" and word_count < 3:
         return None
-    if re.search(
-        r"\b(nightmare|bottleneck|broken|manual|spreadsheet|spreadsheets|pain|problem)\b",
-        lowered,
-    ):
+
+    has_pain = bool(_CUSTOMER_PAIN_RE.search(lowered))
+    has_risk = bool(_CUSTOMER_DECISION_RISK_RE.search(lowered)) or label == "negative"
+
+    # Affect / doubt always wins over business-pain discovery language.
+    if has_risk:
+        return {
+            "label": "Decision risk",
+            "guidance": "Acknowledge how they feel, clarify what would reduce risk, and avoid pushing before trust recovers.",
+            "tone": "negative",
+            "source": "live-call-agent",
+        }
+    if has_pain:
         return {
             "label": "Pain stated",
             "guidance": "Capture this as discovery evidence; only treat it as sentiment risk if the buyer expresses concern, doubt, or frustration.",
             "tone": "neutral",
             "source": "live-call-agent",
         }
-    if re.search(
-        r"\b(not\s+sure\s+(?:how\s+)?(?:you|your|this|that|it|the\s+(?:solution|platform|product|approach))|"
-        r"concerned|worried|frustrated|skeptical|doubt|uncertain\s+(?:about|whether))\b",
-        lowered,
-    ):
-        return {
-            "label": "Decision risk",
-            "guidance": "Clarify the doubt, ask what would reduce risk, and avoid pushing before trust recovers.",
-            "tone": "negative",
-            "source": "live-call-agent",
-        }
-    if re.search(r"\b(move forward|exactly what|great|excited|proposal|appreciate|ready)\b", lowered):
+    if _CUSTOMER_BUYING_RE.search(lowered):
         return {
             "label": "Buying confidence",
             "guidance": "Confirm decision criteria, owner, and next-step date while confidence is high.",
@@ -462,6 +499,23 @@ def _customer_sentiment_cue(
     }
 
 
+def _align_sentiment_with_customer_cue(
+    sentiment: Dict[str, Any],
+    customer_sentiment: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """When the cue clearly signals affect, keep the live score/rail in sync."""
+    if not customer_sentiment:
+        return sentiment
+    tone = customer_sentiment.get("tone")
+    if tone == "negative" and float(sentiment.get("score") or 0.0) > -0.35:
+        return {"label": "negative", "score": -0.45}
+    if tone == "positive" and float(sentiment.get("score") or 0.0) < 0.35:
+        if sentiment.get("label") == "negative":
+            return sentiment
+        return {"label": "positive", "score": 0.4}
+    return sentiment
+
+
 def _sentiment_signal(
     transcript_payload: Dict[str, Any],
     sentiment: Dict[str, Any],
@@ -469,8 +523,14 @@ def _sentiment_signal(
     customer_sentiment: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     label = sentiment.get("label")
+    cue_tone = (customer_sentiment or {}).get("tone") or (sales_rep_tone or {}).get("tone")
     if label not in ("positive", "negative"):
-        return None
+        if cue_tone == "negative":
+            label = "negative"
+        elif cue_tone == "positive":
+            label = "positive"
+        else:
+            return None
 
     speaker_role = transcript_payload.get("speakerRole") or "customer"
     speaker_name = transcript_payload.get("speakerName") or "Speaker"
@@ -481,6 +541,10 @@ def _sentiment_signal(
         else f"Sales rep tone: {(sales_rep_tone or {}).get('label') or tone_label}"
     )
     score = float(sentiment.get("score") or 0.0)
+    if label == "negative" and score >= 0:
+        score = -0.45
+    if label == "positive" and score <= 0:
+        score = 0.4
     return {
         "id": f"sentiment-{transcript_payload.get('id') or uuid.uuid4()}",
         "label": signal_label,
@@ -557,6 +621,8 @@ def analyze_segment(
             "label": sales_rep_tone["tone"],
             "score": sales_rep_tone["score"],
         }
+    else:
+        sentiment = _align_sentiment_with_customer_cue(sentiment, customer_sentiment)
 
     session.segment_count += 1
     _update_keyword_counts(session, speaker_id, kw_result["terms"])
@@ -594,8 +660,8 @@ def analyze_segment(
         public_customer = _public_customer_sentiment(customer_sentiment)
         if public_customer:
             session.last_customer_sentiment = public_customer
-        elif abs(sentiment["score"]) < 0.2 and session.segment_count % 3 == 0:
-            # Periodically drop sticky customer cues when tone has gone quiet.
+        elif abs(sentiment["score"]) < 0.2 and len(re.findall(r"[a-z0-9']+", text.lower())) >= 3:
+            # Clear sticky buyer cues on calm turns so the rail tracks current mood.
             session.last_customer_sentiment = None
 
     new_pains = _detect_pains(text, session, call_id, timestamp, speaker_role)
@@ -653,7 +719,12 @@ def analyze_segment(
             },
         }
 
-    if not nudge and kw_result.get("signal_type") and kw_result.get("routing_confidence", 0) >= 0.65:
+    if (
+        not nudge
+        and kw_result.get("signal_type")
+        and kw_result.get("routing_confidence", 0) >= 0.65
+        and not _is_internal_speaker(speaker_role)
+    ):
         target = "ae"
         for rule in routing:
             if rule.get("id") == kw_result.get("matched_rule_id"):

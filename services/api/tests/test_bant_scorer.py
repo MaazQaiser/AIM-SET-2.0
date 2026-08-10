@@ -222,3 +222,92 @@ def test_should_nudge_respects_throttle_window():
     for item_id in ("budget", "authority", "need", "timeline"):
         state.nudge_history[item_id] = float(state.elapsed_seconds)
     assert should_nudge(state, max_nudges_per_window=3) is None
+
+
+def test_update_checklist_need_from_need_an_platform_alone():
+    """ASR often delivers the Need line without 'must have' — still update Need."""
+    state = initial_checklist_state("call-1")
+
+    updated, changed, dims = update_checklist_from_segment(
+        state,
+        "We need an operations platform for scheduling, payroll, billing, and incident reporting.",
+        elapsed_seconds=90,
+        speaker_role="customer",
+    )
+
+    assert "need" in changed
+    assert "need" in dims
+    assert updated.bant["need"] in ("partial", "confirmed")
+    need_item = next(item for item in updated.items if item.id == "need")
+    assert need_item.evidence
+    assert "operations platform" in need_item.evidence[-1].value.lower()
+
+
+def test_update_checklist_need_ignores_approval_only_language():
+    state = initial_checklist_state("call-1")
+
+    updated, changed, dims = update_checklist_from_segment(
+        state,
+        "Procurement still needs to approve the vendor list before we can sign.",
+        elapsed_seconds=100,
+        speaker_role="customer",
+    )
+
+    assert "need" not in changed
+    assert "need" not in dims
+    assert updated.bant["need"] == "unknown"
+
+
+def test_update_checklist_timeline_urgency_keeps_display_value():
+    state = initial_checklist_state("call-1")
+
+    updated, changed, dims = update_checklist_from_segment(
+        state,
+        "Timeline is urgent for us — this is the main constraint.",
+        elapsed_seconds=110,
+        speaker_role="customer",
+    )
+
+    assert "timeline" in changed
+    assert "timeline" in dims
+    assert updated.bant["timeline"] in ("partial", "confirmed")
+    timeline_item = next(item for item in updated.items if item.id == "timeline")
+    assert timeline_item.evidence
+    assert timeline_item.evidence[-1].value
+    value = timeline_item.evidence[-1].value.lower()
+    assert "urgent" in value or "constraint" in value
+
+
+def test_update_checklist_need_and_timeline_from_fragmented_customer_lines():
+    state = initial_checklist_state("call-1")
+
+    updated, changed, _ = update_checklist_from_segment(
+        state,
+        "Biggest pain point: spreadsheet plus QuickBooks is causing payroll errors.",
+        elapsed_seconds=60,
+        speaker_role="customer",
+    )
+    assert "need" in changed
+    assert updated.bant["need"] in ("partial", "confirmed")
+
+    updated, changed, _ = update_checklist_from_segment(
+        updated,
+        "We need an operations platform. This is a top priority and a must have.",
+        elapsed_seconds=75,
+        speaker_role="customer",
+    )
+    assert "need" in changed
+    assert updated.bant["need"] == "confirmed"
+
+    updated, changed, dims = update_checklist_from_segment(
+        updated,
+        "Kickoff within 2 weeks, decision by Friday, and go-live by end of the month.",
+        elapsed_seconds=120,
+        speaker_role="customer",
+    )
+    assert "timeline" in changed
+    assert "timeline" in dims
+    assert updated.bant["timeline"] in ("partial", "confirmed")
+    timeline_item = next(item for item in updated.items if item.id == "timeline")
+    value = timeline_item.evidence[-1].value.lower()
+    assert "2 weeks" in value or "friday" in value or "end of the month" in value

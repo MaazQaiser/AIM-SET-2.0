@@ -45,23 +45,52 @@ const STOP_WORDS = new Set([
   "and",
   "are",
   "around",
+  "based",
+  "build",
+  "business",
   "call",
   "can",
+  "company",
+  "custom",
   "for",
   "from",
+  "group",
   "have",
+  "help",
   "into",
+  "looking",
+  "management",
+  "need",
+  "needs",
+  "next",
   "now",
   "our",
+  "plus",
+  "process",
+  "processes",
   "right",
+  "service",
+  "services",
+  "solution",
+  "solutions",
+  "system",
+  "systems",
+  "team",
+  "teams",
   "the",
   "this",
+  "using",
+  "want",
   "what",
   "with",
+  "workflow",
+  "workflows",
   "you",
   "your",
 ]);
 
+const MIN_ROUTE_SCORE = 0.35;
+const MIN_FALLBACK_RAW_SCORE = 3;
 function normalize(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -179,18 +208,23 @@ function rankedKbProjects(
       project,
       score: scoreText(projectSearchText(project), tokens, phrases),
     }))
+    .filter(({ score }) => score >= MIN_FALLBACK_RAW_SCORE)
     .sort((a, b) => b.score - a.score || a.project.title.localeCompare(b.project.title));
   const maxScore = scored[0]?.score ?? 0;
+  if (maxScore <= 0) return [];
 
-  return scored.slice(0, 5).map(({ project, score }) => ({
-    id: project.id,
-    title: project.projectName || project.title,
-    meta: [project.companyName, project.industry, project.domain].filter(Boolean).join(" · ") || "Project database",
-    summary: compactText(primarySolution(project), 145),
-    href: `/knowledge/projects/${project.id}`,
-    score: maxScore > 0 && score > 0 ? score / maxScore : undefined,
-    source: "kb",
-  }));
+  return scored
+    .filter(({ score }) => score / maxScore >= MIN_ROUTE_SCORE)
+    .slice(0, 5)
+    .map(({ project, score }) => ({
+      id: project.id,
+      title: project.projectName || project.title,
+      meta: [project.companyName, project.industry, project.domain].filter(Boolean).join(" · ") || "Project database",
+      summary: compactText(primarySolution(project), 145),
+      href: `/knowledge/projects/${project.id}`,
+      score: score / maxScore,
+      source: "kb" as const,
+    }));
 }
 
 function isPresentationAsset(asset: KBAsset): boolean {
@@ -222,28 +256,33 @@ function rankedPresentationAssets(
       asset,
       score: scoreText(assetSearchText(asset), tokens, phrases),
     }))
+    .filter(({ score }) => score >= MIN_FALLBACK_RAW_SCORE)
     .sort((a, b) => b.score - a.score || a.asset.title.localeCompare(b.asset.title));
   const maxScore = scored[0]?.score ?? 0;
+  if (maxScore <= 0) return [];
 
-  return scored.slice(0, 5).map(({ asset, score }) => {
-    const meta = resolveKbFileFormat(asset.fileName, asset.mimeType);
-    const tags = asset.tags ?? [];
-    return {
-      id: asset.id,
-      title: asset.title,
-      meta: [
-        meta.label,
-        asset.previewSlideCount ? `${asset.previewSlideCount} slides` : "",
-        asset.fileName,
-      ]
-        .filter(Boolean)
-        .join(" · "),
-      summary: tags.length > 0 ? tags.slice(0, 4).join(", ") : undefined,
-      href: `/knowledge/${asset.id}`,
-      score: maxScore > 0 && score > 0 ? score / maxScore : undefined,
-      source: "kb",
-    };
-  });
+  return scored
+    .filter(({ score }) => score / maxScore >= MIN_ROUTE_SCORE)
+    .slice(0, 5)
+    .map(({ asset, score }) => {
+      const meta = resolveKbFileFormat(asset.fileName, asset.mimeType);
+      const tags = asset.tags ?? [];
+      return {
+        id: asset.id,
+        title: asset.title,
+        meta: [
+          meta.label,
+          asset.previewSlideCount ? `${asset.previewSlideCount} slides` : "",
+          asset.fileName,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        summary: tags.length > 0 ? tags.slice(0, 4).join(", ") : undefined,
+        href: `/knowledge/${asset.id}`,
+        score: score / maxScore,
+        source: "kb" as const,
+      };
+    });
 }
 
 function dedupeItems(items: DisplayItem[]): DisplayItem[] {
@@ -352,17 +391,22 @@ export function LiveRelevantContentWidget({
     [accountName, brief, call, callId, keywords, leadName, transcript]
   );
   const routeProjects = useMemo(
-    () => (relevantContent?.relevantProjects ?? []).map(routeProjectToDisplay),
+    () =>
+      (relevantContent?.relevantProjects ?? [])
+        .filter((project) => (normalizeScore(project.relevanceScore) ?? 0) >= MIN_ROUTE_SCORE)
+        .map(routeProjectToDisplay),
     [relevantContent]
   );
   const routePresentations = useMemo(() => {
     const docs = [
       ...(relevantContent?.recommendedDeck ? [relevantContent.recommendedDeck] : []),
       ...(relevantContent?.relevantDocuments ?? []),
-    ].filter((doc) => {
-      const format = String(doc.format || "").toLowerCase();
-      return format === "ppt" || format === "pptx" || format === "pdf";
-    });
+    ]
+      .filter((doc) => {
+        const format = String(doc.format || "").toLowerCase();
+        return format === "ppt" || format === "pptx" || format === "pdf";
+      })
+      .filter((doc) => (normalizeScore(doc.relevanceScore) ?? 0) >= MIN_ROUTE_SCORE);
     return dedupeItems(docs.map(routeDocumentToDisplay));
   }, [relevantContent]);
 
@@ -375,9 +419,15 @@ export function LiveRelevantContentWidget({
     [kbAssets, context]
   );
 
-  const projects = routeProjects.length > 0 ? routeProjects : fallbackProjects;
-  const presentations =
-    routePresentations.length > 0 ? routePresentations : fallbackPresentations;
+  // Prefer API-ranked items when they clear the relevance bar; otherwise live-ranked KB only.
+  const projects = useMemo(() => {
+    if (routeProjects.length > 0) return routeProjects.slice(0, 5);
+    return fallbackProjects;
+  }, [routeProjects, fallbackProjects]);
+  const presentations = useMemo(() => {
+    if (routePresentations.length > 0) return routePresentations.slice(0, 5);
+    return fallbackPresentations;
+  }, [routePresentations, fallbackPresentations]);
 
   return (
     <Tabs defaultValue="projects" className="flex min-h-0 flex-col">

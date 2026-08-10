@@ -58,9 +58,9 @@ SIGNAL_RULES: List[Tuple[str, List[str], ChecklistItemStatus]] = [
     ("budget", ["budget approved", "allocated", "signed off", "funding approved", "set aside", "earmarked", "board still has to bless", "board has to bless"], "confirmed"),
     ("authority", ["decision maker", "economic buyer", "sign off", "cio", "cto", "cfo", "ceo", "coo", "cpo", "vp ", "director", "board", "head of", "budget owner", "final approver", "signatory", "approval committee", "steering committee"], "partial"),
     ("authority", ["reports to", "final say", "signatory", "approves", "approve it", "need to approve", "must approve", "has to approve", "board approval", "board bless", "approval path", "owns the decision", "own the decision", "i decide", "my call", "i approve", "full decision authority", "decision authority", "i have the final say", "final say is mine"], "confirmed"),
-    ("need", ["pain", "problem", "challenge", "struggling", "need to", "priority", "impact", "pain point", "overcome", "solution", "looking for", "looking forward", "require", "want to", "wish we", "gap", "issue", "bottleneck", "friction", "limitation", "automat"], "partial"),
+    ("need", ["pain", "problem", "challenge", "struggling", "need to", "need a", "need an", "need the", "we need", "i need", "they need", "need help", "priority", "impact", "pain point", "overcome", "solution", "looking for", "looking forward", "looking to", "require", "want to", "wish we", "gap", "issue", "bottleneck", "friction", "limitation", "automat", "nightmare"], "partial"),
     ("need", ["must have", "urgent need", "business case", "top priority", "deal breaker", "non-negotiable", "critical priority", "critical need"], "confirmed"),
-    ("timeline", ["timeline", "eta", "estimated time", "estimated delivery", "delivery date", "completion date", "deadline", "go-live", "go live", "launch", "q1", "q2", "q3", "q4", "by end of", "this quarter", "next quarter", "this year", "next month", "end of month", "end of the month", "by friday", "by monday", "asap", "soon", "urgent", "immediately", "move quickly", "moving quickly", "timeframe", "time frame", "time-sensitive", "production-grade", "pilot", "next year", "kickoff", "rollout", "within weeks", "within months"], "partial"),
+    ("timeline", ["timeline", "eta", "estimated time", "estimated delivery", "delivery date", "completion date", "deadline", "go-live", "go live", "launch", "q1", "q2", "q3", "q4", "by end of", "this quarter", "next quarter", "this year", "next month", "end of month", "end of the month", "by friday", "by monday", "asap", "soon", "urgent", "immediately", "move quickly", "moving quickly", "timeframe", "time frame", "time-sensitive", "time sensitive", "main constraint", "production-grade", "pilot", "next year", "kickoff", "rollout", "within weeks", "within months", "within days"], "partial"),
     ("timeline", ["project eta", "board meeting", "decision by", "kick off", "kickoff", "pilot kickoff", "start date", "go live date", "go-live by", "production go-live", "target date", "production-grade by", "complete by", "delivery by", "by end of", "within 2 weeks", "within two weeks", "within 30 days", "decision by", "need it by", "needed by", "must be done by"], "confirmed"),
     ("success_criteria", ["success looks like", "success criteria", "kpi", "outcome", "measure", "metric"], "partial"),
     ("stakeholders", ["stakeholder", "who else", "involved", "team members", "evaluating", "colleague"], "partial"),
@@ -386,7 +386,7 @@ _TIMELINE_RE = re.compile(
     rf"|(?:need(?:ed)?|must|have to|want)\s+(?:it\s+)?(?:done|ready|live|complete|delivered)?\s*(?:by|before)\s+(?:the\s+)?(?:Q[1-4]|{_MONTH_PATTERN}|next quarter|this quarter|next month|this month|end of (?:the )?month|{_WEEKDAY_PATTERN}|{_TIMELINE_DURATION_PATTERN})"
     rf"|(?:complete|delivery|delivered|ship|implementation)\s+(?:by|in|before|after|within)\s+(?:the\s+)?(?:Q[1-4]|{_MONTH_PATTERN}|next quarter|this quarter|next month|this month|{_TIMELINE_DURATION_PATTERN})"
     r"|(?:this|next)\s+(?:week|month|quarter|year)"
-    r"|(?:end of (?:the )?month|move quickly|moving quickly|time[- ]sensitive)"
+    r"|(?:end of (?:the )?month|move quickly|moving quickly|time[- ]sensitive|asap|soon|urgent|immediately|main constraint)"
     rf"|(?:\d{{1,2}}\s+)?(?:{_MONTH_PATTERN})(?:\s+20\d{{2}})?\b)",
     re.I,
 )
@@ -406,13 +406,19 @@ _TIMELINE_BOUND_RE = re.compile(
 )
 _NEED_RE = re.compile(
     r"\b(?:pain|problem|challenge|struggling|bottleneck|friction|gap|manual|broken|"
-    r"nightmare|limitation|need to|need a|need an|must have|critical|priority)\b",
+    r"nightmare|limitation|need to|need a|need an|need the|we need|i need|they need|"
+    r"must have|critical|priority|looking for|looking to)\b",
     re.I,
 )
 _APPROVAL_NEED_RE = re.compile(r"\bneed(?:s)?\s+to\s+approv(?:e|al)\b", re.I)
 _PAIN_NEED_RE = re.compile(
     r"\b(?:pain|problem|challenge|struggling|bottleneck|friction|gap|manual|broken|"
     r"nightmare|limitation|must have|critical|priority|business case)\b",
+    re.I,
+)
+_TIMELINE_URGENCY_RE = re.compile(
+    r"\b(?:asap|soon|urgent|immediately|time[- ]sensitive|move quickly|moving quickly|"
+    r"main constraint|tight timeline|time is (?:tight|critical))\b",
     re.I,
 )
 
@@ -459,14 +465,19 @@ def _extract_bant_value(item_id: str, text: str, snippet: str) -> str:
             [*milestones, *generic],
             limit=4,
         )
-        return value
+        if value:
+            return value
+        # Optimistic: urgency / constraint language still gets a display value.
+        # Do not fall back on broad context words like "schedule" / "project".
+        if _TIMELINE_URGENCY_RE.search(text):
+            return snippet[:120]
+        return ""
     elif item_id == "need":
-        # Prefer pain/need language; do not store unrelated timeline-only snippets.
-        if _PAIN_NEED_RE.search(text) or re.search(
-            r"\b(?:need a|need an|looking for|must have|top priority|critical priority|critical need)\b",
-            text,
-            re.I,
-        ):
+        # Approval-only language belongs to Authority, not Need.
+        if _APPROVAL_NEED_RE.search(text) and not _PAIN_NEED_RE.search(text):
+            return ""
+        # Optimistic: any clear need/pain cue stores the customer snippet.
+        if _PAIN_NEED_RE.search(text) or _NEED_RE.search(text):
             return snippet
         return ""
     return snippet
@@ -662,8 +673,12 @@ def _apply_signals(
             # Authority requires an extracted decision-maker value (avoids false hits).
             if item_id == "authority" and not value:
                 continue
-            # Skip empty BANT values — avoid wiping a good display value with "".
-            if item_id in ("timeline", "budget", "need") and not value:
+            # Optimistic Need/Timeline: if we matched status but extractor missed a
+            # structured value, keep the transcript snippet so the live UI updates.
+            if item_id in ("need", "timeline") and not value and snippet.strip():
+                value = snippet.strip()[:120]
+            # Budget stays strict — empty money extract should not invent a value.
+            if item_id == "budget" and not value:
                 if new_status != it.status:
                     it.status = new_status
                     if item_id not in changed:

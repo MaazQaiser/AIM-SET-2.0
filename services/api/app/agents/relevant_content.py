@@ -14,29 +14,60 @@ from app.domain.memory_store import get_memory_store
 from dc_tools.retrieve_kb import default_embed_fn, retrieve_kb
 
 DOCUMENT_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
-PRESENTATION_EXTENSIONS = {".ppt", ".pptx"}
+PRESENTATION_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
 PROJECT_ASSET_HINTS = ("project", "sale enablement")
+# Generic business words that cause false "relevant" hits across the whole library.
 STOP_WORDS = {
     "about",
     "after",
     "also",
     "and",
     "are",
+    "based",
+    "build",
+    "business",
     "call",
     "company",
+    "custom",
     "for",
     "from",
     "group",
     "have",
+    "help",
     "into",
+    "looking",
+    "management",
+    "need",
     "needs",
+    "next",
     "our",
+    "plus",
+    "process",
+    "processes",
+    "service",
+    "services",
+    "solution",
+    "solutions",
+    "system",
+    "systems",
+    "team",
+    "teams",
+    "that",
     "the",
     "their",
     "they",
     "this",
+    "using",
+    "want",
     "with",
+    "workflow",
+    "workflows",
 }
+
+# Absolute raw lexical score required (one short token ≈ 1.0; one long ≈ 2.5).
+MIN_RAW_SCORE = 3.0
+# After relative normalization, drop weak tails so one best hit doesn't keep junk at 0.1.
+MIN_NORMALIZED_SCORE = 0.35
 
 
 def _normalize_score(raw: Any) -> float:
@@ -45,7 +76,8 @@ def _normalize_score(raw: Any) -> float:
     except (TypeError, ValueError):
         return 0.0
     if score > 1.0:
-        return min(1.0, score / max(score, 1.0))
+        # Embedding distances / oversized lexical totals — clamp, don't divide by self.
+        return 1.0
     return max(0.0, min(1.0, score))
 
 
@@ -128,26 +160,89 @@ def _score_text(text: str, query: str) -> float:
         return 0.0
     query_tokens = _tokens(query)
     score = 0.0
+    matched = 0
     seen: set[str] = set()
     for token in query_tokens:
         if token in seen:
             continue
         seen.add(token)
         if token in haystack:
+            matched += 1
             score += 2.5 if len(token) >= 7 else 1.0
 
     # Normalize common vertical aliases that otherwise miss exact filename/title hits.
     if {"health", "care"} <= set(query_tokens) and ("healthcare" in haystack or "health care" in haystack):
         score += 10.0
+        matched += 1
     if "healthcare" in query_tokens and ("health care" in haystack or "hospital" in haystack):
         score += 8.0
+        matched += 1
     if "pediatric" in query_tokens and any(term in haystack for term in ("pediatric", "patient", "clinical", "health")):
         score += 5.0
+        matched += 1
     if "education" in query_tokens and any(term in haystack for term in ("edtech", "school", "learning", "education")):
         score += 8.0
+        matched += 1
     if "security" in query_tokens and any(term in haystack for term in ("security", "guard", "soc")):
         score += 6.0
+        matched += 1
+    if "fintech" in query_tokens and any(term in haystack for term in ("fintech", "payment", "banking", "finance")):
+        score += 6.0
+        matched += 1
+
+    # Require either multi-token overlap or a strong single vertical hit.
+    if matched < 2 and score < 5.0:
+        return 0.0
     return score
+
+
+def _industry_tokens(industry: str) -> List[str]:
+    return [token for token in _tokens(industry) if len(token) >= 4]
+
+
+def _industry_matches(text: str, industry: str) -> bool:
+    industry = (industry or "").strip()
+    if not industry:
+        return True
+    haystack = _search_text(text)
+    if not haystack:
+        return False
+    tokens = _industry_tokens(industry)
+    if any(token in haystack for token in tokens):
+        return True
+    lower = industry.lower()
+    alias_groups = (
+        (("health", "hospital", "pediatric", "clinical", "care"), ("health", "hospital", "pediatric", "clinical", "care", "patient")),
+        (("financ", "fintech", "bank", "payment"), ("financ", "fintech", "bank", "payment", "lending")),
+        (("secur", "guard", "cyber"), ("secur", "guard", "cyber", "soc")),
+        (("educat", "school", "edtech", "learning"), ("educat", "school", "edtech", "learning")),
+        (("retail", "commerce", "ecommerce"), ("retail", "commerce", "ecommerce", "shop")),
+    )
+    for industry_keys, haystack_keys in alias_groups:
+        if any(key in lower for key in industry_keys) and any(key in haystack for key in haystack_keys):
+            return True
+    return False
+
+
+def _passes_relevance(
+    *,
+    text: str,
+    raw_score: float,
+    industry: str,
+    min_raw: float = MIN_RAW_SCORE,
+) -> bool:
+    if raw_score < min_raw:
+        return False
+    if not industry.strip():
+        return True
+    # Known industry: require industry/vertical overlap OR a strong need match.
+    if _industry_matches(text, industry):
+        return True
+    return raw_score >= 8.0
+
+
+def _filter_by_normalized_score(items: List[Dict[str, Any]], *, min_score: float = MIN_NORMALIZED_SCORE) -> List[Dict[str, Any]]:
+    return [item for item in items if float(item.get("relevanceScore") or 0) >= min_score]
 
 
 def _asset_tags(asset: Dict[str, Any]) -> List[str]:
@@ -178,7 +273,8 @@ def _is_presentation_asset(asset: Dict[str, Any]) -> bool:
         ext in PRESENTATION_EXTENSIONS
         or "presentation" in mime
         or "powerpoint" in mime
-        or asset_type == "deck"
+        or "pdf" in mime
+        or asset_type in {"deck", "presentation", "pdf"}
     )
 
 
@@ -316,13 +412,14 @@ def build_relevant_content(
     limit: int = 15,
 ) -> Dict[str, Any]:
     """Group KB hits into file documents (PDF/PPT) and textual relevant projects."""
+    industry = str(research.get("industry") or "").strip()
     query = " ".join(
         filter(
             None,
             [
                 account_name,
                 research.get("needs", ""),
-                research.get("industry", ""),
+                industry,
                 research.get("intersection", ""),
                 research.get("campaign_service", ""),
                 research.get("company_description", "")[:200],
@@ -375,6 +472,24 @@ def build_relevant_content(
         combined = "\n\n".join(snippets)
         score = bucket["best_score"]
         title = _title_for_hit(asset_row, asset_id, meta, combined)
+        search_blob = " ".join(
+            filter(
+                None,
+                [
+                    title,
+                    file_name,
+                    mime,
+                    combined,
+                    " ".join(str(v) for v in meta.values()),
+                ],
+            )
+        )
+        # Vector hits still need call-context relevance (industry / needs).
+        lexical = _score_text(search_blob, query)
+        # Put embedding hits on a comparable scale to lexical raw scores.
+        effective = max(score * 10.0, lexical)
+        if not _passes_relevance(text=search_blob, raw_score=effective, industry=industry, min_raw=2.5):
+            continue
 
         is_document = ext in DOCUMENT_EXTENSIONS or "pdf" in mime or "presentation" in mime
 
@@ -386,7 +501,7 @@ def build_relevant_content(
                     "fileName": file_name,
                     "mimeType": mime,
                 },
-                score=score,
+                score=effective,
                 snippet=snippets[0] if snippets else None,
                 preview_text=combined,
             )
@@ -402,7 +517,7 @@ def build_relevant_content(
                 "id": f"proj-{asset_id}",
                 "title": title,
                 "source": source,
-                "relevanceScore": score,
+                "relevanceScore": effective,
                 "summary": snippets[0][:220] if snippets else "",
                 "details": combined[:4000] if combined else title,
                 "assetId": asset_id if not asset_id.startswith("dc:") else None,
@@ -412,8 +527,9 @@ def build_relevant_content(
     for asset in repo.list_assets(ctx):
         if not _is_presentation_asset(asset):
             continue
-        score = _score_text(_asset_search_blob(asset), query)
-        if score <= 0:
+        blob = _asset_search_blob(asset)
+        score = _score_text(blob, query)
+        if not _passes_relevance(text=blob, raw_score=score, industry=industry):
             continue
         asset_id = str(asset.get("id") or "")
         preview_text = "\n\n".join(repo.list_asset_chunk_texts(ctx, asset_id, limit=3))
@@ -426,8 +542,9 @@ def build_relevant_content(
         project_id = str(project.get("id") or "")
         if project_id in existing_project_ids:
             continue
-        score = _score_text(_project_search_blob(project), query)
-        if score <= 0:
+        blob = _project_search_blob(project)
+        score = _score_text(blob, query)
+        if not _passes_relevance(text=blob, raw_score=score, industry=industry):
             continue
         projects.append(_project_to_relevant(project, score))
 
@@ -435,6 +552,8 @@ def build_relevant_content(
     projects = _merge_by_id(projects, "id")
     _normalize_rank_scores(documents)
     _normalize_rank_scores(projects)
+    documents = _filter_by_normalized_score(documents)
+    projects = _filter_by_normalized_score(projects)
 
     documents.sort(key=lambda d: d["relevanceScore"], reverse=True)
     projects.sort(key=lambda p: p["relevanceScore"], reverse=True)
@@ -443,12 +562,12 @@ def build_relevant_content(
         (
             doc
             for doc in top_documents
-            if str(doc.get("format") or "").lower() in {"ppt", "pptx"}
+            if str(doc.get("format") or "").lower() in {"ppt", "pptx", "pdf"}
         ),
         None,
     )
     return {
         "relevantDocuments": top_documents,
-        "relevantProjects": projects[:12],
+        "relevantProjects": projects[:8],
         "recommendedDeck": recommended_deck,
     }

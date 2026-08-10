@@ -100,21 +100,21 @@ def _discovery_context_text(
             continue
         if latest_offset and latest_offset - _float_or_zero(
             event.get("offset_seconds") or event.get("timestamp")
-        ) > 45:
+        ) > 60:
             continue
         speaker = str(event.get("speaker_id") or event.get("speaker_name") or "")
         # Prefer same speaker, but allow nearby customer lines in the window.
         if latest_speaker and speaker and speaker != latest_speaker:
             if latest_offset and latest_offset - _float_or_zero(
                 event.get("offset_seconds") or event.get("timestamp")
-            ) > 20:
+            ) > 30:
                 continue
         text = str(event.get("text") or "").strip()
         if text and text != fallback_text:
             parts.append(text)
 
     context = " ".join(parts).strip()
-    return context[:720] if context else fallback
+    return context[:900] if context else fallback
 
 
 def _event_offset_seconds(event: Dict[str, Any]) -> float:
@@ -266,14 +266,28 @@ class Orchestrator:
             documents = existing.get("relevantDocuments") or []
             projects = existing.get("relevantProjects") or []
             deck = existing.get("recommendedDeck")
-            # Require both docs/deck and projects before treating cache as complete.
+            # Require both docs/deck and projects with real relevance — not weak junk.
             if (documents or deck) and projects:
-                return {
-                    "relevantDocuments": documents,
-                    "relevantProjects": projects,
-                    "recommendedDeck": deck,
-                    "cached": True,
-                }
+                scored_docs = [
+                    item
+                    for item in ([deck] if isinstance(deck, dict) else []) + list(documents)
+                    if isinstance(item, dict)
+                ]
+                best_project = max(
+                    (float(item.get("relevanceScore") or 0) for item in projects),
+                    default=0.0,
+                )
+                best_doc = max(
+                    (float(item.get("relevanceScore") or 0) for item in scored_docs),
+                    default=0.0,
+                )
+                if best_project >= 0.35 and best_doc >= 0.35:
+                    return {
+                        "relevantDocuments": documents,
+                        "relevantProjects": projects,
+                        "recommendedDeck": deck,
+                        "cached": True,
+                    }
         return self.dispatch_relevant_content(ctx, call_id)
 
     def dispatch_pre_dc_brief(self, ctx: TenantContext, call_id: str) -> Dict[str, Any]:

@@ -28,7 +28,6 @@ function bantStatusLabel(status: string, key: BantKey): string {
     return key === "authority" ? "Identified" : "Confirmed";
   }
   if (status === "partial") return "Partially qualified";
-  if (key === "timeline" && status === "unknown") return "Urgent";
   return "Open";
 }
 

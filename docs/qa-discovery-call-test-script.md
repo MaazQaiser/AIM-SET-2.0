@@ -45,7 +45,7 @@ Speak at a normal pace (~90–120 seconds).
 
 | Area | Should show |
 |------|-------------|
-| **Sentiment** | Concern early → excited / positive at the end |
+| **Sentiment** | Concern / Decision risk early (e.g. “concerned”, “not feeling good”) → Pain stated on pain lines → Buying confidence / positive at the end |
 | **Pain** | Spreadsheet + QuickBooks payroll / invoicing disputes |
 | **Need** | Operations platform (scheduling, payroll, billing, incidents) |
 | **Authority** | Final say / full decision authority |

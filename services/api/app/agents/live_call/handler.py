@@ -229,15 +229,17 @@ def handle_transcript_segment(
     early_sentiment_messages: List[Dict[str, Any]] = []
     if analysis.get("sentiment"):
         sent = analysis["sentiment"]
-        payload: Dict[str, Any] = {"ae": sent.get("ae", 0), "customer": sent.get("customer", 0)}
+        # Always include cue keys (even null) so the UI can clear sticky labels.
+        payload: Dict[str, Any] = {
+            "ae": sent.get("ae", 0),
+            "customer": sent.get("customer", 0),
+            "salesRepTone": sent.get("salesRepTone"),
+            "customerSentiment": sent.get("customerSentiment"),
+        }
         if sent.get("shift"):
             payload["shift"] = sent["shift"]
         if sent.get("signal"):
             payload["signal"] = sent["signal"]
-        if sent.get("salesRepTone"):
-            payload["salesRepTone"] = sent["salesRepTone"]
-        if sent.get("customerSentiment"):
-            payload["customerSentiment"] = sent["customerSentiment"]
         early_sentiment_messages.append({"type": "sentiment", "payload": payload})
         if sent.get("signal"):
             early_sentiment_messages.append({"type": "sentiment_signal", "payload": sent["signal"]})
