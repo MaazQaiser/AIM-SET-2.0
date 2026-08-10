@@ -712,11 +712,12 @@ function nonOpenGapKeys(gaps: ContentGap[]) {
 }
 
 /** Sidebar + Knowledge Base: count unique content assets to generate (grouped by document, not by lead). */
-export function useContentManagerSidebarStats() {
+export function useContentManagerSidebarStats(options?: { enabled?: boolean }) {
+  const enabled = options?.enabled ?? true;
   const { data: preDcGaps = [], isLoading: preLoading, isFetching: preFetching } =
-    usePreDcContentGenerationGaps();
+    usePreDcContentGenerationGaps({ enabled });
   const { data: postDcGaps = [], isLoading: postLoading, isFetching: postFetching } =
-    usePostDcContentGenerationGaps();
+    usePostDcContentGenerationGaps({ enabled });
   const { data: draftGaps = [] } = useContentGaps();
 
   return useMemo(() => {
@@ -735,9 +736,10 @@ export function useContentManagerSidebarStats() {
       preDcAssetCount,
       postDcAssetCount,
       draftReviewCount,
-      isLoading: preLoading || preFetching || postLoading || postFetching,
+      isLoading: enabled && (preLoading || preFetching || postLoading || postFetching),
     };
   }, [
+    enabled,
     preDcGaps,
     postDcGaps,
     draftGaps,
@@ -748,9 +750,10 @@ export function useContentManagerSidebarStats() {
   ]);
 }
 
-export function usePreDcContentGenerationGaps() {
+export function usePreDcContentGenerationGaps(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["pre-dc-content-generation-gaps", getImportVersion()],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const calls = await fetchCallsFromApi();
       const gaps = await Promise.all(
@@ -859,9 +862,10 @@ function collectPostDcMissingGaps(
   });
 }
 
-export function usePostDcContentGenerationGaps() {
+export function usePostDcContentGenerationGaps(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["post-dc-content-generation-gaps", getImportVersion()],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const calls = await fetchCallsFromApi();
       const { postRunMetaByCallId, emailDraftsByCallId } = useDcImportsStore.getState();
@@ -871,7 +875,7 @@ export function usePostDcContentGenerationGaps() {
   });
 }
 
-export function useAgentRuns() {
+export function useAgentRuns(options?: { refetchInterval?: number | false }) {
   return useQuery({
     queryKey: ["agent-runs"],
     queryFn: async () => {
@@ -879,6 +883,7 @@ export function useAgentRuns() {
       return api ?? [];
     },
     staleTime: QUERY_STALE_TIME_MS,
+    refetchInterval: options?.refetchInterval,
   });
 }
 
