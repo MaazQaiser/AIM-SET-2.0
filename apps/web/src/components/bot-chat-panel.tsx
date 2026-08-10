@@ -83,6 +83,10 @@ const assistantProseClassName = [
   "[&_blockquote]:py-1.5 [&_blockquote]:pl-3 [&_blockquote]:pr-2",
   "[&_blockquote]:text-muted-foreground [&_blockquote]:font-normal",
   "[&_blockquote_p]:my-1.5",
+  "[&_table]:my-3 [&_table]:w-full [&_table]:border-collapse [&_table]:text-left",
+  "[&_th]:border-b [&_th]:border-border/60 [&_th]:px-2 [&_th]:py-1.5 [&_th]:align-top [&_th]:font-medium",
+  "[&_td]:border-b [&_td]:border-border/40 [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top",
+  "[&_td]:break-words",
 ].join(" ");
 
 interface BotChatPanelProps {

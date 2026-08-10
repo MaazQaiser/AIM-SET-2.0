@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@dc-copilot/ui/components/button";
-import { Badge } from "@dc-copilot/ui/components/badge";
 import { CallWrapUpActions } from "@/components/calls/call-wrap-up-actions";
 import { DemoTranscriptPlayer } from "@/components/live/demo-transcript-player";
 import { RecallBotLauncher } from "@/components/live/recall-bot-launcher";
@@ -85,22 +84,38 @@ export function LiveCallPageHeader({
 
           <div className="min-w-0 flex-1">
             <h1 className="type-screen-title truncate text-foreground">{accountName}</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 type-body-sm">
-              <Badge variant="live" className="shrink-0 type-label">
-                Live
-              </Badge>
-              {leadName && (
-                <span className="inline-flex items-center gap-1.5 font-medium text-foreground/90">
-                  <ParticipantAvatar name={leadName} kind="external" size="xs" />
-                  {leadName}
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span
+                className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/35 px-2.5 py-1 type-caption"
+                aria-label={`Live${leadName ? ` with ${leadName}` : ""}, recording ${formatElapsed(elapsedSeconds)}`}
+              >
+                <span className="inline-flex shrink-0 items-center gap-1.5 font-semibold text-live">
+                  <span className="h-1.5 w-1.5 rounded-full bg-live animate-pulse" aria-hidden />
+                  Live
                 </span>
-              )}
-              <span className="inline-flex items-center gap-1.5 font-mono text-destructive">
-                <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" aria-hidden />
-                REC {formatElapsed(elapsedSeconds)}
+                {leadName ? (
+                  <>
+                    <span className="h-3 w-px shrink-0 bg-border" aria-hidden />
+                    <span className="inline-flex shrink-0 items-center gap-1.5 font-medium text-foreground">
+                      <ParticipantAvatar
+                        name={leadName}
+                        kind="external"
+                        size="xs"
+                        className="h-5 w-5"
+                        title={leadName}
+                      />
+                      {leadName}
+                    </span>
+                  </>
+                ) : null}
+                <span className="h-3 w-px shrink-0 bg-border" aria-hidden />
+                <span className="inline-flex shrink-0 items-center gap-1.5 font-mono font-medium text-destructive">
+                  <span className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse" aria-hidden />
+                  REC {formatElapsed(elapsedSeconds)}
+                </span>
               </span>
               {!isConnected && (
-                <span className="text-muted-foreground">Connecting…</span>
+                <span className="type-caption text-muted-foreground">Connecting…</span>
               )}
             </div>
           </div>

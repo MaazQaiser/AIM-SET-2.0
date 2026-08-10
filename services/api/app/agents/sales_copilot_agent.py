@@ -929,7 +929,7 @@ def _format_kb_hits(hits: List[Dict[str, Any]], *, query: str, empty: str) -> st
             "I filtered out the nearest KB hits because they do not match the requested terms:",
             "",
             "| KB source | Why I filtered it out |",
-            "|---|---|---|",
+            "|---|---|",
         ]
 
     for item in items:
@@ -1465,7 +1465,7 @@ def _format_project_library_items(
         "I filtered out the nearest KB hits because they do not match the requested terms:",
         "",
         "| KB source | Why I filtered it out |",
-        "|---|---|---|",
+        "|---|---|",
     ]
     for item in items:
         reason = f"{item['title']}: {item['detail']}"

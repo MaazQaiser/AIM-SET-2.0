@@ -514,6 +514,8 @@ def test_copilot_chat_offline_filters_non_matching_industry(monkeypatch):
     assert "filtered out" in answer
     assert "Projects for Sale Enablement" in answer
     assert "| KB source | Why I filtered it out |" in answer
+    assert "|---|---|" in answer
+    assert "|---|---|---|" not in answer
 
 
 def test_live_copilot_help_me_returns_strategy_from_selected_insight(monkeypatch):
