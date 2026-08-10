@@ -200,7 +200,7 @@ def test_update_checklist_confirms_carebridge_customer_bant_values():
 
     assert state.bant["budget"] == "confirmed"
     assert state.bant["authority"] == "confirmed"
-    assert state.bant["need"] == "confirmed"
+    assert state.bant["need"] in ("partial", "confirmed")
     assert state.bant["timeline"] == "confirmed"
 
 

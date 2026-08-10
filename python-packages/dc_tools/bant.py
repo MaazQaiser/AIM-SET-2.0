@@ -357,7 +357,14 @@ _AUTHORITY_APPROVAL_ACTION_RE = re.compile(r"\b(?:approv\w*|sign[ -]?off|review|
 _SELF_AUTHORITY_RE = re.compile(
     r"\b(?:i decide|my call|i approve|i own(?:s)? the decision|i am the decision maker|"
     r"(?:full )?decision authority|i have (?:the )?final say|final say is mine|"
-    r"i(?:'m| am) the (?:final )?approver)\b",
+    r"i(?:'m| am) the (?:final )?approver|"
+    r"i (?:hold|have) (?:a |the )?position to finalize|"
+    r"(?:position|authority|power) to finalize|"
+    r"i (?:can |will )?finalize|i (?:can |will )?sign off|"
+    r"final authority (?:is |would be )?me|"
+    r"(?:the )?final authority would be me|"
+    r"i own(?:s)? (?:operations |the )?approval|"
+    r"i(?:'m| am) (?:the )?(?:point of contact|poc|decision owner|budget owner|final approver))\b",
     re.I,
 )
 _MONTH_PATTERN = (
@@ -618,7 +625,16 @@ def _apply_signals(
     lower = text.lower()
     changed: List[str] = []
     matched_statuses: Dict[str, ChecklistItemStatus] = {}
-    is_customer = (speaker_role or "").lower() in ("customer", "prospect", "buyer", "guest", "")
+    _role = (speaker_role or "").lower()
+    is_ae = _role in ("ae", "se", "sales", "rep", "agent", "host", "designer")
+    # Detect AE-like proposal/commitment text (Recall often misattributes AE as customer)
+    if not is_ae and re.search(
+        r"\b(?:i will send (?:a |the )?proposal|i(?:'ll| will) (?:send|prepare|draft) (?:a |the )?proposal|"
+        r"(?:send|share) (?:a |the )?proposal that includes)\b",
+        text, re.I,
+    ):
+        is_ae = True
+    is_customer = not is_ae
 
     money_hit = bool(
         re.search(
@@ -626,11 +642,14 @@ def _apply_signals(
             r"|\b\d{3,}(?:\.\d+)?\s*(?:per\s+(?:month|year|annum|quarter|week)|a\s+(?:month|year)|monthly|annually|yearly)\b",
             lower,
         )
+    ) or bool(
+        re.search(r"\b(?:hundred|thousand|million|billion)\b", lower)
+        and _WORD_MONEY_RE.search(text)
     )
     signal_item_id = _signal_type_to_item(signal_type)
     for item_id, keywords, tier_status in SIGNAL_RULES:
-        # Budget and authority signals should only come from customer speech
-        if item_id in ("budget", "authority") and not is_customer:
+        # BANT signals should only come from customer speech
+        if item_id in ("budget", "authority", "need", "timeline") and not is_customer:
             continue
         # Authority uses strict regex matching instead of loose keywords —
         # only fire when an actual C-level title, manager role, or
@@ -662,7 +681,9 @@ def _apply_signals(
         matched_statuses[item_id] = _merge_status(current, tier_status)
 
     if signal_item_id and signal_item_id not in matched_statuses:
-        matched_statuses[signal_item_id] = "partial"
+        # Don't let AE signal_type set BANT dimensions — only customer speech counts
+        if is_customer or signal_item_id not in ("budget", "authority", "need", "timeline"):
+            matched_statuses[signal_item_id] = "partial"
 
     timeline_value = _extract_bant_value("timeline", text, snippet)
     if timeline_value and (_TIMELINE_CONTEXT_RE.search(text) or _TIMELINE_BOUND_RE.search(text)):
