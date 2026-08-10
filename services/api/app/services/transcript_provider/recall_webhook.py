@@ -11,7 +11,6 @@ from dc_core.tenancy import TenantContext
 
 from app.config import get_settings
 from app.domain.live_call_repository import get_live_call_repository
-from app.domain.speaker_roles import normalize_speaker_role
 
 
 def verify_recall_signature(
@@ -51,9 +50,6 @@ def parse_recall_payload(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     is_final = envelope.get("is_final")
     if is_final is None:
         is_final = body.get("is_final")
-    # If is_final is explicitly False, skip this interim transcript
-    if is_final is False:
-        return None
 
     data = _dict_or_empty(envelope.get("data")) or envelope or _dict_or_empty(body.get("transcript")) or body
 
@@ -73,16 +69,17 @@ def parse_recall_payload(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     participant = _dict_or_empty(data.get("participant"))
     speaker_name = _speaker_display_name(data, participant)
     speaker_id = _speaker_identity(data, participant, speaker_name)
-    role_raw = data.get("speaker_role") or data.get("role") or ""
-    normalized_role = normalize_speaker_role(role_raw)
-    if normalized_role:
-        speaker_role = normalized_role
+    role_raw = (data.get("speaker_role") or data.get("role") or "").lower()
+    if role_raw in ("agent", "host", "rep", "ae", "sales"):
+        speaker_role = "ae"
+    elif role_raw in ("guest", "customer", "prospect", "client"):
+        speaker_role = "customer"
     elif participant.get("is_host") is True:
         speaker_role = "ae"
     elif participant.get("is_host") is False:
         speaker_role = "customer"
     else:
-        speaker_role = "unknown"
+        speaker_role = "customer" if "?" in text else "ae"
 
     # Extract timestamp — try words first, then original_transcript_timings, then data.timestamp
     offset = _first_relative_timestamp(words)
@@ -148,6 +145,7 @@ def parse_recall_payload(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "provider_event_id": str(provider_event_id),
         "provider_meeting_id": str(meeting_id) if meeting_id else None,
         "call_id": metadata.get("call_id"),
+        "is_interim": is_final is False,
     }
 
 

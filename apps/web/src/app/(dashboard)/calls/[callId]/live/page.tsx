@@ -77,7 +77,7 @@ function LiveCallPageContent({ callId, call, brief, hasReview }: LiveCallPageCon
     [callId, dismissNudge]
   );
 
-  const checklistSeed = useMemo(() => seedChecklistFromCall(call), [call]);
+  const checklistSeed = useMemo(() => seedChecklistFromCall(call, { resetForLive: true }), [call]);
   const checklistDisplay = checklistState ?? checklistSeed;
 
   const viewerRole: PodRole | null = persona === "leadership" ? null : "ae";

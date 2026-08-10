@@ -97,11 +97,17 @@ async def recall_transcript_webhook(
     if not event.get("id"):
         event["id"] = str(uuid.uuid4())
 
+    is_interim = parsed.get("is_interim", False)
     channel = get_call_channel()
 
     # Broadcast before persistence or analysis so the user sees it in <1 second.
     transcript_ws = transcript_event_to_ws(event)
     await channel.broadcast(cid, transcript_ws)
+
+    # Interim transcripts: broadcast for instant UI updates but skip heavy analysis.
+    # The final version will arrive shortly and trigger full BANT/KB processing.
+    if is_interim:
+        return {"ok": True, "call_id": cid, "interim": True}
 
     async def _persist_analyze_and_broadcast():
         try:

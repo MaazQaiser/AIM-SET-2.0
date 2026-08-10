@@ -47,7 +47,9 @@ def handle_segment(
 ) -> Dict[str, Any]:
     """Process one transcript segment; returns WS payloads + envelope."""
     if state is None:
-        state = seed_checklist(call_id, seed_bant=seed_bant)
+        # Do not carry pre-DC BANT into live checklist — start clean.
+        # BANT dimensions should only be set from actual call conversation.
+        state = seed_checklist(call_id, seed_bant=None)
 
     updated, changed, new_dims = update_checklist_from_segment(
         state,

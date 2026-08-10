@@ -37,23 +37,31 @@ function scoreCoverage(items: ChecklistItem[]): { coverage: number; bantCoverage
 }
 
 /** Client-side preview before live WS updates arrive. */
-export function seedChecklistFromCall(call: Call | undefined): DiscoveryChecklistState | null {
+export function seedChecklistFromCall(
+  call: Call | undefined,
+  options?: { resetForLive?: boolean }
+): DiscoveryChecklistState | null {
   if (!call) return null;
-  const bant = call.bant ?? {
-    budget: "unknown",
-    authority: "unknown",
-    need: "unknown",
-    timeline: "unknown",
-  };
+  const resetForLive = options?.resetForLive ?? false;
+  const bant = resetForLive
+    ? { budget: "unknown" as const, authority: "unknown" as const, need: "unknown" as const, timeline: "unknown" as const }
+    : call.bant ?? {
+        budget: "unknown" as const,
+        authority: "unknown" as const,
+        need: "unknown" as const,
+        timeline: "unknown" as const,
+      };
 
   const items: ChecklistItem[] = [
     ...BANT_ITEMS.map((row) => ({
       id: row.id,
       label: row.label,
       tier: "bant" as const,
-      status: bantToItemStatus(
-        bant[row.id as (typeof BANT_KEYS)[number]] as BANTScore[keyof BANTScore]
-      ),
+      status: resetForLive
+        ? ("pending" as const)
+        : bantToItemStatus(
+            bant[row.id as (typeof BANT_KEYS)[number]] as BANTScore[keyof BANTScore]
+          ),
       evidence: [],
     })),
     ...SECONDARY_ITEMS.map((row) => ({
