@@ -38,7 +38,7 @@ def _float_or_zero(value: Any) -> float:
         return 0.0
 
 
-CUSTOMER_LIKE_ROLES = {"customer", "prospect", "buyer", "client", "lead", "contact", "guest", ""}
+CUSTOMER_LIKE_ROLES = {"customer", "prospect", "buyer", "guest", ""}
 
 BANT_REPLAY_CUE_RE = re.compile(
     r"(\$|\b\d+(?:\.\d+)?\s*(?:k|m|b|thousand|million|billion)\b|"
@@ -94,13 +94,13 @@ def _discovery_context_text(
     fallback_text = fallback.strip()
     parts: List[str] = [fallback_text] if fallback_text else []
 
-    for event in events[-12:]:
+    for event in events[-6:]:
         role = str(event.get("speaker_role") or event.get("speakerRole") or "").lower()
         if strict_roles and role not in CUSTOMER_LIKE_ROLES:
             continue
         if latest_offset and latest_offset - _float_or_zero(
             event.get("offset_seconds") or event.get("timestamp")
-        ) > 60:
+        ) > 30:
             continue
         speaker = str(event.get("speaker_id") or event.get("speaker_name") or "")
         # Prefer same speaker, but allow nearby customer lines in the window.
@@ -170,17 +170,12 @@ def _replay_discovery_from_transcript(state: Any, transcript_events: List[Dict[s
             text,
             strict_roles=strict_roles and not is_ae_timeline,
         )
-        replay_speaker_role = (
-            event.get("speaker_role") or event.get("speakerRole")
-            if strict_roles
-            else None
-        )
         replayed, _, _ = update_checklist_from_segment(
             replayed,
             context_text,
             transcript_offset_seconds=_event_offset_seconds(event),
             sentiment=event.get("sentiment"),
-            speaker_role=replay_speaker_role,
+            speaker_role=event.get("speaker_role") or event.get("speakerRole"),
             signal_type=event.get("signal_type") or event.get("signalType"),
         )
     return replayed
@@ -581,20 +576,7 @@ class Orchestrator:
             stored = self.memory.get_discovery_checklist(ctx.tenant_id, call_id)
             state = checklist_from_dict(stored) if stored else None
             recent_events = get_live_call_repository().list_transcript_events(ctx, call_id, limit=8)
-            latest_event = recent_events[-1] if recent_events else {}
             discovery_text = _discovery_context_text(recent_events, text)
-            discovery_speaker_role = (
-                latest_event.get("speaker_role")
-                or latest_event.get("speakerRole")
-                or segment.get("speakerRole")
-                or segment.get("speaker_role")
-            )
-            discovery_signal_type = (
-                latest_event.get("signal_type")
-                or latest_event.get("signalType")
-                or transcript_analysis.get("signalType")
-                or transcript_analysis.get("signal_type")
-            )
 
             discovery_out = handle_segment(
                 call_id,
@@ -603,8 +585,8 @@ class Orchestrator:
                 elapsed_seconds=elapsed_seconds,
                 seed_bant=seed_bant,
                 sentiment=transcript_analysis.get("sentiment"),
-                speaker_role=discovery_speaker_role,
-                signal_type=discovery_signal_type,
+                speaker_role=segment.get("speakerRole") or segment.get("speaker_role"),
+                signal_type=transcript_analysis.get("signalType") or transcript_analysis.get("signal_type"),
             )
             checklist_env = discovery_out["envelope"]
             validate_envelope(checklist_env)
