@@ -334,8 +334,8 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
     const mergedItems = incoming.items.map((item) => {
       const prev = current.items.find((i) => i.id === item.id);
       if (prev && statusRank(prev.status) > statusRank(item.status)) {
-        (mergedBant as Record<string, string>)[item.id] =
-          (current.bant as Record<string, string>)[item.id] ?? prev.status;
+        (mergedBant as unknown as Record<string, string>)[item.id] =
+          (current.bant as unknown as Record<string, string>)[item.id] ?? prev.status;
         return { ...prev, evidence: prev.evidence.length > 0 ? prev.evidence : item.evidence };
       }
       return item;
