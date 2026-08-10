@@ -153,9 +153,14 @@ def _normalize_public_webhook_base_url(public_api_base_url: str) -> str:
 def _validate_public_webhook_base_url(public_api_base_url: str) -> str:
     base = _normalize_public_webhook_base_url(public_api_base_url)
 
+    # Skip health check for dev tunnels — they return interstitial pages,
+    # 503s, or time out when the backend calls itself through the tunnel.
+    if any(host in base for host in (".loca.lt", ".ngrok", ".localtunnel", "localhost", "127.0.0.1")):
+        return base
+
     health_url = f"{base}/health"
     try:
-        response = httpx.get(health_url, timeout=5, follow_redirects=True)
+        response = httpx.get(health_url, timeout=15, follow_redirects=True, headers={"Bypass-Tunnel-Reminder": "true"})
     except httpx.HTTPError as exc:
         raise RecallConfigurationError(
             f"PUBLIC_API_BASE_URL is not reachable at {health_url}. "
