@@ -109,6 +109,18 @@ def start_recall_bot(
     if not meeting_url.startswith(("https://", "http://")):
         raise HTTPException(status_code=400, detail="meeting_url must be an http(s) URL")
 
+    # Clear stale state from previous bot sessions so BANT, sentiment, and
+    # pains start fresh — don't carry over budget/authority from old sessions.
+    try:
+        _orch.memory.set_discovery_checklist(ctx.tenant_id, call_id, None)
+    except Exception:
+        pass
+    try:
+        from app.domain.live_call_session import clear_live_session
+        clear_live_session(ctx.tenant_id, call_id)
+    except Exception:
+        pass
+
     try:
         result = create_recall_live_bot(ctx, call_id, meeting_url)
         try:
