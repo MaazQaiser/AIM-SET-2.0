@@ -38,7 +38,7 @@ def _float_or_zero(value: Any) -> float:
         return 0.0
 
 
-CUSTOMER_LIKE_ROLES = {"customer", "prospect", "buyer", "guest", ""}
+CUSTOMER_LIKE_ROLES = {"customer", "prospect", "buyer", "guest", "", "unknown"}
 
 BANT_REPLAY_CUE_RE = re.compile(
     r"(\$|\b\d+(?:\.\d+)?\s*(?:k|m|b|thousand|million|billion)\b|"
@@ -577,7 +577,14 @@ class Orchestrator:
             stored = self.memory.get_discovery_checklist(ctx.tenant_id, call_id)
             state = checklist_from_dict(stored) if stored else None
             recent_events = get_live_call_repository().list_transcript_events(ctx, call_id, limit=8)
-            discovery_text = _discovery_context_text(recent_events, text)
+            # When all recent events come from one speaker (Recall
+            # misattribution), disable strict_roles so fragments are
+            # aggregated into context regardless of inferred role.
+            speaker_ids = {e.get("speaker_id") or e.get("speaker_name") for e in recent_events}
+            single_speaker = len(speaker_ids) <= 1 and len(recent_events) > 1
+            discovery_text = _discovery_context_text(
+                recent_events, text, strict_roles=not single_speaker
+            )
 
             discovery_out = handle_segment(
                 call_id,
