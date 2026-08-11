@@ -548,6 +548,17 @@ class Orchestrator:
         if segment.get("timestamp") is None:
             segment["timestamp"] = elapsed_seconds
 
+        # Detect Recall single-speaker misattribution early: when all recent
+        # transcript events share one speaker, override the role to
+        # "customer" so pain detection, sentiment cues, and nudges fire
+        # throughout the entire analysis pipeline.
+        _repo = get_live_call_repository()
+        _recent_events = _repo.list_transcript_events(ctx, call_id, limit=8)
+        _speaker_ids = {e.get("speaker_id") or e.get("speaker_name") for e in _recent_events}
+        _single_speaker = len(_speaker_ids) <= 1 and len(_recent_events) > 1
+        if _single_speaker:
+            segment = {**segment, "speakerRole": "customer", "speaker_role": "customer"}
+
         intent_out = handle_transcript_segment(ctx, call_id, segment)
         live_envelope = AgentEnvelope.model_validate(intent_out["envelope"])
         validate_envelope(live_envelope)
@@ -576,14 +587,10 @@ class Orchestrator:
 
             stored = self.memory.get_discovery_checklist(ctx.tenant_id, call_id)
             state = checklist_from_dict(stored) if stored else None
-            recent_events = get_live_call_repository().list_transcript_events(ctx, call_id, limit=8)
-            # When all recent events come from one speaker (Recall
-            # misattribution), disable strict_roles so fragments are
-            # aggregated into context regardless of inferred role.
-            speaker_ids = {e.get("speaker_id") or e.get("speaker_name") for e in recent_events}
-            single_speaker = len(speaker_ids) <= 1 and len(recent_events) > 1
+            # Reuse recent events from single-speaker detection above.
+            recent_events = _recent_events
             discovery_text = _discovery_context_text(
-                recent_events, text, strict_roles=not single_speaker
+                recent_events, text, strict_roles=not _single_speaker
             )
 
             discovery_out = handle_segment(
