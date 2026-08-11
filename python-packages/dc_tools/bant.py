@@ -364,7 +364,10 @@ _SELF_AUTHORITY_RE = re.compile(
     r"final authority (?:is |would be )?me|"
     r"(?:the )?final authority would be me|"
     r"i own(?:s)? (?:operations |the )?approval|"
-    r"i(?:'m| am) (?:the )?(?:point of contact|poc|decision owner|budget owner|final approver))\b",
+    r"i(?:'m| am) (?:the )?(?:point of contact|poc|decision owner|budget owner|final approver)|"
+    # Third-person authority: customer says who owns/approves the decision
+    r"(?:cfo|ceo|cto|cio|coo|cpo|vp|svp|evp|director|board)\s+(?:\w+\s+){0,3}(?:owns?|approves?|decides?|signs? off|can approve)\b"
+    r")\b",
     re.I,
 )
 _MONTH_PATTERN = (
@@ -648,12 +651,12 @@ def _apply_signals(
 
     # Content-based override: Recall bots frequently attribute ALL speech
     # to a single participant, so even segments tagged "ae" may actually be
-    # customer speech.  When the text contains strong buying signals (money,
-    # pain, authority claims) override to customer so BANT fires.
+    # customer speech.  Only override on unambiguous buyer signals — money
+    # amounts, self-authority claims, or concrete timeline bounds.  Pain
+    # language is excluded because AEs naturally echo customer pain.
     if is_ae and (
         money_hit
         or _SELF_AUTHORITY_RE.search(text)
-        or _PAIN_NEED_RE.search(text)
         or _TIMELINE_BOUND_RE.search(text)
     ):
         is_ae = False
