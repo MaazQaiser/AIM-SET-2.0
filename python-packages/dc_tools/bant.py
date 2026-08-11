@@ -57,11 +57,11 @@ SIGNAL_RULES: List[Tuple[str, List[str], ChecklistItemStatus]] = [
     ("budget", ["budget", "pricing", "cost", "spend", "approved budget", "dollar", "price", "afford", "expensive", "cheap", "limited budget", "carved", "envelope", "year one", "year-one", "four hundred", "six hundred", "million", "thousand", "budget owner", "budget range", "per month", "per year", "monthly", "annually", "per annum", "per quarter"], "partial"),
     ("budget", ["budget approved", "allocated", "signed off", "funding approved", "set aside", "earmarked", "board still has to bless", "board has to bless"], "confirmed"),
     ("authority", ["decision maker", "economic buyer", "sign off", "cio", "cto", "cfo", "ceo", "coo", "cpo", "vp ", "director", "board", "head of", "budget owner", "final approver", "signatory", "approval committee", "steering committee"], "partial"),
-    ("authority", ["reports to", "final say", "signatory", "approves", "approve it", "need to approve", "must approve", "has to approve", "board approval", "board bless", "approval path", "owns the decision", "own the decision", "i decide", "my call", "i approve", "full decision authority", "decision authority", "i have the final say", "final say is mine"], "confirmed"),
+    ("authority", ["reports to", "final say", "signatory", "approves", "approve it", "need to approve", "must approve", "has to approve", "board approval", "board bless", "approval path", "owns the decision", "own the decision", "i decide", "my call", "i approve", "full decision authority", "decision authority", "i have the final say", "final say is mine", "i have the authority", "have the authority", "i am the authority"], "confirmed"),
     ("need", ["pain", "problem", "challenge", "struggling", "need to", "need a", "need an", "need the", "we need", "i need", "they need", "need help", "priority", "impact", "pain point", "overcome", "solution", "looking for", "looking forward", "looking to", "require", "want to", "wish we", "gap", "issue", "bottleneck", "friction", "limitation", "automat", "nightmare"], "partial"),
     ("need", ["must have", "urgent need", "business case", "top priority", "deal breaker", "non-negotiable", "critical priority", "critical need"], "confirmed"),
-    ("timeline", ["timeline", "eta", "estimated time", "estimated delivery", "delivery date", "completion date", "deadline", "go-live", "go live", "launch", "q1", "q2", "q3", "q4", "by end of", "this quarter", "next quarter", "this year", "next month", "end of month", "end of the month", "by friday", "by monday", "asap", "soon", "urgent", "immediately", "move quickly", "moving quickly", "timeframe", "time frame", "time-sensitive", "time sensitive", "main constraint", "production-grade", "pilot", "next year", "kickoff", "rollout", "within weeks", "within months", "within days"], "partial"),
-    ("timeline", ["project eta", "board meeting", "decision by", "kick off", "kickoff", "pilot kickoff", "start date", "go live date", "go-live by", "production go-live", "target date", "production-grade by", "complete by", "delivery by", "by end of", "within 2 weeks", "within two weeks", "within 30 days", "decision by", "need it by", "needed by", "must be done by"], "confirmed"),
+    ("timeline", ["timeline", "eta", "estimated time", "estimated delivery", "delivery date", "completion date", "deadline", "go-live", "go live", "launch", "q1", "q2", "q3", "q4", "by end of", "this quarter", "next quarter", "this year", "next month", "end of month", "end of the month", "by friday", "by monday", "asap", "soon", "urgent", "immediately", "move quickly", "moving quickly", "timeframe", "time frame", "time-sensitive", "time sensitive", "main constraint", "production-grade", "pilot", "next year", "kickoff", "rollout", "within weeks", "within months", "within days", "two months", "three months", "four months", "five months", "six months", "two weeks", "three weeks", "four weeks", "90 days", "60 days", "30 days"], "partial"),
+    ("timeline", ["project eta", "board meeting", "decision by", "kick off", "kickoff", "pilot kickoff", "start date", "go live date", "go-live by", "production go-live", "target date", "production-grade by", "complete by", "delivery by", "by end of", "within 2 weeks", "within two weeks", "within 30 days", "decision by", "need it by", "needed by", "must be done by", "three months", "six months", "two months", "four months", "five months", "90 days", "60 days"], "confirmed"),
     ("success_criteria", ["success looks like", "success criteria", "kpi", "outcome", "measure", "metric"], "partial"),
     ("stakeholders", ["stakeholder", "who else", "involved", "team members", "evaluating", "colleague"], "partial"),
     ("decision_process", ["procurement", "rfp", "evaluation process", "steps to", "approval process"], "partial"),
@@ -658,12 +658,18 @@ def _apply_signals(
     # amounts, authority claims (C-level titles, decision maker), or
     # timeline language.  Skip when is_ae was set by the AE proposal
     # detector (AE proposals naturally mention titles and timelines).
+    _duration_hit = bool(re.search(
+        r"\b(?:\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+"
+        r"(?:day|week|month|quarter|year)s?\b",
+        lower,
+    ))
     if is_ae and ae_from_role and not _ae_proposal_match and (
         money_hit
         or _SELF_AUTHORITY_RE.search(text)
         or _AUTHORITY_RE.search(text)
         or _TIMELINE_BOUND_RE.search(text)
         or _TIMELINE_RE.search(text)
+        or _duration_hit
     ):
         is_ae = False
     is_customer = not is_ae

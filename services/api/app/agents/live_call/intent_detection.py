@@ -613,8 +613,9 @@ def analyze_segment(
     # Pain/concern words are NOT used — AEs naturally echo those.
     if _is_internal_speaker(speaker_role) and re.search(
         r"\$[\d,.]+[kmb]?|\b\d+(?:\.\d+)?\s*(?:million|billion|thousand|k|m|b)\b"
-        r"|\b(?:cfo|ceo|cto|cio|coo|vp|director|decision maker|final authority|i decide|i approve)\b"
-        r"|\b(?:deadline|go-live|Q[1-4]|timeline|by end of|this quarter|next quarter)\b",
+        r"|\b(?:cfo|ceo|cto|cio|coo|vp|director|decision maker|final authority|i decide|i approve|have the authority)\b"
+        r"|\b(?:deadline|go-live|Q[1-4]|timeline|by end of|this quarter|next quarter)\b"
+        r"|\b(?:\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:day|week|month|quarter|year)s?\b",
         text, re.I,
     ):
         speaker_role = "customer"
