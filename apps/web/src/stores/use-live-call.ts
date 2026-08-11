@@ -314,8 +314,12 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
 
   applyIntentUpdate: (payload) => {
     const focusAreas = Array.from(new Set(payload.focus_areas ?? []));
+    // Merge incoming pains with existing ones — never drop previously
+    // detected pains when a subsequent update arrives with fewer entries.
+    const existingPains = get().intentSnapshot?.pains ?? [];
+    const allPains = [...existingPains, ...(payload.pains ?? [])];
     const mergedPains = dedupePainSignals(
-      uniqueBy(payload.pains ?? [], (pain) => pain.id)
+      uniqueBy(allPains, (pain) => pain.id)
     );
     const intentSnapshot: IntentSnapshot = {
       ...payload,
