@@ -57,7 +57,7 @@ SIGNAL_RULES: List[Tuple[str, List[str], ChecklistItemStatus]] = [
     ("budget", ["budget", "pricing", "cost", "spend", "approved budget", "dollar", "price", "afford", "expensive", "cheap", "limited budget", "carved", "envelope", "year one", "year-one", "four hundred", "six hundred", "million", "thousand", "budget owner", "budget range", "per month", "per year", "monthly", "annually", "per annum", "per quarter"], "partial"),
     ("budget", ["budget approved", "allocated", "signed off", "funding approved", "set aside", "earmarked", "board still has to bless", "board has to bless"], "confirmed"),
     ("authority", ["decision maker", "economic buyer", "sign off", "cio", "cto", "cfo", "ceo", "coo", "cpo", "vp ", "director", "board", "head of", "budget owner", "final approver", "signatory", "approval committee", "steering committee"], "partial"),
-    ("authority", ["reports to", "final say", "signatory", "approves", "approve it", "need to approve", "must approve", "has to approve", "board approval", "board bless", "approval path", "owns the decision", "own the decision", "i decide", "my call", "i approve", "full decision authority", "decision authority", "i have the final say", "final say is mine", "i have the authority", "have the authority", "i am the authority", "the authority", "at the authority"], "confirmed"),
+    ("authority", ["reports to", "final say", "signatory", "approves", "approve it", "need to approve", "must approve", "has to approve", "board approval", "board bless", "approval path", "owns the decision", "own the decision", "i decide", "my call", "i approve", "full decision authority", "decision authority", "i have the final say", "final say is mine", "i have the authority", "have the authority", "i am the authority", "the authority", "at the authority", "the athurity", "have the athurity", "at the athurity", "the autority", "have the autority"], "confirmed"),
     ("need", ["pain", "problem", "challenge", "struggling", "need to", "need a", "need an", "need the", "we need", "i need", "they need", "need help", "have a need", "have the need", "priority", "impact", "pain point", "overcome", "solution", "looking for", "looking forward", "looking to", "require", "want to", "wish we", "gap", "issue", "bottleneck", "friction", "limitation", "automat", "nightmare"], "partial"),
     ("need", ["must have", "urgent need", "urgent", "business case", "top priority", "deal breaker", "non-negotiable", "critical priority", "critical need"], "confirmed"),
     ("timeline", ["timeline", "eta", "estimated time", "estimated delivery", "delivery date", "completion date", "deadline", "go-live", "go live", "launch", "q1", "q2", "q3", "q4", "by end of", "this quarter", "next quarter", "this year", "next month", "end of month", "end of the month", "by friday", "by monday", "asap", "soon", "urgent", "immediately", "move quickly", "moving quickly", "timeframe", "time frame", "time-sensitive", "time sensitive", "main constraint", "production-grade", "pilot", "next year", "kickoff", "rollout", "within weeks", "within months", "within days", "two months", "three months", "four months", "five months", "six months", "two weeks", "three weeks", "four weeks", "90 days", "60 days", "30 days"], "partial"),
@@ -366,8 +366,9 @@ _SELF_AUTHORITY_RE = re.compile(
     r"i own(?:s)? (?:operations |the )?approval|"
     r"i(?:'m| am) (?:the )?(?:point of contact|poc|decision owner|budget owner|final approver)|"
     # Second/third-person and fragment authority variants
-    r"(?:you |he |she |they )?(?:have|has) (?:the )?(?:final )?(?:authority|say|approval)|"
-    r"(?:at |the )(?:the )?authority\b|"
+    # Include common Recall transcription errors: athurity, autority, athority
+    r"(?:you |he |she |they )?(?:have|has) (?:the )?(?:final )?(?:auth?orit(?:y|ie)|athurity|say|approval)|"
+    r"(?:at |the )(?:the )?(?:auth?orit(?:y|ie)|athurity)\b|"
     r"(?:cfo|ceo|cto|cio|coo|cpo|vp|svp|evp|director|board)\s+(?:\w+\s+){0,3}(?:owns?|approves?|decides?|signs? off|can approve)\b"
     r")\b",
     re.I,
