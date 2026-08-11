@@ -197,6 +197,13 @@ async def poll_transcript(
     new_events: List[Dict[str, Any]] = []
     seen_key = f"{ctx.tenant_id}:{call_id}"
     seen_ids = _poll_emitted_event_ids.setdefault(seen_key, set())
+
+    # Detect single-speaker (Recall misattribution) — override role to
+    # "customer" so frontend instant BANT/sentiment detection fires.
+    _existing = repo.list_transcript_events(ctx, call_id, limit=8) if raw_segments else []
+    _poll_speaker_ids = {e.get("speaker_id") or e.get("speaker_name") for e in _existing}
+    _poll_single_speaker = len(_poll_speaker_ids) <= 1 and len(_existing) > 1
+
     for seg in raw_segments:
         words = seg.get("words") or []
         text = " ".join(w.get("text", "") if isinstance(w, dict) else str(w) for w in words).strip()
@@ -247,6 +254,9 @@ async def poll_transcript(
             call=call_context,
             brief=brief_context,
         )
+        # Override for single-speaker so frontend instant detection fires
+        if _poll_single_speaker and speaker_role in ("ae", "se", "designer"):
+            speaker_role = "customer"
 
         offset = 0.0
         if words and isinstance(words[0], dict):

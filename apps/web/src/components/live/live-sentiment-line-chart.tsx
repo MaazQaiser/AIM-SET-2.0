@@ -62,7 +62,11 @@ function buildSentimentPoints(
   customerScore: SentimentScore
 ): SentimentPoint[] {
   const currentTone = scoreToTone(customerScore);
-  const customerSignals = sentimentSignals.filter((s) => s.speakerRole === "customer");
+  // Include signals from all roles — Recall often misattributes all speech
+  // to the AE, so filtering by "customer" would drop all data points.
+  const customerSignals = sentimentSignals.filter(
+    (s) => !s.speakerRole || !["ae", "se", "designer"].includes(s.speakerRole)
+  );
 
   if (customerSignals.length > 0) {
     const history = customerSignals.slice(-8).map((signal) => ({
@@ -87,8 +91,10 @@ function buildSentimentPoints(
     ];
   }
 
+  // Fall back to transcript events — include all non-AE roles for
+  // Recall single-speaker scenarios.
   const withSentiment = transcript
-    .filter((e) => e.speakerRole === "customer" && e.sentiment)
+    .filter((e) => e.sentiment && (!e.speakerRole || !["ae", "se", "designer"].includes(e.speakerRole)))
     .slice(-12);
 
   if (withSentiment.length > 0) {
