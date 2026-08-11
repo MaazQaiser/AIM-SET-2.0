@@ -50,20 +50,24 @@ async def _process_live_segment(
     transcript_ws = transcript_event_to_ws(segment)
     await channel.broadcast(call_id, transcript_ws)
 
-    # Run heavy analysis with lock (LLM, KB, BANT) — results trickle in
+    # Run heavy analysis with lock (LLM, KB, BANT) — results trickle in.
+    # Use a timeout so segments don't pile up behind a slow LLM call.
     try:
-        async with lock:
-            out = await asyncio.to_thread(
-                _orch.dispatch_live_segment,
-                ctx,
-                call_id,
-                segment,
-                elapsed_seconds=elapsed_seconds,
-        )
-        for msg in out.get("ws_messages") or []:
-            if msg.get("early"):
-                continue
-            await channel.broadcast(call_id, msg)
+        async with asyncio.timeout(12):
+            async with lock:
+                out = await asyncio.to_thread(
+                    _orch.dispatch_live_segment,
+                    ctx,
+                    call_id,
+                    segment,
+                    elapsed_seconds=elapsed_seconds,
+            )
+            for msg in out.get("ws_messages") or []:
+                if msg.get("early"):
+                    continue
+                await channel.broadcast(call_id, msg)
+    except asyncio.TimeoutError:
+        _logger.warning("live segment dispatch timed out call_id=%s", call_id)
     except Exception:
         _logger.exception("live segment dispatch failed call_id=%s", call_id)
 

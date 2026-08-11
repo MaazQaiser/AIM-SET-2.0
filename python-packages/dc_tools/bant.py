@@ -634,7 +634,6 @@ def _apply_signals(
         text, re.I,
     ):
         is_ae = True
-    is_customer = not is_ae
 
     money_hit = bool(
         re.search(
@@ -646,6 +645,19 @@ def _apply_signals(
         re.search(r"\b(?:hundred|thousand|million|billion)\b", lower)
         and _WORD_MONEY_RE.search(text)
     )
+
+    # Content-based override: Recall bots frequently attribute ALL speech
+    # to a single participant, so even segments tagged "ae" may actually be
+    # customer speech.  When the text contains strong buying signals (money,
+    # pain, authority claims) override to customer so BANT fires.
+    if is_ae and (
+        money_hit
+        or _SELF_AUTHORITY_RE.search(text)
+        or _PAIN_NEED_RE.search(text)
+        or _TIMELINE_BOUND_RE.search(text)
+    ):
+        is_ae = False
+    is_customer = not is_ae
     signal_item_id = _signal_type_to_item(signal_type)
     for item_id, keywords, tier_status in SIGNAL_RULES:
         # BANT signals should only come from customer speech

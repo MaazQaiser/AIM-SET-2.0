@@ -74,7 +74,10 @@ export function detectInstantSentiment(
   timestamp: number,
   previousScore: number | null
 ): InstantSentimentResult | null {
-  if (speakerRole !== "customer") return null;
+  // Fire for customer, unknown, or missing role — Recall bots may
+  // misattribute all speech to the AE.
+  const isAe = speakerRole && ["ae", "se", "designer"].includes(speakerRole);
+  if (isAe) return null;
   if (!text || text.length < 10) return null;
 
   const frustration = detectFrustrationIntensity(text);

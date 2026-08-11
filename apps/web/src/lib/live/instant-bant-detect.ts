@@ -73,7 +73,10 @@ export function detectInstantBant(
   speakerRole: string | undefined,
   timestamp: number
 ): BantSignal[] {
-  if (speakerRole !== "customer") return [];
+  // Fire for customer, unknown, or missing role — Recall bots may
+  // misattribute all speech to the AE.
+  const isAe = speakerRole && ["ae", "se", "designer"].includes(speakerRole);
+  if (isAe) return [];
 
   const lower = text.toLowerCase();
   if (lower.length < 10) return [];

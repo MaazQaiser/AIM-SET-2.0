@@ -96,5 +96,12 @@ export function buildCopilotInsights({
     });
   }
 
-  return items;
+  // Deduplicate by message to avoid repeated identical signals
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = item.message.slice(0, 80);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }

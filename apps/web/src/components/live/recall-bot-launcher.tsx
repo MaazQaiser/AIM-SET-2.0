@@ -133,7 +133,7 @@ export function RecallBotLauncher({ callId, meetingUrl }: RecallBotLauncherProps
       })();
     };
     pollOnce();
-    pollRef.current = setInterval(pollOnce, 2000);
+    pollRef.current = setInterval(pollOnce, 1000);
   }
 
   useEffect(() => {

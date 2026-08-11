@@ -607,6 +607,18 @@ def analyze_segment(
 
     speaker_id = segment.get("speakerId") or "unknown"
     speaker_role = segment.get("speakerRole") or "customer"
+    # Content-based override: Recall bots frequently attribute ALL speech
+    # to the AE.  When text has strong buyer signals, treat as customer so
+    # sentiment cues, pain detection, and nudges fire correctly.
+    if _is_internal_speaker(speaker_role) and (
+        _CUSTOMER_PAIN_RE.search(text)
+        or _CUSTOMER_DECISION_RISK_RE.search(text)
+        or re.search(
+            r"\$[\d,.]+[kmb]?|\b\d+(?:\.\d+)?\s*(?:million|billion|thousand|k|m|b)\b",
+            text, re.I,
+        )
+    ):
+        speaker_role = "customer"
     timestamp = float(segment.get("timestamp") or session.segment_count * 2)
 
     cfg = get_agent_config_repository().get_config(ctx, "live-call")

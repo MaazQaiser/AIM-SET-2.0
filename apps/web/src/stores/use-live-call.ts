@@ -221,8 +221,12 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
       transcript: [...s.transcript.slice(-499), event],
     }));
 
-    // Instant BANT + sentiment detection — fire in the same tick
-    if (event.text && event.speakerRole === "customer") {
+    // Instant BANT + sentiment detection — fire in the same tick.
+    // Run for customer, unknown, or missing role — Recall bots often
+    // misattribute all speech to one participant (the AE), so we also
+    // fire when role is explicitly absent.  AE/SE/designer are excluded.
+    const _isAeRole = event.speakerRole && ["ae", "se", "designer"].includes(event.speakerRole);
+    if (event.text && !_isAeRole) {
       const instantSignals = detectInstantBant(
         event.text,
         event.speakerRole,
@@ -251,9 +255,16 @@ export const useLiveCall = create<LiveCallState>((set, get) => ({
   },
 
   addNudge: (nudge) =>
-    set((s) => ({
-      pendingNudges: upsertCapped(s.pendingNudges, nudge, (item) => item.id, 5),
-    })),
+    set((s) => {
+      // Deduplicate by message content — fallback/offline nudges share the
+      // same text but arrive with different IDs.
+      if (s.pendingNudges.some((n) => n.message === nudge.message)) {
+        return {};
+      }
+      return {
+        pendingNudges: upsertCapped(s.pendingNudges, nudge, (item) => item.id, 5),
+      };
+    }),
 
   addBantSignal: (signal) =>
     set((s) => {
