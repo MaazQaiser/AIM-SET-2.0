@@ -47,6 +47,13 @@ const RULES: SummaryHighlightRule[] = [
     pattern: /\b(authority|decision|stakeholder|executive|CTO|CFO|VP|director|buyer)\b/gi,
     className: "rounded px-1 py-0.5 bg-violet-100/90 text-violet-950 dark:bg-violet-500/20 dark:text-violet-100",
   },
+  {
+    // Brand / GTM keywords common in discovery summaries
+    pattern:
+      /\b(?:digital marketing|customer advisor(?: strategy)?|social media|rebrand(?:ing)?|brand\/rebrand|fintech|Asia)\b/gi,
+    className:
+      "rounded px-1 py-0.5 bg-sky-100/90 text-sky-950 font-medium dark:bg-sky-500/20 dark:text-sky-100",
+  },
 ];
 
 type TextPart = { type: "text"; value: string } | { type: "highlight"; value: string; className: string };
@@ -100,7 +107,7 @@ function applyBoldMarkers(parts: TextPart[]): TextPart[] {
         type: "highlight",
         value: m[1],
         className:
-          "rounded px-1 py-0.5 bg-primary/15 text-primary font-semibold dark:bg-primary/25",
+          "rounded px-1 py-0.5 bg-sky-100/90 text-sky-950 font-medium dark:bg-sky-500/20 dark:text-sky-100",
       });
       last = m.index + m[0].length;
       m = boldRe.exec(part.value);
@@ -116,12 +123,14 @@ export function parseSummaryHighlights(
   text: string,
   customRules?: SummaryHighlightRule[]
 ): TextPart[] {
-  const rules =
+  const custom =
     customRules && customRules.length > 0
       ? customRules.map((r) => ({
           pattern: ruleToRegExp(r),
           className: r.className,
         }))
-      : RULES;
+      : [];
+  // Always keep built-in keyword colors; agent config rules add on top (do not replace).
+  const rules = [...RULES, ...custom];
   return applyBoldMarkers(applyRules(text, rules));
 }

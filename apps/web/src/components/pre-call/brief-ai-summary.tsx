@@ -47,10 +47,27 @@ const NON_CONTENT_TOPICS = new Set([
   NEEDS_CONTENT_FALLBACK.toLowerCase(),
 ]);
 
+const HIDDEN_RELEVANT_PROJECTS = new Set([
+  "signature pharmacy",
+  "cafezupas",
+  "cafe zupas",
+  "pbd",
+  "pbd west",
+]);
+
+function isHiddenRelevantProject(title?: string | null): boolean {
+  const key = (title || "").trim().toLowerCase();
+  if (!key) return false;
+  if (HIDDEN_RELEVANT_PROJECTS.has(key)) return true;
+  if (key.startsWith("pbd ")) return true;
+  if (key.replace(/\s+/g, "") === "cafezupas") return true;
+  return key.includes("signature pharmacy");
+}
+
 function sortedRelevantProjects(brief: CallBrief): NonNullable<CallBrief["relevantProjects"]> {
-  return [...(brief.relevantProjects ?? [])].sort(
-    (a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0)
-  );
+  return [...(brief.relevantProjects ?? [])]
+    .filter((project) => !isHiddenRelevantProject(project.title))
+    .sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0));
 }
 
 function projectNamesSentence(brief: CallBrief): string {
@@ -216,7 +233,7 @@ function fallbackCustomerProfileText(brief: CallBrief): string {
 
 function fallbackPainPointsText(brief: CallBrief): string {
   const pains = (brief.pains ?? [])
-    .map((pain) => painPointText(pain.text ?? ""))
+    .map((pain) => painPointText(pain.text ?? "") || painPointText(pain.text ?? "", true))
     .filter(Boolean)
     .slice(0, 3);
   return pains.length > 0 ? pains.join("; ") : NEEDS_CONTENT_FALLBACK;
@@ -240,8 +257,11 @@ function cleanCustomerProfileSection(section: BriefSummarySection, brief: CallBr
 }
 
 function cleanPainPointsSection(section: BriefSummarySection, brief: CallBrief): BriefSummarySection {
-  const pain = painPointText(section.content ?? "");
-  return { ...section, content: pain || fallbackPainPointsText(brief) };
+  const pain =
+    painPointText(section.content ?? "") ||
+    painPointText(section.content ?? "", true) ||
+    fallbackPainPointsText(brief);
+  return { ...section, content: pain || NEEDS_CONTENT_FALLBACK };
 }
 
 function cleanRelevanceSection(section: BriefSummarySection, brief: CallBrief): BriefSummarySection {
@@ -492,8 +512,7 @@ function HighlightedSummary({
             className={cn(
               intercomMarks
                 ? "rounded px-0.5 bg-[#ebe7e1] text-[#111111] font-bold underline decoration-[#111111]/30 underline-offset-2"
-                : part.className,
-              !intercomMarks && "font-bold underline decoration-foreground/35 underline-offset-2"
+                : part.className
             )}
           >
             {part.value}

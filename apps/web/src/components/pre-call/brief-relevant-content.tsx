@@ -16,10 +16,33 @@ import { toast } from "sonner";
 
 export type BriefRelevantContentSection = "all" | "documents" | "projects";
 
+const HIDDEN_RELEVANT_PROJECTS = new Set([
+  "signature pharmacy",
+  "cafezupas",
+  "cafe zupas",
+  "pbd",
+  "pbd west",
+]);
+
+function isHiddenRelevantProject(title?: string | null): boolean {
+  const key = (title || "").trim().toLowerCase();
+  if (!key) return false;
+  if (HIDDEN_RELEVANT_PROJECTS.has(key)) return true;
+  if (key.startsWith("pbd ")) return true;
+  if (key.replace(/\s+/g, "") === "cafezupas") return true;
+  return key.includes("signature pharmacy");
+}
+
+function filterRelevantProjects(
+  projects: CallBrief["relevantProjects"] | undefined | null
+): NonNullable<CallBrief["relevantProjects"]> {
+  return (projects ?? []).filter((project) => !isHiddenRelevantProject(project.title));
+}
+
 function hasRelevantContent(brief: CallBrief): boolean {
   return Boolean(
     brief.relevantDocuments?.length ||
-      brief.relevantProjects?.length ||
+      filterRelevantProjects(brief.relevantProjects).length ||
       brief.recommendedDeck
   );
 }
@@ -87,7 +110,7 @@ export function BriefRelevantContent({
         ),
       ]
     : brief.relevantDocuments ?? [];
-  const projects = brief.relevantProjects ?? [];
+  const projects = filterRelevantProjects(brief.relevantProjects);
   const showDocuments = section === "all" || section === "documents";
   const showProjects = section === "all" || section === "projects";
   const visibleDocuments = showDocuments ? documents : [];
@@ -255,7 +278,10 @@ export function useRelevantContentBrief(callId: string, brief: CallBrief) {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    setMerged(brief);
+    setMerged({
+      ...brief,
+      relevantProjects: filterRelevantProjects(brief.relevantProjects),
+    });
     if (hasRelevantContent(brief)) {
       setLoading(false);
     }
@@ -275,9 +301,9 @@ export function useRelevantContentBrief(callId: string, brief: CallBrief) {
           relevantDocuments: data.relevantDocuments?.length
             ? data.relevantDocuments
             : prev.relevantDocuments,
-          relevantProjects: data.relevantProjects?.length
-            ? data.relevantProjects
-            : prev.relevantProjects,
+          relevantProjects: filterRelevantProjects(
+            data.relevantProjects?.length ? data.relevantProjects : prev.relevantProjects
+          ),
           recommendedDeck: data.recommendedDeck ?? prev.recommendedDeck,
         }));
       } catch {
@@ -298,7 +324,9 @@ export function useRelevantContentBrief(callId: string, brief: CallBrief) {
       setMerged((prev) => ({
         ...prev,
         relevantDocuments: data.relevantDocuments ?? prev.relevantDocuments,
-        relevantProjects: data.relevantProjects ?? prev.relevantProjects,
+        relevantProjects: filterRelevantProjects(
+          data.relevantProjects ?? prev.relevantProjects
+        ),
         recommendedDeck: data.recommendedDeck ?? prev.recommendedDeck,
       }));
       toast.success("KB matches refreshed from knowledge base");

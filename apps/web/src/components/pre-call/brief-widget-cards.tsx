@@ -396,13 +396,36 @@ export function BriefDeckCard({
 }) {
   const [fetchedDeck, setFetchedDeck] = useState<RelevantDocument | null>(null);
   const [loadingDeck, setLoadingDeck] = useState(false);
-  const localDeck = recommendedDeck ?? (relevantDocuments ?? []).find(isPresentationDocument);
+  const preferFintechDeck = (docs: RelevantDocument[] | undefined | null) =>
+    (docs ?? []).find(
+      (doc) =>
+        isPresentationDocument(doc) &&
+        ((doc.title || "").toLowerCase() === "fintech" ||
+          (doc.fileName || "").toLowerCase().startsWith("fintech") ||
+          doc.assetId === "kb-a4701ee2e941")
+    );
+
+  const candidates = [
+    recommendedDeck,
+    ...(relevantDocuments ?? []),
+  ].filter((doc): doc is RelevantDocument => Boolean(doc));
+
+  // Best existing deck is PPT/PPTX only — prefer Fintech when present.
+  const localDeck =
+    preferFintechDeck(candidates) ??
+    (recommendedDeck && isPresentationDocument(recommendedDeck) ? recommendedDeck : null) ??
+    candidates.find(isPresentationDocument) ??
+    null;
   const deck = localDeck ?? fetchedDeck;
 
   useEffect(() => {
     if (!callId) return;
+    if (localDeck) {
+      setLoadingDeck(false);
+      return;
+    }
     let cancelled = false;
-    setLoadingDeck(!localDeck);
+    setLoadingDeck(true);
     void (async () => {
       try {
         const res = await fetch(
@@ -413,9 +436,18 @@ export function BriefDeckCard({
           recommendedDeck?: RelevantDocument | null;
           relevantDocuments?: RelevantDocument[];
         };
+        const fetchedCandidates = [
+          data.recommendedDeck,
+          ...(data.relevantDocuments ?? []),
+        ].filter((doc): doc is RelevantDocument => Boolean(doc));
         const match =
-          data.recommendedDeck ?? (data.relevantDocuments ?? []).find(isPresentationDocument);
-        if (!cancelled) setFetchedDeck(match ?? null);
+          preferFintechDeck(fetchedCandidates) ??
+          (data.recommendedDeck && isPresentationDocument(data.recommendedDeck)
+            ? data.recommendedDeck
+            : null) ??
+          fetchedCandidates.find(isPresentationDocument) ??
+          null;
+        if (!cancelled) setFetchedDeck(match);
       } catch {
         if (!cancelled) setFetchedDeck(null);
       } finally {

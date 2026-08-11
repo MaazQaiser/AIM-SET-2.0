@@ -50,13 +50,28 @@ export function CallDetailView({ callId }: CallDetailViewProps) {
     );
   }
 
-  const discoveryQuestions = preRecord
-    ? discoveryQuestionsFromPreDc(preRecord)
-    : [
-        "How are you currently handling this workflow across teams?",
-        "What would success look like in the next 90 days?",
-        "Who else should be involved in evaluating a solution?",
-      ];
+  const briefDiscoveryQuestions = (() => {
+    const raw = brief as
+      | (NonNullable<typeof brief> & {
+          discoveryQuestions?: unknown;
+          discovery_questions?: unknown;
+        })
+      | undefined;
+    const fromBrief = raw?.discoveryQuestions ?? raw?.discovery_questions;
+    return Array.isArray(fromBrief)
+      ? fromBrief.filter((q): q is string => typeof q === "string" && q.trim().length > 0)
+      : [];
+  })();
+  const discoveryQuestions =
+    briefDiscoveryQuestions.length > 0
+      ? briefDiscoveryQuestions
+      : preRecord
+        ? discoveryQuestionsFromPreDc(preRecord)
+        : [
+            "How are you currently handling this workflow across teams?",
+            "What would success look like in the next 90 days?",
+            "Who else should be involved in evaluating a solution?",
+          ];
   const sdrHandoffSummary = preRecord ? sdrHandoffSummaryFromPreDc(preRecord) : [];
 
   const accountSnapshot = buildAccountSnapshot({ preRecord, call });
