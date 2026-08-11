@@ -88,23 +88,23 @@ def create_recall_live_bot(
 
 
 def poll_recall_transcript(bot_id: str) -> list[Dict[str, Any]]:
-    """Fetch completed transcript segments from Recall.
+    """Fetch transcript segments from Recall.
 
-    Real-time transcript is delivered through Recall realtime endpoints while
-    the meeting is live. Once the recording transcript artifact is done, Recall
-    exposes the final transcript via `recordings[].media_shortcuts.transcript`.
+    During a live call, real-time transcript is delivered via webhook
+    (realtime_endpoints).  This poller is a fallback that checks the bot
+    detail and transcript artifact for any available data — it covers
+    both in-progress transcript artifacts and post-call recording downloads.
     """
     settings = get_settings()
     if not settings.recall_api_key:
         return []
     base_url = _recall_base_url(settings.recall_region)
+    auth = _authorization_header(settings.recall_api_key)
+
     try:
         response = httpx.get(
             f"{base_url}/api/v1/bot/{bot_id}/",
-            headers={
-                "Authorization": _authorization_header(settings.recall_api_key),
-                "accept": "application/json",
-            },
+            headers={"Authorization": auth, "accept": "application/json"},
             timeout=10,
         )
     except httpx.HTTPError:
@@ -120,9 +120,58 @@ def poll_recall_transcript(bot_id: str) -> list[Dict[str, Any]]:
     transcript = data.get("transcript")
     if isinstance(transcript, list):
         return transcript
+
+    # Try transcript artifact endpoint (works once artifact has data).
+    artifact_segments = _fetch_transcript_artifact(data, base_url, auth)
+    if artifact_segments:
+        return artifact_segments
+
     downloaded = _download_recording_transcript(data, settings.recall_api_key)
     if downloaded:
         return downloaded
+    return []
+
+
+def _fetch_transcript_artifact(
+    bot_data: Dict[str, Any], base_url: str, auth: str
+) -> list[Dict[str, Any]]:
+    """Try to fetch transcript from the transcript artifact endpoint."""
+    for recording in bot_data.get("recordings") or []:
+        if not isinstance(recording, dict):
+            continue
+        shortcuts = _dict_or_empty(recording.get("media_shortcuts"))
+        transcript_info = _dict_or_empty(shortcuts.get("transcript"))
+        artifact_id = transcript_info.get("id")
+        if not artifact_id:
+            continue
+        # Check if download_url is available on the artifact
+        artifact_data = _dict_or_empty(transcript_info.get("data"))
+        download_url = artifact_data.get("download_url")
+        if download_url:
+            segments = _fetch_transcript_download(str(download_url), auth.replace("Token ", ""))
+            if segments:
+                return segments
+        # Also try the transcript artifact API endpoint directly
+        try:
+            response = httpx.get(
+                f"{base_url}/api/v1/transcript/{artifact_id}/",
+                headers={"Authorization": auth, "accept": "application/json"},
+                timeout=10,
+            )
+        except httpx.HTTPError:
+            continue
+        if response.status_code >= 400:
+            continue
+        try:
+            artifact = response.json()
+        except ValueError:
+            continue
+        if isinstance(artifact, dict):
+            dl = _dict_or_empty(artifact.get("data")).get("download_url")
+            if dl:
+                segments = _fetch_transcript_download(str(dl), auth.replace("Token ", ""))
+                if segments:
+                    return segments
     return []
 
 

@@ -365,7 +365,8 @@ _SELF_AUTHORITY_RE = re.compile(
     r"(?:the )?final authority would be me|"
     r"i own(?:s)? (?:operations |the )?approval|"
     r"i(?:'m| am) (?:the )?(?:point of contact|poc|decision owner|budget owner|final approver)|"
-    # Third-person authority: customer says who owns/approves the decision
+    # Second/third-person authority variants
+    r"(?:you |he |she |they )?(?:have|has) (?:the )?(?:final )?(?:authority|say|approval)|"
     r"(?:cfo|ceo|cto|cio|coo|cpo|vp|svp|evp|director|board)\s+(?:\w+\s+){0,3}(?:owns?|approves?|decides?|signs? off|can approve)\b"
     r")\b",
     re.I,
@@ -630,12 +631,14 @@ def _apply_signals(
     matched_statuses: Dict[str, ChecklistItemStatus] = {}
     _role = (speaker_role or "").lower()
     is_ae = _role in ("ae", "se", "sales", "rep", "agent", "host", "designer")
+    ae_from_role = is_ae
     # Detect AE-like proposal/commitment text (Recall often misattributes AE as customer)
-    if not is_ae and re.search(
+    _ae_proposal_match = re.search(
         r"\b(?:i will send (?:a |the )?proposal|i(?:'ll| will) (?:send|prepare|draft) (?:a |the )?proposal|"
         r"(?:send|share) (?:a |the )?proposal that includes)\b",
         text, re.I,
-    ):
+    )
+    if not is_ae and _ae_proposal_match:
         is_ae = True
 
     money_hit = bool(
@@ -652,12 +655,15 @@ def _apply_signals(
     # Content-based override: Recall bots frequently attribute ALL speech
     # to a single participant, so even segments tagged "ae" may actually be
     # customer speech.  Only override on unambiguous buyer signals — money
-    # amounts, self-authority claims, or concrete timeline bounds.  Pain
-    # language is excluded because AEs naturally echo customer pain.
-    if is_ae and (
+    # amounts, authority claims (C-level titles, decision maker), or
+    # timeline language.  Skip when is_ae was set by the AE proposal
+    # detector (AE proposals naturally mention titles and timelines).
+    if is_ae and ae_from_role and not _ae_proposal_match and (
         money_hit
         or _SELF_AUTHORITY_RE.search(text)
+        or _AUTHORITY_RE.search(text)
         or _TIMELINE_BOUND_RE.search(text)
+        or _TIMELINE_RE.search(text)
     ):
         is_ae = False
     is_customer = not is_ae

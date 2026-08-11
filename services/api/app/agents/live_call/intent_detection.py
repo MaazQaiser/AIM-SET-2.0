@@ -608,12 +608,13 @@ def analyze_segment(
     speaker_id = segment.get("speakerId") or "unknown"
     speaker_role = segment.get("speakerRole") or "customer"
     # Content-based override: Recall bots frequently attribute ALL speech
-    # to the AE.  When text has unambiguous buyer signals (money amounts),
-    # treat as customer so sentiment cues and nudges fire correctly.
-    # Pain/concern words are NOT used here — AEs naturally use those when
-    # empathising or discussing the industry.
+    # to the AE.  When text has unambiguous buyer signals (money, authority
+    # titles, timeline), treat as customer so sentiment cues fire correctly.
+    # Pain/concern words are NOT used — AEs naturally echo those.
     if _is_internal_speaker(speaker_role) and re.search(
-        r"\$[\d,.]+[kmb]?|\b\d+(?:\.\d+)?\s*(?:million|billion|thousand|k|m|b)\b",
+        r"\$[\d,.]+[kmb]?|\b\d+(?:\.\d+)?\s*(?:million|billion|thousand|k|m|b)\b"
+        r"|\b(?:cfo|ceo|cto|cio|coo|vp|director|decision maker|final authority|i decide|i approve)\b"
+        r"|\b(?:deadline|go-live|Q[1-4]|timeline|by end of|this quarter|next quarter)\b",
         text, re.I,
     ):
         speaker_role = "customer"

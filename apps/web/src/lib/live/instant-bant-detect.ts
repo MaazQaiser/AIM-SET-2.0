@@ -43,6 +43,12 @@ const PATTERNS: BantPattern[] = [
     extractValue: (m) => m[0],
   },
   {
+    dimension: "timeline",
+    regex:
+      /(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:day|week|month|quarter|year)s?/i,
+    extractValue: (m) => m[0],
+  },
+  {
     dimension: "authority",
     regex:
       /(?:(?:i|we)\s+(?:own|approve|sign off|decide|authorize)|(?:CEO|CFO|CIO|COO|CTO|VP|SVP|EVP|Director|board|finance lead)\s+.{0,30}(?:approve|decision|sign|own))/i,
@@ -52,6 +58,12 @@ const PATTERNS: BantPattern[] = [
     dimension: "authority",
     regex:
       /(?:approve|decision|sign off|sign-off|authorization).{0,40}(?:CEO|CFO|CIO|COO|CTO|VP|SVP|EVP|Director|board|finance lead)/i,
+    extractValue: (m) => m[0],
+  },
+  {
+    dimension: "authority",
+    regex:
+      /(?:i\s+am\s+(?:a\s+|the\s+)?(?:\w+\s+)?(?:CEO|CFO|CIO|COO|CTO|VP|SVP|EVP|Director)|(?:decision\s+maker|final\s+authority|have\s+(?:the\s+)?(?:final\s+)?authority))/i,
     extractValue: (m) => m[0],
   },
   {
