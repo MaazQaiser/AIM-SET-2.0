@@ -53,7 +53,7 @@ async def _process_live_segment(
     # Run heavy analysis with lock (LLM, KB, BANT) — results trickle in.
     # Use a timeout so segments don't pile up behind a slow LLM call.
     try:
-        async with asyncio.timeout(12):
+        async with asyncio.timeout(8):
             async with lock:
                 out = await asyncio.to_thread(
                     _orch.dispatch_live_segment,

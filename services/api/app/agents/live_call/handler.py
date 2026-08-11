@@ -165,25 +165,31 @@ def handle_transcript_segment(
         or raw_speaker_id
         or "Speaker"
     )
-    call_context: Dict[str, Any] = {}
-    brief_context: Optional[Dict[str, Any]] = None
-    try:
-        call_context = calls_service.get_call(ctx, call_id) or {}
-    except Exception:
-        _logger.exception("call lookup failed during speaker role inference call_id=%s", call_id)
-    try:
-        brief_context = calls_service.get_brief(ctx, call_id)
-    except Exception:
-        _logger.exception("brief lookup failed during speaker role inference call_id=%s", call_id)
+    explicit_role = segment.get("speakerRole") or segment.get("speaker_role")
+    # Skip expensive call/brief lookups when the role is already explicit
+    # (e.g. dispatcher already overrode to "customer" for single-speaker).
+    if explicit_role and explicit_role in ("customer", "ae", "se", "designer"):
+        speaker_role = explicit_role
+    else:
+        call_context: Dict[str, Any] = {}
+        brief_context: Optional[Dict[str, Any]] = None
+        try:
+            call_context = calls_service.get_call(ctx, call_id) or {}
+        except Exception:
+            _logger.exception("call lookup failed during speaker role inference call_id=%s", call_id)
+        try:
+            brief_context = calls_service.get_brief(ctx, call_id)
+        except Exception:
+            _logger.exception("brief lookup failed during speaker role inference call_id=%s", call_id)
 
-    speaker_role = infer_speaker_role(
-        explicit_role=segment.get("speakerRole") or segment.get("speaker_role"),
-        speaker_id=raw_speaker_id,
-        speaker_name=raw_speaker_name,
-        text=segment.get("text") or "",
-        call=call_context,
-        brief=brief_context,
-    )
+        speaker_role = infer_speaker_role(
+            explicit_role=explicit_role,
+            speaker_id=raw_speaker_id,
+            speaker_name=raw_speaker_name,
+            text=segment.get("text") or "",
+            call=call_context,
+            brief=brief_context,
+        )
 
     normalized = {
         "id": segment.get("id") or str(uuid.uuid4()),
@@ -200,10 +206,14 @@ def handle_transcript_segment(
         "provider_event_id": segment.get("provider_event_id"),
     }
     stored = repo.append_transcript_event(ctx, call_id, normalized)
-    try:
-        calls_service.mark_call_completed(ctx, call_id)
-    except Exception:
-        _logger.exception("failed to mark call completed after transcript event call_id=%s", call_id)
+    # Only mark call completed once per session to avoid repeated DB writes.
+    _mark_key = f"_marked_completed:{call_id}"
+    if not getattr(repo, _mark_key, False):
+        try:
+            calls_service.mark_call_completed(ctx, call_id)
+            setattr(repo, _mark_key, True)
+        except Exception:
+            _logger.exception("failed to mark call completed after transcript event call_id=%s", call_id)
     stored["speaker_name"] = (
         segment.get("speakerName")
         or segment.get("speaker_name")
