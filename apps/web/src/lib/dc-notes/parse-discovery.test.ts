@@ -6,9 +6,11 @@ describe("parseDiscoveryDateTime", () => {
     const iso = parseDiscoveryDateTime("5/19/2026", "10:30 AM");
     expect(iso).toBeTruthy();
     if (!iso) throw new Error("Expected an ISO datetime");
+    // The function converts PKT wall-clock to UTC ISO, so check the
+    // UTC components to avoid timezone-dependent failures in CI.
     const d = new Date(iso);
-    expect(d.getHours()).toBe(10);
-    expect(d.getMinutes()).toBe(30);
+    expect(d.getUTCHours()).toBe(5); // 10:30 AM PKT = 05:30 UTC
+    expect(d.getUTCMinutes()).toBe(30);
   });
 
   it("returns null for empty date", () => {
